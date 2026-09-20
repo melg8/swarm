@@ -1925,3 +1925,38 @@ sandbox tile pack, the navmesh package untouched by this round).
 The live acceptance run against the deployed stack stays for the
 next session with the stack up (the counters walk, the buys and the
 sells from the customer cells).
+
+
+### Progress (2026-09-20, the npc search radius round)
+
+- the owner report: the pathfind into the shop ends at the edge of
+  the shop, not at the requested point; the owner diagnosis: the
+  approach 200 causes it; the directive: every path search to an npc
+  ends at the npc's own point, the approach radius at most 10.
+- the reproduction on the real elven mesh pack (the report's plan
+  origin 46045 41251 -3440): the wide trip ring (approach 200) ended
+  the Unoren plan 226 units short on the shop edge (the first
+  walkable surface inside the ball), Ariel 154 short; the npc search
+  radius (10) walks the same corridors into the shop and ends at the
+  customer cell across the counter (42 / 40 units, the exact answer).
+- the fix: `npcApproachRadius = 10` and the npc stop ladder
+  (`startWalkNpcSegment` / `planNpcSegment`) for every npc
+  destination walk (the merchant stops, the teacher stops, the
+  delevel guard walks): the npc rung arms the tight plan (the found
+  answers validated against the merchant deck - the 2026-09-11 roof
+  teleport geometry refused; the partial answers always arm), the
+  wide rung (`tripApproachRadius`) serves the conservative deck stop
+  for the destinations whose own point the mesh or the geodata cannot
+  deliver. The teacher stop lost its deterministic double attempt.
+- the grid engine bug underneath: the approach goal tested only the
+  ball - a radius under the cell half diagonal (~11.3) never
+  satisfies it on any node, the search flooded the component (ten
+  seconds per search measured) and answered the bare not found; the
+  goal now also accepts the target cell arrival (the plain run's
+  any-layer semantics).
+- verification: go build, go test hunt + pathfind full packages ok;
+  the new pins: TestFarMerchantTripWalksIntoTheShop,
+  TestNpcStopsSearchWithTheNpcApproachRadius,
+  TestDelevelGuardWalkSearchesWithTheNpcRadius,
+  TestMerchantRoofFallbackStopsOnTheWideDeck,
+  TestFindPathApproachTightRadiusReachesTheTargetCell.

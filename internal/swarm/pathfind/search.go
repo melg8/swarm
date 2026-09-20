@@ -441,17 +441,26 @@ func (s *search) segmentDry(from, to *node) bool {
 
 // nodeReached reports whether a popped node satisfies the goal of
 // the search: an approach run accepts the first node within the 3D
-// approach radius of the target point (the exact target node sits
-// inside that ball whenever it is reachable), a plain run accepts the
-// first arrival on the target cell whatever layer the walk came on.
+// approach radius of the target point, a plain run accepts the first
+// arrival on the target cell whatever layer the walk came on. The
+// approach run also accepts the target cell arrival itself: a cell
+// center sits up to half a diagonal away from a point inside the
+// cell, so a radius under that gap never satisfies the ball on any
+// node - not even on the target cell the point belongs to - and the
+// search would flood the whole walkable component looking for a node
+// that does not exist (the tight npc search radius of the town
+// trips). The arrival keeps the plain run's any-layer semantics: the
+// caller validates the landed deck against the destination (the
+// foreign deck refusals of the town planners).
 func (s *search) nodeReached(current *node) bool {
     if s.approachRadius > 0 {
         world := nodeWorld(current)
         dx := world.X - s.targetWorld.X
         dy := world.Y - s.targetWorld.Y
         dz := world.Z - s.targetWorld.Z
-
-        return math.Sqrt(dx*dx+dy*dy+dz*dz) <= s.approachRadius
+        if math.Sqrt(dx*dx+dy*dy+dz*dz) <= s.approachRadius {
+            return true
+        }
     }
 
     return current.coords == s.target

@@ -146,15 +146,18 @@ func TestMerchantExactContractSurvivesTheRepath(t *testing.T) {
         "the re-planned segment must still end on the merchant floor")
 }
 
-// TestMerchantStopFallsBackToTheRing pins the fallback of the one
-// failure class the exact search cannot answer: the plan that
-// resolved onto a foreign deck (a connected roof layer over the shop
-// answers the destination cell's closest-layer resolution hundreds
-// of units above the merchant's floor). The ring stop on the
-// surrounding deck is the safe answer there, the talk machinery owns
-// the rest. A corridor-less exact answer takes no fallback at all -
-// the reachable mesh component is the same for both goals.
-func TestMerchantStopFallsBackToTheRing(t *testing.T) {
+// TestMerchantRoofFallbackStopsOnTheWideDeck pins the ladder of the
+// one failure class the exact and npc searches cannot answer: the plan
+// that resolved onto a foreign deck (a connected roof layer over the
+// shop answers the destination cell's closest-layer resolution hundreds
+// of units above the merchant's floor - the 2026-09-11 roof teleport
+// geometry). The npc rung plans the same roof answer at the npc search
+// radius and refuses it the same way the exact planner does; the wide
+// rung then serves the conservative deck stop the talk machinery
+// finishes through the offset click window. A corridor-less exact
+// answer takes no fallback at all - the reachable mesh component is
+// the same for both goals.
+func TestMerchantRoofFallbackStopsOnTheWideDeck(t *testing.T) {
     disablePace(t)
     // The roof plan: the exact search "succeeds" onto the roof deck
     // 349 units above the merchant floor (the 2026-09-11 roof
@@ -172,12 +175,17 @@ func TestMerchantStopFallsBackToTheRing(t *testing.T) {
     armMerchantStop(t, loop, townNpc{TemplateID: 7148, Name: "Ariel",
         X: arielX, Y: arielY, Z: arielZ})
     require.Equal(t, phaseTownWalk, loop.phase,
-        "the ring fallback must keep the trip walking")
+        "the wide deck stop must keep the trip walking")
     require.NotEmpty(t, loop.waypoints,
-        "the ring fallback must plan the segment")
-    require.NotNil(t, loop.segmentSearch)
-    require.InDelta(t, tripApproachRadius, loop.segmentSearch.Approach, 0.001,
-        "the fallback segment carries the ring contract")
+        "the wide rung must plan the segment")
+    require.Len(t, nav.approachRadii, 2,
+        "the ladder runs the npc rung, then the wide rung")
+    require.InDelta(t, npcApproachRadius, nav.approachRadii[0], 0.001,
+        "the npc rung searches with the npc radius first")
+    require.InDelta(t, tripApproachRadius, nav.approachRadii[1], 0.001,
+        "the wide rung serves the conservative deck stop")
+    require.InDelta(t, tripApproachRadius, loop.segmentSearch.Approach,
+        0.001, "the armed segment carries the wide rung contract")
 }
 
 // TestMerchantStandTableCoversTheCounterTraders pins the stand table

@@ -306,7 +306,11 @@ func (l *Loop) planDelevelWalk() {
         return
     }
     l.delevelGuard = 0
-    if !l.startWalkSegment(townNpcPosition(guard)) {
+    // The guard is an npc destination: the npc search radius plans the
+    // walk to the spawn point itself (the fight machinery owns the
+    // last stretch onto the live guard), not to the first walkable
+    // surface a wide ball catches short of it.
+    if !l.startWalkNpcSegment(townNpcPosition(guard)) {
         l.abortDelevel("no walkable path to the guard")
 
         return

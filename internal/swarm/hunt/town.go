@@ -251,10 +251,25 @@ const (
     // approach gate that the z gap keeps unreachable (the 2026-09-11
     // 05:45 dump looped forever on the offset ring).
     npcInteractionDist = 250.0
-    // tripApproachRadius is the geodata search radius the trip walks
-    // end within: a merchant cell without a modeled floor layer (the
-    // elven village shops) or behind a counter stays reachable, the
-    // water deck below the shop - far in z - does not.
+    // npcApproachRadius is the geodata search radius of every npc
+    // destination walk (the merchant stops, the teacher stops, the
+    // delevel guard walks): the plan must end at the npc's own point -
+    // the closest walkable surface of it (the customer cell across the
+    // counter, the hall row beside the master) - at most this distance
+    // short of it. A wide radius ends the plan at the FIRST walkable
+    // surface inside its ball instead - the shop edge, up to the whole
+    // radius away - and the character never enters the shop (the
+    // 2026-09-20 report: the wide ring plans held the shop edge while
+    // the requested point sat inside it). The merchant cells without a
+    // modeled floor layer or behind a counter stay reached through the
+    // partial answer: the search walks the corridor to the closest
+    // reachable point and the funnel ends there (the water deck below
+    // the shop - far in z - never satisfies the radius).
+    npcApproachRadius = 10.0
+    // tripApproachRadius is the geodata search radius the non npc trip
+    // walks (the farm spot return, the zone return) end within: the
+    // walk home ends wherever the ball around the spot catches the
+    // route, the hunt tick corrects the rest on the spot.
     tripApproachRadius = 200.0
     // merchantFindRadius is the radius around the character within
     // which the spawned merchant npc is looked up once the shop point
@@ -812,29 +827,28 @@ func (l *Loop) maybeStartTownTrip() {
         merchant.Name)
     // The first stop walks the exact mesh search when the merchant is
     // near enough (the same authority the later stops of
-    // advanceTripStop plan with): the approach ring ends the plan on
+    // advanceTripStop plan with): the approach radius ends the plan on
     // the first deck polygon inside its radius - outside the shop, on
     // the outer railing side - and the talk fires from there (or
     // slides along the railing forever). The exact search lands on
-    // the customer cell across the counter; the ring fallback runs
-    // for the one failure class the exact search cannot answer - the
-    // plan that resolved onto a foreign deck (the roof over the
-    // shop), see startWalkExactSegment. The far merchants walk the ring
-    // segment first (the long haul of the hierarchy), the walk completion
-    // arms the near exact approach (see tickTownTrip).
+    // the customer cell across the counter; the npc segment fallback
+    // runs for the one failure class the exact search cannot answer -
+    // the plan that resolved onto a foreign deck (the roof over the
+    // shop), see startWalkExactSegment. The far merchants walk the npc
+    // segment (the npcApproachRadius long haul): the plan ends at the
+    // stand point - the requested cell inside the shop - instead of
+    // the shop edge a wide ring caught.
     planned := false
     if l.merchantWithinExactRange(merchant) {
         var ringFallback bool
         planned, ringFallback = l.startWalkExactSegment(
             merchantStandPoint(merchant))
         if !planned && ringFallback {
-            l.segmentRadius = tripApproachRadius
-            planned = l.startWalkSegment(merchantStandPoint(merchant))
+            planned = l.startWalkNpcSegment(merchantStandPoint(merchant))
         }
     }
     if !planned {
-        l.segmentRadius = tripApproachRadius
-        if !l.startWalkSegment(merchantStandPoint(merchant)) {
+        if !l.startWalkNpcSegment(merchantStandPoint(merchant)) {
             l.abortTownTrip("no walkable path to the shop")
         }
     }
@@ -1128,6 +1142,88 @@ func (l *Loop) startWalkSegmentSearch(dest pathfind.Vec3) bool {
         radius)
 }
 
+// startWalkNpcSegment plans the npc destination walk through the two
+// rung ladder of the npc stops. The npc rung searches with the npc
+// search radius (npcApproachRadius - the plan must end at the npc's
+// own point, not at the first walkable surface a wide ball catches)
+// and refuses the found plan that resolved onto a foreign deck: a
+// connected roof over the shop answers the destination cell's
+// closest-layer resolution hundreds of units above the npc floor, and
+// the roof walk is the 2026-09-11 teleport geometry the deck tolerance
+// exists to stop (the exact planner applies the same rule, see
+// startWalkExactSegment). The wide rung searches with the wide trip
+// ring and arms whatever walkable deck the ball catches: the
+// conservative stop short of the npc for the destinations whose own
+// point the mesh or the geodata cannot deliver (the roof resolution,
+// the merchant cell the pack models as the water bed below the shop)
+// - the offset click window of the talk machinery owns the last
+// stretch there. It reports whether the segment was planned.
+func (l *Loop) startWalkNpcSegment(dest pathfind.Vec3) bool {
+    if l.planNpcSegment(dest) {
+        return true
+    }
+    l.segmentRadius = tripApproachRadius
+
+    return l.startWalkSegment(dest)
+}
+
+// planNpcSegment is the npc rung of the npc stop ladder: the npc
+// search radius plan, armed only when it ends on the npc's deck (the
+// found answers; the partial answers always arm - the closest
+// reachable point is the walk-what-you-can contract, the trip
+// continues from wherever the ground ends). It reports whether the
+// segment was planned.
+func (l *Loop) planNpcSegment(dest pathfind.Vec3) bool {
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    l.segmentRadius = npcApproachRadius
+    from := pathfind.Vec3{
+        X: float64(selfX),
+        Y: float64(selfY),
+        Z: float64(selfZ),
+    }
+    result, err := l.navigator.FindPathApproachAvoiding(
+        from, dest, npcApproachRadius, l.frozenAreas)
+    if err != nil {
+        l.logf("Hunt: town trip npc path search failed: %v", err)
+
+        return false
+    }
+    if result == nil || len(result.Waypoints) == 0 {
+        l.logf("Hunt: no npc path to %d %d at all",
+            int(dest.X), int(dest.Y))
+
+        return false
+    }
+    if result.Found {
+        last := result.Waypoints[len(result.Waypoints)-1]
+        if dz := math.Abs(last.Z - dest.Z); dz > exactSegmentDeckTolerance {
+            // The plan resolved onto a foreign deck: the roof over
+            // the shop. Walking it would click the roof the server
+            // resolves onto the character (the 2026-09-11 teleport
+            // geometry) - the npc rung refuses, the wide rung stops
+            // on the surrounding deck instead.
+            l.logf("Hunt: npc route to %d %d lands %.0f units off "+
+                "the npc deck, refusing the plan",
+                int(dest.X), int(dest.Y), dz)
+
+            return false
+        }
+    } else {
+        // The partial round (docs/navmesh.md): the destination is
+        // unreachable under the filter and the funnel still holds the
+        // walkable corridor toward it - the segment walks the closest
+        // reachable point (the customer cell across the counter).
+        l.logf("Hunt: no npc route to %d %d, walking the closest "+
+            "reachable point", int(dest.X), int(dest.Y))
+    }
+
+    return l.armTownWalkSegment(selfX, selfY, selfZ, from, dest, result,
+        npcApproachRadius)
+}
+
 // merchantWithinExactRange reports whether the merchant is close
 // enough for the exact segment: the distance gate of exactSegmentMaxDistance
 // (see the constant comment - the far exact searches are the
@@ -1148,8 +1244,10 @@ func (l *Loop) merchantWithinExactRange(npc townNpc) bool {
 // cell to its own destination, preserving the segment's search contract:
 // the exact segments re-plan the exact search (a stuck merchant walk must
 // re-arm the customer cell plan, not degrade into the approach ring
-// that ends the plan outside the shop again), the ring segments re-plan
-// with their own radius. It reports whether the segment was planned.
+// that ends the plan outside the shop again), the npc segments re-plan
+// the npc search with its foreign deck refusal, the return segments
+// re-plan with their own wide radius. It reports whether the segment
+// was planned.
 func (l *Loop) replanTownWalkSegment(dest pathfind.Vec3) bool {
     if l.segmentSearch != nil && l.segmentSearch.Approach == 0 {
         planned, ringFallback := l.startWalkExactSegment(dest)
@@ -1157,7 +1255,11 @@ func (l *Loop) replanTownWalkSegment(dest pathfind.Vec3) bool {
             return planned
         }
 
-        return l.startWalkSegmentSearch(dest)
+        return l.startWalkNpcSegment(dest)
+    }
+    if l.segmentSearch != nil &&
+        l.segmentSearch.Approach == npcApproachRadius {
+        return l.startWalkNpcSegment(dest)
     }
 
     return l.startWalkSegmentSearch(dest)

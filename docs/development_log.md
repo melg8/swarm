@@ -7848,3 +7848,75 @@ for the re-pick line).
   same way and hide on the new bot's first snapshot when it publishes
   none - the transient window shows the previous bot's plan, the
   same accepted staleness the HUD carries.
+
+## Round 103: the npc search radius - the plan ends at the npc's own point (2026-09-20)
+
+- date, scope: 2026-09-20, the npc destination walk contract
+  (`internal/swarm/hunt/town.go`, `shopping.go`, `delevel.go`,
+  `loop.go`, `internal/swarm/pathfind/search.go`).
+- Problem statement: the owner report - the pathfind into the shop
+  ends at the edge of the shop instead of the requested point, and
+  the owner diagnosis - the approach 200 causes it; the directive:
+  every path search to an npc ends at the npc's own point, the
+  approach radius at most 10, never 200.
+- Reproduction (the real elven mesh pack, the report's own plan
+  origin 46045 41251 -3440): `RouteApproach` to the trader Unoren
+  with the wide trip ring (approach 200) ends the plan at 44640 46672
+  -226 units short, on the first walkable surface inside the ball
+  (the report's own plan ended 96-97 units short at 44584 46944);
+  Ariel 154 units short. The corridor A* goal test
+  (`astarGoal.approachReached`) stops the search on the FIRST polygon
+  whose closest surface point lies within the radius - the shop edge
+  polygons satisfy the 200 ball long before the corridor reaches the
+  shop interior. With the npc search radius (10) the same searches
+  walk into the shop and end at the customer cell across the counter
+  (42 and 40 units; identical to the exact approach zero answer).
+- The grid engine bug underneath (search.go `nodeReached`): an
+  approach run tested ONLY the ball - but a cell center sits up to
+  half a diagonal (8*sqrt(2) ~ 11.3) from a point inside the cell, so
+  a radius of 10 never satisfies the ball on ANY node, not even on
+  the target cell the point belongs to - the search flooded the whole
+  walkable component (ten seconds measured per search on the elven
+  merchant cells, whose geodata holds no floor layer - only the water
+  bed 946 units below) and answered the bare not found. The fix: the
+  approach goal also accepts the target cell arrival (the plain run's
+  any-layer semantics - the foreign deck the arrival lands on is the
+  caller's validation, see the deck refusals).
+- The fix (hunt): `npcApproachRadius = 10` and the npc stop ladder
+  `startWalkNpcSegment` - the npc rung (`planNpcSegment`) searches
+  every npc destination walk (the merchant stops of `beginTownTrip`
+  and `advanceTripStop`, the teacher stops, the delevel guard walks)
+  with the npc radius and refuses a FOUND plan that lands a roof
+  scale off the npc deck (`exactSegmentDeckTolerance`, the
+  2026-09-11 roof teleport geometry; the PARTIAL answers always arm -
+  the walk-what-you-can contract); the wide rung (`tripApproachRadius`
+  200) serves the conservative deck stop when the npc rung fails or
+  refuses - the destinations whose own point the mesh or the geodata
+  cannot deliver (the roof resolution, the merchant cell the pack
+  models as the water bed), the offset click window of the talk
+  machinery owns the last stretch. The teacher stop loses its
+  two-radius double attempt (a wider radius never rescues a
+  corridor-less answer - the corridor existence does not depend on
+  the radius - the second search was a deterministic repeat). The
+  re-plans preserve the segment's contract
+  (`replanTownWalkSegment`): the exact segments re-plan the exact
+  search, the npc segments re-plan the npc ladder, the returns keep
+  the wide ring. The merchant deck cases the exact search resolves
+  onto a roof keep working: the exact refusal falls back to the npc
+  rung, the npc refusal to the wide deck stop.
+- Tests: `TestFarMerchantTripWalksIntoTheShop` (the real pack, the
+  report's origin: the far Unoren stop plans the npc search and ends
+  at the customer cell 42 units out, the search contract carries the
+  npc radius), `TestNpcStopsSearchWithTheNpcApproachRadius` (the
+  merchant, the teacher and the return contracts on the recorded
+  radii), `TestDelevelGuardWalkSearchesWithTheNpcRadius`,
+  `TestMerchantRoofFallbackStopsOnTheWideDeck` (the ladder: the npc
+  rung refuses the roof plan, the wide rung serves the deck stop),
+  `TestFindPathApproachTightRadiusReachesTheTargetCell` (the grid
+  tight ball goal), the cooldown pins updated to the ladder cost (the
+  npc rung and the wide rung, once each). The fake navigator records
+  the approach radii it is asked for.
+- Verification: go build, go test on hunt and pathfind (the full
+  packages), the real pack reproductions green.
+- Follow ups: none. The webserver viewer needs no change - the plan
+  repro links carry whatever radius the segment searched with.

@@ -531,14 +531,14 @@ type Loop struct {
     zoneRefusalX int32
     zoneRefusalY int32
     // segmentRadius is the approach radius the current town segment searches
-    // its route within: the wide trip ring (tripApproachRadius) for
-    // the merchant stops and the returns, the close ring
-    // (npcApproachOffset) for the teacher stops - the user rule of
-    // the 2026-09-12 report: the character walks right up to the
-    // training npc, and the geodata search is the one that knows the
-    // walkable ring cells (the trainer hall interior is walkable only
-    // along its rows, the straight line offset ring lands on the
-    // roof-only band). The re-paths of the segment inherit it.
+    // its route within: the npc search radius (npcApproachRadius) for
+    // the npc destinations (the merchant stops, the teacher stops, the
+    // delevel guard walks - the plan ends at the npc's own point, the
+    // user rule of the 2026-09-20 report: a wide ring ends the plan at
+    // the first walkable surface inside its ball - the shop edge - and
+    // the character never enters the shop), the wide trip ring
+    // (tripApproachRadius) for the returns. The re-paths of the segment
+    // inherit it.
     segmentRadius float64
     // segmentSearch is the mesh search contract the current segment's plan
     // answered (the filter, the approach radius and the ban circles

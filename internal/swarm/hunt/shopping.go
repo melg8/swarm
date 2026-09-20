@@ -995,20 +995,16 @@ func (l *Loop) advanceTripStop() {
     var planFailed bool
     if stop.teach {
         // The teacher stop walks right up to the class master: the
-        // close approach ring of the npc approach offset, planned by
-        // the geodata search - the only authority that knows the
-        // walkable ring cells (the trainer hall interior carries its
-        // floor along the hall rows, the straight line offset ring
-        // lands on the roof-only band between them). The wide trip
-        // ring stays the fallback for a teacher whose tight ring has
-        // no walkable route at all, the approach window owns the last
-        // stretch there.
-        l.segmentRadius = npcApproachOffset
-        planFailed = !l.startWalkSegment(townNpcPosition(stop.merchant))
-        if planFailed {
-            l.segmentRadius = tripApproachRadius
-            planFailed = !l.startWalkSegment(townNpcPosition(stop.merchant))
-        }
+        // npc search radius plans the walk to the master's own point -
+        // the closest walkable surface of it (the hall row beside the
+        // master) - the only authority that knows the walkable hall
+        // rows (the trainer hall interior carries its floor along the
+        // rows, the straight line offset ring lands on the roof-only
+        // band between them). A master cell the mesh never connects
+        // (a desk row) stays reached through the partial answer: the
+        // plan ends at the closest reachable point in front of it.
+        planFailed = !l.startWalkNpcSegment(
+            townNpcPosition(stop.merchant))
     } else {
         // The merchant stop walks the exact mesh search first (the
         // same authority the manual walk plans with): the approach
@@ -1023,24 +1019,22 @@ func (l *Loop) advanceTripStop() {
         // spawn route answered the outer side of the stall front, the
         // user report of the counter stand round), so the plan lands
         // the character face to face with the merchant across the
-        // counter. The ring fallback runs for the one failure class
-        // the exact search cannot answer - the plan that resolved onto
-        // a foreign deck (the roof over the shop), see
-        // startWalkExactSegment.
+        // counter. The npc segment fallback runs for the one failure
+        // class the exact search cannot answer - the plan that
+        // resolved onto a foreign deck (the roof over the shop), see
+        // startWalkNpcSegment.
         planned := false
         if l.merchantWithinExactRange(stop.merchant) {
             var ringFallback bool
             planned, ringFallback = l.startWalkExactSegment(
                 merchantStandPoint(stop.merchant))
             if !planned && ringFallback {
-                l.segmentRadius = tripApproachRadius
-                planned = l.startWalkSegment(
+                planned = l.startWalkNpcSegment(
                     merchantStandPoint(stop.merchant))
             }
         }
         if !planned {
-            l.segmentRadius = tripApproachRadius
-            planned = l.startWalkSegment(
+            planned = l.startWalkNpcSegment(
                 merchantStandPoint(stop.merchant))
         }
         planFailed = !planned

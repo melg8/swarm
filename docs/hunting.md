@@ -754,23 +754,36 @@ The short form:
 - Path layer selection: the trip segments navigate through the
   Navigator's mesh corridor search (FindPathApproach /
   FindPathApproachAvoiding with the session's frozen corridor bans)
-  and the segment approach radius: the merchant
-  stops and the returns use the wide trip ring (200 units, under the
-  interaction distance): the walk ends on the deck ring around the
-  merchant, which handles the C1 shop interiors (the geodata holds no
-  floor layer at the real merchant z - only a raised surface and the
-  water below) and the counters the same way, while the water deck
-  below the shop never satisfies the radius (the z difference counts
-  in the 3D distance). The teacher stops search the close ring
-  instead (npcApproachOffset, 150 units) with the wide ring as the
-  fallback: the character walks right up to the training npc - the
-  mesh search is the one that knows the walkable ring cells (the
-  trainer hall interior carries its floor along the hall rows, the
+  and the segment approach radius. Every npc destination walk (the
+  merchant stops, the teacher stops, the delevel guard walks) plans
+  through the npc stop ladder (`startWalkNpcSegment`): the npc rung
+  searches with the npc search radius (`npcApproachRadius`, 10 units -
+  the user rule of the 2026-09-20 report: the plan must end at the
+  npc's own point, not at the first walkable surface a wide ball
+  catches - the wide ring plans held the shop edge 96-232 units short
+  of the trader while the requested point sat inside the shop) and
+  refuses a found plan that resolved onto a foreign deck (a connected
+  roof over the shop answers the destination cell's closest-layer
+  resolution hundreds of units above the npc floor - the 2026-09-11
+  roof teleport geometry the exact planner refuses the same way); the
+  wide rung (`tripApproachRadius`, 200 units, under the interaction
+  distance) serves the conservative deck stop for the destinations
+  whose own point the mesh or the geodata cannot deliver, and the
+  offset click window of the talk machinery owns the last stretch
+  there. The merchant cells without a modeled floor layer or behind a
+  counter stay reached through the partial answer (the search walks
+  the corridor to the closest reachable point - the customer cell
+  across the counter), while the water deck below the shop never
+  satisfies any radius (the z difference counts in the 3D distance).
+  The teacher stops walk right up to the training npc on the same npc
+  rung - the mesh search is the one that knows the walkable hall rows
+  (the trainer hall interior carries its floor along the rows, the
   straight line offset ring lands on the roof-only bands between
   them), and the tight segments complete their route end with the pass
-  radius instead of the wide trip slack. The water prices at the swim
-  rate in the search, so the walks cross the village ramps whenever
-  the swim is the slower walk (the priced round; regression
+  radius instead of the wide trip slack. The returns (the farm spot,
+  the zone) search the wide trip ring directly. The water prices at
+  the swim rate in the search, so the walks cross the village ramps
+  whenever the swim is the slower walk (the priced round; regression
   tests `TestFindPathToShopDeck`, the synthetic water tests of
   `search_test.go` and the priced swim tests of
   `priced_search_test.go`).

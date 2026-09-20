@@ -63,6 +63,9 @@ type fakeNavigator struct {
     // approachEnds records the destinations the approach searches
     // received (the zone return goal checks live here).
     approachEnds []pathfind.Vec3
+    // approachRadii records the approach radii the approach searches
+    // received, call ordered (the npc search radius pins live here).
+    approachRadii []float64
     // miss makes the segment planner searches answer not found: the
     // destination no route reaches (the abort pins).
     miss bool
@@ -126,9 +129,10 @@ func (f *fakeNavigator) result(
 
 // FindPathApproach plans the approach radius search.
 func (f *fakeNavigator) FindPathApproach(
-    start, end pathfind.Vec3, _ float64,
+    start, end pathfind.Vec3, approachRadius float64,
 ) (*pathfind.Result, error) {
     f.approachEnds = append(f.approachEnds, end)
+    f.approachRadii = append(f.approachRadii, approachRadius)
 
     return f.result(start, end)
 }
@@ -139,9 +143,11 @@ func (f *fakeNavigator) FindPathApproach(
 // route and partial route: the plain result - the ban made no
 // difference to the fake planner).
 func (f *fakeNavigator) FindPathApproachAvoiding(
-    start, end pathfind.Vec3, _ float64, avoid []pathfind.AvoidArea,
+    start, end pathfind.Vec3, approachRadius float64,
+    avoid []pathfind.AvoidArea,
 ) (*pathfind.Result, error) {
     f.approachEnds = append(f.approachEnds, end)
+    f.approachRadii = append(f.approachRadii, approachRadius)
     f.avoiding = append(f.avoiding, avoid)
     if f.avoidRoute != nil {
         f.calls++
@@ -420,8 +426,9 @@ func TestTripNeedsNavigator(t *testing.T) {
 
 // TestTripNoPathArmsCooldown verifies that a broken path search (a
 // hard error, e.g. no geodata) does not retry every tick. The trip
-// start runs the priced search once (a hard error fails it at once),
-// so one tick costs one search and the cooldown arms afterwards.
+// start runs the npc stop ladder once (a hard error fails the npc
+// rung at once and the wide rung the same way), so one tick costs two
+// searches and the cooldown arms afterwards.
 func TestTripNoPathArmsCooldown(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     nav.fail = true
@@ -430,20 +437,24 @@ func TestTripNoPathArmsCooldown(t *testing.T) {
     loop.tick()
     require.Equal(t, phaseEngage, loop.phase, "no trip without a path")
     require.False(t, loop.tripCooldownOver(), "the cooldown is armed")
-    require.Equal(t, 1, nav.calls)
+    require.Equal(t, 2, nav.calls,
+        "the ladder costs the npc rung and the wide rung, once each")
     loop.tick()
-    require.Equal(t, 1, nav.calls, "no retry while the cooldown runs")
+    require.Equal(t, 2, nav.calls, "no retry while the cooldown runs")
 
     loop.tripEndedAt = time.Now().Add(-tripCooldown - time.Second)
     loop.tick()
-    require.Equal(t, 2, nav.calls, "a new trip starts after the cooldown")
+    require.Equal(t, 4, nav.calls, "a new trip starts after the cooldown")
 }
 
 // TestTripNoRouteArmsCooldown verifies the not found handling of the
-// priced planning: the approach search reports no route at all (no
+// priced planning: the approach searches report no route at all (no
 // corridor exists toward the destination), the trip aborts at once
 // with the trigger cooldown armed - a re-plan of the identical
-// deterministic search would answer the identical nothing.
+// deterministic search would answer the identical nothing. The abort
+// costs the npc stop ladder (the npc rung and the wide rung, once
+// each) - the corridor existence does not depend on the radius, both
+// rungs answer the same nothing.
 func TestTripNoRouteArmsCooldown(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     nav.found = false
@@ -453,13 +464,14 @@ func TestTripNoRouteArmsCooldown(t *testing.T) {
     require.Equal(t, phaseEngage, loop.phase,
         "no trip without a path")
     require.False(t, loop.tripCooldownOver(), "the cooldown is armed")
-    require.Equal(t, 1, nav.calls, "the priced search ran once")
+    require.Equal(t, 2, nav.calls,
+        "the ladder costs the npc rung and the wide rung, once each")
     loop.tick()
-    require.Equal(t, 1, nav.calls, "no retry while the cooldown runs")
+    require.Equal(t, 2, nav.calls, "no retry while the cooldown runs")
 
     loop.tripEndedAt = time.Now().Add(-tripCooldown - time.Second)
     loop.tick()
-    require.Equal(t, 2, nav.calls, "a new trip starts after the cooldown")
+    require.Equal(t, 4, nav.calls, "a new trip starts after the cooldown")
 }
 
 // TestTripFullFlow walks the whole trip: farm to shop, the merchant

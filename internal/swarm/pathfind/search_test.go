@@ -372,6 +372,36 @@ func TestFindPathApproachPrefersExactTarget(t *testing.T) {
     require.InDelta(t, target.Y, end.Y, cellSize)
 }
 
+// TestFindPathApproachTightRadiusReachesTheTargetCell pins the tight
+// ball goal of the npc search radius: a radius under the cell half
+// diagonal (8*sqrt(2) ~ 11.3) never satisfies the ball test on any
+// node - the target point sits up to 11.3 units from its own cell
+// center and every neighbor center sits further - so the goal test
+// must accept the target cell arrival the same way the plain run
+// does. Without the arrival the search floods the whole walkable
+// component looking for a node that does not exist and answers the
+// bare not found (the 2026-09-20 npc radius round: the grid engine
+// burned ten seconds per search on the elven merchant cells).
+func TestFindPathApproachTightRadiusReachesTheTargetCell(t *testing.T) {
+    spec := &regionSpec{}
+    spec.setFlat(0)
+    engine := newTestEngine(t, spec)
+    center := worldOf(900, 900, 0)
+    // The target point near the cell corner: ~11.2 units from the cell
+    // center, inside the cell, outside the tight 10 unit ball of every
+    // node center of the region.
+    target := Vec3{X: center.X + 7.9, Y: center.Y + 7.9, Z: 0}
+
+    result, err := engine.FindPathApproach(
+        worldOf(100, 100, 0), target, 10, DefaultMaxPassableHeight)
+    require.NoError(t, err)
+    require.True(t, result.Found,
+        "the target cell arrival must satisfy the tight ball goal")
+    end := result.Waypoints[len(result.Waypoints)-1]
+    require.InDelta(t, center.X, end.X, cellSize)
+    require.InDelta(t, center.Y, end.Y, cellSize)
+}
+
 // waterChannelSpec builds the elven lake shape: the land at -3000 on
 // both sides of a water channel whose bed sits at -4000 (below the
 // -3780 C1 water surface), a climbable 40 unit step slope on the south
