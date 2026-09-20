@@ -50,7 +50,6 @@ type fakeGame struct {
     uses        []int32
     drops       [][5]int32
     clicks      []int32
-    pulls       []int32
     clears      int
     lessons     [][2]int32
     casts       []int32
@@ -213,17 +212,6 @@ func (f *fakeGame) ClickObject(objectID int32) error {
         return f.lastError
     }
     f.clicks = append(f.clicks, objectID)
-
-    return nil
-}
-
-// InteractPull records the attack analog pull of the npc interaction
-// (the second plain click on the selected npc).
-func (f *fakeGame) InteractPull(objectID int32) error {
-    if f.lastError != nil {
-        return f.lastError
-    }
-    f.pulls = append(f.pulls, objectID)
 
     return nil
 }

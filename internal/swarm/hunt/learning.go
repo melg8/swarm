@@ -476,21 +476,16 @@ func (l *Loop) approachTeacher(now time.Time) bool {
             return true
         }
         // The teacher stands on another deck and no ring walk closes
-        // the z gap: the paced talk clicks keep firing while the
-        // window runs (the offset clicks cannot help - clicking the
-        // teacher's exact cell teleported the bot onto the roof, the
-        // 2026-09-11 report) and the attack analog pull of the
-        // already selected teacher hands the close walk to the
-        // server - the straight line the pack cannot walk. The
-        // expiry path below talks from wherever the character stands
-        // or skips.
+        // the z gap: wait the window out (the offset clicks cannot
+        // help - clicking the teacher's exact cell teleported the bot
+        // onto the roof, the 2026-09-11 report), then the expiry path
+        // below talks from wherever the character stands or skips.
         if l.teacherDeckUntil.IsZero() {
             l.teacherDeckUntil = now.Add(merchantDeckWindow)
             l.logger.Printf("Hunt: learn: the teacher stands on "+
-                "another deck (z %d vs %d), the pull walks the "+
-                "straight line", z, selfZ)
+                "another deck (z %d vs %d), waiting out the approach",
+                z, selfZ)
         }
-        l.clickTeacher(now)
 
         return false
     }
@@ -529,21 +524,11 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 
 // clickTeacher sends the paced talk click that selects the teacher and
 // refreshes the server's last-folk memory (the RequestAcquireSkill
-// lesson requests resolve their trainer through it). When the teacher
-// is already the selected target the click is the attack analog pull:
-// the second plain click takes the interact branch and the server
-// walks the character to the teacher along the straight line, so the
-// talk distance is met however the deck geometry sits between them.
+// lesson requests resolve their trainer through it).
 func (l *Loop) clickTeacher(now time.Time) {
     if now.Sub(l.teacherPick) >= selectPeriod {
         l.teacherPick = now
-        var err error
-        if l.tracker.SelfTargetID() == l.teacherID {
-            err = l.game.InteractPull(l.teacherID)
-        } else {
-            err = l.game.ClickObject(l.teacherID)
-        }
-        if err != nil {
+        if err := l.game.ClickObject(l.teacherID); err != nil {
             l.logger.Printf("Hunt: learn: teacher click failed: %v", err)
         }
     }

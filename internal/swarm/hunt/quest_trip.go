@@ -660,17 +660,9 @@ func (l *Loop) driveQuestTransfer(
         transfer.Gatekeeper.Name, target.ObjectID, transfer.DestLabel)
 
     // The talk opens the first page (the walk-in gate of the
-    // html action cache). The attack analog pull follows one pace
-    // later: when the walk landed outside the interaction distance
-    // the plain click only selected the gatekeeper and the pull
-    // hands the close walk to the server - the dialog opens on its
-    // arrival; within the distance it re-opens the same page.
+    // html action cache).
     if err := l.game.ClickObject(target.ObjectID); err != nil {
         return fmt.Errorf("the gatekeeper click: %w", err)
-    }
-    pace(dialogClickPause)
-    if err := l.game.InteractPull(target.ObjectID); err != nil {
-        return fmt.Errorf("the gatekeeper pull: %w", err)
     }
     if _, html, err := l.awaitTransferPage(
         target.ObjectID, "", questTransferArriveWait); err != nil {
