@@ -1,4 +1,0 @@
-consumer 0: processed 24 items
-consumer 1: processed 26 items
-consumer 2: processed 0 items
-total processed: 50/50 [OK] in 5.569159ms
