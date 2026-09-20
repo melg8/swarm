@@ -71,6 +71,16 @@ type GameAPI interface {
     // the teacher the lesson requests resolve their trainer
     // through.
     ClickObject(objectID int32) error
+    // InteractPull fires the attack analog of the npc interaction:
+    // the second plain click on an already selected npc (the client
+    // double click). The Mobius NpcClick handler resolves it to the
+    // interact branch: out of the interaction distance the player AI
+    // takes the INTERACT intention and walks the character to the
+    // npc along the straight line, so the distance is met however
+    // the geometry between them sits. It is not the real attack
+    // request (AttackTarget): no forced attack intention, no swings,
+    // the folk npc never takes damage.
+    InteractPull(objectID int32) error
     // ClearTarget drops the npc selection a conversation left
     // behind: the self click replaces the server side selection
     // (see GameClient.ClearTarget), so the leftover villager
@@ -547,11 +557,18 @@ type Loop struct {
     merchantID        int32
     merchantPick      time.Time
     merchantDeckUntil time.Time
-    sold              map[int32]bool
-    tripStart         time.Time
-    tripEndedAt       time.Time
-    zoneReturn        bool
-    zoneFails         int
+    // merchantPull paces the attack analog pull ladder of the deck
+    // wait (one click per select period, see approachMerchant).
+    merchantPull time.Time
+    // merchantPulled holds the object id the post selection pull
+    // already fired for (the practice fires once per merchant, a
+    // re-pick to a different object id arms it again).
+    merchantPulled int32
+    sold           map[int32]bool
+    tripStart      time.Time
+    tripEndedAt    time.Time
+    zoneReturn     bool
+    zoneFails      int
     // zoneSegmentAt/zoneSegmentX/zoneSegmentY hold the no-movement
     // window of the direct zone segments (see noteZoneSegmentStall):
     // the baseline arms on

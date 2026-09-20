@@ -609,6 +609,42 @@ func (gc *GameClient) ClickObject(objectID int32) error {
     return nil
 }
 
+// InteractPull fires the attack analog of the npc interaction: the
+// second plain client click on an already selected npc (the client
+// double click). The Mobius NpcClick handler resolves it to the
+// interact branch - for a folk npc out of the interaction distance
+// the player AI takes the INTERACT intention and walks the character
+// to the npc along the straight line (thinkInteract moves the pawn
+// to 36 units), opening the dialog on arrival; within the distance
+// it just opens the dialog. The interaction distance is therefore
+// met whatever the geometry between the character and the npc does.
+// It is deliberately NOT the real attack request (AttackTarget, the
+// 0x0A packet the guard engage drives): no forced attack intention,
+// no swings, the folk npc never takes damage - and a plain click on
+// an npc the character does not hold yet only selects it, so the
+// pull is safe at any range.
+func (gc *GameClient) InteractPull(objectID int32) error {
+    if objectID == 0 {
+        return nil
+    }
+    x, y, z, ok := gc.tracker.ObjectPosition(objectID)
+    if !ok {
+        return fmt.Errorf(
+            "failed to interact pull %d: object unknown", objectID)
+    }
+    request := togameserver.NewActionRequestPacket()
+    request.ObjectID = objectID
+    request.X = x
+    request.Y = y
+    request.Z = z
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to interact pull: %w", err)
+    }
+    gc.tracker.RecordEvent("attack analog pull to the npc")
+
+    return nil
+}
+
 // ClearTarget drops the selection a conversation with an npc left
 // behind (the teacher or the merchant the trip talked to): the client
 // cannot unselect directly - the C1 protocol has no deselect request
