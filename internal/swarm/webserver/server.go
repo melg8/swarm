@@ -86,10 +86,27 @@ func (s *sseStream) snapshotEvent(
 ) {
     s.payload = bot.AppendSnapshotJSON(s.payload[:0])
     s.frame = appendEventFrame(s.frame[:0], s.payload)
+    armSSEWrite(w)
     if _, err := w.Write(s.frame); err != nil {
         return
     }
     flusher.Flush()
+}
+
+// sseWriteTimeout bounds one SSE frame write: a half-open client (a
+// phone asleep, a dead NAT binding) otherwise parks the handler
+// goroutine in a blocked Write forever - the shutdown then waits out
+// the whole handler budget and eventsDone cannot interrupt a blocked
+// write. The deadline refreshes per frame, so a live slow reader
+// keeps streaming.
+const sseWriteTimeout = 15 * time.Second
+
+// armSSEWrite sets the per frame write deadline of the SSE streams.
+// Writers without deadline support (the wrapped recorders of the
+// tests) keep the unbounded behavior.
+func armSSEWrite(w http.ResponseWriter) {
+    _ = http.NewResponseController(w).SetWriteDeadline(
+        time.Now().Add(sseWriteTimeout))
 }
 
 // appendEventFrame assembles the SSE event frame for a payload into
@@ -442,6 +459,7 @@ func (s *Server) streamEvents(
 
 // writePing sends the keepalive comment. It reports a write failure.
 func (s *Server) writePing(w http.ResponseWriter, flusher http.Flusher) bool {
+    armSSEWrite(w)
     if _, err := w.Write(ssePingComment); err != nil {
         return true
     }

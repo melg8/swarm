@@ -900,16 +900,25 @@ func (l *Loop) farmQuestStage(
         }
         mob, ok := l.tracker.NearestNpcByTemplates(
             templates, questKillScanRadius)
-        if ok {
-            // A quest mob stands in the scan radius: the tired
-            // character drinks a healing potion instead of sitting
-            // down (the Ruins of Agony skeletons are aggressive -
-            // the first live run sat the character down inside the
-            // camp and it died seated).
-            if err := l.drinkHealingPotion(); err != nil {
+        if !ok {
+            // The ground is momentarily dead (a respawn window or a
+            // cleared camp): resting and pacing keeps the loop alive
+            // for the rescan - the old fallthrough attacked the
+            // zero-value target and ground refused WalkTo(0, 0)
+            // clicks against the flood protector until the respawn.
+            if err := l.restBetweenFights(ctx); err != nil {
                 return err
             }
-        } else if err := l.restBetweenFights(ctx); err != nil {
+            pace(questKillAttackPeriod)
+
+            continue
+        }
+        // A quest mob stands in the scan radius: the tired
+        // character drinks a healing potion instead of sitting
+        // down (the Ruins of Agony skeletons are aggressive -
+        // the first live run sat the character down inside the
+        // camp and it died seated).
+        if err := l.drinkHealingPotion(); err != nil {
             return err
         }
         if err := l.closeAndAttack(mob.X, mob.Y, mob.Z,

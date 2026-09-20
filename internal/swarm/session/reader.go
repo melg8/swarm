@@ -10,7 +10,9 @@ import (
     "encoding/json"
     "fmt"
     "io"
+    "log"
     "os"
+    "path/filepath"
     "time"
 )
 
@@ -81,6 +83,7 @@ func scanJournal(path string, visit func(record) error) error {
 
     scanner := bufio.NewScanner(reader)
     scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+    skipped := 0
     for scanner.Scan() {
         line := scanner.Bytes()
         if len(line) == 0 {
@@ -89,7 +92,12 @@ func scanJournal(path string, visit func(record) error) error {
         var r record
         if err := json.Unmarshal(line, &r); err != nil {
             // A torn final line of a crashed run is expected: the
-            // records before it still parse.
+            // records before it still parse. The skips stay counted -
+            // a silent skip made the report undercount against the
+            // file, and a corrupted middle line would hide behind the
+            // same silence as the torn tail.
+            skipped++
+
             continue
         }
         if err := visit(r); err != nil {
@@ -98,6 +106,10 @@ func scanJournal(path string, visit func(record) error) error {
     }
     if err := scanner.Err(); err != nil {
         return fmt.Errorf("read journal: %w", err)
+    }
+    if skipped > 0 {
+        log.Printf("Warning session journal read: %d unparsable line(s) "+
+            "skipped in %s", skipped, filepath.Base(path))
     }
 
     return nil

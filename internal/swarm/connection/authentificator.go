@@ -11,6 +11,7 @@ import (
     "fmt"
     "log"
     "net"
+    "time"
 
     "github.com/melg8/swarm/internal/swarm/crypt"
     "github.com/melg8/swarm/internal/swarm/helpers"
@@ -21,6 +22,14 @@ import (
 const (
     initPacketID = 0x00
     loginFailID  = 0x01
+    // loginReadTimeout bounds one blocking read of the login flow.
+    // Every step is a single request/response round trip, so a stalled
+    // or half-open login server surfaces as a deadline error instead
+    // of parking the bot goroutine forever (the runBotForever
+    // supervisor only reloops when runBot returns - a read without a
+    // deadline is exactly the frozen state the in-world silence
+    // watchdog was built against, one stage earlier).
+    loginReadTimeout = 30 * time.Second
 )
 
 // AuthResult contains everything needed to connect to the game server.
@@ -65,8 +74,20 @@ func NewLoginClient(conn net.Conn) *LoginClient {
     }
 }
 
+// armReadDeadline bounds the next blocking socket read (see
+// loginReadTimeout). A buffered remainder of a previous packet
+// short circuits before the socket and the deadline simply rides
+// along.
+func (lc *LoginClient) armReadDeadline() error {
+    return lc.conn.SetReadDeadline(time.Now().Add(loginReadTimeout))
+}
+
 // readPacket reads and decrypts the next login server packet.
 func (lc *LoginClient) readPacket() ([]byte, error) {
+    if err := lc.armReadDeadline(); err != nil {
+        return nil, fmt.Errorf(
+            "failed to arm the login read deadline: %w", err)
+    }
     payload, err := readWirePacket(lc.conn, lc.readBuf)
     if err != nil {
         return nil, err
@@ -83,6 +104,10 @@ func (lc *LoginClient) readPacket() ([]byte, error) {
 
 // readInitPacket reads the unencrypted Init packet of the session.
 func (lc *LoginClient) readInitPacket() (*fromauthserver.InitPacket, error) {
+    if err := lc.armReadDeadline(); err != nil {
+        return nil, fmt.Errorf(
+            "failed to arm the init read deadline: %w", err)
+    }
     payload, err := readWirePacket(lc.conn, lc.readBuf)
     if err != nil {
         return nil, err

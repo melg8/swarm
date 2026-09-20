@@ -119,42 +119,80 @@ func skillTotals(entries []SkillPlanEntry, sp int64) (total, missing int64) {
     return total, missing
 }
 
-// ensureSkillQueueLocked rebuilds the stored learning queue when the
-// class, the learned set or the weapon priority changed since the
-// last build. A nil skills map (never listed, or cleared by a session
-// reset) keeps the queue empty: the server lists the learned skills on
-// entering the world, so a queue without them would plan lessons the
-// character may already know. The stored queue carries the order only -
-// the affordability flag stays meaningless on it and is computed by
-// every view against the SP it reads under the same lock. The caller
-// must hold a lock.
-func (b *Bot) ensureSkillQueueLocked() {
-    if b.skillQueueClass == b.char.ClassID &&
-        b.skillQueueRevision == b.skillsRevision {
-        return
+// skillQueueCache is the immutable cached build of the learning
+// queue: the key fields answer "is this still current", the queue
+// slice is never mutated after the store.
+type skillQueueCache struct {
+    class    int32
+    revision uint64
+    queue    []SkillPlanEntry
+}
+
+// bookKeepCache is the immutable cached set of the demanded spellbook
+// item ids (see demandedBooksLocked).
+type bookKeepCache struct {
+    class    int32
+    revision uint64
+    level    int32
+    books    map[int32]bool
+}
+
+// currentSkillQueueLocked returns the cached queue with a freshness
+// flag: ok is true when the cache key still matches the current class
+// and skills revision (the queue itself may be nil - a class with
+// nothing left to learn caches as empty). The peek never rebuilds, so
+// the size estimate and the other hint paths stay allocation free.
+// The caller must hold a lock.
+func (b *Bot) currentSkillQueueLocked() (queue []SkillPlanEntry, ok bool) {
+    if c := b.skillQueueCache.Load(); c != nil &&
+        c.class == b.char.ClassID && c.revision == b.skillsRevision {
+        return c.queue, true
     }
-    b.skillQueue = nil
+
+    return nil, false
+}
+
+// skillQueueLocked returns the ordered learning queue of the current
+// class, learned set and weapon priority, rebuilding the cache when
+// the class or the skills revision moved. The cache lives behind an
+// atomic pointer instead of plain bot fields: the readers here run
+// under the store read lock, and a lazily written field turned two
+// concurrent snapshot encoders into writers of the single source of
+// truth - a real data race the review of 2026-09-20 caught before a
+// test did. Two concurrent rebuilds store two consistent snapshots
+// and one wins; the steady state read stays allocation free. The
+// returned slice is immutable (every view copies it or reads it value
+// by value). The caller must hold a lock.
+func (b *Bot) skillQueueLocked() []SkillPlanEntry {
+    if queue, ok := b.currentSkillQueueLocked(); ok {
+        return queue
+    }
+    var queue []SkillPlanEntry
     if b.skills != nil {
-        b.skillQueue = buildSkillQueue(
-            b.char.ClassID, b.skills, b.skillWeapons)
+        queue = buildSkillQueue(b.char.ClassID, b.skills, b.skillWeapons)
     }
-    b.skillQueueClass = b.char.ClassID
-    b.skillQueueRevision = b.skillsRevision
+    b.skillQueueCache.Store(&skillQueueCache{
+        class:    b.char.ClassID,
+        revision: b.skillsRevision,
+        queue:    queue,
+    })
+
+    return queue
 }
 
 // skillPlanViewLocked builds the learning queue view of the snapshot:
-// a defensive copy of the stored queue with the affordability flags
-// set against the current SP, plus the queue total and the missing
-// SP. The copy keeps the view safe against the next queue rebuild.
-// The caller must hold a lock.
+// a copy of the queue with the affordability flags set against the
+// current SP, plus the queue total and the missing SP. The copy keeps
+// the view safe against the next queue rebuild. The caller must hold
+// a lock.
 func (b *Bot) skillPlanViewLocked() *SkillPlanView {
-    b.ensureSkillQueueLocked()
-    if len(b.skillQueue) == 0 {
+    queue := b.skillQueueLocked()
+    if len(queue) == 0 {
         return nil
     }
     sp := int64(b.char.Sp)
-    entries := make([]SkillPlanEntry, len(b.skillQueue))
-    copy(entries, b.skillQueue)
+    entries := make([]SkillPlanEntry, len(queue))
+    copy(entries, queue)
     for i := range entries {
         entries[i].Affordable = sp >= int64(entries[i].SpCost)
     }
@@ -175,18 +213,21 @@ func (b *Bot) skillPlanViewLocked() *SkillPlanView {
 // same lessons joins them). The sell and destroy junk flows keep the
 // collected items - a book sold for referencePrice/2 comes back as a
 // full priced buy of the next learning trip, and the lesson it feeds
-// waits forever without it. The result is cached per skills revision
-// and level; the stored queue may lag one rebuild behind a fresh
-// learn (the views rebuild it), which only keeps a consumed book one
-// cache cycle longer, never drops one. The caller must hold a lock.
+// waits forever without it. The set is cached per class, skills
+// revision and level behind an atomic pointer for the same reason as
+// the queue (see skillQueueLocked): a learn bumps the revision, a
+// level up shifts the unlock window, and the next read rebuilds. The
+// caller must hold a lock.
 func (b *Bot) demandedBooksLocked() map[int32]bool {
-    if b.bookKeep != nil && b.bookKeepRevision == b.skillsRevision &&
-        b.bookKeepLevel == b.char.Level {
-        return b.bookKeep
+    if c := b.bookKeepCache.Load(); c != nil &&
+        c.class == b.char.ClassID && c.revision == b.skillsRevision &&
+        c.level == b.char.Level {
+        return c.books
     }
     var books map[int32]bool
-    for i := range b.skillQueue {
-        entry := &b.skillQueue[i]
+    queue := b.skillQueueLocked()
+    for i := range queue {
+        entry := &queue[i]
         if entry.BookItemID == 0 || entry.ReqLevel > b.char.Level {
             continue
         }
@@ -195,9 +236,12 @@ func (b *Bot) demandedBooksLocked() map[int32]bool {
         }
         books[entry.BookItemID] = true
     }
-    b.bookKeep = books
-    b.bookKeepRevision = b.skillsRevision
-    b.bookKeepLevel = b.char.Level
+    b.bookKeepCache.Store(&bookKeepCache{
+        class:    b.char.ClassID,
+        revision: b.skillsRevision,
+        level:    b.char.Level,
+        books:    books,
+    })
 
     return books
 }

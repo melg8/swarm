@@ -31,7 +31,7 @@
 #               then /home/z/opt/go-root/usr/lib/go-1.24/bin/go)
 #   GOPATH      Go workspace (default: ~/go)
 #   TOOLS       space-separated tool list override (default:
-#               "task golangci-lint gci gofmt-spaces")
+#               "task golangci-lint gci gofmt-spaces govulncheck")
 
 set -euo pipefail
 
@@ -51,7 +51,7 @@ if [ -z "$GO_BIN" ]; then
 fi
 
 GOPATH_VAL="${GOPATH:-$HOME/go}"
-TOOLS_LIST="${TOOLS:-task golangci-lint gci gofmt-spaces}"
+TOOLS_LIST="${TOOLS:-task golangci-lint gci gofmt-spaces govulncheck}"
 BIN_DIR="$GOPATH_VAL/bin"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$BIN_DIR"
@@ -65,6 +65,7 @@ declare -A PIN=(
     [task]="github.com/go-task/task/v3/cmd/task@v3.53.1"
     [golangci-lint]="github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2"
     [gci]="github.com/daixiang0/gci@v0.13.5"
+    [govulncheck]="golang.org/x/vuln/cmd/govulncheck@v1.8.0"
 )
 
 check_tool() {

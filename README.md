@@ -185,7 +185,8 @@ do the same job.
 
 - **the storage** - [MariaDB][3] - GPLv2 - the game database
 
-- **the language** - [Go][4] 1.24 - BSD 3-Clause - the client itself
+- **the language** - [Go][4] - BSD 3-Clause - the client itself (the
+  module targets go 1.23.2, the `go.mod` toolchain line pins go1.26.8)
 
 - **the tasks** - [go-task][2] - MIT - the check recipes
 

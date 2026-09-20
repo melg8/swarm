@@ -255,7 +255,12 @@ func cellAggroMass(cell Cell) float64 {
     mass := 0.0
     for index := range cell.Mobs {
         mob := &cell.Mobs[index]
-        if npcdata.NPCIsAggressive(mob.TemplateID) {
+        // The spawn data carries the xml id; the aggression table
+        // keys on the raw NpcInfo template id - the same translation
+        // the sibling lookups apply (a raw xml id fails the
+        // >1000000 guard and zeroed the whole danger input).
+        if npcdata.NPCIsAggressive(
+            npcdata.NPCWireTemplateID(mob.TemplateID)) {
             mass += float64(mob.Count)
         }
     }

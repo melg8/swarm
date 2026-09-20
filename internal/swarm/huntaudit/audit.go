@@ -340,6 +340,11 @@ func openSession(
     }
     game, err := connection.NewGameClient(gameConn)
     if err != nil {
+        // NewGameClient owns the connection only on success: the
+        // handshake failure must not leak the socket (one fd per
+        // audited cell visit compounds over a sweep).
+        _ = gameConn.Close()
+
         return nil, fmt.Errorf("game handshake: %w", err)
     }
     game.SetTracker(tracker)
@@ -390,6 +395,9 @@ func ensureCharacter(cfg Config) error {
     }
     game, err := connection.NewGameClient(gameConn)
     if err != nil {
+        // NewGameClient owns the connection only on success.
+        _ = gameConn.Close()
+
         return fmt.Errorf("game handshake: %w", err)
     }
     charList, err := game.Authenticate(connection.GameSessionParams{

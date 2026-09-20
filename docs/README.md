@@ -50,8 +50,7 @@ the area you are about to touch, not all of them.
 | [fastpath_research.md](fastpath_research.md) | The fast route planning research: the measured baseline, the hierarchical options, the 10 second budget |
 | [quality_review_and_agent_prompts.md](quality_review_and_agent_prompts.md) | The 2026-09-07 architecture review and improvement program (historical snapshot) |
 | [codebase_review_2026-09-20.md](codebase_review_2026-09-20.md) | The 2026-09-20 fresh-eyes review: the verified findings (the journal data-loss path, the read-lock cache writes, the session lifecycle edges, the never-activated CI, the handover file) and the prioritized P0/P1/P2 backlog |
-| [hunting_system_redesign.md](hunting_system_redesign.md) | The spot-anchored farming research behind the retired spot mode: respawn awareness, efficiency scoring, the zone visibility
-  measurements - superseded by hunting_cells.md (figures in [hunt_analysis/](hunt_analysis/)) |
+| [hunting_system_redesign.md](hunting_system_redesign.md) | The spot-anchored farming research behind the retired spot mode: respawn awareness, efficiency scoring, the zone visibility measurements - superseded by hunting_cells.md (figures in [hunt_analysis/](hunt_analysis/)) |
 
 ## Pending redesigns (not implemented yet)
 
@@ -64,6 +63,8 @@ the area you are about to touch, not all of them.
 | Document | Area |
 | --- | --- |
 | [agent_progress.md](agent_progress.md) | The active task handover file (crash-safe progress tracking); finished entries move to agent_progress_archive.md |
+| [agent_progress_archive.md](agent_progress_archive.md) | The archive of the finished agent rounds (the append-only history the handover file points back to) |
+| [ci_workflow.yml](ci_workflow.yml) | The CI verification gate designed for GitHub Actions (build, vet, test, whitespace, the full lint, the race slice, govulncheck): inactive until a workflow-scoped token copies it to .github/workflows/ci.yml |
 | [agent_feedback_loops.md](agent_feedback_loops.md) | The audit of the feedback an autonomous agent receives: the verification loop, the live acceptance, the observability, the process memory |
 | [flake_ledger.md](flake_ledger.md) | The searchable memory of observed test flakes: every flake gets one row (the cause, the fix, the pin that closed it) |
 

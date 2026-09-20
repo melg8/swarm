@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+#
+# SPDX-License-Identifier: MIT
+
+# The dependency posture used to be fully manual (the 2026-09-20
+# review): nothing watched go.mod for updates or vulnerabilities.
+# This config opens the gomod update PRs weekly; the vulnerability
+# side rides the govulncheck step of the CI workflow (docs/
+# ci_workflow.yml, task vuln locally). The dev tool pins of tools/
+# install_dev_tools.sh stay manual by design - one source of version
+# truth, bumped deliberately.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly

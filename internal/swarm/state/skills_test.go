@@ -6,6 +6,7 @@ package state
 
 import (
     "encoding/json"
+    "sync"
     "testing"
 
     "github.com/melg8/swarm/internal/swarm/npcdata"
@@ -311,4 +312,44 @@ func TestSkillPlanWeaponPriority(t *testing.T) {
     require.NotNil(t, plan)
     require.Equal(t, npcdata.SkillCategoryAttack,
         plan.Entries[0].Category)
+}
+
+// TestConcurrentEncodersShareTheQueueCache pins the cache shape the
+// snapshot encoders rely on: several live encoders plus a skills
+// revision writer rebuild the queue and the book set concurrently,
+// and the atomic pointer keeps every reader consistent. The plain
+// fields version raced here - the read lock turned into a write the
+// moment two encoders met after a revision bump.
+func TestConcurrentEncodersShareTheQueueCache(t *testing.T) {
+    bot := NewBot("unittest1")
+    bot.ApplyUserInfo(UserInfo{
+        Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 100,
+    })
+    bot.SetSkills(elvenFighterSkills())
+
+    var wg sync.WaitGroup
+    for range 4 {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            for range 100 {
+                dst := bot.AppendSnapshotJSON(make([]byte, 0, 4096))
+                if len(dst) == 0 {
+                    t.Error("empty snapshot payload")
+                }
+            }
+        }()
+    }
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        for range 50 {
+            bot.SetSkills(elvenFighterSkills())
+        }
+    }()
+    wg.Wait()
+
+    plan := bot.Snapshot().SkillPlan
+    require.NotNil(t, plan)
+    require.NotEmpty(t, plan.Entries)
 }

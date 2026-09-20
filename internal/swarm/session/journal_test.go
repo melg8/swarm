@@ -6,10 +6,15 @@ package session
 
 import (
     "bufio"
+    "compress/gzip"
     "encoding/json"
+    "errors"
+    "io"
     "os"
     "path/filepath"
     "strings"
+    "sync"
+    "sync/atomic"
     "testing"
     "time"
 
@@ -273,4 +278,104 @@ func TestReportEmptyBot(t *testing.T) {
     require.Contains(t, report, "kills: 0")
     require.Contains(t, report, "xp stalls: 0")
     require.True(t, strings.HasSuffix(report, "\n"))
+}
+
+// TestGzipFileKeepsTheOriginalWhenTheCopyFails pins the data
+// guarantee of the rotation: a gzip copy failure (a disk full under
+// the rotated segment) keeps the original on disk and drops the
+// partial archive - the old order removed the source unconditionally
+// and destroyed the record the comment promised to protect.
+func TestGzipFileKeepsTheOriginalWhenTheCopyFails(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "session.jsonl")
+    const payload = "the rotated segment payload"
+    require.NoError(t, os.WriteFile(path, []byte(payload), 0o600))
+
+    orig := gzipCopy
+    gzipCopy = func(io.Writer, io.Reader) (int64, error) {
+        return 0, errors.New("disk full")
+    }
+    defer func() { gzipCopy = orig }()
+
+    var wg sync.WaitGroup
+    wg.Add(1)
+    gzipFile(path, &wg, nil)
+    wg.Wait()
+
+    got, err := os.ReadFile(path)
+    require.NoError(t, err, "the original segment must survive")
+    require.Equal(t, payload, string(got))
+    require.NoFileExists(t, path+".gz", "the partial archive must go")
+}
+
+// TestGzipFileCompressesOnSuccess pins the happy path: the original
+// goes away, the archive round-trips byte for byte.
+func TestGzipFileCompressesOnSuccess(t *testing.T) {
+    dir := t.TempDir()
+    path := filepath.Join(dir, "session.jsonl")
+    payload := strings.Repeat("the journal line\n", 64)
+    require.NoError(t, os.WriteFile(path, []byte(payload), 0o600))
+
+    var wg sync.WaitGroup
+    wg.Add(1)
+    gzipFile(path, &wg, nil)
+    wg.Wait()
+
+    require.NoFileExists(t, path)
+    file, err := os.Open(path + ".gz")
+    require.NoError(t, err)
+    defer file.Close()
+    gz, err := gzip.NewReader(file)
+    require.NoError(t, err)
+    got, err := io.ReadAll(gz)
+    require.NoError(t, err)
+    require.NoError(t, gz.Close())
+    require.Equal(t, payload, string(got))
+}
+
+// TestRotateKeepsTheWriterWhenTheNextSegmentFails pins the rotation
+// failure path: the next segment opens before the old file closes, so
+// a failed open leaves the writer on the still-open file and the
+// later records keep landing. The old order closed the file first and
+// stranded every later record on the closed handle - the report kept
+// counting while the file went silent.
+func TestRotateKeepsTheWriterWhenTheNextSegmentFails(t *testing.T) {
+    dir := t.TempDir()
+    file, path, err := createJournalFile(dir)
+    require.NoError(t, err)
+    j := &Journal{
+        dir:     dir,
+        path:    path,
+        counter: &countingWriter{inner: file, written: 0},
+        wg:      sync.WaitGroup{},
+        mu:      sync.RWMutex{},
+        aggs:    map[string]*botAgg{},
+        seq:     0,
+        written: 0,
+        dropped: atomic.Uint64{},
+    }
+    j.install(file)
+
+    before := newRecord("unittest1", kindStory, time.Now())
+    before.M = "before"
+    j.write(before)
+    j.flushFile()
+
+    // The segment paths move into a missing directory: the rotate
+    // open fails while the active file stays healthy.
+    j.dir = filepath.Join(dir, "missing")
+    j.written = rotateBytes
+    j.counter.written = rotateBytes
+    j.flushFile()
+
+    after := newRecord("unittest1", kindStory, time.Now())
+    after.M = "after"
+    j.write(after)
+    j.flushFile()
+    j.closeFile()
+
+    lines := readLines(t, path)
+    require.Len(t, lines, 2, "both records must land despite the failed rotate")
+    require.Equal(t, "before", lines[0].M)
+    require.Equal(t, "after", lines[1].M)
 }

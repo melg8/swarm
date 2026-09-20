@@ -11,7 +11,81 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task: the recastnavigation port - the production Detour runtime and the Go mesh builder (2026-09-15)
+## Active task (status: in progress): the review backlog fixes round (2026-09-20)
+
+Started: 2026-09-20. Branch: `feature/new-pathfind-alternative`,
+commits as melg8. Other agents push to the same branch - rebase
+before every push. The owner asked to fix the problems the
+2026-09-20 fresh-eyes evaluation found.
+
+### Goal
+
+Fix the verified findings of `docs/codebase_review_2026-09-20.md`,
+P0 first, then the surgical P1/P2 items, each with a focused test
+where the review demands one and the full gate before every push.
+
+### Progress
+
+- P0-1: the journal gzipFile keeps the original segment on any
+  failure (copy, sink close, target close) and drops the partial
+  .gz archive - the old order removed the source unconditionally and
+  a disk full destroyed the rotated record. The test swaps the
+  gzipCopy seam with a failing copy and asserts the original
+  survives byte for byte.
+- P0-8 (the same file): the journal rotate opens the next segment
+  before closing the old one - a failed open now keeps the writer on
+  the still-open file and the size cap re-arms the attempt on every
+  later flush; the old order stranded the writer on a closed handle
+  forever. The test forces the segment open into a missing directory
+  and asserts both records land.
+- P0-2: the lazy skill queue and demanded books caches moved behind
+  atomic pointers (skillQueueCache, bookKeepCache) - the snapshot
+  encoder and the inventory flows run under the store read lock, and
+  the plain fields turned two concurrent encoders into writers of
+  the single source of truth. The steady state read stays
+  allocation free (the AGENTS.md zero-alloc bar holds); two
+  concurrent rebuilds store two consistent snapshots and one wins.
+  The test drives four encoders plus a SetSkills writer under
+  -race.
+- P0-3: runBot closes the game connection on every pre-Run failure
+  path (the handshake failure closes the raw conn, the later paths
+  go through a deferred game.Close that is a no-op after Run's own
+  disconnect); the login flow arms a 30 s read deadline on every
+  blocking read and the pre-world char list / creation reads bound
+  by charListWait - a stalled server now surfaces as a reconnect
+  instead of a silently parked bot goroutine.
+- P1-6: cellAggroMass resolves the spawn xml id through
+  npcdata.NPCWireTemplateID before the aggression lookup (the raw
+  xml id failed the >1000000 guard and zeroed the static danger
+  input of the cell safety score).
+- P1-7: farmQuestStage paces and rescans when the quest mob scan
+  comes up empty - the old fallthrough attacked the zero-value
+  target and ground refused WalkTo(0, 0) clicks against the flood
+  protector until the respawn.
+- P1-9: the SSE frames bound their writes (sseWriteTimeout via
+  ResponseController) so a half-open client cannot park the handler
+  goroutine past the shutdown; the proxy accept loop backs off and
+  retries on a transient accept error instead of dying with the
+  listener still advertised; the hunt loop and the journal sampler
+  join a WaitGroup the shutdown waits before the journal closes.
+- P1-12/P0-4: the CI workflow refresh (the full uncapped lint
+  replaces the stale --new debt step, the permissions block lands,
+  the race slice covers state and webserver too, the govulncheck
+  step joins) plus the gomod dependabot config and the pinned
+  govulncheck in tools/install_dev_tools.sh (task vuln locally).
+- P1-13: the docs drift batch - the Go version story told one way
+  (AGENTS.md and README follow the go.mod toolchain line), the
+  verify-loop skill numbers and the CI citation fixed, the
+  repository layout maps all nine cmd/ binaries, docs/README.md
+  gained the ci_workflow.yml and agent_progress_archive.md rows and
+  the corrupted hunting_system_redesign.md row was repaired.
+- P0-5: the handover restructure - the seven stale Active task
+  headings (all landed work) retitled to Completed so exactly one
+  status-marked active task stays (this section). The archive keeps
+  untouched per the standing owner rule; a later round may move the
+  closed sections there when the rule lifts.
+
+## Completed: the recastnavigation port - the production Detour runtime and the Go mesh builder (2026-09-15)
 
 Started: 2026-09-15. Branch: `feature/new-pathfind` (on the research
 tip cf000f5). Commits as melg8. Other agents may push to the same
@@ -711,7 +785,7 @@ over the Dion hunting grounds.
   ~163 absent lines of the 1733 are reflowed, superseded or
   rephrased in docs/; the restoration adds the operational layer
   back, not the 112 KB blob.
-## Active task: the webui debugging surface - the walk plan timings, the pathfind link and the hover coordinates (2026-09-19)
+## Completed: the webui debugging surface - the walk plan timings, the pathfind link and the hover coordinates (2026-09-19)
 
 Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`. Commits
 as melg8. Other agents may push to the same branch concurrently -
@@ -783,7 +857,7 @@ atomic commit):
   harness drives the whole surface (the label absence, the hover
   label, the chip, the copy shortcut, the flash, the leave reset).
 
-## Active task: the village escape round - the route following cursor escape, the move start watchdog and the refused click root cause (2026-09-19)
+## Completed: the village escape round - the route following cursor escape, the move start watchdog and the refused click root cause (2026-09-19)
 
 Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
 Commits as melg8. Rebase before every push.
@@ -1002,7 +1076,7 @@ Commits as melg8. Rebase before every push.
   from `--new` to the full run); the push needs the workflow-scoped
   token, otherwise the owner copy stays the fallback.
 
-## Active task: the pathfind link repro contract - the viewer rebuilds the very search the bot walks (2026-09-19)
+## Completed: the pathfind link repro contract - the viewer rebuilds the very search the bot walks (2026-09-19)
 
 Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
 Commits as melg8. Other agents may push to the same branch
@@ -1077,7 +1151,7 @@ its `search` line for the paste-a-dump flow.
   the real pack, the planless fallback unit pin, the village escape
   end to end over the refusal pocket), the hunt suite green, 28
   packages ok, lint --new clean.
-## Active task: the unit test gate red - the race slice budget and the coverage lift (2026-09-19)
+## Completed: the unit test gate red - the race slice budget and the coverage lift (2026-09-19)
 
 Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
 Commits as melg8. Other agents may push to the same branch
@@ -1227,8 +1301,8 @@ three independent defects, all fixed in one round:
   answers 28 packages ok, zero failures, the whitespace gate and
   the uncapped lint green.
 
-## Active task: the priced water - the walled form retires, the bot plans through the water objects (2026-09-19)
-## Active task: the wasd ground progress - the escape claims mark the walked waypoints and carry the server heading (2026-09-19)
+## Completed: the priced water - the walled form retires, the bot plans through the water objects (2026-09-19)
+## Completed: the wasd ground progress - the escape claims mark the walked waypoints and carry the server heading (2026-09-19)
 
 Started: 2026-09-19. Branch: `feature/new-pathfind-alternative`.
 Commits as melg8. Other agents may push to the same branch

@@ -39,6 +39,11 @@ const (
     LoginAltPortAddress   = "127.0.0.2:2107"
     DefaultGameAddress    = "127.0.0.1:7778"
     GameFallbackAddress   = "127.0.0.2:7778"
+    // acceptRetryDelay paces the accept loop over a transient accept
+    // failure (the fd drought of a loaded fleet, an aborted inbound
+    // connection): the bound port stays advertised and the loop
+    // retries instead of dying on the first hiccup.
+    acceptRetryDelay = time.Second
 )
 
 // DefaultLoginAddresses is the login listener set of the default
@@ -465,6 +470,10 @@ func (s *Server) Serve() error {
 }
 
 // serve accepts connections of one listener until the server stops.
+// A transient accept failure (an fd drought of a loaded fleet, an
+// aborted inbound connection) backs off and retries - the old order
+// returned on the first error and left the bound listener dead but
+// still advertised.
 func (s *Server) serve(listener net.Listener, handle func(net.Conn)) {
     for {
         conn, err := listener.Accept()
@@ -474,9 +483,17 @@ func (s *Server) serve(listener net.Listener, handle func(net.Conn)) {
                 return
             default:
             }
+            if errors.Is(err, net.ErrClosed) {
+                return
+            }
             s.logger.Printf("Proxy accept failed: %v", err)
+            select {
+            case <-s.done:
+                return
+            case <-time.After(acceptRetryDelay):
+            }
 
-            return
+            continue
         }
         go handle(conn)
     }

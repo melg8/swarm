@@ -282,15 +282,15 @@ func (b *Bot) sortedSkillIDsLocked() []int32 {
 // appendLiveSkillPlanJSON writes the learning queue (null when the
 // class is unknown or nothing is left to learn) exactly like the
 // Snapshot view. The affordability flag is computed inline against
-// the SP read under the same lock - the stored queue never carries a
-// valid flag. The caller must hold a lock.
+// the SP read under the same lock - the queue never carries a valid
+// flag. The caller must hold a lock.
 func (b *Bot) appendLiveSkillPlanJSON(dst []byte) []byte {
-    b.ensureSkillQueueLocked()
-    if len(b.skillQueue) == 0 {
+    queue := b.skillQueueLocked()
+    if len(queue) == 0 {
         return append(dst, `null`...)
     }
     sp := int64(b.char.Sp)
-    total, missing := skillTotals(b.skillQueue, sp)
+    total, missing := skillTotals(queue, sp)
     dst = append(dst, `{"sp":`...)
     dst = strconv.AppendInt(dst, sp, 10)
     dst = append(dst, `,"total":`...)
@@ -298,11 +298,11 @@ func (b *Bot) appendLiveSkillPlanJSON(dst []byte) []byte {
     dst = append(dst, `,"missing":`...)
     dst = strconv.AppendInt(dst, missing, 10)
     dst = append(dst, `,"entries":[`...)
-    for i := range b.skillQueue {
+    for i := range queue {
         if i > 0 {
             dst = append(dst, ',')
         }
-        entry := b.skillQueue[i]
+        entry := queue[i]
         entry.Affordable = sp >= int64(entry.SpCost)
         dst = appendSkillPlanEntryJSON(dst, entry)
     }
@@ -548,7 +548,9 @@ func (b *Bot) snapshotJSONSizeLocked() int {
         size += 256 * len(b.shopping.Entries)
     }
     size += 160 * len(b.skills)
-    size += 256 * len(b.skillQueue)
+    if queue, ok := b.currentSkillQueueLocked(); ok {
+        size += 256 * len(queue)
+    }
     size += 160 * len(b.combat.events)
     size += 160 * len(b.zoneViews)
     size += 320

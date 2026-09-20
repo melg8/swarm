@@ -268,22 +268,21 @@ func (j *Journal) flushFile() {
     }
 }
 
-// rotate closes the current file, gzips it in the background and opens
-// the next segment. The segments keep sequence numbers, so they order
-// lexically after the base file.
+// rotate gzips the filled segment in the background and opens the
+// next one. The segments keep sequence numbers, so they order
+// lexically after the base file. The next segment opens before the
+// old one closes: a failed open keeps the writer on the still-open
+// file and the size cap re-arms the attempt on every later flush,
+// while the old order closed the file first and stranded every later
+// record on a closed handle forever (the report and the file
+// silently diverged).
 func (j *Journal) rotate() {
-    if err := j.file.Close(); err != nil && j.logger != nil {
-        j.logger.Printf("Error session journal close: %v", err)
-    }
     rotated := j.path
     if j.seq > 0 {
         rotated = j.segmentPath(j.seq)
     }
-    j.wg.Add(1)
-    go gzipFile(rotated, &j.wg, j.logger)
-    j.seq++
     next, err := os.OpenFile(
-        j.segmentPath(j.seq), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+        j.segmentPath(j.seq+1), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
     if err != nil {
         if j.logger != nil {
             j.logger.Printf("Error session journal rotate: %v", err)
@@ -291,6 +290,12 @@ func (j *Journal) rotate() {
 
         return
     }
+    if err := j.file.Close(); err != nil && j.logger != nil {
+        j.logger.Printf("Error session journal close: %v", err)
+    }
+    j.wg.Add(1)
+    go gzipFile(rotated, &j.wg, j.logger)
+    j.seq++
     j.written = 0
     j.counter.written = 0
     j.install(next)
@@ -537,39 +542,63 @@ func (c *countingWriter) Write(p []byte) (int, error) {
     return n, err //nolint:wrapcheck // passthrough writer
 }
 
-// gzipFile compresses a rotated journal segment to path.gz and removes
-// the original on success. A gzip failure keeps the original on disk
-// (the data survives, only the compression is lost).
+// gzipFile compresses a rotated journal segment to path.gz and
+// removes the original on success. Any failure (open, create,
+// compress) keeps the original on disk - the data survives, only the
+// compression is lost - and drops the partial archive so a truncated
+// .gz never shadows the intact original.
 func gzipFile(path string, wg *sync.WaitGroup, logger *log.Logger) {
     defer wg.Done()
     source, err := os.Open(path)
     if err != nil {
-        if logger != nil {
-            logger.Printf("Error session journal gzip open: %v", err)
-        }
+        gzipLog(logger, "open", err)
 
         return
     }
     defer source.Close()
     target, err := os.Create(path + ".gz")
     if err != nil {
-        if logger != nil {
-            logger.Printf("Error session journal gzip create: %v", err)
+        gzipLog(logger, "create", err)
+
+        return
+    }
+    if err := compressSegment(target, source); err != nil {
+        gzipLog(logger, "compress", err)
+        if rmErr := os.Remove(path + ".gz"); rmErr != nil {
+            gzipLog(logger, "cleanup", rmErr)
         }
 
         return
     }
-    sink := gzip.NewWriter(target)
-    if _, err := io.Copy(sink, source); err != nil && logger != nil {
-        logger.Printf("Error session journal gzip copy: %v", err)
-    }
-    if err := sink.Close(); err != nil && logger != nil {
-        logger.Printf("Error session journal gzip close: %v", err)
-    }
-    if err := target.Close(); err != nil && logger != nil {
-        logger.Printf("Error session journal gzip target: %v", err)
-    }
-    if err := os.Remove(path); err != nil && logger != nil {
-        logger.Printf("Error session journal gzip cleanup: %v", err)
+    if err := os.Remove(path); err != nil {
+        gzipLog(logger, "cleanup", err)
     }
 }
+
+// compressSegment copies the source through the gzip sink into the
+// target. The copy, the sink close and the target close are one unit
+// of work - a failure anywhere means the archive did not land.
+func compressSegment(target *os.File, source *os.File) error {
+    sink := gzip.NewWriter(target)
+    if _, err := gzipCopy(sink, source); err != nil {
+        return err
+    }
+    if err := sink.Close(); err != nil {
+        return err
+    }
+
+    return target.Close()
+}
+
+// gzipLog reports one gzip stage failure when the journal carries a
+// logger.
+func gzipLog(logger *log.Logger, stage string, err error) {
+    if logger == nil || err == nil {
+        return
+    }
+    logger.Printf("Error session journal gzip %s: %v", stage, err)
+}
+
+// gzipCopy is the copy step of compressSegment, a seam the tests
+// swap to force a copy failure.
+var gzipCopy = io.Copy

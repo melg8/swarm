@@ -422,6 +422,7 @@ func runBot( //nolint:funlen // linear session script
     ctx context.Context, cfg config, tracker *state.Bot,
     engine *pathfind.Engine, mesh *navmesh.Mesh,
     proxyServer *proxy.Server, journal *session.Journal,
+    journalWG *sync.WaitGroup,
 ) error {
     sessionCtx, cancelSession := context.WithCancel(ctx)
     defer cancelSession()
@@ -451,8 +452,19 @@ func runBot( //nolint:funlen // linear session script
 
     game, err := connection.NewGameClient(gameConn)
     if err != nil {
+        // NewGameClient owns the connection only on success: the
+        // handshake failure must not leak it (the supervisor retries
+        // around the clock and every leaked fd and server account
+        // slot compounds across the retries).
+        _ = gameConn.Close()
+
         return fmt.Errorf("game handshake failed: %w", err)
     }
+    // Every later pre-Run failure (game authentication, character
+    // preparation, world entry) closes the session through this
+    // defer; on the happy path Run already disconnected and the
+    // second close is a no-op.
+    defer func() { _ = game.Close() }()
     game.SetTracker(tracker)
 
     // The proxy observes the whole session (the recorder replays it to
@@ -524,7 +536,11 @@ func runBot( //nolint:funlen // linear session script
     } else {
         loop.SetAutonomy(false)
     }
-    go loop.Run(sessionCtx)
+    journalWG.Add(1)
+    go func() {
+        defer journalWG.Done()
+        loop.Run(sessionCtx)
+    }()
 
     return game.Run(sessionCtx, cfg.charName)
 }
@@ -584,9 +600,12 @@ func openSessionJournal(cfg config) *session.Journal {
 
 // wireSessionBot connects one tracker to the journal: the event story
 // mirror (every recorded tracker event lands in the journal file) and
-// the periodic state sampler of the quantitative trail.
+// the periodic state sampler of the quantitative trail. The sampler
+// goroutine joins the wait group so the shutdown waits for its final
+// records before the journal closes.
 func wireSessionBot(
     ctx context.Context, journal *session.Journal, tracker *state.Bot,
+    journalWG *sync.WaitGroup,
 ) {
     if journal == nil {
         return
@@ -595,7 +614,11 @@ func wireSessionBot(
     tracker.SetEventSink(func(at time.Time, message string) {
         journal.Story(botID, message, at)
     })
-    go session.NewSampler(botID, tracker, journal).Run(ctx)
+    journalWG.Add(1)
+    go func() {
+        defer journalWG.Done()
+        session.NewSampler(botID, tracker, journal).Run(ctx)
+    }()
 }
 
 // runSessionReportCLI renders the session report of a journal file to
@@ -714,11 +737,13 @@ func runBotForever(
     ctx context.Context, cfg config, tracker *state.Bot,
     engine *pathfind.Engine,
     mesh *navmesh.Mesh, proxyServer *proxy.Server, journal *session.Journal,
+    journalWG *sync.WaitGroup,
 ) {
     delay := reconnectMinDelay
     for {
         started := time.Now()
-        err := runBot(ctx, cfg, tracker, engine, mesh, proxyServer, journal)
+        err := runBot(ctx, cfg, tracker, engine, mesh, proxyServer,
+            journal, journalWG)
         if ctx.Err() != nil {
             return
         }
@@ -844,7 +869,8 @@ func main() {
     journal := openSessionJournal(cfg)
     ctx, stop := signal.NotifyContext(context.Background(),
         syscall.SIGINT, syscall.SIGTERM)
-    wireSessionBot(ctx, journal, tracker)
+    journalWG := &sync.WaitGroup{}
+    wireSessionBot(ctx, journal, tracker, journalWG)
     startMemoryWatch(ctx)
 
     var proxyServer *proxy.Server
@@ -876,10 +902,16 @@ func main() {
         web.SetSessionJournal(journal)
     }
 
-    runBotForever(ctx, cfg, tracker, engine, mesh, proxyServer, journal)
+    runBotForever(ctx, cfg, tracker, engine, mesh, proxyServer, journal,
+        journalWG)
     stop()
     shutdownWebInterface(web)
     shutdownProxy(proxyServer)
+    // The hunt loop and the sampler hold their final records until
+    // their contexts unwind: they join here, before the journal
+    // closes, so the last story lines and samples land in the file
+    // instead of dropping on a closed queue.
+    journalWG.Wait()
     if journal != nil {
         journal.Shutdown("process finished")
         journal.Close()
@@ -948,8 +980,9 @@ func runFleet(cfg config) {
         syscall.SIGINT, syscall.SIGTERM)
     startMemoryWatch(ctx)
 
+    journalWG := &sync.WaitGroup{}
     for _, tracker := range trackers {
-        wireSessionBot(ctx, journal, tracker)
+        wireSessionBot(ctx, journal, tracker, journalWG)
     }
 
     // Launch every bot supervisor in its own goroutine. A per-bot
@@ -963,13 +996,19 @@ func runFleet(cfg config) {
         wg.Add(1)
         go func(c config, t *state.Bot) {
             defer wg.Done()
-            runBotForever(ctx, c, t, engine, mesh, proxyServer, journal)
+            runBotForever(ctx, c, t, engine, mesh, proxyServer, journal,
+                journalWG)
         }(botCfg, tracker)
     }
     wg.Wait()
     stop()
     shutdownWebInterface(web)
     shutdownProxy(proxyServer)
+    // The hunt loops and the samplers hold their final records until
+    // their contexts unwind: they join here, before the journal
+    // closes, so the last story lines and samples land in the file
+    // instead of dropping on a closed queue.
+    journalWG.Wait()
     if journal != nil {
         journal.Shutdown("fleet finished")
         journal.Close()

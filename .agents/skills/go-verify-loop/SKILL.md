@@ -17,7 +17,7 @@ Run it from the repository root, in this order:
 ```bash
 go build ./...            # compiles everything including cmd/
 go vet ./...              # cheap static checks
-go test ./... -count=1    # the full suite (~40 s, pathfind dominates)
+go test ./... -count=1    # the full suite (~2-3 min on a cold cache, pathfind dominates)
 task fmt:check            # spaces-only gate: no tabs, gofmt-spaces clean
 golangci-lint run         # the strict gate; 0 issues required
 ```
@@ -35,8 +35,11 @@ the call that started it (docs/deployment.md, "Foreground
 execution is mandatory").
 
 `task check:all` is the alias of `task verify` - the full gate: build
-+ vet + lint + test + fmt:check (`.github/workflows/ci.yml` runs the
-same order on every push). The fast pre-push gate is `task prepush`
++ vet + lint + test + fmt:check (the same order is designed for CI in
+`docs/ci_workflow.yml` - it stays a designed-but-inactive gate until
+a workflow-scoped token copies it to `.github/workflows/ci.yml`, see
+the note at the top of that file; the review of 2026-09-20 verified
+zero workflow runs). The fast pre-push gate is `task prepush`
 (build, vet, `lint --new`, whitespace, the tests of the touched
 packages; installable as a git hook via
 `tools/install_dev_tools.sh hook`). The individual tasks are `task

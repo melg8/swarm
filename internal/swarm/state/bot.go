@@ -9,6 +9,7 @@ import (
     "sort"
     "strconv"
     "sync"
+    "sync/atomic"
     "time"
 
     "github.com/melg8/swarm/internal/swarm/npcdata"
@@ -500,27 +501,27 @@ type Bot struct {
     questItems map[int32]int32
     // skills holds the learned skill list of the server packet
     // (id -> level + passive). skillsRevision counts the SetSkills
-    // calls and the weapon priority changes; skillQueue caches the
-    // ordered learning queue and rebuilds when the class or the
-    // revision moves (see ensureSkillQueueLocked). skillWeapons
-    // holds the weapon families the queue prefers (the weapon in
-    // hand and the next weapon of the purchase plan).
-    skills             map[int32]learnedSkill
-    skillsRevision     uint64
-    skillQueue         []SkillPlanEntry
-    skillQueueClass    int32
-    skillQueueRevision uint64
-    skillWeapons       []string
-    // bookKeep caches the demanded spellbook item ids of the unlocked
-    // queued lessons (see demandedBooksLocked): the junk flows of the
-    // sell trips and the overflow destroy read it under the read lock,
-    // so the per call walk of the queue stays cached between the
-    // skill list revisions. bookKeepRevision and bookKeepLevel key the
-    // cache - a learn bumps the revision, a level up shifts the
-    // unlock window.
-    bookKeep         map[int32]bool
-    bookKeepRevision uint64
-    bookKeepLevel    int32
+    // calls and the weapon priority changes; skillQueueCache caches
+    // the ordered learning queue behind an atomic pointer and
+    // rebuilds when the class or the revision moves (see
+    // skillQueueLocked). skillWeapons holds the weapon families the
+    // queue prefers (the weapon in hand and the next weapon of the
+    // purchase plan).
+    skills          map[int32]learnedSkill
+    skillsRevision  uint64
+    skillQueueCache atomic.Pointer[skillQueueCache]
+    skillWeapons    []string
+    // bookKeepCache caches the demanded spellbook item ids of the
+    // unlocked queued lessons (see demandedBooksLocked): the junk
+    // flows of the sell trips and the overflow destroy read it under
+    // the read lock, so the per call walk of the queue stays cached
+    // between the skill list revisions. A learn bumps the revision, a
+    // level up shifts the unlock window, a class swap changes the
+    // tree - the key fields answer all three. The atomic pointer
+    // keeps the read lock readers read-only (the plain fields here
+    // raced two concurrent snapshot encoders, see the 2026-09-20
+    // review).
+    bookKeepCache atomic.Pointer[bookKeepCache]
     // buffs holds the active effect list of the server
     // AbnormalStatusUpdate packets (skillId -> level + seconds left
     // at the arrival); buffsAt anchors the remaining seconds the
@@ -586,26 +587,20 @@ func NewBot(id string) *Bot {
         packetWindow: packetRateWindow{
             second: 0, filled: 0, counts: [packetRateSeconds]int32{},
         },
-        eventSink:          nil,
-        commandQueue:       make(chan Command, commandQueueCapacity),
-        walkPlan:           nil,
-        walkPlanAt:         time.Time{},
-        shopping:           nil,
-        shoppingAt:         time.Time{},
-        skills:             nil,
-        skillsRevision:     0,
-        quests:             nil,
-        questItems:         nil,
-        skillQueue:         nil,
-        skillQueueClass:    0,
-        skillQueueRevision: 0,
-        skillWeapons:       nil,
-        bookKeep:           nil,
-        bookKeepRevision:   0,
-        bookKeepLevel:      0,
-        buffs:              nil,
-        buffsAt:            time.Time{},
-        metrics:            newBotMetrics(),
+        eventSink:      nil,
+        commandQueue:   make(chan Command, commandQueueCapacity),
+        walkPlan:       nil,
+        walkPlanAt:     time.Time{},
+        shopping:       nil,
+        shoppingAt:     time.Time{},
+        skills:         nil,
+        skillsRevision: 0,
+        quests:         nil,
+        questItems:     nil,
+        skillWeapons:   nil,
+        buffs:          nil,
+        buffsAt:        time.Time{},
+        metrics:        newBotMetrics(),
     }
 }
 
@@ -1348,9 +1343,6 @@ func (b *Bot) ResetSession() {
     b.quests = nil
     b.questItems = nil
     b.dialog = openDialog{} //nolint:exhaustruct_v5 // the zero page clears
-    b.skillQueue = nil
-    b.skillQueueClass = 0
-    b.skillQueueRevision = 0
     b.skillWeapons = nil
     b.buffs = nil
     b.buffsAt = time.Time{}

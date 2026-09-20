@@ -100,6 +100,14 @@ const (
     charSelectWait     = 5 * time.Second
     charSelectAttempts = 3
     charCreateOkWait   = 2 * time.Second
+    // charListWait bounds one pre-world read outside the bounded
+    // selection dance: the character list answer of the AuthLogin
+    // exchange and each packet of the creation exchange (see
+    // EnsureCharacter). These reads sit before the in-world silence
+    // watchdog exists, so an unbounded read here parks the bot
+    // goroutine forever on a stalled or half-open server while the
+    // supervisor waits for a session that never returns.
+    charListWait = 30 * time.Second
 )
 
 // Packet ids used by the game flow state machine.
@@ -930,9 +938,21 @@ func (gc *GameClient) Authenticate(
     }
     gc.logger.Println("Sent game auth login for account " + params.Account)
 
+    // The char list answer bounds like every pre-world read (see
+    // charListWait): the silence watchdog of the live session does
+    // not exist yet.
+    if err := gc.conn.SetReadDeadline(
+        time.Now().Add(charListWait)); err != nil {
+        return nil, fmt.Errorf(
+            "failed to set the character list deadline: %w", err)
+    }
     payload, err := gc.readPacket(gc.readBuf)
     if err != nil {
         return nil, fmt.Errorf("failed to read character list: %w", err)
+    }
+    if err := gc.conn.SetReadDeadline(time.Time{}); err != nil {
+        return nil, fmt.Errorf(
+            "failed to reset the character list deadline: %w", err)
     }
     gc.readBuf = payload
     if len(payload) == 0 {
@@ -1048,13 +1068,24 @@ func (gc *GameClient) drainCharCreateOk() {
 
 // awaitCharacterCreation reads packets until the creation result resolves.
 // The first return value reports completion, the second carries the updated
-// character list when the requested character appeared in it.
+// character list when the requested character appeared in it. Every read
+// bounds by charListWait: the creation exchange sits before the in-world
+// silence watchdog exists.
 func (gc *GameClient) awaitCharacterCreation(
     name string,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
+    if err := gc.conn.SetReadDeadline(
+        time.Now().Add(charListWait)); err != nil {
+        return false, nil, fmt.Errorf(
+            "failed to set the creation wait deadline: %w", err)
+    }
     payload, err := gc.readPacket(gc.readBuf)
     if err != nil {
         return false, nil, fmt.Errorf("failed to read creation result: %w", err)
+    }
+    if err := gc.conn.SetReadDeadline(time.Time{}); err != nil {
+        return false, nil, fmt.Errorf(
+            "failed to reset the creation wait deadline: %w", err)
     }
     gc.readBuf = payload
     if len(payload) == 0 {

@@ -106,11 +106,13 @@ server is load-bearing for the task.
 
 ## Tech stack at a glance (read this first)
 
-- **Language**: Go 1.24 (deployed by `tools/swarm_fast_deploy.sh`).
-  `go.mod` pins `go 1.23.2`; the toolchain auto-downloads 1.24 on
-  first `go build`. There is **no Rust, no Node, no C** in the bot
-  itself. Node is only used by the four `tools/repro_*.js` web UI
-  harnesses (plain JS, no npm).
+- **Language**: Go (deployed by `tools/swarm_fast_deploy.sh`).
+  `go.mod` pins `go 1.23.2` and the `toolchain go1.26.8` line - every
+  `go` invocation inside the module switches to the go1.26.8
+  toolchain, so the formatting and the gates agree on every host (the
+  deb go1.24 GOROOT included). There is **no Rust, no Node, no C** in
+  the bot itself. Node is only used by the four `tools/repro_*.js`
+  web UI harnesses (plain JS, no npm).
 - **Module path**: `github.com/melg8/swarm`.
 - **Libraries**: `golang.org/x/crypto` (Blowfish), `golang.org/x/text`
   (UTF-16 handling), `testify` (assertions), `sergi/go-diff` (test
@@ -473,6 +475,27 @@ cmd/swarm/                     Application entry point (flags: login,
 cmd/navmesh-build/             The offline geodata -> navmesh tile
                                converter of feature/new-pathfind
                                (docs/navmesh.md).
+cmd/navmesh-export/            Dumps the built tile pack (polygons,
+                               links, portals) for the external
+                               pathfinding harnesses (docs/navmesh.md).
+cmd/navanalyze/                Scratch analysis of the navmesh tile
+                               geometry and the raw geodata (the viewer
+                               defect hunts).
+cmd/stuckprobe/                Prints the exact RouteApproach answers
+                               for reported frozen bot positions (the
+                               stuck verdict probe).
+cmd/benchdiff/                 Compares two `go test -bench` output
+                               files into the per benchmark deltas (the
+                               plumbing of `task bench:diff`).
+cmd/geotest/                   The one-route geodata smoke probe (the
+                               hunting zone -> guard Kendell path).
+cmd/dbpos/                     Prints the character rows of the stack
+                               DB through the acceptance wire client
+                               (the live scenario watch helper).
+cmd/gofmt-spaces/              The spaces-only gofmt the repository
+                               style mandates (installed by
+                               tools/install_dev_tools.sh, run through
+                               `task fmt`).
 internal/swarm/
   pathfind/                    Geodata path finder (docs/pathfinding.md).
   pathfind/navmesh/            The navmesh runtime: tiles, mesh, A*,

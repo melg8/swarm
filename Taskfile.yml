@@ -92,6 +92,11 @@ tasks:
     cmds:
       - golangci-lint linters
 
+  vuln:
+    desc: Runs govulncheck (the reachable-symbol vulnerability scan; the CI gate runs it on every push)
+    cmds:
+      - govulncheck ./...
+
   packages:
     desc: Shows list of packages
     aliases: [p]
