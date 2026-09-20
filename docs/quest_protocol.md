@@ -109,7 +109,7 @@ the first click on an npc only selects it (target set,
 static html `data/html/<type>/<npcId>.htm`; a hostile npc becomes an
 attack intention instead. Outside the 250 units the player AI walks
 toward the npc first - the bot already replicates the click-from-
-the-ring behavior in its teacher leg (hunt/learning.go).
+the-ring behavior in its teacher segment (hunt/learning.go).
 
 ### RequestBypassToServer (0x21) - the dialog command channel
 
@@ -433,7 +433,7 @@ Every npc of both chains stands OUTSIDE the elven lands: the quest
 givers and the class master in **Gludio**, Kluto in **Gludin**, the
 kill grounds in the Ruins of Agony (west of Gludio) and the Ol
 Mahum camps (Gludin north). The elven lands autonomy (M0) covers
-none of this. The reachable legs:
+none of this. The reachable segments:
 
 - Elven Village -> Gludio: gatekeeper **Mirabel (30146**, elven
   village 46926, 51511, -2976), teleport "The Town of Gludio"
@@ -451,14 +451,14 @@ none of this. The reachable legs:
 A level 19-20 bot with the shop income of the elven ladder can
 afford both gatekeeper hops long before the class change; the
 navigation itself (zone registries of the Gludio/Gludin bands, the
-gatekeeper leg planner) is the M3 infrastructure the M2 acceptance
+gatekeeper segment planner) is the M3 infrastructure the M2 acceptance
 will need early - the exact overlap the follow-up tasks below
 spell out.
 
 ## What the bot has and what it needs (the follow-up tasks)
 
 Present state: the bot speaks `Action` (0x04, the talk click - the
-teacher and merchant legs), `RequestAcquireSkill`, `RequestBuyItem`
+teacher and merchant segments), `RequestAcquireSkill`, `RequestBuyItem`
 and `RequestSellItem`; it parses the inventory, the status and the
 paperdoll packets. It never parsed a dialog page and never sent a
 bypass; the whole html stream of its town trips is dropped unseen
@@ -501,7 +501,7 @@ decomposes into:
    ladders, the kill economy, the proof items, the class change
    routes, every id pinned through npcdata). The remaining
    halves: the quest trip phase (the hunt loop wiring that drives
-   the walker on the chain data), the gatekeeper leg (a town trip
+   the walker on the chain data), the gatekeeper segment (a town trip
    whose walk is a teleport buy - T-008), and the Gludio/Gludin
    navigation data (the M3 zone survey feeds it).
 5. **The M2 acceptance scenario** (acceptance): the class-transfer

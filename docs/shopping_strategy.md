@@ -178,10 +178,10 @@ trip plans them behind its gear stops: the stop order is the weapon
 stop (the sell stop routed to the weapon merchant), the armor stop,
 the jewel stop (which absorbs the spellbook purchases when the
 merchants match - Creamees sells both the basic jewels and the
-books), the teacher stop and the return leg. The weapon stop runs
-FIRST, so the stuck teacher leg that once aborted a weapon run with
+books), the teacher stop and the return segment. The weapon stop runs
+FIRST, so the stuck teacher segment that once aborted a weapon run with
 the weapon already sold cannot strand a bare-handed bot anymore: the
-weapon is bought and worn before the teacher leg ever runs. The gear
+weapon is bought and worn before the teacher segment ever runs. The gear
 plan reserves the spellbook budget out of its planning wallet
 (`Loop.pendingBookBudget` prices the books of the learnable lessons
 the inventory does not carry yet), so the aggressive armor spending
@@ -193,7 +193,7 @@ its book buying and its lessons in ONE walk through the village.
 town trip may leave a paperdoll slot worse than it found it: the
 trip start snapshots the worn slots (`Loop.snapshotTripGear`) and
 every trip exit - the normal end, the aborts, the attacker
-interrupt, the relogin-resumed return leg - compares the reached
+interrupt, the relogin-resumed return segment - compares the reached
 paperdoll against the snapshot (`Loop.gearDebtCheck`). A slot that
 was occupied, sits empty now and whose piece is gone from the
 inventory was sold for a replacement that never landed (a silently

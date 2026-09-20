@@ -130,14 +130,13 @@ free RAM, no root. The whole playground stands in three steps:
 
 ## Usage
 
-Okay. The stack is running, let's take a look at what you can do with it.
-
-The web interface is the main way to use swarm. The sidebar selects the
-session, the map shows the world, the floating panels hold the HUD, the
-target, the equipment and the skills. Interact with the world directly:
-double click the map to move, attack or loot, drag inventory items onto
-the paperdoll to equip them. The `view` menu toggles the map layers, the
-sun button flips the theme, the `log` tab shows the raw event stream.
+The web interface is the main way to use swarm. The sidebar selects
+the session, the map shows the world, the floating panels hold the
+HUD, the target, the equipment and the skills. Interact with the
+world directly: double click the map to move, attack or loot, drag
+inventory items onto the paperdoll to equip them. The `view` menu
+toggles the map layers, the sun button flips the theme, the `log`
+tab shows the raw event stream.
 
 The run variants:
 
@@ -195,9 +194,10 @@ do the same job.
 - Parties farming raid bosses, cross party healing, an alliance sieging
   a castle - the long goal of the project
 
-- The hunting system redesign: the spot model, respawn awareness,
-  efficiency scoring - see
-  [docs/hunting_system_redesign.md](docs/hunting_system_redesign.md)
+- The next hunting bands beyond the elven lands (the 20-40 band is
+  surveyed in [docs/band_20_25_survey.md](docs/band_20_25_survey.md);
+  the hexagon cell system of [docs/hunting_cells.md](docs/hunting_cells.md)
+  is the ground model)
 
 - Wiring the queued skill lessons to the server
 

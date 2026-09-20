@@ -147,7 +147,7 @@ would have paid for.
 - A running fight that turns into a death risk is fled: under 25%
   health, or under 60% while the target holds a 25+ percent health
   lead, the target is dropped with a two minute skip and paced escape
-  legs open distance (toward the zone center when the straight line
+  segments open distance (toward the zone center when the straight line
   leaves the square); a target one swing from dead is finished
   instead. A hurt character under attack keeps fleeing instead of
   standing in the blows.
@@ -155,7 +155,7 @@ would have paid for.
   a social pile up - two or more living attackable mobs holding the
   character as their target (`SelfAttackerCount`; a chasing mob
   carries the same target id as a swinging one, the character's own
-  engagement never counts). One last escape leg keeps the offline
+  engagement never counts). One last escape segment keeps the offline
   character moving through the 15 s combat stance the server holds it
   in, the `RequestLogout` packet plus the socket close follow, and a
   30 s login cooldown the supervisor (`runBotForever`) honors before
@@ -168,7 +168,7 @@ would have paid for.
   patience window instead of standing still. A big square whose pack
   sits outside the engage radius (1500) is walked toward directly:
   `walkToFarTarget` searches the whole zone for the nearest valid mob
-  and follows one paced leg per second, so the hunter closes on a far
+  and follows one paced segment per second, so the hunter closes on a far
   pack instead of standing central in an empty radius (the rotation
   only fires on a fully empty square).
 - A flee that never shakes the chase ends the session too: one escape
@@ -329,10 +329,10 @@ gear 260, spiders 13-16 gear 300, lirein 16-19 gear 380).
   pick), a manual zone override dies with the demotion.
 - A manual zone selection stops the walks aimed at the old square
   (`stopForZoneSwitch`: a manual move, a town trip walk and a zone
-  return leg are cancelled, one walk request to the current spot
+  return segment are cancelled, one walk request to the current spot
   replaces the running server walk; the deleveling refuses the stop
   like every movement command, the selling stop keeps running and its
-  return leg re-targets the new zone). The map draws every zone and
+  return segment re-targets the new zone). The map draws every zone and
   the floating collapsible zone panel of the map switches zones
   manually (the `zone` command, index in the Count field; the override
   holds until the character outgrows the band or dies it out) - see
@@ -487,19 +487,19 @@ The short form:
   share ONE stop and the replacement lands seconds after the sale -
   the old order sold the weapon at the nearest merchant and walked
   the village for the replacement, and every trip killer in between
-  (a stuck teacher leg, an attacker interrupt, a merchant no-show)
+  (a stuck teacher segment, an attacker interrupt, a merchant no-show)
   left the character bare-handed. A character with NO weapon at all
   runs the weapon errand (`weaponlessRunWanted`: no profile
   usable weapon in the inventory and an affordable weapon in the plan
   - see `gear.HasWeapon`): the run carries the learning stops too
   (the 2026-09-12 one town visit rule - the weapon stop runs FIRST,
-  so a stuck teacher leg can no longer strand a bare-handed
-  character: the weapon is bought and worn before the teacher leg
+  so a stuck teacher segment can no longer strand a bare-handed
+  character: the weapon is bought and worn before the teacher segment
   ever runs), the retry cooldown shortens to 45
   seconds (`weaponRunCooldown`) instead of the five minute trip
   cooldown. While the weapon run is pending the engage holds its
   fresh target picks (`logWeaponWait` paces the hold line) and the
-  zone entry engage of the return leg skips the same way - the fists
+  zone entry engage of the return segment skips the same way - the fists
   land 2 damage and nothing outranks fixing that; the attacker self
   defense answer stays armed whatever the weapon state is. A wallet
   that cannot afford any weapon keeps farming: the gate only holds
@@ -565,7 +565,7 @@ The short form:
   sell-first step is one-way - a sale that lands while its
   replacement buy fails (a silently refused request, a merchant
   no-show, a walk abort, a session death the relogin resumed into
-  the return leg) strands the slot, and every trip exit used to end
+  the return segment) strands the slot, and every trip exit used to end
   the trip as a success. Now the trip start snapshots the worn
   slots (`Loop.snapshotTripGear`) and every exit (`endTownTrip`,
   the interrupt `resetTownTrip`) compares the reached paperdoll
@@ -615,7 +615,7 @@ The short form:
   port (`Navigator.ValidateClick`, see round 52): the server refuses
   whole lines its Bresenham raster walks into walled corners - a
   refused click collapses onto the walker and never moves the
-  character, so the follower reacts instead of sending it (the leg
+  character, so the follower reacts instead of sending it (the segment
   shortening first, then the hop back to the nearest swallowed plan
   bend - the escape out of the geodata trap cells - and finally the
   re-path). The walker re-paths around obstacles after
@@ -627,7 +627,7 @@ The short form:
   server collapsed onto the first step, and the partial clicks crept
   the character 16 units at a time into the dead-end pocket cell east
   of the aisle whose closed east wall then refused the click
-  wholesale), and the re-planned leg advances its cursor past the
+  wholesale), and the re-planned segment advances its cursor past the
   fresh plan's wp 0 (the standing cell itself) before the click fires
   - a click at the character's own position is a guaranteed server
   refusal that would burn the re-path budget on nothing. A re-path
@@ -637,16 +637,16 @@ The short form:
   planner reproduces the same first click the server already refused
   twice (the 2026-09-11 11:34 village return dump froze through two
   whole trip cycles this way), and the zone return escalates straight
-  to the direct server routed legs (a frozen return sets the zone
-  fail budget). The town walk legs climb their own escalation ladder
+  to the direct server routed segments (a frozen return sets the zone
+  fail budget). The town walk segments climb their own escalation ladder
   instead of dying on the first freeze (the 2026-09-12 03:56 trainer
-  hall dump: the learn leg froze at the aisle entrance through every
+  hall dump: the learn segment froze at the aisle entrance through every
   re-path of two whole trips - the server walled the corridor the
   pack modeled as open): the frozen abort first bans the aimed
   waypoint's cells as the session's avoid areas and re-plans the
   detour around them (the pathfind search takes the banned patches -
   a step onto banned ground costs impassable, and neither the direct
-  line shortcut nor the smoothing may collapse a leg across them, so
+  line shortcut nor the smoothing may collapse a segment across them, so
   the trainer hall route goes north over the terrace and east past
   the hall), then - if the detour freezes as well - the follower
   drops the plan and clicks the stop target directly by the server's
@@ -689,8 +689,8 @@ The short form:
   and the quarter of the capped click, then the perpendicular
   offsets, every variant offline validated and water guarded) because
   the refusal is target specific; the corridor ban rung of the
-  escalation ladder is SKIPPED for a leg whose evidence latched
-  (legRefused) - a leg the server refused does not name a frozen
+  escalation ladder is SKIPPED for a segment whose evidence latched
+  (segmentRefused) - a segment the server refused does not name a frozen
   corridor, banning it would seal innocent ground for the session
   (the dump poisoned six corridors and a widened r768 ban across both
   village exits of a server whose build simply refuses those clicks);
@@ -701,7 +701,7 @@ The short form:
   fallback was structurally dead), every hop passes the offline click
   port, a wet hop line shortens to its dry shore prefix and a refused
   routed hop aborts the trip early with the honest reason; and the
-  direct zone leg stall splits on the ground covered - a character
+  direct zone segment stall splits on the ground covered - a character
   that progressed re-arms the pathfound return (the partially
   refusing deployment walks out through the varied aims), a
   character that stood on the same cell as the previous refusal stall
@@ -722,18 +722,18 @@ The short form:
   position - a 0 length walk) and the re-paths replanned from the same
   floating spot. Four defenses keep the trips ashore now: (0) the
   planning itself is dry (FindPathApproachDry, the 2026-09-10 delevel
-  water loop): the water is a wall for the trip leg searches, a
-  destination only swimming reaches aborts the leg at once (the
-  cooldowns arm) instead of planning a route the walker refuses leg by
-  leg - the wet route of the ordinary search is exactly what looped the
+  water loop): the water is a wall for the trip segment searches, a
+  destination only swimming reaches aborts the segment at once (the
+  cooldowns arm) instead of planning a route the walker refuses segment by
+  segment - the wet route of the ordinary search is exactly what looped the
   deleveling "walking to the guard" -> "the walk would enter water" ->
   "aborted, the walk would cross water" every 1.3 s in the reported
   state dump, (1) the
-  smoothing never collapses a leg between two dry points across water
+  smoothing never collapses a segment between two dry points across water
   (pathfind legDry), (2) the follower verifies every click line with
   pathfind.WaterCrossed before sending it - the pure water raster, NOT
   the DryLine answer: the line of sight half of DryLine fails on the
-  height steps of the village deck ramps, the teacher legs of the
+  height steps of the village deck ramps, the teacher segments of the
   learning trips read as water that way and every trip that carried
   them aborted on the 3 re-path budget (the 2026-09-10 teacher round) -
   a wet click is refused and the walk re-paths around the shore (the
@@ -742,8 +742,8 @@ The short form:
   (the geodata surface under it below the water level, OverWater)
   enters the water escape: the walk to the nearest shore
   (FindWaterEscape, a breadth first flood over the walkable surface)
-  replaces the leg, a stuck escape re-plans itself, and once the
-  character stands dry the interrupted leg re-plans from the shore with
+  replaces the segment, a stuck escape re-plans itself, and once the
+  character stands dry the interrupted segment re-plans from the shore with
   a fresh re-path budget. An abort of a walk machinery that runs during
   the deleveling aborts the deleveling itself (abortTownTrip
   delegates to abortDelevel): the plain trip end left the delevel
@@ -753,17 +753,18 @@ The short form:
   without a modeled floor resolve to the lake layer below them, every
   straight line over the plaza center fails the dry raster while the
   points stand dry): when the re-path budget exhausts without an
-  escape on the trip, the plan is trusted for the rest of the leg and
-  walks over the server routing (wetPlanTrusted; the standing water
-  check and the shore escape stay armed, and a next budget exhaustion
-  after an escape ends the trip for real). The dump and the map carry the whole leg -
-  origin, every waypoint with the passed markers, the TARGET marker on
-  the current waypoint and the destination - for exactly this class of
-  debugging (see docs/webui.md).
-- Path layer selection: the trip legs navigate with
+  escape on the trip, the plan is trusted for the rest of the
+  segment and walks over the server routing (wetPlanTrusted; the
+  standing water check and the shore escape stay armed, and a next
+  budget exhaustion after an escape ends the trip for real). The
+  dump and the map carry the whole segment - origin, every waypoint
+  with the passed markers, the TARGET marker on the current waypoint
+  and the destination - for exactly this class of debugging (see
+  docs/webui.md).
+- Path layer selection: the trip segments navigate with
   pathfind.Engine.FindPathApproachDry (through the Navigator's
   FindPathApproachDryAvoiding - the dry search with the session's
-  frozen corridor bans) and the leg approach radius: the merchant
+  frozen corridor bans) and the segment approach radius: the merchant
   stops and the returns use the wide trip ring (200 units, under the
   interaction distance): the walk ends on the deck ring around the
   merchant, which handles the C1 shop interiors (the geodata holds no
@@ -776,7 +777,7 @@ The short form:
   geodata search is the one that knows the walkable ring cells (the
   trainer hall interior carries its floor along the hall rows, the
   straight line offset ring lands on the roof-only bands between
-  them), and the tight legs complete their route end with the pass
+  them), and the tight segments complete their route end with the pass
   radius instead of the wide trip slack. The water is a wall for the
   search, so the walks cross the village ramps instead of swimming
   the lake under the floating island (the 2026-09-09 fix; regression
@@ -888,7 +889,7 @@ the stage extends instead of blacklisting a guard that had no damage
 to retaliate against (internal/swarm/state SelfLandedHit feeds the
 distinction). The whole deleveling is bounded by a 60 min timeout and
 a 1 min cooldown after it ends. The
-walk legs are split into at most 1000 unit steps because the server
+walk segments are split into at most 1000 unit steps because the server
 refuses move requests with a target farther than 9900 units
 (MoveToLocation readImpl); the smoothed geodata routes happily exceed
 that over open terrain. A death during the deleveling keeps the phase
@@ -990,7 +991,7 @@ space) and drives the entry prefix plus the stage links, a kill
 stage walks to the ground and engages the quest mobs until the
 journal counters fill. The run ends when the exit talk drops the
 quest from the journal (the proof item survives in the inventory,
-the class change leg of the caller consumes it).
+the class change segment of the caller consumes it).
 
 The script facts the engine rides (Q00406 read from the Mobius
 source, no guessing): the 20th piece drop itself sets the next cond
@@ -1004,7 +1005,7 @@ decision) returns an error naming the stage. The kill engage paces
 the attack requests at 700 ms (the Mobius double click semantics:
 the repeated request starts the fight), a ground with no living
 quest mob in the 1600 scan radius holds for the respawn instead of
-walking away. The class change leg (the Rains route) and the level
+walking away. The class change segment (the Rains route) and the level
 19 DB injection stay with the acceptance scenario of T-016.
 
 ## Live validated facts (2026-09-07 round, do not re-derive)

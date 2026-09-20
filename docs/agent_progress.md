@@ -1654,3 +1654,65 @@ item not forbidden from the sale sells to any merchant.
   clean, bash -n on every touched script, go test -count=1 ./... 28
   packages ok. No behavior change: the translations touch the
   comments, the diagnostic strings, the webui captions and the docs.
+
+### Progress (2026-09-20, the docs and comments audit round)
+
+- the owner asked for an audit of the code comments and every md
+  file: cut the slack, remove the deprecated, make a new agent get
+  what it needs from AGENTS.md and get routed to the right docs,
+  and recheck the skills instructions for the Go source work.
+- the fact check against the tree surfaced the stale claims:
+  AGENTS.md still carried the two contradicting reaper studies
+  (09-18 death vs 09-19 survival) under the mandatory 10 minute
+  owner rule, a duplicate Tech stack section, the paid-off ~200
+  finding lint debt paragraph against the zero findings
+  discipline, the false "imports grouped by gci" claim (gci is
+  disabled in .golangci.yml - its canonical form is tab indented),
+  the stale .golangci-lint filename, the .github/workflows/ci.yml
+  reference (the file is the owner placed copy of
+  docs/ci_workflow.yml, nothing in tree), "four project playbooks"
+  in three places (there are seven), and seven docs missing from
+  the documentation map (ROADMAP, quest_protocol,
+  band_20_25_survey, fastpath_research, flake_ledger, the
+  superseded hunting_system_redesign, the docs index itself).
+- AGENTS.md now opens with the Start here block (the first minute
+  of a session: skim this file, one doc from the map, the matching
+  playbook, agent_progress.md, deploy first); the subprocess
+  section condenses to the 10 minute rule plus the one call
+  pattern; the agents.md mirror drops the survival verdict it
+  still carried against the owner rule and points at Start here.
+- the skills recheck the owner asked for: the instructions exist
+  and got sharper - the vendored samber/cc-skills-golang collection
+  (46 golang-* skills) is pinned as the Go knowledge base for the
+  tree's Go source with the area to skill mapping spelled out
+  (golang-testing, golang-concurrency, golang-error-handling,
+  golang-lint/golang-code-style, golang-naming, golang-performance,
+  golang-troubleshooting); the seven hand-maintained project
+  playbooks (go-verify-loop, mobius-stack, packet-recipe,
+  webui-harness, performance, dump-state-repro, e2e-repro) cover
+  the repo specific procedures.
+- the terminology completion: docs/hunting.md was missed by the
+  leg->segment doc rename (35 movement prose lines plus the
+  legRefused reference to the renamed symbol), the same cleanup
+  landed in shopping_strategy.md (4), proxy.md (3),
+  band_20_25_survey.md (7) and quest_protocol.md (5); the
+  equipment legs (the armor slot: the legs slot, the legs armor,
+  the chest/legs/head lists) stay as they should.
+- README.md: the Planned section stopped advertising the
+  superseded hunting_system_redesign.md (the spot model was
+  implemented and retired for the cell system) and points at the
+  band survey and hunting_cells instead; the "Okay. The stack is
+  running" slack prose is gone. docs/README.md gained the missing
+  rows (navmesh, quest_protocol, band_20_25_survey, ROADMAP,
+  recast_pathfinding, fastpath_research, agent_feedback_loops,
+  flake_ledger) so both indexes route to every doc that exists.
+- the code comment audit is clean: no TODO/FIXME markers, no
+  references to the retired claim/lease queue or the reaper
+  studies, the Cyrillic only in the multibyte encoding test
+  fixtures, the "deprecated" words only about the real protocol
+  and stdlib facts (the deprecated zero ints of CharSelectionInfo,
+  the net.Dialer deprecated fields).
+- verification: go build, golangci-lint run 0 issues, task
+  fmt:check clean (the quests_test.go gofmt drift a parallel push
+  landed is fixed in its own commit), no behavior change - the
+  round touches the docs and the comments only.

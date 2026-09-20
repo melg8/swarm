@@ -195,7 +195,7 @@ stale place.
 That was the reported deleveling breakdown: the bot died at the guard,
 the bot's restart teleported the character to the village, the
 attached client kept reporting the death spot, the server snapped the
-character back to the guard post, the bot's walk legs pulled it toward
+character back to the guard post, the bot's walk segments pulled it toward
 the village again, the next report snapped it back - an endless
 position ping pong (the WebUI event log showed the known object list
 flipping between the village and the guard camp every second). The
@@ -210,8 +210,8 @@ and does nothing for a long time".
 The fix severs that loop with the same seam the keepalive uses: a
 client position report is compared against the live tracker position
 of the attached bot session, and a report that contradicts it beyond
-one walk leg plus slack (2000 units - a live client that follows the
-own character through the broadcasts stays within one leg even mid
+one walk segment plus slack (2000 units - a live client that follows the
+own character through the broadcasts stays within one segment even mid
 movement) never transits. Instead the proxy answers the client
 locally with the same `ValidateLocation` (0x76) correction the server
 itself sends for an out of sync report, carrying the live place of the

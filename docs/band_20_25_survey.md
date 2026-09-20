@@ -31,7 +31,7 @@ analysis measured for the shipped pathfinder caps. The band is
 reached through the gatekeeper network (the H-002 hypothesis of the
 AGENTS.md registry covers its dialog protocol):
 
-| Leg | Gatekeeper (npc) | From -> to | Fee (adena) | Arrival |
+| Segment | Gatekeeper (npc) | From -> to | Fee (adena) | Arrival |
 | --- | --- | --- | --- | --- |
 | 1 | Mirabel (30146) | Elven Village -> Town of Gludio | 9 200 | -12694 122776 -3114 |
 | 2 | Bella (30256) | Gludio -> Town of Dion | 3 400 | 15671 142994 -2704 |
@@ -49,13 +49,13 @@ into the same trips. The walking alternative is MEASURED (T-018,
 expansions, 13 s with the raised 40M cap) and Gludio -> Dion of
 42 831 units (25 waypoints, 0.94M nodes - within the shipped 1M
 cap), so the corridor through the Neutral Zone exists end to end on
-foot. The economics keep the gatekeeper chain the practical leg
+foot. The economics keep the gatekeeper chain the practical segment
 (~154 700 units of pure running, over 14 minutes at the run speed,
 against the instant 13 600 adena hop); the walk is the zero-adena
 fallback of a broke character and the emergency return. The shipped
-expansion cap (1M) aborts the elven -> Gludio leg - the cap must
+expansion cap (1M) aborts the elven -> Gludio segment - the cap must
 become a search parameter (the navigation analysis roadmap item 1)
-before the walk leg is usable in the bot.
+before the walk segment is usable in the bot.
 
 ## The grounds
 
@@ -124,7 +124,7 @@ The Monster Eye Watcher (20067) level 25, hp 507, exp 819, passive,
 in squares mixed with the aggressive Lesser Basilisk (20070) level
 27 and Basilisk (20072) level 28. The nearest square
 (gludio04_1923_06) is 7.6k from the Plains of Dion teleport - a
-band walk, not a separate leg. The deeper wasteland squares (30-45k
+band walk, not a separate segment. The deeper wasteland squares (30-45k
 out) and the Turek orc camps (77k+ walking from Gludio) are out of
 practical reach of this band and stay out of the survey scope.
 
@@ -189,12 +189,12 @@ earlier trip).
    catalogs of the Dion merchants (buylists 3006000-3006300) wired
    into the gear planner with the band price brackets and the
    sell-first rules of the shop strategy.
-4. **The walking leg verification** (M3, done as T-018, 2026-09-12):
+4. **The walking segment verification** (M3, done as T-018, 2026-09-12):
    both routes found - Elven Village -> Gludio 111 852 units
    (aborts at the shipped 1M cap, 1.25M nodes at the raised cap) and
    Gludio -> Dion 42 831 units (within the shipped cap). The
    teleport-only assumption is refuted as a hard claim; the
-   gatekeeper chain stays the practical leg, the walk is the
+   gatekeeper chain stays the practical segment, the walk is the
    zero-adena fallback.
 5. **The lesson trip book routing** (M2/M3): the town trip planner
    learns the Dion book stop for the books the village does not sell
