@@ -11,6 +11,21 @@ This file holds the RULES and the load-bearing FACTS only; the
 implementation-level detail of every subsystem lives in `docs/` (see
 the documentation map below) and is read on demand, not upfront.
 
+## Start here (the first minute of a session)
+
+1. Skim this file once, top to bottom - it is the rules, the
+   load-bearing facts and the commands, nothing else.
+2. Find your area in the documentation map below and read that one
+   doc, on demand - never all of them.
+3. Load the matching playbook from `.agents/skills/` before opening
+   code in its area (the Agent skills section below names them;
+   for Go source work the vendored `golang-*` collection is the
+   knowledge base).
+4. Read `docs/agent_progress.md` for the active task context; if an
+   entry is unfinished, resume it before taking new work.
+5. Deploy first (`tools/swarm_fast_deploy.sh`, the mandatory first
+   step below) - no task runs against an undeployed stack.
+
 ## Session limits (owner instruction, mandatory)
 
 - One agent process lives at most **2 hours** from the owner prompt.
@@ -36,46 +51,28 @@ the documentation map below) and is read on demand, not upfront.
 
 ## Long running subprocesses in the agent sandbox
 
-The sandbox host reaps session processes, but the behavior changed
-over time - re-test before relying on either verdict; both studies
-keep their probe scripts under `/home/z/my-project/scripts/`.
+**Owner instruction (2026-09-20, mandatory): background processes
+live at most 10 minutes.** Treat a detached process as dead 10
+minutes after its launch. The reaper behavior is a property of the
+sandbox version and it changed between studies (2026-09-18: death
+at the end of the launching tool call; 2026-09-19: survival across
+calls) - never rely on a stale verdict, re-test when a long-lived
+server is load-bearing for the task.
 
-- **Owner instruction (2026-09-20, mandatory): background processes
-  live at most 10 minutes.** Whatever the studies below observed, a
-  detached process must be treated as dead 10 minutes after its
-  launch: never assume a server or daemon started earlier is still
-  serving - re-check it (`ps -eo pid,ppid,sid,cmd | grep NAME`)
-  immediately before every reuse, kill the leftover and start a
-  fresh twin, and never hand a long task to a background process and
-  walk away. The one-call pattern below (start, probe, kill, report
-  inside a single tool call) is the reliable shape for anything
-  longer than a few minutes.
-
-- **Study of 2026-09-19 (latest, verified with the heartbeat probes
-  `detach_probe_a.sh` / `detach_probe_b.sh`)**: a detached process
-  **survives across tool calls**. Verified variants: `setsid nohup
-  ... < /dev/null > /dev/null 2>&1 &` (own session, PPID 1) and the
-  double fork with `env -i` and a renamed binary - both stayed alive
-  and serving 8+ minutes after the launching call returned. The
-  earlier verdicts below do NOT reproduce in the current sandbox.
-- **Study of 2026-09-18 (superseded, kept for the failure mode)**:
-  every detached variant died at the end of the launching tool call,
-  whatever the pid trick; `unshare --fork --mount-proc` answered
-  "Operation not permitted" (still forbidden today); the
-  agent-browser daemon and its Chrome survived across calls, so the
-  reaper tracked the session bookkeeping, not the process tree.
+- Never assume a server or daemon started earlier is still serving:
+  re-check it (`ps -eo pid,ppid,sid,cmd | grep NAME`) immediately
+  before every reuse, kill the leftover and start a fresh twin (a
+  port conflict means the previous instance is still alive), and
+  never hand a long task to a background process and walk away.
 - **The always-correct pattern**: run an operation up to 10 minutes
   inside ONE tool call - start the server, wait for the port, run
   every probe, kill the server, print the results (a bash script
   under `scripts/` keeps it reproducible; the Bash tool allows a
   10 minute timeout).
 - A detached server is the option for services that must outlive
-  the call. Re-verify it with `ps -eo pid,ppid,sid,cmd | grep NAME`
-  before every reuse, and kill the leftover before starting a twin
-  (a port conflict means the previous instance is still alive).
-- If a long-lived server is load-bearing for the task, re-run the
-  probe at the session start: the reaper behavior is a property of
-  the sandbox version, not of the command.
+  the call; a detached `setsid nohup ... &` twin is the known
+  workable form. The restricted shells also forbid `unshare --fork
+  --mount-proc` ("Operation not permitted").
 
 ## Measurements (owner instruction, 2026-09-20)
 
@@ -115,16 +112,14 @@ keep their probe scripts under `/home/z/my-project/scripts/`.
   itself. Node is only used by the four `tools/repro_*.js` web UI
   harnesses (plain JS, no npm).
 - **Module path**: `github.com/melg8/swarm`.
+- **Libraries**: `golang.org/x/crypto` (Blowfish), `golang.org/x/text`
+  (UTF-16 handling), `testify` (assertions), `sergi/go-diff` (test
+  helpers).
+- **Task runner**: `Taskfile.yml` (go-task) wraps every routine
+  command - prefer the `task` aliases over bare `go`/lint calls.
 - **Linter gate**: golangci-lint v2.13.2, strict (see
-  `.golangci.yml`). `task`, `gci` and the repository formatter
+  `.golangci.yml`). `task` and the repository formatter
   `gofmt-spaces` are installed by `tools/install_dev_tools.sh`.
-- **Server**: a locally hosted
-  [L2J Mobius](https://gitlab.com/MobiusDevelopment/L2J_Mobius/)
-  emulator, module `L2J_Mobius_C1_HarbingersOfWar` (Chronicle 1).
-  Java 25 (server build), MariaDB 11.8 (server database).
-- **Concurrency target**: 9 minimum, 36 optimistic, 100 stretch goal.
-  Every design decision must hold at 100 concurrent bots (see the
-  Performance section below).
 
 Do **not** install Rust, Cargo, Node bundlers, webpack or any C/C++
 toolchain. The only Go toolchain is the one the fast deploy puts at
@@ -175,6 +170,13 @@ one of them is the reference for its subsystem:
 | `docs/project_description.md` | The long term design goals, scalability ideas (packet deduplication, "eyes" bot concept, synchronized party behavior) - read it before making architectural decisions |
 | `docs/quality_review_and_agent_prompts.md` | The 2026-09-07 architecture review and its improvement program (a historical snapshot - verify the state of a finding against the code before acting on it) |
 | `docs/webui_modernization_proposal.md` | The pending web UI modernization proposal (awaiting user approval; do not implement before it) |
+| `docs/quest_protocol.md` | The quest subsystem protocol (Mobius C1, the M2 first-profession research): the quest machine, the packet flows, the live traces |
+| `docs/band_20_25_survey.md` | The 20-25 band survey (M3 preparation): the hunting grounds reachable from the elven lands, the travel, the shopping, the learning |
+| `docs/fastpath_research.md` | The fast route planning research: the measured baseline, the hierarchical route options, the 10 second budget |
+| `docs/flake_ledger.md` | The searchable memory of observed test flakes: every flake gets one row (the cause, the fix, the pin that closed it) |
+| `docs/ROADMAP.md` | The goal ladder: the milestones with binary live-acceptance criteria; every change must advance one |
+| `docs/hunting_system_redesign.md` | The spot-anchored farming research, SUPERSEDED by hunting_cells.md (historical - do not implement from it) |
+| `docs/README.md` | The docs index itself, grouped by area (stack, bot, web, history, process) |
 
 ## Hypotheses and unknowns: the registry
 
@@ -356,16 +358,13 @@ numbers to budget a verification loop.
   contains an unfinished task entry, resume that task (verify the
   described state against the code, then continue from the recorded
   "next" step) before taking a new one.
-- **The claim/lease task queue is retired (2026-09-12).** The queue and
-  its design document were removed by the owner decision - the approach
-  underperformed; a replacement coordination approach is pending and
-  will be defined by the owner in this file. Until it lands, do not take
-  new work from any queue: resume the unfinished entries of
-  `docs/agent_progress.md` only. The goal ladder still lives in
-  `docs/ROADMAP.md` (milestones with binary live-acceptance criteria;
-  the progress of the project is the highest green milestone) and every
-  change must still advance a milestone - do not invent disconnected
-  work.
+- **Task coordination.** The claim/lease task queue is retired
+  (2026-09-12, removed by the owner decision): do not take work
+  from any queue - resume the unfinished entries of
+  `docs/agent_progress.md` only. Every change must still advance a
+  milestone of the goal ladder in `docs/ROADMAP.md` (the progress
+  of the project is the highest green milestone) - do not invent
+  disconnected work.
 
 ## Agent skills
 
@@ -374,7 +373,7 @@ the agent tooling automatically; read the matching one before working
 in its area. Each skill is a short (60-100 line) step-by-step
 procedure; AGENTS.md stays the source of truth for rules and facts.
 
-The four project playbooks (hand-maintained, never touched by the
+The seven project playbooks (hand-maintained, never touched by the
 upstream sync):
 
 | Skill | Use when |
@@ -393,11 +392,16 @@ Skip loading when the task is unrelated (a typo fix does not need the
 packet-recipe skill).
 
 On top of the project playbooks the repository vendors the
-`samber/cc-skills-golang` collection (46 `golang-*` skills, MIT, e.g.
-`golang-testing`, `golang-concurrency`, `golang-error-handling`,
-`golang-lint`, `golang-performance`, `golang-troubleshooting`) as the
-general Go knowledge base - load the matching one for generic Go
-questions. The vendored copy travels with the repository (a fresh
+`samber/cc-skills-golang` collection (46 `golang-*` skills, MIT) as
+the Go knowledge base for this tree's Go source: before writing or
+reviewing Go, load the matching skill when the touched area matches
+one - `golang-testing` (tests), `golang-concurrency` (goroutines,
+shared state), `golang-error-handling` (error paths),
+`golang-lint`/`golang-code-style` (conventions), `golang-naming`
+(identifiers), `golang-performance` (hot paths),
+`golang-troubleshooting` (a bug hunt) and the rest of the family.
+They answer the generic Go questions so this file does not have to.
+The vendored copy travels with the repository (a fresh
 environment gets it through `git clone` alone, no network access
 needed). Management:
 
@@ -407,10 +411,10 @@ tools/install_agent_skills.sh latest    # update to upstream HEAD
 tools/install_agent_skills.sh check     # verify against the pin, exit 1 on drift
 ```
 
-The script manages the `golang-*` directories only - the four project
-playbooks are hand-maintained and never touched. The pinned upstream
-commit lives in the script header (`SKILLS_COMMIT`); after updating,
-refresh the pin there and commit the diff.
+The script manages the `golang-*` directories only - the seven
+project playbooks are hand-maintained and never touched. The pinned
+upstream commit lives in the script header (`SKILLS_COMMIT`); after
+updating, refresh the pin there and commit the diff.
 
 ## Server integrity rules (non-negotiable)
 
@@ -456,17 +460,6 @@ never the other way round.
   pathfinding and future hunting grounds beyond the elven lands are
   covered too; refresh the pack the same way when a deployment upgrade
   changes it.
-
-## Tech stack
-
-- Go 1.23.2, module path `github.com/melg8/swarm`.
-- `golang.org/x/crypto` (Blowfish), `golang.org/x/text` (UTF-16
-  handling).
-- `testify` for assertions, `sergi/go-diff` for test helpers.
-- `Taskfile.yml` (go-task) wraps all routine commands. Prefer `task`
-  aliases.
-- `golangci-lint` with a strict linter set configured in
-  `.golangci.yml`.
 
 ## Repository layout
 
@@ -529,7 +522,7 @@ tools/                         Idempotent bash scripts that deploy and
                                run the local Mobius C1 test server stack
                                (docs/deployment.md).
 docs/                          Subsystem documentation (the map above).
-.agents/skills/                The four project playbooks plus the
+.agents/skills/                The seven project playbooks plus the
                                vendored golang skill collection.
 ```
 
@@ -551,7 +544,7 @@ to launch N concurrent bot sessions in one process (accounts
 task run:app              # or: go run ./cmd/swarm -web 127.0.0.1:8080
 ```
 
-The bot less launch modes (`-pathfind-test`, `-test-fight-ui`,
+The botless launch modes (`-pathfind-test`, `-test-fight-ui`,
 `-test-fight-ui-v1`) are described in docs/webui.md and
 docs/pathfinding.md; the 3D navmesh viewer of `-show-navmesh`
 (bare flag: every tile stitched; `-show-navmesh=21_19`: the named
@@ -589,17 +582,14 @@ not by the next session. The logging conventions are enforced by the
 first letter (a lowercase component tag like `login#%d:` counts), no
 trailing period - fix the message, not the checker.
 
-The branch carries a tracked pre-existing lint debt (~200 findings
-as of 2026-09-19: funlen/cyclop/gocognit on the wire parsers and
-scenario tables, exhaustruct in the reset fixtures, lll in the long
-descriptions, plus the historical accepted set). The findings are
-not yours to fix in an unrelated change - shrink them opportunistically
-when the touched function is already in your diff, and never add new
-ones (the CI gate runs `lint --new`, which only reads the changed
-lines; the full `golangci-lint run` returns to the gate when the debt
-clears). Use `task lint:new` for the changed-code
-verdict; if `--new` is clean, your change is lint-clean regardless of
-the full-tree count.
+The full uncapped lint is zero findings and every commit keeps it
+there (the discipline lives in the tree cleanliness section below).
+While iterating use `task lint:new` for the changed-code verdict -
+if `--new` is clean, your change is lint-clean; run the full
+`golangci-lint run ./...` before a push and fix any finding in the
+same commit. Shrink the debt a touched function already owes
+(a `//nolint` the refactor made stale, a function now under the
+limits) opportunistically, never in an unrelated change.
 
 Benchmarks exist for hot paths (crypt, packet parsing, hex view). Use
 them when touching performance sensitive code:
@@ -631,6 +621,17 @@ bootstrap for a clean host, the script inventory) lives in
 
 ## Architecture rules (non-negotiable)
 
+The live state tracker (`internal/swarm/state`) is the single source
+of truth every other layer reads: the game session
+(`internal/swarm/connection`) feeds it from the parsed packets, the
+hunt loop (`internal/swarm/hunt`) decides against it, the webserver
+serializes it into snapshots and the proxy patches the client replay
+from it. The hunt loop is the autonomous brain (docs/hunting.md), the
+gear planner scores and buys the equipment
+(docs/shopping_strategy.md), the zones registry climbs the mob
+ladder, the pathfinder (`internal/swarm/pathfind`) walks the geodata.
+Read the matching doc before changing a layer.
+
 The project lives or dies by its layer boundaries. A bot that grew
 into a god object (the historical `state.Bot` of 2392 lines) is the
 failure mode every refactor must move away from, not toward.
@@ -656,12 +657,6 @@ failure mode every refactor must move away from, not toward.
   fake-server pattern (`connection/game_test.go`) for protocol flows,
   never a live server unless the suite is explicitly opt-in (the
   `fleete2e` suite gates on `SWARM_FLEET_E2E=1`).
-- **Skills are part of the workflow.** Before working in an area, load
-  the matching playbook in `.agents/skills/` (`go-verify-loop`,
-  `mobius-stack`, `packet-recipe`, `webui-harness`, plus the new
-  `performance`, `dump-state-repro`, `e2e-repro` playbooks). The
-  skills are the step-by-step procedures; AGENTS.md stays the source of
-  truth for rules and facts. See the "Agent skills" section below.
 
 ## Performance and data-oriented design (the 100-bot constraint)
 
@@ -710,21 +705,6 @@ goal reachable.
 
 When in doubt, measure: `go test -bench=. -benchmem -count=5` on the
 affected package, then `fleete2e` for the fleet-wide view.
-
-## Architecture in one paragraph
-
-The live state tracker (`internal/swarm/state`) is the single source
-of truth every other layer reads: the game session
-(`internal/swarm/connection`) feeds it from the parsed packets, the
-hunt loop (`internal/swarm/hunt`) decides against it, the webserver
-serializes it into snapshots and the proxy patches the client replay
-from it. The hunt loop is the autonomous brain (docs/hunting.md), the
-gear planner scores and buys the equipment (docs/shopping_strategy.md),
-the zones registry climbs the mob ladder, the pathfinder
-(`internal/swarm/pathfind`) walks the geodata. Read the matching doc
-before changing a layer; keep the layer boundaries (parsers stay pure,
-the tracker stays the only shared mutable state, the web layer never
-talks to the connection directly).
 
 ## Mobius stack operational notes
 
@@ -808,7 +788,7 @@ triage); the facts every proxy change builds on:
 
 ## Code conventions
 
-Enforced by `.golangci-lint` config (strict, most linters enabled):
+Enforced by `.golangci.yml` (strict, most linters enabled):
 
 - **Whitespace is spaces only, never tabs.** Four spaces per
   indentation step, repository wide (Go, go.mod, the tools scripts,
@@ -832,8 +812,10 @@ Enforced by `.golangci-lint` config (strict, most linters enabled):
   `SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>`
   followed by `SPDX-License-Identifier: MIT`. Copy it from any existing
   file (including shell scripts in `tools/`, which use `#` comments).
-- Imports grouped by `gci` (the only formatter the lint gate runs;
-  the whitespace itself belongs to `gofmt-spaces`, see above).
+- Import grouping stays with `gofmt-spaces` and review; `gci` is
+  disabled (its canonical form is tab-indented, so it flags every
+  fresh spaces-only file - see the formatter notes of
+  `.golangci.yml`).
 - Function length and complexity are limited (`funlen` 65 lines /
   45 statements, `cyclop` 15, `gocognit` 25, `maintidx` 20). The
   genuinely tangled functions (the wire parsers, the hunt loop
@@ -870,9 +852,10 @@ commit keeps it at zero:
   previously masked the tail of the debt behind 3-identical-issue
   rounds). Expect the FULL list from every lint run.
 - `task verify` (build, vet, full `lint`, test, `fmt:check`) and
-  `task prepush` run before every push; CI (`.github/workflows/
-  ci.yml`, mirrored in `docs/ci_workflow.yml` for the token without
-  the workflow scope) runs the same order plus the race slice.
+  `task prepush` run before every push; the CI workflow
+  (`docs/ci_workflow.yml`, the copy the owner places into
+  `.github/workflows/ci.yml` when the token carries the workflow
+  scope) runs the same order plus the race slice.
 - Before committing files another agent may have touched in
   parallel: run `task fmt` first (the parallel commits landed tab
   formatted ten times), then `golangci-lint run ./...` - a red

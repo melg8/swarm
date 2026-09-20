@@ -1,10 +1,11 @@
 # Agent Notes
 
-The load bearing repo manual lives in `AGENTS.md` (the rules, the
-session limits, the sandbox subprocess verdicts, the subsystem map,
-the docs index); this file carries the session run notes the owner
-asked to keep on top. Keep the two in sync by editing `AGENTS.md`
-first and mirroring the operational digest here.
+The load bearing repo manual lives in `AGENTS.md` (start at its
+"Start here" section: the rules, the session limits, the sandbox
+subprocess rules, the documentation map, the skills index); this
+file carries the session run notes the owner asked to keep on top.
+Keep the two in sync by editing `AGENTS.md` first and mirroring the
+operational digest here.
 
 ## Session limits (owner instruction, mandatory)
 
@@ -21,27 +22,22 @@ first and mirroring the operational digest here.
 
 ## Long running subprocesses (servers, builds)
 
-- UPDATE 2026-09-19, second study of the day (heartbeat probes
-  `scripts/detach_probe_a.sh` / `detach_probe_b.sh`, both variants
-  alive 8+ minutes across tool calls): in the CURRENT sandbox a
-  detached process SURVIVES across tool calls - `setsid nohup ...
-  < /dev/null > /dev/null 2>&1 &` with its own session (PPID 1) and
-  the double fork with `env -i` plus a renamed binary both keep
-  running and serving after the launching call returned. The 09-18
-  morning verdicts (death at the call end, the 15-20 second window)
-  do NOT reproduce today; the reaper behavior is a property of the
-  sandbox version - re-run the probe at the session start when a
-  long-lived server is load-bearing.
-- Still true from the 09-18 study: `unshare --fork --mount-proc` is
-  forbidden ("Operation not permitted"); the agent tooling itself
-  (the agent-browser daemon) survives across calls regardless.
+- Owner instruction (2026-09-20, mandatory): background processes
+  live at most 10 minutes - treat a detached process as dead 10
+  minutes after its launch. The reaper behavior changed between the
+  09-18 and 09-19 studies (death at the call end vs survival across
+  calls), so never rely on a stale verdict: re-check a server with
+  `ps -eo pid,ppid,sid,cmd | grep NAME` immediately before every
+  reuse, kill the leftover before starting a twin (a port conflict
+  means the previous instance is still running), and never hand a
+  long task to a background process and walk away.
 - The always-correct pattern: run an operation up to 10 minutes
   inside ONE tool call - start the server, wait for the port, run
   every probe, kill the server, print the results; the harness
   script under `scripts/` keeps it reproducible.
-- A detached server still needs a `ps` re-check before every reuse,
-  and a leftover must be killed before starting a twin (a port
-  conflict means the previous instance is still running).
+- Still true from the studies: `unshare --fork --mount-proc` is
+  forbidden ("Operation not permitted"); the agent tooling itself
+  (the agent-browser daemon) survives across calls regardless.
 
 ## Language (owner instruction, mandatory)
 
