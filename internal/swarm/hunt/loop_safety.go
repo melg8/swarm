@@ -320,6 +320,40 @@ func (l *Loop) attackerEngageable(objectID int32) bool {
     return maxLevel <= 0 || level <= maxLevel
 }
 
+// pileUpWinnable reports whether a social pile up answers with a
+// fight instead of the panic run: the character is healthy enough to
+// press the fight, every attacker sits inside the engage level
+// ceiling and the pack is small enough to tank. The tank answers the
+// reported two mob softlock - the old unconditional panic run,
+// relogin and immediate walk home restarted the same aggro cycle
+// with full aggro on both mobs, while a healthy character that tanks
+// the pair down (one mob dies, the loot runs, the aggro answer picks
+// the survivor) keeps the experience and the drops. The health gate
+// makes the verdict dynamic: the fight that goes bad re-arms the
+// panic run on the next tick, the kill that thins the pack to one
+// attacker hands the answer to the ordinary aggro flow.
+func (l *Loop) pileUpWinnable() bool {
+    if l.tracker.SelfHealthPercent() < reengageHealthPercent {
+        return false
+    }
+    attackers := l.tracker.SelfAttackers()
+    if len(attackers) > pileUpFightMaxAttackers {
+        return false
+    }
+    maxLevel := l.maxTargetLevel()
+    for i := range attackers {
+        level, ok := l.tracker.ObjectLevel(attackers[i].ObjectID)
+        if !ok || level <= 0 {
+            continue
+        }
+        if maxLevel > 0 && level > maxLevel {
+            return false
+        }
+    }
+
+    return true
+}
+
 // activeSkips collects the object ids whose skip expiry has not
 // passed yet into the reused dense scratch list (see skipScratch).
 func (l *Loop) activeSkips(now time.Time) []int32 {

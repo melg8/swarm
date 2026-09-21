@@ -318,6 +318,30 @@ const (
     // distance within it (a cornered or blocked escape) still
     // ends the session rather than running forever.
     fleeLogoutAfter = 20 * time.Second
+    // pileUpFightMaxAttackers is the attacker count a winnable pile
+    // up still tanks (see pileUpWinnable): two mobs are the reported
+    // softlock case, the third is the headroom for a wandering add
+    // that trails the fight - the health gate escalates into the
+    // panic run the moment the tanking turns into a death risk.
+    pileUpFightMaxAttackers = 3
+    // settleWindow bounds the post relogin settle (see settle.go):
+    // the spawn protection of the deployed stack lasts far longer
+    // (600 s), the window only stops the hold from outliving the
+    // stagnation watch budget - the sitting regeneration of the low
+    // levels covers it with a wide margin.
+    settleWindow = 5 * time.Minute
+    // firstStrikeRange is the distance the post settle first strike
+    // answers an aggressive mob from: the Power Shot cast range of
+    // the bow - a shot or two land before the mob closes the melee
+    // distance, and a farther mob is not worth breaking the spot
+    // for (the ordinary pick flow walks to it).
+    firstStrikeRange = 700.0
+    // fightPotionHealthPercent is the health level a running fight
+    // drinks a healing potion at: below it the swings of a second
+    // attacker (the tanked pile up) outpace the natural regeneration
+    // and the potion is the difference between the kill and the
+    // emergency logout.
+    fightPotionHealthPercent = 50.0
 )
 
 // phase is the coarse activity of the hunt loop.
@@ -701,7 +725,18 @@ type Loop struct {
     // logoutDone marks the one shot emergency logout: the session
     // unwinds within a second of the request, the flag keeps the
     // dying ticks quiet.
-    logoutDone    bool
+    logoutDone bool
+    // spawnSettle arms the post relogin settle (see settle.go): the
+    // supervisor enables it on every fresh session, the tests and
+    // the manual sessions keep it off.
+    spawnSettle bool
+    // settled marks the one shot spawn settle: the hold, the
+    // regeneration and the first strike run once per session, the
+    // flag ends them for good.
+    settled bool
+    // settleHoldAt stamps the start of the settle hold: the entry
+    // log line fires once, the field keeps it from repeating.
+    settleHoldAt  time.Time
     userKind      string
     userX         int32
     userY         int32
@@ -1060,6 +1095,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         panicX:              0,
         panicY:              0,
         logoutDone:          false,
+        spawnSettle:         false,
+        settled:             false,
+        settleHoldAt:        time.Time{},
         userKind:            "",
         userX:               0,
         userY:               0,
@@ -1400,6 +1438,11 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
     // one shot while the session unwinds. The armed run keeps
     // driving the logout even after the pack thins out on the
     // way: the escape distance, not the live mob count, ends it.
+    // The winnable pile up is the exception: a healthy character
+    // whose attackers sit inside the engage ceiling tanks the pack
+    // down instead of throwing the fight away - the old unconditional
+    // run, relogin and immediate walk home restarted the same aggro
+    // cycle on the same spot (see pileUpWinnable).
     if !l.logoutDone && l.autonomous && l.phase != phaseDelevel {
         if l.tracker.SelfHealthPercent() < panicLogoutHealthPercent &&
             l.tracker.SelfUnderAttack() {
@@ -1407,8 +1450,9 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
 
             return
         }
-        if l.tracker.SelfAttackerCount() >= panicLogoutAttackers ||
-            !l.panicAt.IsZero() {
+        if !l.panicAt.IsZero() ||
+            (l.tracker.SelfAttackerCount() >= panicLogoutAttackers &&
+                !l.pileUpWinnable()) {
             l.panicPileUpRun(time.Now())
 
             return
@@ -1811,6 +1855,43 @@ func (l *Loop) engage() {
 
         return
     }
+    // The aggro answer of the approach: a mob that aggros while the
+    // character walks to a pick must not wait for the pick to start
+    // fighting - the walk would drag the chase into a second
+    // opponent while the swings keep landing unanswered (the
+    // reported peaceful pick fights). A selected target that
+    // already holds the character as its own target IS the aggro
+    // answer (the first strike pick, the mob that noticed the
+    // approach first): the switch would only shuffle two identical
+    // fights, so it stays.
+    if l.target != 0 && !l.tracker.SelfFighting(l.target) &&
+        !l.tracker.ObjectTargetsSelf(l.target) {
+        if attacker, ok := l.tracker.NearestAttacker(); ok &&
+            attacker.ObjectID != l.target {
+            if !l.attackerEngageable(attacker.ObjectID) {
+                // The attacker outranks the character: the peaceful
+                // pick waits, the defense flow answers.
+                l.target = 0
+                l.engageAt = time.Time{}
+                l.fleeFromThreat(now)
+
+                return
+            }
+            l.logf("Hunt: %s aggroed on the approach, answering it "+
+                "first", attacker.Name)
+            l.target = attacker.ObjectID
+            l.engageAt = now
+            l.clearBlindRecovery()
+        }
+    }
+    // The spawn settle of the fresh session (see settle.go): the
+    // protected character holds the spot and regenerates before the
+    // first move, then opens with the first strike. It runs before
+    // the targetless pick - the strike pick it arms must not be
+    // overwritten by the ordinary search.
+    if l.settleAfterLogin(now) {
+        return
+    }
     if l.target == 0 {
         // Rest while the character is hurt: the regeneration is
         // faster out of combat and engaging with low HP risks
@@ -1972,6 +2053,11 @@ func (l *Loop) engage() {
         // of the loop, the auto attack keeps swinging whatever the
         // cast request does.
         l.maybeCastCombatSkill(now)
+        // The healing potion of the running fight (see
+        // maybeDrinkFightPotion): the tanked pile up grinds the
+        // health bar down faster than the natural regeneration, the
+        // potion buys the swings that finish the first attacker.
+        l.maybeDrinkFightPotion(now)
         // The swings land right now: nothing to re-request. A stale
         // engagement (the fight was interrupted, the auto attack flag
         // and the combat window linger) falls through and keeps

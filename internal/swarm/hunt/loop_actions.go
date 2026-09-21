@@ -120,6 +120,42 @@ func (l *Loop) rest() {
     l.restActionSit = wantSit
 }
 
+// maybeDrinkFightPotion drinks a healing potion in the running fight
+// when the health fell under the fight threshold: the tanked pile up
+// grinds the bar down faster than the natural regeneration, and the
+// potion is the difference between finishing the first attacker and
+// the emergency logout (the owner recipe: the healers keep the
+// first kill alive). The reuse window is shared with the quest trip
+// potion pacing (questPotionAt) - the server paces ONE potion reuse
+// window across every source, so the engine mirrors it.
+func (l *Loop) maybeDrinkFightPotion(now time.Time) {
+    if l.tracker.SelfHealthPercent() >= fightPotionHealthPercent {
+        return
+    }
+    reuseHeld := !l.questPotionAt.IsZero() &&
+        now.Sub(l.questPotionAt) < questPotionReuse
+    if reuseHeld {
+        return
+    }
+    for _, item := range l.tracker.InventoryItems() {
+        if item.ItemID != questPotionItemID || item.Count <= 0 ||
+            item.Equipped {
+            continue
+        }
+        if err := l.game.UseItem(item.ObjectID); err != nil {
+            l.logf("Hunt: healing potion use failed: %v", err)
+            l.questPotionAt = now
+
+            return
+        }
+        l.questPotionAt = now
+        l.logf("Hunt: HP %.0f%% in the fight, drinking a healing potion",
+            l.tracker.SelfHealthPercent())
+
+        return
+    }
+}
+
 // noteKillPosition records where the killed mob died: the corpse
 // position of the target (the character position when the corpse
 // already vanished from the knownlist - it died at the feet). The

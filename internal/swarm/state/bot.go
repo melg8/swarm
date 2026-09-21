@@ -883,6 +883,22 @@ func (b *Bot) SelfAttackerCount() int {
     return count
 }
 
+// ObjectTargetsSelf reports whether the npc object currently holds
+// the played character as its target: the mob whose blows land or
+// whose chase steps carry the character as the target id. The hunt
+// loop uses it to keep a selected target that is already part of the
+// aggro answer in place instead of shuffling between two attackers.
+func (b *Bot) ObjectTargetsSelf(objectID int32) bool {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    obj, _ := b.objectLocked(objectID)
+    if obj == nil {
+        return false
+    }
+
+    return b.selfID != 0 && obj.TargetID == b.selfID
+}
+
 // SelfDead reports whether the character died: a known maximum with a
 // zero current HP only happens on death (the server broadcasts
 // StatusUpdate CUR_HP 0 there).

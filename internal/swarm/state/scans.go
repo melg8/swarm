@@ -106,6 +106,36 @@ func (b *Bot) NearestAttacker() (AttackTarget, bool) {
     return best, found
 }
 
+// SelfAttackers returns every living attackable npc that currently
+// targets the character: the full aggro load of the moment, not just
+// the nearest one. The positions are the raw last known ones - the
+// callers that measure a moving chase want the projected
+// NearestAttacker instead - and the order follows the object storage.
+func (b *Bot) SelfAttackers() []AttackTarget {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    if b.selfID == 0 {
+        return nil
+    }
+    attackers := make([]AttackTarget, 0, 4)
+    for i := range b.world.hot {
+        obj := &b.world.hot[i]
+        if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
+            obj.TargetID != b.selfID {
+            continue
+        }
+        attackers = append(attackers, AttackTarget{
+            ObjectID: obj.ObjectID,
+            Name:     b.world.cold[i].Name,
+            X:        obj.X,
+            Y:        obj.Y,
+            Z:        obj.Z,
+        })
+    }
+
+    return attackers
+}
+
 // NearestAttackable returns the closest living attackable npc within the
 // given distance of the character. The distance uses the projected
 // current position of every npc (see projectedPosition), not the raw
