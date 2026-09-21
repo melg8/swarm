@@ -9032,3 +9032,45 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
 - Verification: all nine web UI harnesses green (repro_map_render
   grown to 114 checks), the whitespace gate clean, node --check
   clean; no Go source touched, the change is web only.
+## Round 129: the config-based launch - the JSON launch file with the fleet composition (2026-09-21)
+
+- Report: the owner issue #12 (the kanban board) - launch the
+  application via a configuration file that controls the bot
+  parameters (bot types, counts, related settings), with a default
+  config out of the box and a fallback to it when no file is given.
+
+- Root cause (design shape): the launch surface was the CLI flag
+  block of parseFlags alone - a swarm composition beyond "-bots N of
+  one behavior" had no expression, and the type surface the owner
+  asks for (the archer of #13) had nowhere to live. Design: JSON (the
+  stdlib, zero new dependencies), the launchConfig schema of the
+  shared parameters plus a bots array of {type, count} specs, the
+  -config flag folding the file into the flag configuration with a
+  strict precedence (an explicitly set flag wins over the file -
+  flag.Visit names them; an omitted field keeps its flag default),
+  and a loud validation contract: unknown fields, unknown bot types
+  (the message lists the implemented registry), non-positive counts
+  and an empty composition all exit 1 naming the problem - a config
+  must fail loudly, never silently degrade.
+
+- Landed: cmd/swarm/launch_config.go (the schema, the loader, the
+  validation, the expansion over the account ladder, the flag fold);
+  cmd/swarm/main.go (the -config flag, the launch normalization of
+  every origin into one fleet plan the single bot path and the fleet
+  path share, the composition log line); configs/swarm.json (the
+  shipped default, pinned equal to the built-in default and the flag
+  defaults by test); docs/launch_config.md (the format, the
+  precedence rules, the option table, the composition semantics,
+  registered in the AGENTS.md and docs README maps). The type
+  registry carries fighter today and reserves archer for #13.
+
+- Verification: the cmd/swarm suite green (the format contract, the
+  precedence rules, the three-way default equality, the classic plan
+  pin); go vet clean; golangci-lint --new 0 issues (the first round
+  found 6 - gocognit on the fold fixed by the table-driven
+  foldStringFields, goconst by the botTypeFighter constant, gosec by
+  the 0600 test file perms, intrange and perfsprint by the modern
+  forms); a live smoke test of the binary: a 3-bot fleet launched
+  off a file (the ladder smoke1..smoke3 with the omitted fields at
+  their flag defaults), an unknown type and an unknown field both
+  refused loudly with exit 1.
