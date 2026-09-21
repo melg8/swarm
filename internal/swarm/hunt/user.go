@@ -9,6 +9,7 @@ import (
     "time"
 
     "github.com/melg8/swarm/internal/swarm/gear"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
 )
@@ -897,6 +898,24 @@ func (l *Loop) publishedSegmentSearch() *state.WalkSearch {
     return l.segmentSearch
 }
 
+// bowEquipped reports whether the paperdoll weapon is a bow: a bow
+// user engages and fights at the weapon range, not at the melee
+// distance, so the attack order and the chase stall watchdog use the
+// ranged radii for it.
+func (l *Loop) bowEquipped() bool {
+    for _, item := range l.tracker.InventoryItems() {
+        if !item.Equipped {
+            continue
+        }
+        if stats, ok := npcdata.ItemGearStats(item.ItemID); ok &&
+            stats.WeaponType == "BOW" {
+            return true
+        }
+    }
+
+    return false
+}
+
 // tickUserAttack forces the attack on the clicked object until the
 // fight starts, then the fight plays out under the server AI. The
 // first request selects the target, the repeated request forces the
@@ -943,6 +962,15 @@ func (l *Loop) tickUserAttack(now time.Time) {
         return
     }
     dist := math.Hypot(float64(x-selfX), float64(y-selfY))
+    // A bow in hand shoots from the weapon range: the forced request
+    // starts the shot immediately, the melee distance walk would only
+    // delay it (the Mobius bow attack range is ~500 units).
+    engageRadius := userEngageRadius
+    stallRadius := userEngageRadius
+    if l.bowEquipped() {
+        engageRadius = userBowEngageRadius
+        stallRadius = userBowStallRadius
+    }
     fighting := l.tracker.SelfFighting(l.userTarget)
     if fighting || l.tracker.SelfWalking() {
         // A running fight or walk refreshes the manual deadline: a
@@ -950,7 +978,7 @@ func (l *Loop) tickUserAttack(now time.Time) {
         // mid swing.
         l.userStart = now
     }
-    if fighting && dist > userEngageRadius &&
+    if fighting && dist > stallRadius &&
         !l.chaseProgress(&l.userLastDist, &l.userDistAt, dist, now) {
         // The server chase stalled with the target far away: walk
         // toward the target instead of trusting the stuck chase.
@@ -984,8 +1012,8 @@ func (l *Loop) tickUserAttack(now time.Time) {
 
         return
     }
-    if dist > userEngageRadius {
-        // Selected but out of melee range: approach the target - the
+    if dist > engageRadius {
+        // Selected but out of engage range: approach the target - the
         // walk request works where the AI chase stalls.
         if !l.tracker.SelfWalking() {
             if err := l.game.WalkTo(x, y, z); err != nil {

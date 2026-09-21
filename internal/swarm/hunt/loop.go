@@ -213,6 +213,16 @@ const (
     // outside it the chase (or the fallback walk) closes the distance
     // first.
     userEngageRadius = 150.0
+    // userBowEngageRadius is the approach distance of an attack
+    // command for a bow user: the Mobius bow attack range is the
+    // weapon range (~500 units), so the forced request starts the
+    // shot long before the melee distance is reached.
+    userBowEngageRadius = 450.0
+    // userBowStallRadius bounds the healthy distance of a ranged fight
+    // in the chase stall watchdog: a bow fight stands and shoots
+    // inside the weapon range and closes no chase distance while
+    // doing it, which is progress, not a stalled chase.
+    userBowStallRadius = 650.0
     // chaseProgressWindow bounds one progress sample of a chase: the
     // distance to the target is measured once per window.
     chaseProgressWindow = 3 * time.Second
@@ -2119,7 +2129,14 @@ func (l *Loop) engage() {
             if selfX, selfY, _, selfOK := l.tracker.SelfPosition(); selfOK {
                 dist := math.Hypot(
                     float64(x-selfX), float64(y-selfY))
-                if dist > userEngageRadius &&
+                // A bow fight stands and shoots inside the weapon
+                // range: the stall watchdog only owns the stretches
+                // beyond it (see the userBow radii).
+                stallRadius := userEngageRadius
+                if l.bowEquipped() {
+                    stallRadius = userBowStallRadius
+                }
+                if dist > stallRadius &&
                     !l.lureArmed() &&
                     !l.chaseProgress(
                         &l.engLastDist, &l.engDistAt, dist, now) &&

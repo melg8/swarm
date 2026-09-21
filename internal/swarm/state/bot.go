@@ -1856,10 +1856,14 @@ func (b *Bot) ApplyMovement(m Movement) {
 }
 
 // ApplyPawnMovement updates a chasing object: it runs toward the point
-// `distance` in front of its target and faces the target. The packet is
-// only sent for attacking creatures, so it also refreshes the combat
-// state and the target reference. The played character is handled as
-// well because the server broadcasts its own chase to it.
+// `distance` in front of its target and faces the target. The packet
+// rides an attack chase, so it refreshes the combat state and the
+// target reference - with one exception: the Mobius player AI moves
+// the pawn toward a folk npc for the interact intention too (the walk
+// to the ~36 unit talk distance), and a known non attackable npc pawn
+// marks no combat (selecting a buffer or a shop is an interaction, not
+// a fight). The played character is handled as well because the server
+// broadcasts its own chase to it.
 func (b *Bot) ApplyPawnMovement(m PawnMovement) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -1902,7 +1906,10 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
 }
 
 // applySelfPawnMovementLocked tracks the played character chasing its
-// attack target. The caller must hold the state write lock.
+// attack target. A pawn movement toward a known non attackable npc is
+// the interact walk of the Mobius player AI (the talk distance
+// approach): it updates the target reference but marks no combat. The
+// caller must hold the state write lock.
 func (b *Bot) applySelfPawnMovementLocked(
     m PawnMovement, destX int32, destY int32, now time.Time,
 ) {
@@ -1918,6 +1925,10 @@ func (b *Bot) applySelfPawnMovementLocked(
     b.char.Moving = destX != m.X || destY != m.Y
     b.char.MoveAt = now
     b.char.TargetID = m.TargetID
+    if obj, _ := b.objectLocked(m.TargetID); obj != nil &&
+        obj.Kind == kindNPC && !obj.Attackable {
+        return
+    }
     b.char.FightingTargetID = m.TargetID
     b.noteSelfCombatLocked(now)
 }
