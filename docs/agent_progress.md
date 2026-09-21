@@ -1,12 +1,5 @@
 # Agent progress log
 
-> FROZEN ARCHIVE (2026-09-22, the merge clash policy round, issue
-> #33): this file is the handover log as it stood before the fragment
-> split - read it for history, NEVER append to it. New task entries
-> live in `docs/progress/` (one file per task, see
-> docs/progress/README.md); the shared-append protocol retired
-> because every append forced a rebase on every concurrent branch.
-
 Crash-safe task tracking: the current task, its full context and
 per-commit progress live here (see the "Work protocol" section in
 AGENTS.md). Entries are append-only; a new agent resumes the newest
@@ -18,92 +11,102 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task (status: in review): the dead mob icon round - the x eyes face lands in the live map (2026-09-21, branch feature/dead-mob-icon-research, issue #6)
+## Active task (status: in progress): the kiting parameters pinned - the optimal band and the re-engage delay (2026-09-21, branch feature/archer-kiting, issue #18)
 
-Started 2026-09-21 ~18:52 UTC, review round ~19:23 UTC. The source
-is the GitHub project board issue melg8/swarm#6 ("Bad dead mobs icon
-style research"): the live map corpse marker - the dead threat circle
-with the look tick at 0.45 alpha - read as a faded alive mob.
+Started 2026-09-21 ~20:22 UTC, continuing the kite entry below on the
+same board issue melg8/swarm#18 ("Kiting core: retreat when the mob
+closes, re-engage at the optimal range"). A parallel round landed the
+train-member trigger mid flight (the hostile scan of kiteThreat,
+commit 5257564) - this round rebased on it and closes the remaining
+parameter task of the issue:
 
-Round one (the research): a standalone comparison page with 31
-numbered corpse icon variants (0 the current baseline, 1..30 the new
-ideas in seven families) on one fixed hunting scene painted in the
-live map's exact visual language, with variant swapping, a
-side-by-side gallery, a kill skull toggle and a built-in self test
-(31/31 pass). The findings comment on the issue carries the catalog
-and the screenshots; the owner picked variant 26 (the x eyes face:
-the gray circle keeps its footprint, two small X eyes replace the
-look direction) and asked for the pr to carry the implementation
-only.
+- The optimal band is pinned in the constants block of kite.go as
+  the two edge references: the inner edge kiteRetreatRadius (a
+  hostile below it arms the next step), the outer edge
+  userBowEngageRadius (user.go, 450 - the re-request shoots from
+  range). A copied literal would drift from the radii the fight
+  actually fights with, so the band lives as the documented edge
+  pair.
+- The re-engage delay is a named constant now (kiteReengageDelay,
+  zero today) and rides the movement window timestamp
+  (combatAvoidUntil = window + delay): the window end IS the
+  re-engage today, the knob exists so the live tuning round (#20)
+  can hold the aim without touching the walk contract.
+- One test pins the direction choice the trigger round left open:
+  TestKiteDirectionReadsTheNearestChaser - both hostiles inside the
+  radius (the target 240 east, the chasing member 180 west), the
+  step goes away from the NEAREST one (east), not away from the
+  target (west).
 
-Round two (the implementation, the current pr diff):
+Verification: the kite suite is green (11 tests), `go build`,
+`go vet`, `golangci-lint run --new` clean, the gofmt-spaces check
+quiet. Status: pushed to PR #15; the PR body carries the issue
+marker ("Fixes #18") now. The centroid train steering and the
+retreat path quality stay with #19, the acceptance and the live
+tuning with #20.
 
-- `drawUnitTick` of map.js gains the dead branch: a corpse draws no
-  look direction tick - the circle body (alpha 0.45 -> 0.55) carries
-  two small X eyes at +/-0.32r, 0.12r above the center (eye half
-  size max(0.7, 0.16r), width max(0.7, 0.7k), tick slate, round
-  caps) - so a corpse reads "killed here" instead of a faded alive
-  mob. The alive units keep the tick; nothing else of the marker
-  geometry changes.
-- The research page and its screenshots left the branch per the
-  review (git rm); the research record lives in the issue comments.
-- `tools/repro_map_render.js` gains the "dead face" scenario: the
-  gray circle body at the dead radius, the two eye X strokes at the
-  eye line, and the absence of the radial heading tick (the old
-  style) - three checks that pin the new style against drift.
-- `docs/webui.md` map rendering section updated (the dead units draw
-  no look direction, the X eyes face).
+## Active task (status: in progress): the archer kite step - the bow user steps clear of a closed target (2026-09-21, branch feature/archer-kiting, issues #18, #13)
 
-Verification: repro_map_render ALL PASS (with the new scenario),
-repro_movement, repro_bot_switch, repro_zone_hover, repro_fight_ui,
-repro_hud green, `go build ./...`, `go test
-./internal/swarm/webserver/` and `golangci-lint run --new` clean.
+Started 2026-09-21 ~19:35 UTC. The source is the project board issue
+melg8/swarm#13 ("Add support for archer warriors with kiting behavior
+against mobs"), resumed 2026-09-21 ~20:20 UTC as the kiting core slice
+(the slice issue melg8/swarm#18, the first round in flight as PR #15): an archer that fights a mob from the bow range never
+wants the mob in its face - the Mobius server AI stands the archer
+still while the auto attack shoots, so a melee mob that closes simply
+swings away at a target it could outrange.
 
-Status: the pr (#8, "Fixes #6") carries the implementation diff
-only; the issue waits for the merge review.
+Design (the first implementation round of the issue):
 
-Round three (2026-09-21 ~20:35 UTC, the review feedback of 20:32 -
-"the kill markers come back for the whole map with the new icon, the
-retire round removed the wrong thing"):
+- `internal/swarm/hunt/kite.go`: the kite step - while a bow fight
+  runs, a target that closed inside kiteRetreatRadius (250, the mob
+  is a second from melee) steps the character kiteStep (400) units
+  straight away from it through WalkTo (the retreat follows the mesh
+  routes, never runs into a known wall). The step reuses the fighting
+  movement window (combatAvoidUntil): the forced attack re-requests
+  hold while the retreat walks (a request would interrupt the walk
+  server-side), and once the window closes the engage re-requests the
+  attack - the distance after the step lands back inside the bow
+  engage radius (450), so the re-request shoots from range instead of
+  starting a server chase that walks the distance right back in.
+- The step paces itself (kiteStepPeriod 3s: 2s walk, 1s shoot at the
+  fastest cycle), respects the zone leash (a cornered archer stands
+  and shoots - the leash outranks the kite), and carries a streak
+  limit (kiteStreakLimit 8 per target): a chaser at least as fast as
+  the character never falls behind, and past the limit the archer
+  fights it out instead of shuffling forever (the losing fight and
+  panic machinery still own the death risk). A fresh target resets
+  the streak.
+- The hook sits in the running fight branch of engage() ahead of the
+  impending-add scan: the closing target is the concrete damage, the
+  add scan runs the next tick when the target holds its distance.
+- The behavior arms itself on the weapon in hand (bowEquipped): no
+  config, no class check - whatever bot holds a bow (the planned
+  archer type of the config launch round, issue #12) kites its
+  fights.
+- The edge cases the issue names, handled or bounded: cornered (the
+  leash skip above), multiple mobs chasing (the step reads the target
+  alone; the attacker count gate and the panic run already own the
+  pile up), pathfinding while retreating (WalkTo routes over the
+  mesh), attack animation/travel time (the window pauses re-requests,
+  the already flying shots land; nothing more is modeled - honest
+  limit, recorded in kite.go).
+- The kiting parameters (the trigger radius, the step length, the
+  window, the period, the streak limit) are the tunable block at the
+  top of kite.go, each with its rationale comment.
 
-- The fleet kill ring returns to the map with the NEW icon: the
-  marks of /api/fleet/kills (every recent kill of every bot, the
-  layer that survives the bot switches) draw as the dead mob face -
-  the gray corpse circle body (mapColors.dead #80868b) with the two
-  X eyes in the look tick slate (mapColors.tick #39424e), the same
-  proportions the corpse marker uses. No orange anywhere.
-- The layer behavior restores as it was: the five minute melt (8
-  alpha buckets, one body fill + one eye stroke per bucket), the
-  show-kills toolbar toggle, the victim tooltip (name, level, the
-  ticking kill age) that wins over the dead unit tooltip while the
-  corpse sits on its own mark. The bot-switch gap frame keeps
-  painting the ring (repro_bot_switch pins the survive + the one
-  legitimate gap fill).
-- The zone kill centroid skulls stay retired: they were the observed
-  bot's per spot read (they did not survive the bot switches), the
-  fleet ring plus the corpse icon carry the death read now.
-- map.js: the killMarks state and the drawKillMarks / setKillMarks /
-  killMarkAt / showKillTooltip / refreshKillTooltipAge methods are
-  back with the new icon; the paint flow calls the layer in the gap
-  branch and after the hunt zones; the duplicate drawZone call the
-  retire round left in the gap branch is gone. app.js re-fetches the
-  ring with the bot list (404 tolerant); index.html regains the
-  kills checkbox.
-- Harnesses: repro_zone_hover regains the fleet kill marks scenario
-  (12 checks: the body + eyes geometry, the age fade, the TTL drop,
-  the pick, the tooltip flow, the corpse priority, the toggle
-  isolation - run before the corpse object joins the scene, the
-  corpse unit paints the same face by design); repro_bot_switch
-  carries the survive check and the gap fill count (1 body fill, the
-  eyes ride as a stroke).
+Verification: 8 new tests in kite_test.go pin the step geometry, the
+quiet weapon-range case, the melee gate (a melee fight only closes,
+never retreats), the pacing window, the post-walk attack resume, the
+leash skip, the streak limit and the fresh-target reset; the full hunt
+suite green (78s), `go build`, `go vet`, `golangci-lint run --new`
+clean.
 
-Verification: repro_zone_hover, repro_bot_switch, repro_map_render,
-repro_fight_ui, repro_hud, repro_buffs, repro_movement, repro_stats,
-repro_gear all exit 0; go build, go vet, go test
-./internal/swarm/webserver/ green.
-
-Status: round three pushed to the pr branch; the issue reports the
-restored layer and waits for the merge review.
+Status: one commit (a28121f) on feature/archer-kiting, pushed; the
+pull request references the issue. Follow-ups for the next rounds
+(recorded in the issue comment): the live acceptance round against
+the deployed stack (the kite constants measured against the real mob
+speeds), the arrow-aware timing (a step that waits the flying shot),
+and the config launch wiring of the archer type once issue #12 lands.
 
 Round 2 (2026-09-21 ~20:20 UTC, the kiting core slice issue #18):
 
