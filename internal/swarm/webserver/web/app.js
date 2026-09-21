@@ -118,7 +118,6 @@ async function refreshBots() {
   } catch (err) {
     return;
   }
-  refreshFleetKills();
   await refreshProxy();
   renderBotList();
   if (!App.activeBotId && App.bots.length > 0) {
@@ -128,24 +127,6 @@ async function refreshBots() {
   }
 }
 
-// Fetch the fleet wide kill marks of /api/fleet/kills: every recent
-// kill of every bot of the process (the hunt loops publish their kill
-// rings to the bot state, the registry merges them). The map draws
-// them as the skulls of the whole deployment - switching the
-// observed bot never loses them again. An older server without the
-// endpoint answers 404 and the layer simply stays empty.
-async function refreshFleetKills() {
-  try {
-    const response = await fetch("/api/fleet/kills");
-    if (!response.ok) { return; }
-    const marks = await response.json();
-    if (Array.isArray(marks)) {
-      MapView.setKillMarks(marks);
-    }
-  } catch (err) {
-    // The endpoint is absent on the pathfind and fight servers.
-  }
-}
 
 // Fetch the proxy state (the endpoints stay absent without -proxy and
 // the UI then hides the selection entirely).
