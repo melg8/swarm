@@ -9032,3 +9032,60 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
 - Verification: all nine web UI harnesses green (repro_map_render
   grown to 114 checks), the whitespace gate clean, node --check
   clean; no Go source touched, the change is web only.
+
+## Round 130: the navmesh pack size round - the measured breakdown, the zstd best level and the compressed sidecars (2026-09-21)
+
+- Report: the owner issue #11 - the new pathfinding files are
+  unexpectedly large; understand why and reduce the size without
+  breaking the pathfinding correctness.
+
+- The measurement (cmd/navsize, the new pack measurement bench): the
+  164 region pack over the 527 MB geodata answers 881.5 MB of
+  zstd wrapped tiles (3476.1 MB of raw wire) plus 405.9 MB of PLAIN
+  abstract sidecars and 15 MB of strip files - 1.29 GB total. The
+  raw wire splits: the polygon planes 1551.3 MB (16 B/poly over
+  101,663,710 polygons - the root driver, the exact height
+  rectangle decomposition fragments the noisy geodata into ~7 cell
+  polygons), the link span words 930.4 MB (4 B/link over 243.9M
+  links), the grid entries 402.1 MB, the link CSR 387.8 MB, the
+  rest ~200 MB. The sidecars: the 64 byte abstract edge records
+  (three float64s of the portal midpoint plus mostly zero and
+  repeated fields) over 406 MB of never compressed bytes.
+
+- The zero risk reductions (the decoded bytes are bit identical -
+  the wrapping is a transparent transport):
+  1. The tile zstd level moves from SpeedDefault to
+     SpeedBestCompression: 881.5 -> 770.4 MB (-12.6 percent). The
+     zstd decode speed does not move with the encode level (a
+     format property), so the ratio costs only the one time pack
+     build - the old comment's balance point was wrong about the
+     runtime side.
+  2. The abstract sidecars ride the same zstd frame as their tiles
+     (the loader unwraps the magic word; the plain sidecars of the
+     older packs keep loading): 405.9 -> 72.6 MB (-82 percent).
+  The two land 1287.4 -> 843.0 MB (-34.5 percent) on the full pack;
+  the rebuilt 20_18..21_20 block measures 58.6 -> 40.6 MB (-30.7
+  percent).
+
+- The correctness proof (cmd/navpack-verify, the pack comparison
+  bench): the same route corpus over the old pack (default level,
+  plain sidecars) and the rebuilt pack (best level, framed
+  sidecars) answers IDENTICAL routes - the same found/partial
+  verdicts and the same waypoints on every query; plus the unit
+  roundtrips (the navbuild sidecar write unwraps to the byte equal
+  plain encode, the navmesh loader serves the framed and the plain
+  sidecar alike).
+
+- The remaining headroom (the follow-up round): the poly count is
+  the root driver - a height quantization or a merge tolerance in
+  the decomposition would shrink the planes AND the links together,
+  but it changes the mesh and needs the regression corpus (the old
+  vs new route answers over a broad query set) the issue asks for.
+  The grid entries (402 MB raw) may delta encode. Both are scoped
+  for their own round; the measurement benches stay in the tree.
+
+- Verification: go test of navbuild, navmesh and pathfind green
+  (the navmesh suite over the present 1.3 GB research pack OOMs the
+  4 GB sandbox on the base commit too - the CI runs packless and
+  passes), go vet clean, golangci-lint --new 0 issues, the
+  whitespace gates clean.
