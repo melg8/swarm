@@ -60,10 +60,10 @@ func OverhitSkill(id int32) bool {
 // active skills that target SELF and carry a Heal effect. Source:
 // the TARGET_SELF blocks with <effect name="Heal"> of the skill
 // stats - Divine Heal (00000-00099.xml), Elemental Heal (same file),
-// Self Heal (01200-01299.xml L533, power 42, mp 7, reuse 10 s). The
-// mystic starting classes auto learn Self Heal; a server may grant
-// any of the three to any class, so the recovery keys on the skill
-// list the server sent, not on the class tree.
+// Self Heal (01200-01299.xml L533, power 42, mp 7 plus 2 initial,
+// reuse 10 s). The mystic starting classes auto learn Self Heal; a
+// server may grant any of the three to any class, so the recovery
+// keys on the skill list the server sent, not on the class tree.
 var selfHealSkills = map[int32]bool{
     45:   true, // Divine Heal
     58:   true, // Elemental Heal
@@ -76,4 +76,43 @@ var selfHealSkills = map[int32]bool{
 // pays and no blow is landing.
 func SelfHealSkill(id int32) bool {
     return selfHealSkills[id]
+}
+
+// selfHealInitialConsume holds the per level mpInitialConsume of
+// the self heal skills (the mana the server burns before the cast
+// resolves, on top of mpConsume - the server gate sums both,
+// Creature.java L2049: getMpConsume + getMpInitialConsume, so the
+// bot gate must too). The tables are hand copied from
+// the C1 stats: 01200-01299.xml (Self Heal, one level), and the
+// #mpInitialConsume tables of Divine Heal and Elemental Heal in
+// 00000-00099.xml. An id outside the map answers 0.
+var selfHealInitialConsume = map[int32][]int32{
+    45: {15, 16, 17, 18, 18, 18, 20, 21, 21},
+    58: {8, 9, 9, 11, 12, 12, 13, 13, 14, 15, 16, 17, 18, 18,
+        19, 20, 21, 22, 23, 24, 25, 25, 26, 26, 27, 28, 29, 30,
+        31, 32, 32, 32, 33, 34, 35, 36, 36, 37, 38, 39, 39, 39,
+        40, 41, 42, 42, 43, 44, 45, 45, 46, 46, 47, 48, 48},
+    1216: {2},
+}
+
+// SelfHealInitialConsumeOf returns the initial mana consume of one
+// level of a self heal skill (the tables clamp to their last entry
+// like MPCostOf does, an unknown id answers 0). The generated cast
+// tables carry mpConsume only - folding the initial consume in is
+// the generator follow up, this hand table covers the three skills
+// the recovery gates until then.
+func SelfHealInitialConsumeOf(id, level int32) int32 {
+    table, ok := selfHealInitialConsume[id]
+    if !ok || len(table) == 0 {
+        return 0
+    }
+    index := int(level) - 1
+    if index < 0 {
+        index = 0
+    }
+    if index >= len(table) {
+        index = len(table) - 1
+    }
+
+    return table[index]
 }

@@ -55,13 +55,17 @@ const (
     // exp * min(overkill / maxHp, 0.25) when the cast of an
     // overhit-flagged skill is the killing blow, and any non lethal
     // hit clears the armed flag (AttackableStatus.reduceHp L40) -
-    // an early cast only burns the reuse window. In the low level
-    // band one melee swing takes 25-45 percent of the mob bar, so a
-    // cast request fired at 40 percent lands while the bar still
-    // holds a skill's worth of damage: the strike kills and the
-    // overkill reaches the cap. The trash that dies inside one
-    // swing never opens the window - the strike stays sheathed and
-    // the mana is saved.
+    // an early cast only burns the reuse window. The 40 percent
+    // window is the kill probability play of the low level band:
+    // one melee swing there takes 25-45 percent of the mob bar, so
+    // a bar inside the window usually holds about a strike's worth
+    // of damage - the cast lands the kill and the overkill pays the
+    // bonus. A strike weaker than the remaining bar (the level +2
+    // pulls, the early strike levels) fires inside the window,
+    // misses the kill and loses this cast's bonus - the total
+    // damage of the fight is unchanged, so the cost is the delay
+    // and the mana; the absolute damage estimate follow up (the
+    // observed swing damage vs ObjectVitals) closes that gap.
     overhitFinishPercent = 40.0
 )
 

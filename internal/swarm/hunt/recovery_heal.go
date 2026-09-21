@@ -52,7 +52,8 @@ func (l *Loop) selfHealSkill(now time.Time) (int32, bool) {
         if !ok || cast.Operate != "A1" || cast.Target != "SELF" {
             continue
         }
-        if float64(cast.MPCostOf(skill.Level)) >
+        if float64(cast.MPCostOf(skill.Level)+
+            npcdata.SelfHealInitialConsumeOf(skill.SkillID, skill.Level)) >
             l.tracker.SelfCurMP() {
             continue
         }

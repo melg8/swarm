@@ -98,12 +98,24 @@ would have paid for.
   the bar in one hit time where the sitting regeneration grinds for
   half a minute, and a standing character keeps the flee option the
   sit gives up. The verified server refusals shape the flow
-  (Mobius C1 Player.useMagic L7537 and Player.sitDown L2383): a
+  (Mobius C1, the cast refusal of a sitting character at
+  Player.useMagic L7540 and the sit refusal of a casting character
+  at Player.sitDown L2383): a
   sitting character cannot cast, so the deep rest (below the sit
   threshold) stands up first and casts on the next window; a
   casting character cannot sit, so the sit transition waits the
   heal flight (hit time plus a 1 s margin) out instead of bouncing
-  off the server. The mana rest of the mystic is untouched - a dry
+  off the server. The mana gate matches the server one
+  (Creature.java L2049 sums mpConsume and mpInitialConsume -
+  npcdata.SelfHealInitialConsumeOf covers the initial part the
+  generated cast tables do not carry yet). The blunt scope fact:
+  the vanilla C1 skill trees never teach a self heal to a fighter
+  class - the deployment melee bots keep the sit-rest until the
+  server actually grants them a heal skill (a custom grant, a
+  changed tree), and the mechanism above fires the moment the
+  skill list carries one. The deployment mystics (Self Heal 1216
+  is auto learned) benefit today. The mana rest of the mystic is
+  untouched - a dry
   caster needs the sitting mana regeneration, a heal only spends
   it - and the post relogin settle needs no heal branch: a cast is
   one of the five packets that burn the spawn protection (see
@@ -189,15 +201,20 @@ would have paid for.
   therefore holds the flagged strike while the target stands above
   the 40 percent finish window (`overhitFinishPercent`) and fires
   it once the bar drops into it: in the low level band one melee
-  swing takes 25-45 percent of the mob bar, so the cast lands while
-  the bar still holds a skill's worth of damage - the strike kills
-  and the overkill reaches the cap, and the trash that dies inside
-  one swing never opens the window (the strike stays sheathed, the
-  mana is saved). An "Over-hit!" system message (id 361) confirms a
-  landed overhit on the wire. The follow up: a skill damage
-  estimate from the observed swing damage would let the bot open
-  the very small bars (one autoattack swing away from death) with
-  the cast at full health for the same capped bonus.
+  swing takes 25-45 percent of the mob bar, so a bar inside the
+  window usually holds about a strike's worth of damage - the cast
+  lands the kill and the overkill pays the bonus. A strike weaker
+  than the remaining bar (the level +2 pulls, the early strike
+  levels) fires inside the window, misses the kill and loses this
+  cast's bonus; the total fight damage is unchanged, the cost is
+  the delay and the mana - the absolute damage estimate follow up
+  (observed swing damage vs ObjectVitals) closes the gap. The
+  trash that dies inside one swing never opens the window (the
+  strike stays sheathed, the mana is saved), and a missed cast
+  keeps the server flag armed - the auto attack kill that follows
+  still pays the bonus (only a landed non lethal hit clears it).
+  An "Over-hit!" system message (id 361) confirms a
+  landed overhit on the wire.
 - Two triggers end the session: critical health (12%) under attack, or
   a social pile up - two or more living attackable mobs holding the
   character as their target (`SelfAttackerCount`; a chasing mob

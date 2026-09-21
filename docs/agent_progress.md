@@ -3102,4 +3102,40 @@ run right after "Sent enter world request" and passed twice since
 (isolated and combined) - a load flake, watch it, no ledger row
 until it repeats.
 
-Next: the fresh context review round, then the session close.
+The fresh context review round (a general purpose critic with the
+original prompt plus the refined version) returned no critical
+findings: every server mechanic claim reproduced from the Mobius
+sources line by line (arming order before activateSkill, the first
+damage event consume, the +25 percent cap, the player-only bonus,
+the 21 id set exact), no stuck bot paths found, 13/13 targeted
+tests green. The follow ups it raised landed the same session:
+
+- The mana gate of the heal now sums mpInitialConsume
+  (npcdata.SelfHealInitialConsumeOf, hand tables for 45/58/1216
+  from the C1 stats; the server gate is Creature.java L2049) - the
+  2-15 mana band no longer fires a cast the server refuses (which
+  would arm the local reuse and delay the sit by the flight
+  window). Folding the initial consume into the generated cast
+  tables is the generator follow up; the combat cast gate has the
+  same shape (a refused strike locks its 15 s local reuse) and is
+  the recorded follow up of the same class.
+- The overhitFinishPercent comment and the docs section no longer
+  overclaim: the 40 percent window is the kill probability play;
+  a strike weaker than the remaining bar fires, misses the kill
+  and loses that cast's bonus (total fight damage unchanged).
+- The docs state the blunt scope fact: the vanilla C1 trees never
+  teach a self heal to a fighter class, so the deployment melee
+  bots keep the sit-rest until the server grants them the skill;
+  the mechanism fires the moment the list carries one (the
+  deployment mystics benefit today).
+- npcdata/skill_flags_test.go locks the flag set membership, the
+  A1/SELF shape and the initial consume tables against
+  transcription drift.
+- Doc line drift fixed (the useMagic refusal is L7540), the
+  missed-cast keeps the flag armed note added (the auto attack
+  kill that follows still pays).
+
+Verification: build, vet, the npcdata and hunt suites green,
+lint --new clean. Commits as melg8: 4ce5693 (the task entry),
+8b96cce (the implementation), a29e65e (the docs), the review fix
+commit on top. Round complete.
