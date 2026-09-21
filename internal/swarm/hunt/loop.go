@@ -337,11 +337,13 @@ const (
     // for (the ordinary pick flow walks to it).
     firstStrikeRange = 700.0
     // fightPotionHealthPercent is the health level a running fight
-    // drinks a healing potion at: below it the swings of a second
-    // attacker (the tanked pile up) outpace the natural regeneration
-    // and the potion is the difference between the kill and the
-    // emergency logout.
-    fightPotionHealthPercent = 50.0
+    // drinks a healing potion at: it must sit ABOVE the re-engage
+    // threshold - the losing fight gates (the flee at 60, the panic
+    // run at the same line) would otherwise always fire first and
+    // the potion would never pour (the tanked pile up grinds the
+    // bar down faster than the natural regeneration, and the potion
+    // is the difference between the kill and the emergency logout).
+    fightPotionHealthPercent = 70.0
 )
 
 // phase is the coarse activity of the hunt loop.

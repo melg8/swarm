@@ -154,8 +154,9 @@ func TestLoopTanksAWinnablePileUp(t *testing.T) {
 }
 
 // TestFightPotionDrinksUnderHalf pins the fight potion: a running
-// fight below the health threshold drinks a healing potion from the
-// bag (the owner recipe that keeps the first pile up kill alive).
+// fight below the drink threshold (above the re-engage line, so the
+// flee gates never pre-empt it) drinks a healing potion from the bag
+// (the owner recipe that keeps the first pile up kill alive).
 func TestFightPotionDrinksUnderHalf(t *testing.T) {
     bot := newTestBot()
     spawnMob(bot)
@@ -176,7 +177,7 @@ func TestFightPotionDrinksUnderHalf(t *testing.T) {
 
     loop.tick()
     require.Contains(t, game.uses, int32(601),
-        "the fight below half health drinks the potion")
+        "the fight below the drink threshold drinks the potion")
 
     // The reuse window holds the next potion back.
     game.uses = nil

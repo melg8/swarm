@@ -899,6 +899,23 @@ func (b *Bot) ObjectTargetsSelf(objectID int32) bool {
     return b.selfID != 0 && obj.TargetID == b.selfID
 }
 
+// KnownNpcCount returns how many npcs the session knows right now:
+// the warmup gauge of the enter world burst. A zero means the spawn
+// packets have not arrived yet, so a scan over the world answers
+// empty without describing the real surroundings.
+func (b *Bot) KnownNpcCount() int {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    count := 0
+    for i := range b.world.hot {
+        if b.world.hot[i].Kind == kindNPC {
+            count++
+        }
+    }
+
+    return count
+}
+
 // SelfDead reports whether the character died: a known maximum with a
 // zero current HP only happens on death (the server broadcasts
 // StatusUpdate CUR_HP 0 there).

@@ -43,6 +43,12 @@ func (l *Loop) settleAfterLogin(now time.Time) bool {
     if !l.spawnSettle || l.settled {
         return false
     }
+    if _, _, _, ok := l.tracker.SelfPosition(); !ok {
+        // The self spawn packet has not arrived yet: the settle
+        // holds without deciding - every scan below needs the
+        // position.
+        return true
+    }
     startedAt := l.tracker.SessionStartedAt()
     if startedAt.IsZero() || now.Sub(startedAt) > settleWindow {
         l.endSettle("the settle window lapsed")
@@ -58,8 +64,15 @@ func (l *Loop) settleAfterLogin(now time.Time) bool {
         return false
     }
     if !l.aggressiveMobNearby() {
-        // The spot is clear: no aggressive mob reaches the character,
-        // the protection has nothing to protect against.
+        if l.tracker.KnownNpcCount() == 0 {
+            // The enter world burst has not arrived yet: the empty
+            // scan describes the packet gap, not the ground - hold
+            // the spot instead of burning the one shot settle on it.
+            return true
+        }
+        // The ground is loaded and clear: no aggressive mob reaches
+        // the character, the protection has nothing to protect
+        // against.
         l.endSettle("no aggressive mob in reach")
 
         return false
@@ -70,6 +83,11 @@ func (l *Loop) settleAfterLogin(now time.Time) bool {
         // refuses the attack requests of a sitting character, the
         // stand window of the rest guard paces the transition) and
         // open with the first strike.
+        if l.settleSitPending(now) {
+            // The sit request is still unconfirmed: hold until the
+            // server answers before the stand and strike sequence.
+            return true
+        }
         if l.tracker.SelfSitting() || (!l.restActionAt.IsZero() &&
             !l.restActionSit) {
             if !l.standUpGuarded(now) {
@@ -129,6 +147,25 @@ func (l *Loop) settleRest(now time.Time, hp float64) {
     l.logf("Hunt: sitting down under the spawn protection at %.0f%% HP", hp)
 }
 
+// settleSitPending reports whether the settle sit request is still
+// unconfirmed: the rest action guard window has not lapsed and the
+// last transition sent was a sit. The stand and strike sequence
+// waits it out - a strike fired before the confirm would land on a
+// sitting character (the server refuses those attacks).
+func (l *Loop) settleSitPending(now time.Time) bool {
+    return !l.restActionAt.IsZero() && l.restActionSit &&
+        now.Sub(l.restActionAt) < restRetryPeriod
+}
+
+// settleHolding reports whether the settle hold is active right now:
+// the tick pile up gate suppresses the panic run while it holds - the
+// protected character has no real attackers (the protection strips
+// the hate before any broadcast), a phantom pair reading must not arm
+// the irreversible run the settle exists to prevent.
+func (l *Loop) settleHolding() bool {
+    return l.spawnSettle && !l.settled
+}
+
 // EnableSpawnSettle arms the post relogin settle: the supervisor
 // calls it on every fresh session (the login IS the relogin into the
 // same world spot), the tests and the manual sessions stay off.
@@ -179,6 +216,16 @@ func (l *Loop) maybeBeginFirstStrike(now time.Time) bool {
     l.target = strike.ObjectID
     l.engageAt = now
     l.clearBlindRecovery()
+    // The strike keeps the engage discipline: an attacker above the
+    // level ceiling is not engaged (the protection burn would buy a
+    // death risk), the dry mystic does not spend the cast it cannot
+    // answer with.
+    if !l.attackerEngageable(strike.ObjectID) || l.mageManaLow() {
+        l.target = 0
+        l.engageAt = time.Time{}
+
+        return false
+    }
     if bowID, arrowID, hasTool := l.bowAndArrow(); hasTool &&
         l.profileLuresWithBow() {
         var meleeObjID int32

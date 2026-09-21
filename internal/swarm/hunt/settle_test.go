@@ -151,3 +151,34 @@ func TestSettleOffByDefault(t *testing.T) {
     require.Empty(t, game.forces,
         "the hurt character never attacks from the rest")
 }
+
+// TestSettleWaitsForTheWorldWarmup pins the packet gap guard: the
+// enter world burst arrives after the first ticks, and an empty
+// knownlist scan describes the gap, not the ground - the settle must
+// not burn its one shot on it.
+func TestSettleWaitsForTheWorldWarmup(t *testing.T) {
+    bot := newTestBot()
+    hurtTo(bot, 40)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.EnableSpawnSettle()
+    loop.lastHit = time.Now().Add(-time.Minute)
+
+    loop.tick()
+    require.False(t, loop.settled,
+        "the empty knownlist holds the settle")
+    require.Empty(t, game.walks, "the hold never moves")
+
+    // A passive mob loads: the ground is known and clear, the settle
+    // ends and the ordinary flow owns the tick.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID:   9100,
+        TemplateID: npcdata.NPCWireTemplateID(20013),
+        Attackable: true,
+        X:          45300, Y: 50000, Z: -3500,
+        Name: "Dryad",
+    })
+    loop.tick()
+    require.True(t, loop.settled,
+        "the loaded clear ground ends the settle")
+}

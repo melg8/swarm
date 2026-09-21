@@ -250,6 +250,11 @@ func (l *Loop) killApproachWalk() bool {
 // at its corpse), and the corpse approach walk of the ranged kills
 // holds the phase until the drops land instead of leaving them behind.
 func (l *Loop) loot() {
+    // The potion serves the loot too: the kill that emptied the
+    // health bar (the tanked pair, the hard single) leaves the
+    // character picking up drops at a bar the survivor's next swing
+    // can empty - drink before the walk to the corpse.
+    l.maybeDrinkFightPotion(time.Now())
     radius := lootRadius
     if l.killPosKnown {
         if selfX, selfY, _, ok := l.tracker.SelfPosition(); ok {
