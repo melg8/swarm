@@ -322,6 +322,12 @@ const (
     // unit, Amount the HP it lost and X/Y its placement at the
     // moment.
     CombatEventDamage = "damage"
+    // CombatEventMiss is an evaded blow: the swing was thrown at
+    // TargetID but the server resolved it as a miss (the Hit.java
+    // MISS flag). The viewer draws the miss float instead of a
+    // damage number, so a fight stays legible when blows start
+    // missing.
+    CombatEventMiss = "miss"
 )
 
 // CombatEvent is one observed beat of the combat animation feed
@@ -1956,14 +1962,28 @@ func (b *Bot) ApplyAttack(a Attack) {
 }
 
 // recordSwingEventsLocked feeds the swing animation of the web view
-// with one event per hit that actually landed. The Mobius Attack
-// packet carries the miss flag of every hit, so an evaded blow draws
-// nothing - the streak only plays for the blows that connect, and
-// the viewer reads who hit whom instead of a swing storm of dodged
-// attacks. The caller must hold the write lock.
+// with one event per hit: the blows that land record the swing, the
+// evaded ones record the miss float (the viewer shows both, so a
+// fight stays legible even when the blows start missing). The Mobius
+// Attack packet carries the miss flag of every hit; a missed blow
+// carries no swing streak and no damage number. The caller must hold
+// the write lock.
 func (b *Bot) recordSwingEventsLocked(a Attack, now time.Time) {
     for i := range a.TargetCount {
         if a.HitFlags[i]&attackHitMissFlag != 0 {
+            //nolint:exhaustruct_v5 // the ring assigns Seq, a miss
+            // carries no amount
+            b.recordCombatEventLocked(CombatEvent{
+                Kind:       CombatEventMiss,
+                AttackerID: a.AttackerID,
+                TargetID:   a.TargetIDs[i],
+                X:          a.X,
+                Y:          a.Y,
+                TargetX:    a.TargetX,
+                TargetY:    a.TargetY,
+                At:         now,
+            })
+
             continue
         }
         if a.AttackerID == b.selfID {

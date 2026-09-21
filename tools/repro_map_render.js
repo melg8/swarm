@@ -92,12 +92,30 @@ function worldToScreen(wx, wy) {
 function makeRecordingContext(record) {
     let current = null;
     let pending = null;
+    // The canvas origin of the save/restore + translate stack: the
+    // float layer (the damage and miss numbers) translates to its
+    // anchor and fills the text at the local zero, so the record
+    // must fold the translate into the recorded position or every
+    // float lands at (0, 0).
+    let origin = { x: 0, y: 0 };
+    const originStack = [];
     return {
         canvas: { width: CANVAS_W, height: CANVAS_H },
         clearRect: () => {},
         setTransform: () => {},
-        save: () => {},
-        restore: () => {},
+        save: () => { originStack.push({ x: origin.x, y: origin.y }); },
+        restore: () => {
+            origin = originStack.pop() || { x: 0, y: 0 };
+        },
+        translate: (x, y) => {
+            origin.x += x;
+            origin.y += y;
+        },
+        // The pop scale of the floats reads 1 at the beats the
+        // scenarios assert (the pop settles in the first 15%), so
+        // the scale does not distort the recorded positions.
+        scale: () => {},
+        rotate: () => {},
         beginPath: () => { current = { segments: [], arcs: [] }; },
         closePath: () => {},
         // The path model: every lineTo completes one segment from the
@@ -136,10 +154,16 @@ function makeRecordingContext(record) {
         },
         fillRect: () => {},
         fillText: (text, x, y) => {
-            record.texts.push({ text, x, y, style: record.fillStyle });
+            record.texts.push({
+                text, x: x + origin.x, y: y + origin.y,
+                style: record.fillStyle
+            });
         },
         strokeText: (text, x, y) => {
-            record.texts.push({ text, x, y, style: record.strokeStyle });
+            record.texts.push({
+                text, x: x + origin.x, y: y + origin.y,
+                style: record.strokeStyle
+            });
         },
         measureText: (text) => ({ width: (text || "").length * 6 }),
         setLineDash: (dash) => { record.dash = dash.slice(); },
@@ -370,9 +394,105 @@ function check(results, name, ok, detail) {
 }
 
 // The marker radius of the map (radiusOf): player 5.5, passive npc 5,
-// combat 6, self 7.
+// combat 6, self 6 (the mob combat parity - the owner dropped the
+// bigger self marker).
 function markerRadius(kind) {
-    return kind === "player" ? 5.5 : kind === "self" ? 7 : 5;
+    return kind === "player" ? 5.5 : kind === "self" ? 6 : 5;
+}
+
+// runScenarioCombatFloats covers the floating text layer: the miss
+// floats of the evaded blows (the owner asked for the miss display by
+// analogy with the damage numbers) and the direction split of the
+// floats (the damage the character takes pops to the LEFT of the
+// fight, the damage it deals and its misses to the RIGHT).
+function runScenarioCombatFloats(mapFile) {
+    const { MapView, record, advanceClock } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    const selfId = WORLD.self.objectId;
+    const mob = WORLD.playerTargetMob;
+    snap.combatEvents = [
+        { seq: 1, kind: "miss", attackerId: selfId, targetId: mob.objectId,
+            amount: 0, atMs: 0, x: mob.x, y: mob.y,
+            targetX: mob.x, targetY: mob.y },
+        { seq: 2, kind: "miss", attackerId: mob.objectId,
+            targetId: selfId, amount: 0, atMs: 0,
+            x: WORLD.self.x, y: WORLD.self.y,
+            targetX: WORLD.self.x, targetY: WORLD.self.y },
+        { seq: 3, kind: "damage", attackerId: selfId,
+            targetId: mob.objectId, amount: 42, atMs: 0,
+            x: mob.x, y: mob.y, targetX: 0, targetY: 0 },
+        { seq: 4, kind: "damage", attackerId: mob.objectId,
+            targetId: selfId, amount: 17, atMs: 0,
+            x: WORLD.self.x, y: WORLD.self.y,
+            targetX: 0, targetY: 0 }
+    ];
+    // The first update (without the events) arms the sequence
+    // cursor, the fresh events of the second snapshot spawn the
+    // floats (the ingest rule of the event stream).
+    MapView.update(buildSnapshot(0, false));
+    MapView.update(snap);
+    advanceClock(300);
+    MapView.draw();
+
+    const results = [];
+    const self = worldToScreen(WORLD.self.x, WORLD.self.y);
+    const mobScreen = worldToScreen(mob.x, mob.y);
+    const floats = (text) => record.texts.filter(
+        (t) => t.text === text);
+    // The floats of one anchor: the side offset (15) plus the jitter
+    // (bounded by 8) keeps every float of an anchor within 10 px of
+    // its expected x.
+    const nearX = (list, expectedX) => list.filter(
+        (t) => Math.abs(t.x - expectedX) < 10);
+
+    // The miss floats draw on both sides of the fight.
+    const mobMiss = nearX(floats("Miss"), mobScreen.x + 15);
+    const selfMiss = nearX(floats("Miss"), self.x - 15);
+    check(results, "the miss of the bot floats at the mob",
+        mobMiss.length > 0,
+        "no Miss float near x=" + (mobScreen.x + 15) + " (got "
+        + floats("Miss").map((t) => t.x) + ")");
+    check(results, "the miss against the bot floats at the bot",
+        selfMiss.length > 0,
+        "no Miss float near x=" + (self.x - 15) + " (got "
+        + floats("Miss").map((t) => t.x) + ")");
+
+    // The direction split: the bot's miss to the RIGHT of the mob,
+    // the miss against the bot to the LEFT of the bot.
+    check(results, "the bot's miss floats to the right of the fight",
+        mobMiss.length > 0
+        && mobMiss.every((t) => t.x > mobScreen.x + 5),
+        "Miss x=" + mobMiss.map((t) => t.x) + " anchor x="
+        + mobScreen.x);
+    check(results, "the miss against the bot floats to its left",
+        selfMiss.length > 0
+        && selfMiss.every((t) => t.x < self.x - 5),
+        "Miss x=" + selfMiss.map((t) => t.x) + " anchor x="
+        + self.x);
+
+    // The damage numbers split the same way: dealt to the right,
+    // taken to the left.
+    const dealt = nearX(floats("-42"), mobScreen.x + 15);
+    const taken = nearX(floats("-17"), self.x - 15);
+    check(results, "the dealt damage floats to the right of the mob",
+        dealt.length > 0 && dealt.every((t) => t.x > mobScreen.x + 5),
+        "-42 x=" + dealt.map((t) => t.x) + " anchor x="
+        + mobScreen.x);
+    check(results, "the taken damage floats to the left of the bot",
+        taken.length > 0 && taken.every((t) => t.x < self.x - 5),
+        "-17 x=" + taken.map((t) => t.x) + " anchor x=" + self.x);
+
+    // The miss float clears out after its life (800ms), the damage
+    // number (950ms) still paints at 900ms.
+    record.texts.length = 0;
+    advanceClock(600);
+    MapView.draw();
+    check(results, "the miss float melts before the damage number",
+        floats("Miss").length === 0 && floats("-42").length > 0,
+        "Miss survived " + floats("Miss").length + " texts");
+
+    return results;
 }
 
 function runScenario(mapFile, verbose) {
@@ -1308,6 +1428,7 @@ function main() {
         ["map drag keeps the grabbed point", runScenarioMapDrag(mapFile)],
         ["social animation marker", runScenarioSocialMarker(mapFile)],
         ["stable draw order", runScenarioStableOrder(mapFile)],
+        ["combat floats", runScenarioCombatFloats(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
         ["walk cursor", runScenarioWalkCursor(mapFile)],

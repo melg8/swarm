@@ -151,11 +151,13 @@ func TestCombatEventsFeedBounded(t *testing.T) {
     require.Len(t, bot.Snapshot().CombatEvents, combatEventMax)
 }
 
-// TestApplyAttackSkipsMissedHits pins the hit only swing feed: the
-// Attack packet marks every hit with the Mobius miss flag, and only
-// the blows that actually land play a swing - a dodged attack draws
-// nothing, a dual hit draws one swing per landed blow.
-func TestApplyAttackSkipsMissedHits(t *testing.T) {
+// TestApplyAttackRecordsMisses pins the miss float feed: the Attack
+// packet marks every hit with the Mobius miss flag, and a dodged
+// attack records a miss event instead of a swing - the viewer draws
+// the miss float where the landed blow would draw the streak, so the
+// fight stays legible when blows start missing. A dual hit draws one
+// event per hit, each with its own kind.
+func TestApplyAttackRecordsMisses(t *testing.T) {
     bot := NewBot("acc1")
     bot.SetOnline("unittest1")
     bot.ApplyNpcInfo(NpcInfo{
@@ -163,7 +165,7 @@ func TestApplyAttackSkipsMissedHits(t *testing.T) {
         X: 46000, Y: 50000, Name: "Gremlin",
     })
 
-    // The mob swings at the character and misses: no swing event.
+    // The mob swings at the character and misses: one miss event.
     bot.ApplyAttack(Attack{
         AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
         TargetX: 45000, TargetY: 50000, TargetZ: -3500,
@@ -172,6 +174,10 @@ func TestApplyAttackSkipsMissedHits(t *testing.T) {
         TargetCount: 1,
     })
     views := bot.Snapshot().CombatEvents
+    require.Len(t, views, 1, "the missed swing records one event")
+    require.Equal(t, CombatEventMiss, views[0].Kind)
+    require.Equal(t, int32(7), views[0].AttackerID)
+    require.Equal(t, int32(100), views[0].TargetID)
     require.Empty(t, countSwings(views),
         "the missed swing records no attack event")
 
@@ -195,7 +201,11 @@ func TestApplyAttackSkipsMissedHits(t *testing.T) {
     views = bot.Snapshot().CombatEvents
     require.Equal(t, 3, countSwings(views))
 
-    // A dual weapon lands one and misses one: one swing event.
+    // A dual weapon lands one and misses one: one swing event and
+    // one miss event, in the feed order. The miss of the opening
+    // swing is still inside the feed window, so the miss count reads
+    // incrementally.
+    missesBefore := len(countMisses(bot.Snapshot().CombatEvents))
     bot.ApplyAttack(Attack{
         AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
         TargetX: 45000, TargetY: 50000, TargetZ: -3500,
@@ -205,6 +215,13 @@ func TestApplyAttackSkipsMissedHits(t *testing.T) {
     })
     views = bot.Snapshot().CombatEvents
     require.Equal(t, 4, countSwings(views))
+    misses := countMisses(views)
+    require.Len(t, misses, missesBefore+1,
+        "the evaded hit of the pair records one miss event")
+    newest := misses[len(misses)-1]
+    require.Equal(t, CombatEventMiss, newest.Kind)
+    require.Equal(t, int32(7), newest.AttackerID)
+    require.Equal(t, int32(100), newest.TargetID)
 }
 
 // countSwings counts the attack events of the snapshot feed.
@@ -217,4 +234,16 @@ func countSwings(views []CombatEventView) int {
     }
 
     return count
+}
+
+// countMisses collects the miss events of the snapshot feed.
+func countMisses(views []CombatEventView) []CombatEventView {
+    misses := make([]CombatEventView, 0, 2)
+    for _, view := range views {
+        if view.Kind == CombatEventMiss {
+            misses = append(misses, view)
+        }
+    }
+
+    return misses
 }

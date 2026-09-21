@@ -2921,8 +2921,9 @@ const MapView = {
     ctx.setLineDash([]);
     ctx.restore();
 
-    const radius = (self ? 7 : radiusOf(target, threatOf(target)))
-      * this.unitScale + 5;
+    const radius = (self
+      ? selfMarkerUnits
+      : radiusOf(target, threatOf(target))) * this.unitScale + 5;
     ctx.save();
     ctx.strokeStyle = this.mapColors.player;
     ctx.globalAlpha = 0.75;
@@ -2970,8 +2971,9 @@ const MapView = {
       ctx.restore();
     }
 
-    // The self marker: bigger circle, accent ring and the look tick.
-    const selfRadius = 7 * this.unitScale;
+    // The self marker: the mob parity circle, the accent ring and
+    // the look tick.
+    const selfRadius = selfMarkerUnits * this.unitScale;
     drawUnitTick(ctx, p.x, p.y, heading, selfRadius,
       this.mapColors.self, this.mapColors.tick, {
         self: true, pulse: performance.now(), scale: this.unitScale
@@ -3541,11 +3543,12 @@ const MapView = {
   },
 
   // spawnCombatAnim turns one fresh combat event into an animation
-  // entry: a swing streak from the attacker to the hit target, or
-  // a floating damage number on the hurt unit. The entry captures
-  // the event placement so the effect still renders after the unit
-  // despawns; while the unit stays on the map the effect follows
-  // its interpolated position.
+  // entry: a swing streak from the attacker to the hit target, a
+  // floating damage number on the hurt unit, or a miss float on the
+  // unit an evaded blow was thrown at. The entry captures the event
+  // placement so the effect still renders after the unit despawns;
+  // while the unit stays on the map the effect follows its
+  // interpolated position.
   spawnCombatAnim(ev) {
     const selfId = this.lastSnap.character
       && this.lastSnap.character.objectId;
@@ -3557,6 +3560,17 @@ const MapView = {
         toWorld: { x: ev.targetX, y: ev.targetY },
         bySelf: ev.attackerId === selfId,
         onSelf: ev.targetId === selfId
+      });
+
+      return;
+    }
+    if (ev.kind === "miss") {
+      const missJitter = ((ev.seq * 29) % 13 - 6) * 1.2;
+      this.combatAnims.push({
+        kind: "miss", at: performance.now(), seq: ev.seq,
+        objectId: ev.targetId, onSelf: ev.targetId === selfId,
+        world: { x: ev.targetX, y: ev.targetY },
+        jitter: missJitter
       });
 
       return;
@@ -3574,10 +3588,11 @@ const MapView = {
   },
 
   // drawCombatEffects renders the live combat animation layer on
-  // top of the units: the swing streaks of the landed hits
-  // and the floating damage numbers of the HP deltas. Finished
-  // entries drop out here; needsMoreFrames keeps the render loop
-  // alive while any of them are still running.
+  // top of the units: the swing streaks of the landed hits, the
+  // floating damage numbers of the HP deltas and the miss floats of
+  // the evaded blows. Finished entries drop out here;
+  // needsMoreFrames keeps the render loop alive while any of them
+  // are still running.
   drawCombatEffects(ctx) {
     if (this.combatAnims.length === 0) {
       return;
@@ -3585,12 +3600,15 @@ const MapView = {
     const nowMs = performance.now();
     const keep = [];
     for (const anim of this.combatAnims) {
-      const life = anim.kind === "swing" ? swingMs : damageMs;
+      const life = anim.kind === "swing" ? swingMs
+        : anim.kind === "miss" ? missMs : damageMs;
       const age = nowMs - anim.at;
       if (age >= life) { continue; }
       keep.push(anim);
       if (anim.kind === "swing") {
         this.drawSwingEffect(ctx, anim, age / life);
+      } else if (anim.kind === "miss") {
+        this.drawMissEffect(ctx, anim, age / life);
       } else {
         this.drawDamageEffect(ctx, anim, age / life);
       }
@@ -3688,9 +3706,10 @@ const MapView = {
 
   // drawDamageEffect renders one floating damage number: it pops
   // in with a slight overshoot, rises above the hurt unit and melts
-  // away. The hits the character takes read red, the damage the
-  // character deals amber; a short flash ring under the number
-  // marks the hurt unit itself.
+  // away. The hits the character takes read red and fly out to the
+  // LEFT of the fight, the damage the character deals amber and to
+  // the RIGHT - the direction split of the owner brief; a short
+  // flash ring under the number marks the hurt unit itself.
   drawDamageEffect(ctx, anim, t) {
     const pos = this.effectScreenPos(anim.objectId, anim.world);
     const k = this.unitScale || 1;
@@ -3700,7 +3719,8 @@ const MapView = {
     const color = anim.onSelf ? damageSelfColor : damageMobColor;
     const size = Math.max(10, Math.min(17,
       (anim.onSelf ? 12 : 11) + Math.sqrt(anim.amount) * 0.7)) * k;
-    const x = pos.x + anim.jitter * k;
+    const x = pos.x + anim.jitter * k
+      + (anim.onSelf ? -1 : 1) * floatSideOffset * k;
     const y = pos.y - 8 * k - rise;
     ctx.save();
     // The flash ring under the number.
@@ -3723,6 +3743,36 @@ const MapView = {
     ctx.strokeText(text, 0, 0);
     ctx.fillStyle = color;
     ctx.fillText(text, 0, 0);
+    ctx.restore();
+  },
+
+  // drawMissEffect renders one floating miss marker: the plain
+  // "Miss" text where an evaded blow was thrown at, by the same
+  // analogy as the damage numbers (pop, rise, melt - no streak, no
+  // flash ring: nothing landed on the unit). The same direction
+  // split applies: a blow the character dodged reads to the LEFT of
+  // the fight, a blow the character missed reads to the RIGHT.
+  drawMissEffect(ctx, anim, t) {
+    const pos = this.effectScreenPos(anim.objectId, anim.world);
+    const k = this.unitScale || 1;
+    const rise = easeOutQuad(t) * 24 * k;
+    const alpha = t < 0.7 ? 0.95 : 0.95 * (1 - (t - 0.7) / 0.3);
+    const scale = t < 0.14 ? easeOutBack(t / 0.14) : 1;
+    const size = 11 * k;
+    const x = pos.x + anim.jitter * k
+      + (anim.onSelf ? -1 : 1) * floatSideOffset * k;
+    const y = pos.y - 8 * k - rise;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    ctx.font = "600 italic " + size.toFixed(1) + "px " + this.sansStack;
+    ctx.textAlign = "center";
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "rgba(15, 18, 22, 0.75)";
+    ctx.globalAlpha = alpha;
+    ctx.strokeText("Miss", 0, 0);
+    ctx.fillStyle = missColor;
+    ctx.fillText("Miss", 0, 0);
     ctx.restore();
   },
 
@@ -3926,13 +3976,31 @@ const swingMs = 340;
 // rises above the hurt unit and melts away.
 const damageMs = 950;
 
+// missMs is the life of one floating miss marker: the same reading
+// as the damage number, slightly shorter (nothing landed, so the
+// float clears out of the way sooner).
+const missMs = 800;
+
+// floatSideOffset is the horizontal float offset in unit scale
+// pixels: the damage the character takes pops to the LEFT of the
+// fight, the damage it deals (and its misses) to the RIGHT.
+const floatSideOffset = 15;
+
 // The combat animation palette: the own swings read light blue, the
 // mob swings red; the damage numbers on the mobs the character
-// grinds render amber, the hits the character takes red.
+// grinds render amber, the hits the character takes red; the miss
+// floats stay neutral gray white on both sides.
 const swingSelfColor = "#7cc4ff";
 const swingMobColor = "#ff6b4a";
 const damageMobColor = "#ffd25c";
 const damageSelfColor = "#ff5252";
+const missColor = "#dfe6ee";
+
+// selfMarkerUnits is the self marker radius in the same unit space
+// radiusOf sizes the world markers with: the character reads as one
+// combatant among the others (mob combat parity), no bigger-self
+// emphasis.
+const selfMarkerUnits = 6;
 
 // easeOutQuad eases t out: fast at the start, settled at the end.
 function easeOutQuad(t) {

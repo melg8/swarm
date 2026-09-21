@@ -11,6 +11,48 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in progress): the combat feedback round - miss floats, directional damage, circle parity, skill cast and cooldown (2026-09-21, branch feature/improved-behaviour)
+
+Started 2026-09-21 ~11:45 UTC. The owner prompt assigned five web UI
+asks around the combat visuals, all English-only as usual:
+
+1. A "miss" floating text when the bot or its enemy evades a blow,
+   by analogy with the floating damage numbers of a landed hit.
+2. Directional floats: the damage the character takes flies out to
+   the LEFT of the fight, the damage the character deals to the
+   RIGHT.
+3. The self marker circle matches the mob circle size (no more
+   bigger-self emphasis).
+4. A skill icon with a fill animation above the character while it
+   casts or prepares a skill attack.
+5. The skills widget cells show the same cast fill when open, plus
+   the unavailable state while the skill is on reuse with the
+   remaining seconds until ready.
+
+Design (verified against the code):
+
+- Miss: `recordSwingEventsLocked` currently drops the miss flagged
+  hits; a `CombatEventMiss` event rides the existing feed instead
+  (no wire schema change, the kind string is new), map.js grows a
+  `drawMissEffect` beside `drawDamageEffect`.
+- Direction: both floats anchor on the hurt unit; `onSelf` floats
+  offset left, everything else right (the damage feed carries no
+  attacker id - the target side IS the requested split).
+- Circle: `drawSelf` used 7 units vs `radiusOf` mob combat 6; self
+  drops to the mob parity 6 (the `drawPlayerTargetLink` hardcode and
+  the harness pin follow).
+- Cast/cooldown: Mobius C1 `MagicSkillUse` (0x5A, verified in the
+  server tree) carries casterId, targetId, skillId, skillLevel,
+  hitTime ms, reuseDelay ms - the parser opens a cast window
+  (hitTime) and a reuse window (reuseDelay) per self skill; the
+  snapshot publishes `skillStates` (skillId + the milliseconds left
+  and the totals, computed at the snapshot moment); map.js draws the
+  cast icon fill above the self marker from it, app.js syncs the
+  keyed skill cells (a bottom-up cast fill + a dim overlay with the
+  buffLeftShort style seconds countdown).
+
+Status: commit 1 (miss + direction + circle parity) in flight.
+
 ## Active task (status: complete): the effects panel strict classic round (2026-09-21, branch feature/improved-behaviour)
 
 Started 2026-09-21 ~11:00 UTC. The owner prompt reversed the earlier
