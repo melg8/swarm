@@ -56,6 +56,12 @@ runs/.coverage-current.txt
 # itself is not a baseline)
 runs/race_full.log
 
+# The runtime artifacts of tools/coverage_report.sh (the raw run log
+# and the rendered HTML drill down - the ranked report lands in the
+# terminal, the raw profile runs/cover.out stays gitignored via *.out)
+runs/.cover-report-run.log
+runs/coverage.html
+
 # The fleet profile artifacts (the binary pprof dumps and the journal
 # files the 40 bot instrument writes; the report lands in the commit
 # message and the docs instead).
