@@ -13,11 +13,17 @@ check the archive when the recent context references an older task.
 
 ## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
 
-Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7).
+Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7);
+the review round 2026-09-21 ~19:52 UTC (the owner feedback on the
+first implementation).
+
 The owner ask: "Bot and npcs should not reduce their icon size even
 if they get close to each other. When bot fights and it is too
 close to enemy both icons should just touch facing each other, but
-should not change size."
+should not change size." The review ask: a bot and a mob that meet
+too tight drifted apart SIDEWAYS (a north-south pair read west-east
+while both kept looking north-south) - the facing and the rendered
+positions must never mismatch.
 
 Design (verified against the Round 124 contact pass):
 
@@ -38,13 +44,27 @@ Design (verified against the Round 124 contact pass):
   together. The world-anchored layers (the aggro range circles,
   the kill marks, the walk plans) keep the true positions: they
   are world facts, not unit plates.
-- Stacked pairs (a respawn under a standing character) separate on
-  a fixed horizontal fallback axis.
+- The review round fix: the separation axis of a tight pair comes
+  from the LOOK DIRECTION, not the connecting centers. Under the
+  new contactAxisEpsilon (3px screen) the center-to-center
+  direction of a pair is packet jitter, not geometry - the old
+  code split a stacked pair on a fixed west-east fallback and a
+  sub pixel residual could aim the slide sideways, which read as
+  the icons drifting perpendicular to the facing. contactAxis
+  rotates the slide axis into the heading line of the pair (the
+  same 65536-step circle the tick renders, so the axis lives in
+  exactly the space the tick draws in), blending by the gap
+  fraction so a pair wobbling around the epsilon does not pop: a
+  pair that faces each other separates along the shared facing
+  line with each unit backing away from what it looks at, two
+  units facing the same way line up nose to tail, and the units
+  without heading data (heading 0) keep the old horizontal split.
 
-Status: implementation complete, all nine web UI harnesses green
-(repro_map_render re-pinned to 106 checks with the new stacked
-contact scenario), go test ./internal/swarm/webserver/ green, the
-branch pushed and the PR open for the issue.
+Status: the review round implementation complete, all nine web UI
+harnesses green (repro_map_render grown with the facing contact
+and the facing near contact scenarios - both fail on the pre-fix
+map.js, pinning the reported drift), the change is web only, the
+branch pushed for the PR review.
 
 ## Active task (status: complete): the cast icon side round - the bow order shot, the quiet npc interact (2026-09-21, branch feature/improved-behaviour)
 

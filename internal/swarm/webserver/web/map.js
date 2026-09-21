@@ -2730,9 +2730,16 @@ const MapView = {
   // slides apart along the axis that connects the two centers, so
   // the circles touch face to face with a hair of separation instead
   // (the offset cap keeps a dense crowd from carrying one unit far
-  // from its true place). Dead units, ground items and the
-  // decorations stay out of it; a unit overlapping several partners
-  // accumulates the pushes of every pair.
+  // from its true place). A pair that meets too tight (the attacker
+  // walks into the target's spot) has no trustworthy connecting
+  // axis - the sub pixel gap is packet and interpolation jitter - so
+  // the slide axis rotates into the look direction of the pair (see
+  // contactAxis): the pair that faces each other separates along the
+  // shared facing line, each unit backing away from what it looks
+  // at, and the rendered positions can never mismatch the look
+  // direction ticks. Dead units, ground items and the decorations
+  // stay out of it; a unit overlapping several partners accumulates
+  // the pushes of every pair.
   computeContactOffsets() {
     const k = this.unitScale || 1;
     const units = [];
@@ -2742,7 +2749,8 @@ const MapView = {
       const p = this.worldToScreen(
         selfRt ? selfRt.drawX : c.x, selfRt ? selfRt.drawY : c.y);
       units.push({ key: "self", ox: p.x, oy: p.y, x: p.x, y: p.y,
-        r: selfMarkerUnits * k });
+        r: selfMarkerUnits * k,
+        heading: (selfRt ? selfRt.drawHeading : c.heading) || 0 });
     }
     for (const obj of this.sortedObjects) {
       if (obj.kind === "item" || obj.dead) { continue; }
@@ -2750,7 +2758,8 @@ const MapView = {
       const p = this.worldToScreen(
         rt ? rt.drawX : obj.x, rt ? rt.drawY : obj.y);
       units.push({ key: obj.objectId, ox: p.x, oy: p.y, x: p.x, y: p.y,
-        r: radiusOf(obj, threatOf(obj)) * k });
+        r: radiusOf(obj, threatOf(obj)) * k,
+        heading: (rt ? rt.drawHeading : obj.heading) || 0 });
     }
     // The separation pass: pairwise pushes over the working
     // positions, where a later pair sees the pairs before it
@@ -2772,13 +2781,11 @@ const MapView = {
           const dist = Math.hypot(dx, dy);
           if (dist >= want) { continue; }
           const push = (want - dist) / 2;
-          let ux = 1;
-          let uy = 0;
-          if (dist > 0.001) { ux = dx / dist; uy = dy / dist; }
-          a.x -= ux * push;
-          a.y -= uy * push;
-          b.x += ux * push;
-          b.y += uy * push;
+          const axis = contactAxis(a, dx, dy, dist);
+          a.x -= axis.x * push;
+          a.y -= axis.y * push;
+          b.x += axis.x * push;
+          b.y += axis.y * push;
         }
       }
     }
@@ -4588,6 +4595,64 @@ const selfMarkerUnits = 6;
 // between two touching circles: exactly tangent rims fuse under the
 // canvas anti aliasing, the half pixel seam keeps the pair readable.
 const contactGap = 0.5;
+
+// contactAxisEpsilon is the screen distance under which the
+// connecting axis of an overlapping pair stops being trustworthy
+// geometry: a tight melee meet (the attacker walks into the target's
+// spot before the server pushes it back to the collision distance)
+// or a deep zoom out leaves the pair closer than the packet and
+// interpolation jitter, so the measured center-to-center direction
+// is noise - it can sit perpendicular to the line the two units
+// actually face, which read as the icons drifting apart sideways
+// while both kept looking straight at each other. Below the epsilon
+// the look direction owns the slide axis instead (see contactAxis).
+const contactAxisEpsilon = 3;
+
+// headingVec returns the screen space look direction of one heading
+// value - the same 65536 step circle drawUnitTick renders the tick
+// with. The contact pass must resolve its axes in exactly the space
+// the ticks draw in, so a pair separated along a heading line reads
+// as facing each other with no mismatch between the ticks and the
+// marker positions.
+function headingVec(heading) {
+  const angle = ((heading || 0) / 65536) * 2 * Math.PI;
+
+  return { x: Math.cos(angle), y: Math.sin(angle) };
+}
+
+// contactAxis resolves the separation axis of one overlapping pair:
+// the connecting center axis while the gap between the centers is
+// real geometry (a healthy overlap - the axis IS the approach line
+// of the two units), rotating into the look axis of the first unit
+// of the pair as the gap shrinks under contactAxisEpsilon. The
+// rotation blends by the gap fraction, so a pair wobbling around
+// the epsilon does not pop between two directions frame to frame.
+// The look axis kills the facing mismatch at the source: a pair
+// that faces each other separates along the shared facing line with
+// each unit backing away from what it looks at (the character that
+// looks south slides north, the mob that looks north slides south),
+// two units facing the same way line up nose to tail along their
+// course, and the old stacked fallback survives only for units
+// without heading data (heading 0 reads as looking east, so the
+// no-data pair still splits horizontally, deterministic as before).
+function contactAxis(a, dx, dy, dist) {
+  const look = headingVec(a.heading);
+  if (dist >= contactAxisEpsilon) {
+    return { x: dx / dist, y: dy / dist };
+  }
+  if (dist <= 0.001) {
+    return look;
+  }
+  const t = dist / contactAxisEpsilon;
+  const from = Math.atan2(look.y, look.x);
+  const to = Math.atan2(dy, dx);
+  let delta = to - from;
+  while (delta > Math.PI) { delta -= 2 * Math.PI; }
+  while (delta < -Math.PI) { delta += 2 * Math.PI; }
+  const angle = from + delta * t;
+
+  return { x: Math.cos(angle), y: Math.sin(angle) };
+}
 
 // easeOutQuad eases t out: fast at the start, settled at the end.
 function easeOutQuad(t) {

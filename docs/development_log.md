@@ -8981,3 +8981,54 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
 - Verification: all nine web UI harnesses green (repro_map_render
   grown to 106 checks), go test ./internal/swarm/webserver/ green;
   no Go source touched, the change is web only.
+
+## Round 128: the facing aware contact axis - the tight pair separates along the look line (2026-09-21)
+
+- Report: the owner review of Round 127 (issue #7, the kanban
+  board) - when a bot and a mob approach each other too tight the
+  icons drifted apart sideways: a pair that stood north-south and
+  looked north-south read as standing west-east after the contact
+  slide, a mismatch between the look direction ticks and the
+  rendered positions. The ask: no such mismatch may survive.
+
+- Root cause: the Round 127 slide separated every overlapping pair
+  along the axis that connects the two centers, with a fixed
+  west-east fallback when the pair was exactly stacked. But a tight
+  melee meet has no trustworthy connecting axis: the attacker walks
+  into the target's spot before the server pushes it back to the
+  collision distance, and at the fleet zoom the whole collision
+  distance is sub pixel - the measured center-to-center direction
+  is packet and interpolation jitter, which can sit perpendicular
+  to the line the two units actually face. The stacked fallback
+  then split the pair west-east unconditionally. Both paths read as
+  the icons drifting sideways while the ticks kept pointing at each
+  other.
+
+- Fix: the separation axis of a pair now rotates into the LOOK
+  DIRECTION as the gap shrinks (contactAxis + headingVec in map.js,
+  the threshold contactAxisEpsilon = 3px screen). The look axis is
+  computed in exactly the space drawUnitTick renders (the same
+  65536-step heading circle), so the slide can never disagree with
+  the visible tick: a pair that faces each other separates along
+  the shared facing line with each unit backing away from what it
+  looks at, two units facing the same way line up nose to tail
+  along their course, and the units without heading data (heading 0
+  reads as looking east) keep the old deterministic horizontal
+  split. Above the epsilon the connecting axis stays the real
+  geometry it always was (a healthy overlap - the axis IS the
+  approach line); the transition blends by the gap fraction, so a
+  pair wobbling around the threshold does not pop between
+  directions frame to frame.
+
+- Landed: map.js (computeContactOffsets carries the per unit
+  heading, the pair loop resolves its axis through contactAxis);
+  repro_map_render.js (the new "facing contact" scenario - the
+  exact stack of a facing pair now separates along the facing line
+  with no sideways drift - and the new "facing near contact"
+  scenario - the sub pixel perpendicular residual that used to aim
+  the slide sideways; both fail on the pre-fix map.js, pinning the
+  reported drift).
+
+- Verification: all nine web UI harnesses green (repro_map_render
+  grown to 114 checks), the whitespace gate clean, node --check
+  clean; no Go source touched, the change is web only.
