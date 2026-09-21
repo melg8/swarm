@@ -15,7 +15,11 @@
     "bots": [
         {
             "type": "fighter",
-            "count": 1
+            "count": 3
+        },
+        {
+            "type": "archer",
+            "count": 3
         }
     ]
 }

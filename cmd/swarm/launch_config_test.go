@@ -70,11 +70,22 @@ func TestLaunchConfigRejectsBrokenFiles(t *testing.T) {
 
     t.Run("the unknown bot type refuses", func(t *testing.T) {
         path := writeConfigFile(t,
-            `{"bots": [{"type": "archer", "count": 1}]}`)
+            `{"bots": [{"type": "mage", "count": 1}]}`)
         _, err := loadLaunchConfig(path)
         require.ErrorContains(t, err, "unknown bot type")
         require.ErrorContains(t, err, "fighter",
             "the message lists the implemented types")
+    })
+
+    t.Run("the archer type is valid", func(t *testing.T) {
+        path := writeConfigFile(t,
+            `{"account": "archbot", "bots": [{"type": "archer", "count": 2}]}`)
+        lc, err := loadLaunchConfig(path)
+        require.NoError(t, err)
+        require.Equal(t, []botPlan{
+            {Type: "archer", Account: "archbot"},
+            {Type: "archer", Account: "archbot2"},
+        }, lc.expand())
     })
 
     t.Run("the zero count refuses", func(t *testing.T) {
@@ -194,12 +205,14 @@ func TestApplyLaunchConfigFoldsTheFile(t *testing.T) {
         })
 }
 
-// TestDefaultLaunchConfigMatchesTheFlagDefaults pins the three-way
-// agreement the issue asks for: the built-in default config, the
-// shipped configs/swarm.json and the plain flag defaults describe the
-// same launch, so "run without a config" and "run the default config"
-// can never drift apart.
-func TestDefaultLaunchConfigMatchesTheFlagDefaults(t *testing.T) {
+// TestDefaultLaunchConfigMatchesTheShippedFile pins the agreement
+// the issue asks for: the built-in default config and the shipped
+// configs/swarm.json describe the same launch - the owner picked the
+// default swarm of three melee warriors and three archers (the
+// account ladder walks the composition: test1..test3 fight melee,
+// test4..test6 shoot). The plain flag form stays the single fighter
+// fallback of a launch without a file.
+func TestDefaultLaunchConfigMatchesTheShippedFile(t *testing.T) {
     def := defaultLaunchConfig()
     require.Equal(t, defaultLoginAddress, def.Login)
     require.Equal(t, defaultAccount, def.Account)
@@ -209,17 +222,25 @@ func TestDefaultLaunchConfigMatchesTheFlagDefaults(t *testing.T) {
     require.False(t, def.Hunt)
     require.Equal(t, "logs", def.SessionDir)
     require.Equal(t, defaultProxyLogPath, def.ProxyLog)
-    require.Equal(t, []botSpec{{Type: "fighter", Count: 1}}, def.Bots)
+    require.Equal(t, []botSpec{
+        {Type: botTypeFighter, Count: 3},
+        {Type: botTypeArcher, Count: 3},
+    }, def.Bots)
 
     // The shipped file parses, validates and expands to the same
-    // single fighter as the built-in default.
+    // six bot plan as the built-in default.
     lc, err := loadLaunchConfig(filepath.Join("..", "..",
         "configs", "swarm.json"))
     require.NoError(t, err)
     require.Equal(t, def, lc,
         "configs/swarm.json mirrors the built-in default")
     require.Equal(t, []botPlan{
-        {Type: "fighter", Account: defaultAccount},
+        {Type: botTypeFighter, Account: "test1"},
+        {Type: botTypeFighter, Account: "test2"},
+        {Type: botTypeFighter, Account: "test3"},
+        {Type: botTypeArcher, Account: "test4"},
+        {Type: botTypeArcher, Account: "test5"},
+        {Type: botTypeArcher, Account: "test6"},
     }, lc.expand())
 }
 
