@@ -14,7 +14,10 @@
 #
 # Usage: bash tools/webui_fix_verify.sh [shot-dir]
 # Needs: node, agent-browser (headless browser CLI).
+# PORT overrides the preview port (8093 default) so concurrent runs
+# never collide.
 set -uo pipefail
+PORT="${PORT:-8093}"
 TOOL_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_DIR="$(dirname "$TOOL_DIR")"
 cd "$REPO_DIR"
@@ -22,13 +25,13 @@ cd "$REPO_DIR"
 SHOT_DIR="${1:-/tmp/webui_verify}"
 mkdir -p "$SHOT_DIR"
 
-node tools/webui_preview_server.js 8093 > /tmp/preview.log 2>&1 &
+node tools/webui_preview_server.js "$PORT" > /tmp/preview.log 2>&1 &
 SRV=$!
 trap 'kill $SRV 2>/dev/null; agent-browser close 2>/dev/null' EXIT
 sleep 1
 
 agent-browser set viewport 1360 900 > /dev/null 2>&1
-agent-browser open http://127.0.0.1:8093 2>&1 | tail -1
+agent-browser open "http://127.0.0.1:$PORT" 2>&1 | tail -1
 sleep 2
 
 agent-browser eval "$(cat "$TOOL_DIR/webui_fix_inject.js")" 2>&1 | tail -2

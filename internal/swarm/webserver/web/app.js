@@ -632,7 +632,7 @@ function engageFightDetail(snap, c, hunt) {
   let head = "fighting " + (target && target.name
     ? target.name
     : "a target");
-  if (hunt && hunt.targetId) {
+  if (hunt && hunt.targetId && hunt.targetForMs > 0) {
     head += " for " + formatAgeMs(hunt.targetForMs);
   }
   const parts = [head];

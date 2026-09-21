@@ -2169,7 +2169,8 @@ function main() {
         check(results, "the quest switch css keeps the grids as siblings",
             css.includes(".inv-tabs { display: flex;") &&
             css.includes(".inv-grid.hidden { display: none; }") &&
-            css.includes(".quest-empty {") &&
+            /#quest-grid\s*\{\s*position:\s*relative/.test(css) &&
+            /\.quest-empty\s*\{[^}]*position:\s*absolute/.test(css) &&
             !css.includes(".quest-view"),
             "the quest switch css drifted");
     }
