@@ -19,18 +19,23 @@ SPDX-License-Identifier: MIT
 //   the tooltip singleton exists and buffs_tooltip.js loads before
 //   buffs.js before app.js (the flip module is deleted);
 // - the styles: the grid packs 34px cells (the 32px native icon art
-//   plus the 2px white separator) 10 columns wide, caps at the two
-//   classic rows and clips past the 20 visible slots without a
+//   plus the 2px theme tinted separator) 10 columns wide, caps at the
+//   two classic rows and clips past the 20 visible slots without a
 //   scrollbar, the body pads the top edge only (the cell separators
 //   answer the bottom chrome), the icons answer their native 32px,
-//   the mini time strip rides 3px tall in the bright per theme tint,
-//   nothing animates (no view morph transitions, no spawn keyframes)
-//   and the pathfind mode still hides the panel;
+//   the level badge reads white on its dark translucent plate in
+//   both themes, the mini time strip rides 3px tall in the bright
+//   per theme tint, nothing animates (no view morph transitions, no
+//   spawn keyframes) and the pathfind mode still hides the panel;
 // - the render: exactly the active effects show (two buffs build two
 //   cells), the keyed cells keep their DOM nodes across the
-//   snapshots (the icons must not blink), a buff leaving the list
-//   drops only its own node, a joining one snaps in with no spawn
-//   class and no queued animation timer;
+//   snapshots (the icons must not blink), a refresh that already
+//   sits in the snapshot order moves no node (a move detaches the
+//   node, the browser drops its :hover state and the hover chip
+//   flickered on every 300 ms snapshot), a reorder moves only the
+//   out of place nodes and lands in the snapshot order, a buff
+//   leaving the list drops only its own node, a joining one snaps
+//   in with no spawn class and no queued animation timer;
 // - the grid cells carry the mini time strip (left over total), a
 //   zero total pins the strip empty, the countdown chip fills for
 //   the hover only, every node names its skill id for the tooltip;
@@ -315,10 +320,21 @@ function checkStyles() {
         !css.includes("repeat(10, 30px)"));
     check("styles: the body pads the top edge only",
         /\.buffs-panel-body \{[^}]*padding: 2px 3px 0;/s.test(css));
-    check("styles: the cells paint the white separator strips",
-        /\.buff-cell \{[^}]*border-right: 2px solid #ffffff;/s.test(css) &&
-        /\.buff-cell \{[^}]*border-bottom: 2px solid #ffffff;/s.test(css) &&
+    check("styles: the cells paint the theme tinted separator strips",
+        /\.buff-cell \{[^}]*border-right: 2px solid var\(--buff-separator\);/s
+            .test(css) &&
+        /\.buff-cell \{[^}]*border-bottom: 2px solid var\(--buff-separator\);/s
+            .test(css) &&
         /\.buffs-grid \{[^}]*gap: 0;/s.test(css));
+    check("styles: no hardcoded white separator is left",
+        !/\.buff-cell \{[^}]*#ffffff/s.test(css));
+    check("styles: the separator tint answers per theme",
+        css.includes("--buff-separator: #ffffff;") &&
+        css.includes("--buff-separator: var(--bg-panel);"));
+    check("styles: the level badge reads white on its dark plate",
+        /\.buff-cell \.badge-level \{[^}]*color: #ffffff;/s.test(css) &&
+        /\.buff-cell \.badge-level \{[^}]*background: rgba\(0, 0, 0, 0\.55\);/s
+            .test(css));
     check("styles: the icons answer the native 32px art unscaled",
         /\.buff-cell img \{[^}]*width: 32px;/s.test(css) &&
         /\.buff-cell img \{[^}]*height: 32px;/s.test(css));
@@ -402,6 +418,39 @@ function checkBehavior(harness) {
         timers.timeouts.length === 0);
 
     const cell91 = api.state.cells.get(91).item;
+    check("keyed: the in place refresh moves no cell", (() => {
+        const gridEl = grid();
+        const realAppend = gridEl.append;
+        let moves = 0;
+        gridEl.append = (...added) => {
+            moves += added.length;
+
+            return realAppend.apply(gridEl, added);
+        };
+        // The same list again: every node already sits at its
+        // snapshot index, the 300 ms snapshot stream may not touch
+        // them - a move detaches the node, the browser drops its
+        // :hover state and the hover countdown chip flickered.
+        api.panel({ buffs: [
+            buff(91, 1, 1190, 1200, "Defense Aura", "skill0091"),
+            buff(77, 2, 590, 1200, "Attack Aura", "skill0077")
+        ] });
+        const steadyMoves = moves;
+        // A reordered list moves the out of place nodes and lands
+        // in the snapshot order.
+        moves = 0;
+        api.panel({ buffs: [
+            buff(77, 2, 590, 1200, "Attack Aura", "skill0077"),
+            buff(91, 1, 1190, 1200, "Defense Aura", "skill0091")
+        ] });
+        const reorderMoves = moves;
+        const order = gridEl.children.map((cell) =>
+            cell.getAttribute("data-skill-id")).join(",");
+        gridEl.append = realAppend;
+        api.panel({ buffs: two });
+
+        return steadyMoves === 0 && reorderMoves > 0 && order === "77,91";
+    })());
     api.panel({ buffs: [
         buff(91, 1, 1190, 1200, "Defense Aura", "skill0091"),
         buff(77, 2, 590, 1200, "Attack Aura", "skill0077")

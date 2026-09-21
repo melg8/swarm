@@ -23,6 +23,11 @@ SPDX-License-Identifier: MIT
      accent drowned next to the white cell separators of the effects
      panel (see the .buff-strip rule). */
   --buff-strip: #f59e0b;
+  /* The separator chrome of the effects panel cells: the white
+     classic slot gaps of the light theme. The dark theme re-tints
+     them to the panel chrome - the hardcoded white read as bright
+     white holes between and under the icons on the dark panel. */
+  --buff-separator: #ffffff;
   --green: #1a7f37;
   --red: #cf222e;
   --blue: #0969da;
@@ -64,6 +69,10 @@ html[data-theme="dark"] {
   --text-bright: #eef1f5;
   --accent: #f0a03a;
   --buff-strip: #ffc061;
+  /* The dark separators melt into the panel frame: the gap areas
+     below and between the buffs darken with the rest of the panel
+     instead of staying white. */
+  --buff-separator: var(--bg-panel);
   --green: #3fb950;
   --red: #e5484d;
   --blue: #58a6ff;
@@ -277,16 +286,17 @@ body {
    the horizontal icon grid - the classic buff bar (the vertical
    detailed list is gone by decision, no toggle control exists):
    the active effects pack edge to edge as 34px cells (the 32px
-   native icon art plus the 2px white separator strip each cell
-   paints on its right and bottom edge - the icons answer 1:1,
-   nothing scales), 10 per row and at most 2 rows; more than the 20
-   visible slots stay clipped, no scrollbar - the strict classic bar
-   owns the cap. The frame hugs the filled columns and rows, the
-   body pads 2px on the top edge only (the cells' own white
-   separators answer the bottom chrome, so the white below the icons
-   reads the same 2px as the white above them). The panel renders
-   strictly: no appear or disappear animation, a change snaps. It
-   hides entirely while no effect runs. */
+   native icon art plus the 2px separator strip each cell paints on
+   its right and bottom edge, tinted by --buff-separator - white in
+   the light theme, the panel chrome in the dark one - the icons
+   answer 1:1, nothing scales), 10 per row and at most 2 rows; more
+   than the 20 visible slots stay clipped, no scrollbar - the strict
+   classic bar owns the cap. The frame hugs the filled columns and
+   rows, the body pads 2px on the top edge only (the cells' own
+   separators answer the bottom chrome, so the chrome below the
+   icons reads the same 2px as the chrome above them). The panel
+   renders strictly: no appear or disappear animation, a change
+   snaps. It hides entirely while no effect runs. */
 .buffs-panel {
   position: absolute;
   top: 10px;
@@ -311,11 +321,11 @@ body.mode-pathfind .buffs-panel { display: none; }
 }
 
 /* The icon grid: 10 columns of 34px cells (the 32px native icon
-   plus the 2px white separator), no grid gap - every cell paints
-   its own white strip on the right and the bottom edge, so the
+   plus the 2px separator), no grid gap - every cell paints its own
+   separator strip on the right and the bottom edge, so the
    separators run only between (and under) the icons that actually
-   show and a partially filled row never leaves a white hole (the
-   white grid background answer did exactly that on the dark theme).
+   show and a partially filled row never leaves a chrome hole (the
+   grid background answer did exactly that on the dark theme).
    The cap clips past the 20 visible slots without a scrollbar.
    Keep in sync with the geometry constants in buffs.js. */
 .buffs-grid {
@@ -334,8 +344,12 @@ body.mode-pathfind .buffs-panel { display: none; }
   width: 34px;
   height: 34px;
   background: var(--bg-panel-2);
-  border-right: 2px solid #ffffff;
-  border-bottom: 2px solid #ffffff;
+  /* The separator strips ride the --buff-separator tint: the white
+     classic slot gaps of the light theme, the panel chrome of the
+     dark one (the hardcoded white stayed bright on the dark
+     panel). */
+  border-right: 2px solid var(--buff-separator);
+  border-bottom: 2px solid var(--buff-separator);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -357,7 +371,11 @@ body.mode-pathfind .buffs-panel { display: none; }
   padding: 0 3px;
   font-size: 9px;
   line-height: 11px;
-  color: var(--text-bright);
+  /* The fixed white over the dark translucent plate: the badge
+     plate is dark in both themes, so the theme text colors flip the
+     label unreadable in the light theme (the near black --text-bright
+     sank into the plate). */
+  color: #ffffff;
   background: rgba(0, 0, 0, 0.55);
   border-radius: 0 0 0 3px;
   pointer-events: none;
@@ -392,9 +410,10 @@ body.mode-pathfind .buffs-panel { display: none; }
 
 /* The mini time strip of a grid cell: a 3px sliver pinned to the
    bottom pixels of the icon, its width is the remaining share of
-   the duration the effect landed with. The dedicated bright color
+   the effect duration (the full abnormal time of the skill stats
+   when the server data carries it). The dedicated bright color
    (one tint per theme) keeps it clearly visible over the icon art
-   and next to the white separators. */
+   and next to the separators. */
 .buff-cell .buff-strip {
   position: absolute;
   left: 0;

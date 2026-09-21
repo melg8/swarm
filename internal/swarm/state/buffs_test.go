@@ -159,21 +159,48 @@ func TestSetBuffsKeepsTheTotalOnRefresh(t *testing.T) {
 }
 
 // TestSetBuffsFreshSkillCarriesItsOwnTotal pins the per skill total:
-// a skill joining the list later starts from its own landed duration,
-// it never inherits the total of the running ones.
+// a skill joining the list never inherits the total of the running
+// ones. A skill the server data knows rides its full abnormal time as
+// the denominator, an unknown skill rides the seconds it first
+// reported (the only duration the process ever saw for it).
 func TestSetBuffsFreshSkillCarriesItsOwnTotal(t *testing.T) {
     bot := NewBot("unittest1")
     bot.SetBuffs([]BuffEntry{
-        {SkillID: 91, Level: 1, Time: 1200},
+        {SkillID: 99999, Level: 1, Time: 300},
         {SkillID: 77, Level: 2, Time: 300},
     })
     snaps := bot.Snapshot().Buffs
     require.Len(t, snaps, 2)
-    // The snapshot sorts by skill id: 77 first, 91 second.
+    // The snapshot sorts by skill id: 77 first, 99999 second.
     require.Equal(t, int32(77), snaps[0].SkillID)
-    require.InDelta(t, 300, snaps[0].Total, 1)
-    require.Equal(t, int32(91), snaps[1].SkillID)
-    require.InDelta(t, 1200, snaps[1].Total, 1)
+    // Attack Aura's abnormal time is 1200: the strip reads the
+    // remaining 300 over the full 1200, not 300 over 300.
+    require.InDelta(t, 1200, snaps[0].Total, 1)
+    require.Equal(t, int32(99999), snaps[1].SkillID)
+    require.InDelta(t, 300, snaps[1].Total, 1)
+}
+
+// TestSetBuffsLoginMidBuffRidesTheFullDuration pins the login
+// scenario: the server reports the seconds the effect still has, the
+// strip must read the remaining share of the FULL duration - five
+// minutes left of a twenty minute Wind Walk render a quarter of the
+// strip, not a full one draining to zero.
+func TestSetBuffsLoginMidBuffRidesTheFullDuration(t *testing.T) {
+    bot := NewBot("unittest1")
+    bot.SetBuffs([]BuffEntry{{SkillID: 1204, Level: 2, Time: 300}})
+
+    snap := bot.Snapshot()
+    require.Len(t, snap.Buffs, 1)
+    require.InDelta(t, 300, snap.Buffs[0].Left, 1)
+    require.InDelta(t, 1200, snap.Buffs[0].Total, 1)
+
+    // A fresh cast later reports the full duration itself: the
+    // recast detection takes the fresh reading as the total, the
+    // skill stats answer the same value and the strip stays honest.
+    bot.SetBuffs([]BuffEntry{{SkillID: 1204, Level: 2, Time: 1200}})
+    snap = bot.Snapshot()
+    require.InDelta(t, 1200, snap.Buffs[0].Left, 2)
+    require.InDelta(t, 1200, snap.Buffs[0].Total, 1)
 }
 
 // TestSelfManaPercent pins the mana percent accessor.

@@ -8,9 +8,11 @@
 // AbnormalStatusUpdate list as the single horizontal icon grid - the
 // classic buff bar (the vertical detailed list is gone by decision):
 // one cell per active effect, at most 10 columns by 2 rows, every
-// cell packs edge to edge with the thin white separator strips on its
-// right and bottom edges and carries the icon at its native 32px size
-// (nothing scales), the level badge, the remaining time chip on hover
+// cell packs edge to edge with the thin separator strips on its
+// right and bottom edges (theme tinted, the white chrome of the
+// light theme and the panel chrome of the dark one) and carries the
+// icon at its native 32px size - nothing scales - plus the level
+// badge, the remaining time chip on hover
 // and the mini time strip pinned to its bottom pixels.
 //
 // The panel renders strictly and classically: no view switch, no
@@ -30,13 +32,13 @@
 
 // The panel geometry constants: the grid packs buffCellSize px icon
 // boxes at most buffGridColumns per row and at most buffGridRows rows
-// (the classic buff bar), every cell adds buffCellBorder px of white
+// (the classic buff bar), every cell adds buffCellBorder px of
 // separator on its right and bottom edges (buffCellStep is the full
 // cell box the arithmetic rides with), the body adds buffBodyPaddingY
 // px of panel colored frame on the TOP edge only (the bottom edge
-// carries none - the cells' own white separators answer the bottom
-// chrome, so the white below the icons reads the same 2px as the
-// white above them), the sides add 2 x 3px of body padding and the
+// carries none - the cells' own separators answer the bottom
+// chrome, so the chrome below the icons reads the same 2px as the
+// chrome above them), the sides add 2 x 3px of body padding and the
 // frame 2 x 1px of borders (buffPanelSide). Keep in sync with the
 // .buffs-panel geometry in style.css.
 const buffGridColumns = 10;
@@ -190,11 +192,17 @@ function applyBuffCell(cell, buff) {
 // syncBuffsKeyed diffs the keyed grid against the snapshot list: the
 // effects that left the server list drop their nodes, the effects
 // that joined build fresh ones, the surviving ones refresh in place
-// and every node ends in the snapshot order (appending an existing
-// node moves it, the icons never re-decode for a reorder). No spawn
-// or leave animation runs - a change snaps, the strict classic read.
-// Every node carries its skill id in the data-skill-id attribute -
-// the hover tooltip card resolves the anchor through it.
+// and every node ends in the snapshot order. Appending an existing
+// node moves it to the end, and a move detaches the node for a
+// moment - the browser then drops its :hover state until the next
+// real mouse move, which flickered the hover countdown chip on every
+// snapshot of the 300 ms event stream under a stationary cursor. So
+// a node already sitting at its snapshot index stays untouched and
+// only the out of place ones move (the icons never re-decode for a
+// reorder either way). No spawn or leave animation runs - a change
+// snaps, the strict classic read. Every node carries its skill id in
+// the data-skill-id attribute - the hover tooltip card resolves the
+// anchor through it.
 function syncBuffsKeyed(container, buffs, store, make, apply) {
   const seen = new Set();
   for (const buff of buffs) { seen.add(buff.skillId); }
@@ -205,6 +213,7 @@ function syncBuffsKeyed(container, buffs, store, make, apply) {
       BuffsPanel.anchors.delete(id);
     }
   }
+  let index = 0;
   for (const buff of buffs) {
     let entry = store.get(buff.skillId);
     if (!entry) {
@@ -214,7 +223,10 @@ function syncBuffsKeyed(container, buffs, store, make, apply) {
     entry.item.setAttribute("data-skill-id", String(buff.skillId));
     const anchor = buffAnchorOf(buff.skillId, buff);
     apply(entry, anchor);
-    container.append(entry.item);
+    if (container.children[index] !== entry.item) {
+      container.append(entry.item);
+    }
+    index += 1;
   }
 }
 

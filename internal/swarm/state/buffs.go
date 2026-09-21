@@ -23,8 +23,10 @@ type BuffEntry struct {
 
 // buffRecord is the stored form of one active effect: the learned
 // level of the buff skill, the seconds it still had when the server
-// last refreshed the list and the seconds it had when it landed (the
-// denominator of the remaining time percent the web UI list draws).
+// last refreshed the list and the duration the remaining time percent
+// rides against (the full abnormal time of the skill stats when it is
+// known, else the seconds the effect carried when the process first
+// saw it).
 type buffRecord struct {
     level int32
     left  int32
@@ -39,13 +41,14 @@ const buffTotalGraceSeconds = 2
 
 // BuffSnapshot is one active effect of the snapshot: the skill the
 // effect comes from with its level, the remaining seconds and the
-// seconds the effect had when it landed (Total, the denominator of
-// the remaining time percent), plus the resolved display data (name,
-// icon, the tooltip texts). The web UI buffs widget renders the
-// list; Desc is the generic client tooltip line of the level (empty
-// when the skill stats carry none) and Effect is the numeric effect
-// summary the server data bites with (empty for the skills outside
-// the effect table).
+// duration the remaining time percent rides against (Total - the full
+// abnormal time of the skill stats when the server data carries it,
+// else the seconds the effect had when the process first saw it),
+// plus the resolved display data (name, icon, the tooltip texts). The
+// web UI buffs widget renders the list; Desc is the generic client
+// tooltip line of the level (empty when the skill stats carry none)
+// and Effect is the numeric effect summary the server data bites with
+// (empty for the skills outside the effect table).
 type BuffSnapshot struct {
     SkillID int32  `json:"skillId"`
     Level   int32  `json:"level"`
@@ -71,6 +74,7 @@ func (b *Bot) SetBuffs(buffs []BuffEntry) {
     entries := make(map[int32]buffRecord, len(buffs))
     for _, buff := range buffs {
         total := buff.Time
+        prev, seen := b.buffs[buff.SkillID]
         // A continuing effect reports its current remaining time,
         // which only sinks below the previous reading (plus the
         // jitter grace); a reading above that marks a recast, and
@@ -78,10 +82,22 @@ func (b *Bot) SetBuffs(buffs []BuffEntry) {
         // level is a replaced effect (another cast overwriting the
         // same skill id) - always a recast, even when the fresh
         // duration fits under the counted down previous one.
-        if prev, ok := b.buffs[buff.SkillID]; ok &&
-            prev.level == buff.Level &&
+        if seen && prev.level == buff.Level &&
             buff.Time <= prev.left-elapsed+buffTotalGraceSeconds {
             total = prev.total
+        } else if !seen {
+            // The first observation of the process reports the
+            // seconds the effect still has, not the seconds it
+            // landed with - a login in the middle of a running buff
+            // would read a full strip draining to zero otherwise.
+            // The abnormal time of the skill stats answers the full
+            // duration when it is known and longer, so the strip
+            // reads remaining over full (5 minutes left of a 20
+            // minute buff renders a quarter of the strip).
+            if cast, ok := npcdata.SkillCastOf(buff.SkillID); ok &&
+                cast.BuffTime > total {
+                total = cast.BuffTime
+            }
         }
         entries[buff.SkillID] = buffRecord{
             level: buff.Level,
