@@ -55,7 +55,31 @@ Design (verified against the code and the Mobius C1 sources):
   break-word) instead of the nowrap ellipsis clip.
 - Trash: `.gear-trash` 30x38 -> 36x36.
 
-Status: commit A (crit floats) in flight.
+Status: complete. Three commits pushed to
+origin/feature/improved-behaviour:
+- The crit hint backend (59dcb97): the Attack packet HITFLAG_CRIT
+  (0x20) rides state.Attack.CritFlags; the tracker correlates the
+  victim of the landed critical blows (500ms window, an awaited drop
+  count per crit hit - a dual weapon crits twice) and the next HP
+  drops of that victim carry crit on the wire (TestCritHintLabels*
+  pin it; the count-consume design came out of the test round - the
+  sticky hint labeled plain follow-ups).
+- The map round (bce92f6): the crit float renders bigger with the
+  italic " Crit!" tail (the miss float styling); the melee contact
+  pass shrinks every overlapping pair of unit circles so they touch
+  face to face instead of merging (computeContactFactors, factor =
+  dist/(r1+r2) floor 0.25 x 0.95; dead units, items and far units
+  untouched).
+- The chrome round (c9999e9): the effects bar loses the whole
+  framing (bare 32px icons, 2px grid gaps, the size arithmetic
+  cols*34-2 x rows*34-2, the dead --buff-separator tints removed);
+  the status banner caps at min(380px, 60%) and wraps the detail
+  onto up to three lines (break-word + line clamp); the inventory
+  trash target squares to 36x36.
+Verification: the state suite green, all eight harnesses green
+(repro_buffs re-pinned to the bare geometry, repro_map_render grew
+the crit + contact scenarios with the font tracking, repro_gear
+pins the square trash and the banner wrap), lint/fmt clean.
 
 ## Active task (status: complete): the combat feedback round - miss floats, directional damage, circle parity, skill cast and cooldown (2026-09-21, branch feature/improved-behaviour)
 
