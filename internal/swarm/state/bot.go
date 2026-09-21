@@ -733,17 +733,6 @@ func (b *Bot) SelfPosition() (int32, int32, int32, bool) {
     return b.char.X, b.char.Y, b.char.Z, true
 }
 
-// SelfRunSpeed returns the observed run speed of the played character
-// in world units per second: the walk ETA input of the hunt loop. The
-// zero value before the first UserInfo carried the speeds, the
-// callers fall back to their default.
-func (b *Bot) SelfRunSpeed() float64 {
-    b.mu.RLock()
-    defer b.mu.RUnlock()
-
-    return b.char.RunSpeed
-}
-
 // SelfHeading returns the last observed heading of the played
 // character (the client position validation reports it alongside the
 // placement, the server stores it as the client heading).
