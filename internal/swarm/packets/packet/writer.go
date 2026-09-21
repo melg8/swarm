@@ -28,11 +28,19 @@ type Writer struct {
 }
 
 func NewWriter() *Writer {
-    return &Writer{Buffer: bytes.NewBuffer([]byte{})}
+    return &Writer{
+        Buffer:      bytes.NewBuffer([]byte{}),
+        writeErr:    nil,
+        writeBudget: 0,
+    }
 }
 
 func NewWriterTo(data []byte) *Writer {
-    return &Writer{Buffer: bytes.NewBuffer(data)}
+    return &Writer{
+        Buffer:      bytes.NewBuffer(data),
+        writeErr:    nil,
+        writeBudget: 0,
+    }
 }
 
 // FailWrites arms the sticky write failure: every write method of
