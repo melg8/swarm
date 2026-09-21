@@ -14,6 +14,29 @@ import (
     "time"
 )
 
+// dropAttackTarget drops the held fight and the server side target
+// selection with it: the travel tasks of the loop (the walk to town,
+// the route change of a zone or ground rotation) own the target
+// register - a loop target the selection keeps would resurrect on the
+// next engage tick (the re-adopt reads the server view of the
+// selection, and the server never unselects on its own), so the drop
+// sends the clear self click whenever a selection exists. The mob
+// itself stays untouched - no skip entry, the next pick may fight it
+// again when the travel is over.
+func (l *Loop) dropAttackTarget(reason string) {
+    if l.target == 0 && l.tracker.SelfTargetID() == 0 {
+        return
+    }
+    l.logf("Hunt: dropping the target %d: %s", l.target, reason)
+    l.target = 0
+    l.engageAt = time.Time{}
+    l.resetFightClock()
+    l.clearBlindRecovery()
+    l.noTargetSince = time.Time{}
+    l.noPickLogAt = time.Time{}
+    l.clearTalkedTarget()
+}
+
 // fleeFromTarget drops a fight the character is losing and opens
 // distance: the target lands on the long skip list (the walk back
 // must not re-select it), the pending engage bookkeeping clears and

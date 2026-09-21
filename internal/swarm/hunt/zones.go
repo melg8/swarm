@@ -350,6 +350,11 @@ func (l *Loop) stopForZoneSwitch() {
     if l.phase == phaseUser && l.userKind == state.CommandMove {
         l.resumeAuto()
     }
+    // The route change owns the target register: a held fight of the
+    // old square drops with its server selection (see
+    // dropAttackTarget) - the switch walk answers the blows through
+    // the defense nets, not through the stale fight.
+    l.dropAttackTarget("the zone switch owns the way")
     if l.phase == phaseTownWalk || l.phase == phaseTownReturn {
         l.resetTownTrip()
         l.zoneReturn = false
@@ -433,9 +438,15 @@ func (l *Loop) selfZoneAnchor() (int32, int32) {
 // pair 294 units apart inside the square, each fencing the other
 // out). The reading only applies while the character stands central
 // (the tracker only knows the mobs the server showed it, and the
-// patrol walk brings the character to the middle first); running
-// fights, resting walks and town trips reset the timer - a rotation
-// never abandons any of them.
+// patrol walk brings the character to the middle first); resting
+// walks and town trips reset the timer - a rotation never abandons
+// them.
+// The held fight of a stuck engage no longer resets the timer (the
+// owner rule of the travel target reset): a target the ground cannot
+// convert into a kill holds the emptiness reading open, the rotation
+// window runs and the drop of applyHuntingZone clears the stuck fight
+// when the rotation fires. The other guards (the loot, the trip, the
+// blows landing, the rest) still reset it.
 // The linear guard chain is the emptiness protocol itself: every
 // guard either resets or holds the empty timer, and splitting it
 // would scatter that contract over helpers.
@@ -446,7 +457,7 @@ func (l *Loop) maybeRotateEmptyZone(now time.Time) { //nolint:cyclop
 
         return
     }
-    if l.phase != phaseEngage || l.target != 0 || l.tripActive() ||
+    if l.phase != phaseEngage || l.tripActive() ||
         l.tracker.SelfUnderAttack() || l.tracker.SelfSitting() ||
         !l.inZoneSelf() {
         l.zoneEmptySince = time.Time{}
@@ -725,8 +736,12 @@ func (l *Loop) resetZoneDeathState() {
 // square gets its own empty window before any rotation away from it.
 // The mob list of the ground becomes the engage bias: every species
 // of the square stays attackable, the priorities tilt the pick toward
-// the exp rich mobs.
+// the exp rich mobs. The route change owns the target register: the
+// fight of the old square drops with its server selection (the
+// owner rule of the travel target reset), the defense nets answer
+// whatever chases.
 func (l *Loop) applyHuntingZone(zone HuntingZone) {
+    l.dropAttackTarget("the zone change owns the way")
     l.zonePickedID = zone.ID
     l.zoneCX, l.zoneCY, l.zoneHalf = zone.CX, zone.CY, zone.Half
     l.farmX, l.farmY, l.farmZ = 0, 0, 0

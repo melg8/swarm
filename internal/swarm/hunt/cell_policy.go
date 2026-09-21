@@ -641,8 +641,12 @@ func (h *cellHunter) ringEligible(now time.Time) bool {
 // apply switches the hunter to a cell: the patrol square and the
 // polygon leash of the loop retarget, the fleet claim moves, the
 // visit metrics of the old ground fold into the totals and the new
-// visit begins.
+// visit begins. The route change owns the target register: the held
+// fight of the old ground drops with its server selection (the owner
+// rule of the travel target reset, see dropAttackTarget) - a no-op
+// while the walk answers nothing.
 func (h *cellHunter) apply(l *Loop, index int, now time.Time) {
+    l.dropAttackTarget("the ground rotation owns the way")
     if h.picked >= 0 && h.picked < len(h.metrics) {
         h.foldVisit(h.picked)
     }
@@ -807,16 +811,19 @@ func (h *cellHunter) accumulate(l *Loop, now time.Time) {
 // every walk (the hunter drifts to the corpse position), and only a
 // knownlist that holds NOTHING pickable at all lets the economy
 // decide between waiting out the respawn and rotating to the
-// neighbor. The guards mirror the zone rotation: only a targetless,
-// healthy, standing engage phase reads the emptiness at all -
-// running fights, resting walks and town trips never rotate. The
-// reading runs UNFENCED (the whole knownlist through the level
-// window): a mob of the neighbor hexagon the character already sees
-// is not emptiness, the bot walks and fights it - a ground counts as
-// zero-enemy only when nothing at all is in sight, and moving there
-// is the last resort of the economy.
+// neighbor. The guards mirror the zone rotation: only a healthy,
+// standing engage phase reads the emptiness at all - resting walks
+// and town trips never rotate. A merely held target no longer resets
+// the timer (the owner rule of the travel target reset): a stuck
+// fight the ground cannot convert into a kill lets the window run,
+// and the apply of the rotation drops it. The reading runs UNFENCED
+// (the whole knownlist through the level window): a mob of the
+// neighbor hexagon the character already sees is not emptiness, the
+// bot walks and fights it - a ground counts as zero-enemy only when
+// nothing at all is in sight, and moving there is the last resort of
+// the economy.
 func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
-    if l.phase != phaseEngage || l.target != 0 || l.tripActive() ||
+    if l.phase != phaseEngage || l.tripActive() ||
         l.tracker.SelfUnderAttack() || l.tracker.SelfSitting() {
         h.emptySince = time.Time{}
 

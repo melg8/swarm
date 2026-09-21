@@ -698,17 +698,15 @@ func TestTripStuckWalkRepaths(t *testing.T) {
             "waypoint plan")
 }
 
-// TestTripWaitsForTheFightToEnd pins the combat gate of the trip start:
-// a full inventory must not send the character to the vendor while the
-// target lives or the loot of the kill still lies on the ground - the
-// drops are the point of the fight. Only the between-fights window
-// starts the trip.
-func TestTripWaitsForTheFightToEnd(t *testing.T) {
+// TestTripStartsThroughTheMidFightTarget pins the travel target reset
+// of the trip start: the bag crossing the trip threshold mid-fight
+// drops the merely held target (the trip owns the way, the owner rule
+// of 2026-09-21) instead of waiting the fight out. The loot of a kill
+// and the blows landing still hold the start (see
+// TestTripStartWaitsForLootAndBlows).
+func TestTripStartsThroughTheMidFightTarget(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     spawnMob(bot)
-    bot.ApplySpawnItem(state.ItemInfo{
-        ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
-    })
 
     // The mob is picked as the target while the inventory is still
     // light.
@@ -716,30 +714,15 @@ func TestTripWaitsForTheFightToEnd(t *testing.T) {
     require.Equal(t, int32(7), loop.target)
     require.False(t, loop.tripActive())
 
-    // The bag crosses the trip threshold mid-fight: no vendor walk.
+    // The bag crosses the trip threshold mid-fight: the trip starts
+    // and the held fight drops (the clear click rides only when the
+    // server confirmed the selection - the selection-less pick of
+    // this fixture clears nothing, see TestTripStartDropsHeldTarget).
     fillInventory(bot)
     loop.tick()
-    require.False(t, loop.tripActive(), "no vendor walk mid-combat")
-    require.Equal(t, phaseEngage, loop.phase)
-
-    // The target dies with a drop on the ground: the kill tick enters
-    // the loot phase and the loot keeps the trip armed off.
-    bot.ApplyStatusUpdate(7, []state.Attribute{
-        {ID: state.AttrCurHP, Value: 0},
-    })
-    bot.ApplySelfTarget(7)
-    loop.tick()
-    require.Equal(t, phaseLoot, loop.phase)
-    require.False(t, loop.tripActive(), "the loot of the kill comes first")
-
-    // The drop is picked up: the loot phase drains, the between-fights
-    // window opens and the full inventory starts the trip.
-    bot.ApplyItemPickup(state.ItemPickup{ObjectID: 9, PlayerID: 100})
-    loop.tick()
-    require.Equal(t, phaseEngage, loop.phase)
-    loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)
-    require.NotEmpty(t, game.walks)
+    require.Zero(t, loop.target, "the trip owns the way")
+    require.NotEmpty(t, game.walks, "the vendor walk goes out")
 }
 
 // TestShoppingTripSellsJunkBelowTheTrigger pins the sell policy of

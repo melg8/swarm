@@ -693,6 +693,11 @@ func (l *Loop) maybeStartTownTrip() {
     if !weaponRun && l.zone() != nil && !l.inZoneSelf() {
         return
     }
+    // The trip owns the way from here on: the trigger gates all
+    // passed, so a merely held engage target drops with its server
+    // selection (the owner rule of the travel target reset) - the
+    // fight of the old task must not bind the walk that replaces it.
+    l.dropAttackTarget("the town trip owns the way")
     // The walk needs a standing character: a resting one stands up
     // first and the trip starts on a later tick.
     if !l.standUpGuarded(time.Now()) {

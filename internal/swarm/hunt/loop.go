@@ -1551,10 +1551,10 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
 // running or just started), so the caller skips the engage/loot logic.
 // The town walk plan view publishes here too: while the trip walks to
 // or from the merchant, the remaining geodata waypoints publish so the
-// map draws the planned path. A town trip never abandons a running
-// fight (the loot of the kill is the point of the fight), so the start
-// waits for the last corpse to be looted and the character to stand
-// between the targets (see fightBusy).
+// map draws the planned path. A real fight still holds the start (the
+// loot of the kill is the point of the fight, the blows landing now
+// need the answer), but a merely held engage target drops: the trip
+// owns the target register the moment it starts (see dropAttackTarget).
 func (l *Loop) handleTownTrip() bool {
     if l.tripActive() {
         l.tickTownTrip()
@@ -1563,7 +1563,12 @@ func (l *Loop) handleTownTrip() bool {
         return true
     }
     if l.fightBusy() {
-        return false
+        if l.phase == phaseLoot || l.tracker.SelfUnderAttack() {
+            return false
+        }
+        // A merely held target falls through to the start attempt: the
+        // drop decision belongs to maybeStartTownTrip (its trigger
+        // gates decide whether the way changes hands at all).
     }
     l.maybeStartTownTrip()
     if !l.tripActive() {
@@ -1577,9 +1582,8 @@ func (l *Loop) handleTownTrip() bool {
 
 // fightBusy reports whether the character is still bound to the fight
 // it started: a selected living target, a pending loot pickup or a hit
-// landing right now. The town trip start waits it out - walking to a
-// vendor mid-combat leaves the mob alive (it heals back up) and its
-// drops on the ground.
+// landing right now. The town trip start waits out a real fight (the
+// loot, the blows) and drops a merely held target (see dropAttackTarget).
 func (l *Loop) fightBusy() bool {
     if l.phase == phaseLoot {
         return true
