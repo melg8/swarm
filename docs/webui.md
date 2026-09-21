@@ -765,16 +765,19 @@ widget checks live in `tools/repro_gear.js`.
 The floating frame right of the character HUD (left: 272, top: 10 of
 the map wrap) renders the server effect list (`snapshot.buffs`, the
 AbnormalStatusUpdate view: skillId, level, name, icon, the remaining
-seconds `left`, the landed duration `total`, the generic level
-description `desc` and the numeric effect summary `effect`) as the
-single horizontal icon grid - the classic buff bar. The vertical
-detailed list, the toggle chevron, the dock strip and the view
-persistence are gone by decision: no view classes, no storage state,
-no control - the grid is all there is.
+seconds `left`, the duration `total` the percent rides against, the
+generic level description `desc` and the numeric effect summary
+`effect`) as the single horizontal icon grid - the classic buff bar.
+The vertical detailed list, the toggle chevron, the dock strip and
+the view persistence are gone by decision: no view classes, no
+storage state, no control - the grid is all there is.
 
 - one 34px cell per active effect (the 32px native icon art plus the
-  2px white separator the cell paints on its right and bottom
-  edges), at most 10 columns wide and 2 rows for the classic buff
+  2px separator the cell paints on its right and bottom edges,
+  tinted by the `--buff-separator` variable: white in the light
+  theme, the panel chrome in the dark one - the hardcoded white read
+  as bright holes between and under the icons on the dark panel),
+  at most 10 columns wide and 2 rows for the classic buff
   bar; more than the 20 visible slots stay clipped with no scrollbar
   (the strict classic bar owns the cap, a clipped effect surfaces as
   soon as a slot frees); the icons answer their art 1:1 - nothing
@@ -783,16 +786,25 @@ no control - the grid is all there is.
   pins the inline width from min(cells, 10) and the body height from
   min(rows, 2) - one arithmetic code path for the real DOM and the
   harness stub alike), the body pads 2px on the top edge, none on
-  the bottom (the cells' own white separators answer the bottom
-  chrome, so the white below the icons reads the same 2px as the
-  white above them) and 3px on the sides;
+  the bottom (the cells' own separators answer the bottom
+  chrome, so the chrome below the icons reads the same 2px as the
+  chrome above them) and 3px on the sides;
 - the remaining time does NOT overlay the cell by default - a hover
   chip appears whose darkening hugs only the digits (width
   max-content, centered, riding just above the strip), and a 3px
   bright sliver pinned to the bottom pixels of the cell (the
   `buff-strip`, the dedicated per theme tint `--buff-strip`:
   #f59e0b light, #ffc061 dark) carries the remaining share left
-  over total.
+  over total. The `total` denominator is the full abnormal time of
+  the skill stats (`SkillCast.BuffTime` of the generated npcdata)
+  from the first observation of the effect on, so a login in the
+  middle of a running buff reads remaining over FULL - five minutes
+  left of a twenty minute Wind Walk render a quarter of the strip,
+  not a full one draining to zero; a recast keeps the fresh server
+  reading and an unknown skill keeps the seconds it first reported.
+  The level badge reads fixed white on its dark translucent plate in
+  both themes (the near black light theme text colors sank into the
+  plate).
 
 The measured geometry: the full 10 column frame spans 348px from its
 map-relative left 272 (the absolute left is 472 with the 200px
@@ -806,10 +818,10 @@ overlaps it there and clears from a ~1370px wide map container up
 The panel renders strictly: no appear or disappear animation, no
 view morph - a change snaps (no transitions on the frame, no spawn
 keyframes; a buff joining or leaving touches only its own cell).
-The panel hides entirely while no effect runs. Theme note: the equal
-2px bands read identically only in the light theme - on the dark
-theme the top band is the dark panel padding while the bottom band
-is the cells' pure white separator (the classic bar look, accepted).
+The panel hides entirely while no effect runs. The separator chrome
+is theme tinted now (--buff-separator: white light, the dark panel
+itself dark), so the bands below and between the buffs darken with
+the panel in the dark theme instead of staying white.
 
 Hovering a cell opens the floating card (the `#buffs-tooltip`
 singleton of `buffs_tooltip.js`, the mechanics of the item tooltip):
@@ -826,7 +838,11 @@ The countdowns run locally: every snapshot entry anchors its reading
 Hz ticker counts the elapsed wall clock off it, so the times keep
 running between the server snapshots. The cells are persistent DOM
 nodes keyed by the skill id, a buff joining or leaving touches only
-its own node (the icons never blink on a refresh), the panel holds
+its own node (the icons never blink on a refresh), and the refresh
+moves only the out of place nodes: appending an in place node would
+detach it for a moment, the browser would drop its :hover state and
+the hover chip flickered on every 300 ms snapshot under a stationary
+cursor. The panel holds
 the previous bot's content through the switch gap like every
 snapshot driven panel. The panel code lives in `web/buffs_tooltip.js`
 and `web/buffs.js` (loaded in this order before `app.js`, which
@@ -1234,11 +1250,12 @@ no bundler, no network dependency; every dynamic text lands through
 - `tools/repro_buffs.js` (`task repro:buffs`) for the effects panel:
   the markup (no EFFECTS head, no toggle button, no dock, no detailed
   list, no view classes), the styles (the 10 column grid of 34px
-  cells with the native 32px icons, the per cell white separators,
-  the clip without a scrollbar, the 3px bright strip, the top only
-  body padding, no transitions and no spawn keyframes), the render
-  (exactly the active effects, the keyed nodes surviving the
-  refreshes, the strip fills from left over total), the local
+  cells with the native 32px icons, the per cell theme tinted
+  separators, the clip without a scrollbar, the 3px bright strip,
+  the top only body padding, no transitions and no spawn keyframes),
+  the render (exactly the active effects, the keyed nodes surviving
+  the refreshes, the in place refresh moving no node, the strip
+  fills from left over the full duration), the local
   countdown ticker, the frame geometry (the column and row hugging
   with the two row cap) and the hover tooltip card (stub DOM).
 - `tools/repro_gear.js` (`task repro:gear`) for the equipment widget

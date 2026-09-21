@@ -53,7 +53,48 @@ Design (verified against the code):
 
 Status: commit 1 (miss + direction + circle parity) in flight.
 
-## Active task (status: complete): the effects panel strict classic round (2026-09-21, branch feature/improved-behaviour)
+## Active task (status: complete): the effects panel fix round (2026-09-21, branch feature/improved-behaviour)
+
+Started 2026-09-21 ~11:55 UTC. The owner prompt reported four defects
+of the strict classic panel. All four landed in commit 24b9f3d
+(code + tests + harness), the live browser verification (clean
+subagent, the static preview) passed 7/7 with measurements:
+
+- Dark theme kept white space below and between the buffs: the cells
+  painted hardcoded #ffffff separator borders. The separators ride
+  the new `--buff-separator` tint now (white light, `var(--bg-panel)`
+  dark) - the dark theme melts the gaps into the panel.
+- The hover countdown chip flickered under a stationary cursor:
+  syncBuffsKeyed re-appended every cell on every snapshot (the SSE
+  stream pushes at 300 ms) and a DOM move detaches the node, the
+  browser drops its :hover state until the next real mouse move, so
+  the chip cycled its 0.12s opacity transition. The refresh moves
+  only the out of place nodes now (an index guard against
+  container.children).
+- The strip rode the seconds the buff had at the first observation
+  (a login mid buff read a full strip draining to zero). The
+  denominator now fills from `SkillCast.BuffTime` of the generated
+  npcdata (the full abnormal time of the Mobius skill stats) when
+  the skill is known and larger: five minutes left of a twenty
+  minute Wind Walk read a quarter strip. A recast keeps the fresh
+  server reading, an unknown skill keeps the observed seconds.
+- The level badge was unreadable in the light theme (the near black
+  `--text-bright` sank into the dark translucent plate). The badge
+  reads fixed white in both themes.
+
+Verification: `node tools/repro_buffs.js` 51 checks green (new pins:
+no move on the in place refresh, the tint pair, the badge colors),
+the other eight harnesses green, `go build ./...`, vet and the full
+state package tests green, the fast deploy green, the live preview
+measurements above. Docs: webui.md effects section + the harness
+list updated. Open notes: the strip percent resolves against the
+32px content box (the 34px border-box division reads ~23% - a
+measurement trap), the tooltip meta line does not tick under a
+stationary cursor (it refills on mouseover only, the chip does
+tick), the chip text flips 5m to 4m at the 300s boundary
+(round-then-floor, cosmetic).
+
+## Past task (archive next): the effects panel strict classic round (2026-09-21, branch feature/improved-behaviour)
 
 Started 2026-09-21 ~11:00 UTC. The owner prompt reversed the earlier
 panel decisions: the vertical mode dies entirely, the panel renders
