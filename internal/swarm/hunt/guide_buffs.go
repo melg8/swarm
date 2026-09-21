@@ -106,6 +106,19 @@ var guideStopNpc = townNpc{
     X: 45475, Y: 48359, Z: -3056,
 }
 
+// guideForRegion returns the Newbie Guide npc of the hunting region:
+// the elven village guide serves the elven region (the default when
+// the loop carries no region yet), the regions without a mapped
+// guide answer none - a stop planned for a foreign region would walk
+// the Dion trips back to the elven village across the whole map.
+func guideForRegion(region string) (townNpc, bool) {
+    if region == regionDion {
+        return zeroTownNpc, false
+    }
+
+    return guideStopNpc, true
+}
+
 // guideStop reports whether the current trip stop is the Newbie
 // Guide support magic stop.
 func (l *Loop) guideStop() bool {
@@ -193,13 +206,31 @@ func (l *Loop) selfBuffSuperseded(skillID int32) bool {
     return false
 }
 
+// guideRunWanted reports whether the support magic of the Newbie
+// Guide is worth a dedicated town trip right now: the hunting region
+// carries a guide and the stop is wanted (the level band holds, no
+// refusal cooldown runs, at least one eligible buff is missing). It
+// mirrors weaponlessRunWanted as the second trip reason that may
+// start outside the hunting zone: the village revive of a death
+// lands next to the guide, and walking home through the aggressive
+// packs unbuffed wastes the death the character just paid for - the
+// buffs come first, the return segment of the trip walks home armed
+// with them.
+func (l *Loop) guideRunWanted() bool {
+    _, ok := guideForRegion(l.zoneRegion)
+
+    return ok && l.guideWanted()
+}
+
 // planGuideStop appends the Newbie Guide stop of the running trip:
 // the support magic rides BEHIND the learning stops (the sell phase
 // calls this after planLearnStops), so one town visit sells, buys,
 // learns and picks up the guide buffs on the way home. The stop
-// plans once per trip - the appended stop never duplicates.
+// plans once per trip - the appended stop never duplicates - and
+// only when the hunting region carries a guide.
 func (l *Loop) planGuideStop() {
-    if !l.guideWanted() {
+    guide, ok := guideForRegion(l.zoneRegion)
+    if !ok || !l.guideWanted() {
         return
     }
     for index := range l.tripStops {
@@ -208,7 +239,7 @@ func (l *Loop) planGuideStop() {
         }
     }
     l.tripStops = append(l.tripStops, tripStop{
-        merchant: guideStopNpc,
+        merchant: guide,
         buys:     nil,
         sell:     false,
         teach:    false,

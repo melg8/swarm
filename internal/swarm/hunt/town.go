@@ -650,7 +650,7 @@ func (l *Loop) inventoryFull() bool {
 // no geodata, no path) arms the cooldown, so a broken deployment does
 // not retry every tick.
 //
-//nolint:cyclop,funlen,gocognit // learning joined
+//nolint:cyclop,funlen // the trigger and stop freeze decision tree
 func (l *Loop) maybeStartTownTrip() {
     // The first trip of a session waits for the server skill list:
     // the learning stops plan on the skill queue and the packet burst
@@ -678,19 +678,32 @@ func (l *Loop) maybeStartTownTrip() {
     // without any weapon shops for one at once, whatever the inventory
     // and the lesson queue say.
     weaponRun := l.weaponlessRunWanted()
+    // The guide run is the buff refill: the support magic of the
+    // Newbie Guide expired or never landed, and farming without the
+    // buffs gives the packs the fight the character paid the town
+    // visit for. The trip rides the ordinary sell stop (the junk
+    // sells at the first stop, the guide stop plans behind the
+    // learning ones), so a buff-only errand shares the whole trip
+    // machinery.
+    guideRun := l.guideRunWanted()
     if l.navigator == nil || !l.tripCooldownOver() ||
-        (!l.inventoryFull() && !shopping && !learning && !weaponRun) {
+        (!l.inventoryFull() && !shopping && !learning &&
+            !weaponRun && !guideRun) {
         return
     }
     // A bot outside the hunting zone returns first: the zone return
     // owns the walk until the bot is back in the zone. The weapon run
-    // is the sole exception - a bare-handed character shops for a
+    // is the one exception - a bare-handed character shops for a
     // weapon at once, even outside the zone (punching mobs through the
-    // walk home is worse than a late return). The 2026-09-11 06:00
-    // dump showed a learning trip starting at the village (outside the
-    // zone) before the zone return, both searches failed with "no dry
-    // path", and the bot never moved.
-    if !weaponRun && l.zone() != nil && !l.inZoneSelf() {
+    // walk home is worse than a late return). The guide run joins it:
+    // the village revive of a death lands next to the guide, and the
+    // trip machinery walks the buffs first and the farm spot second -
+    // the plain zone return would skip both. The 2026-09-11 06:00
+    // dump showed a learning trip starting at the village (outside
+    // the zone) before the zone return, both searches failed with "no
+    // dry path", and the bot never moved - the learning stays inside
+    // the gate.
+    if !weaponRun && !guideRun && l.zone() != nil && !l.inZoneSelf() {
         return
     }
     // The trip owns the way from here on: the trigger gates all
@@ -745,8 +758,15 @@ func (l *Loop) maybeStartTownTrip() {
     }
     // The walk back target: the farm spot when the trip starts inside
     // the hunting zone, the zone center otherwise (a village respawn,
-    // a chase that ran away).
-    l.rememberFarmSpot()
+    // a chase that ran away). The guide run keeps the remembered spot
+    // when it starts outside the zone: the death that armed the run
+    // never touched it (resetTownTrip keeps the farm spot) and the
+    // revive point sits next to the guide anyway - overwriting the
+    // precise return the death preserved with the zone center would
+    // move the resumed farming ground.
+    if !guideRun || l.inZoneSelf() {
+        l.rememberFarmSpot()
+    }
     l.tripStart = time.Now()
     l.sold = make(map[int32]bool)
     l.rePaths = 0
@@ -777,38 +797,7 @@ func (l *Loop) maybeStartTownTrip() {
     // no longer strand a bare-handed character: the weapon is
     // bought and worn before the teacher segment ever runs.
     l.phase = phaseTownWalk
-    stats := l.tracker.InventoryStats()
-    reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
-        strconv.FormatFloat(stats.WeightPercent, 'f', 0, 64) +
-        "% weight"
-    if !l.inventoryFull() {
-        reason = "the shop strategy plans purchases worth " +
-            strconv.FormatInt(gear.AdenaSpent(l.tripPlan), 10) +
-            " adena"
-    }
-    if weaponRun {
-        // The bare-handed errand names itself: the 2 damage punches of
-        // the dump report read at a glance in the log tail.
-        reason = "no weapon in hand, the weapon run comes first"
-    }
-    if learning {
-        // The learning contributes its lesson budget to the reason:
-        // a learning-only trip names it, a combined one appends it.
-        lessons := l.learnableLessons()
-        lessonReason := strconv.Itoa(len(lessons)) + " lessons worth " +
-            strconv.FormatInt(spTotal(lessons), 10) + " sp wait at " +
-            "the teacher"
-        if l.inventoryFull() || shopping {
-            reason += ", " + lessonReason
-        } else {
-            reason = lessonReason
-        }
-    }
-    if l.gearDebtRunWanted() {
-        // The refill names itself: the stranded slot of the dump
-        // report reads at a glance in the log tail.
-        reason += " (the gear debt refill)"
-    }
+    reason := l.tripStartReason(shopping, learning, weaponRun, guideRun)
     // The trigger plan cache drops: the frozen trip plan owns the
     // trip now, the cache only feeds the widget view between the
     // recomputes.
@@ -847,6 +836,62 @@ func (l *Loop) maybeStartTownTrip() {
             l.abortTownTrip("no walkable path to the shop")
         }
     }
+}
+
+// tripStartReason composes the journal and log reason of a starting
+// town trip: every trigger names itself, the combined trips chain the
+// reasons (the log tail reads at a glance in the state dumps). The
+// order is the priority order of the triggers: the weapon first, the
+// learning and the guide refill behind, the inventory and the shop
+// plan as the baseline.
+func (l *Loop) tripStartReason(
+    shopping, learning, weaponRun, guideRun bool,
+) string {
+    stats := l.tracker.InventoryStats()
+    reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
+        strconv.FormatFloat(stats.WeightPercent, 'f', 0, 64) +
+        "% weight"
+    if !l.inventoryFull() {
+        reason = "the shop strategy plans purchases worth " +
+            strconv.FormatInt(gear.AdenaSpent(l.tripPlan), 10) +
+            " adena"
+    }
+    if weaponRun {
+        // The bare-handed errand names itself: the 2 damage punches of
+        // the dump report read at a glance in the log tail.
+        reason = "no weapon in hand, the weapon run comes first"
+    }
+    if learning {
+        // The learning contributes its lesson budget to the reason:
+        // a learning-only trip names it, a combined one appends it.
+        lessons := l.learnableLessons()
+        lessonReason := strconv.Itoa(len(lessons)) + " lessons worth " +
+            strconv.FormatInt(spTotal(lessons), 10) + " sp wait at " +
+            "the teacher"
+        if l.inventoryFull() || shopping {
+            reason += ", " + lessonReason
+        } else {
+            reason = lessonReason
+        }
+    }
+    if guideRun {
+        // The buff refill names itself: the support magic trip reads
+        // at a glance in the log tail, the same convention as the
+        // weapon run above.
+        guideReason := "the support magic buffs wait at the Newbie Guide"
+        if l.inventoryFull() || shopping || learning || weaponRun {
+            reason += ", " + guideReason
+        } else {
+            reason = guideReason
+        }
+    }
+    if l.gearDebtRunWanted() {
+        // The refill names itself: the stranded slot of the dump
+        // report reads at a glance in the log tail.
+        reason += " (the gear debt refill)"
+    }
+
+    return reason
 }
 
 // townNpcPosition returns the spawn point of the npc.
