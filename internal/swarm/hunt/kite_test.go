@@ -191,3 +191,68 @@ func TestKiteStreakResetsForAFreshTarget(t *testing.T) {
     require.Len(t, game.walks, 1,
         "a fresh target must reset the kite streak")
 }
+
+// mobChasesSelf makes the npc of objectID chase the character from
+// x: the attack broadcast the server sends for the mob's swings
+// (AttackerID the mob, TargetIDs the character) - the state reads the
+// npc as a self attacker (TargetID self, the NearestAttacker scan).
+func mobChasesSelf(bot *state.Bot, objectID int32, x, z int32) {
+    bot.ApplyAttack(state.Attack{
+        AttackerID:  objectID,
+        X:           x,
+        Y:           50000,
+        Z:           z,
+        TargetX:     45000,
+        TargetY:     50000,
+        TargetZ:     -3500,
+        TargetIDs:   [state.AttackTargets]int32{100},
+        TargetCount: 1,
+    })
+}
+
+// TestKiteTrainMemberArmsTheRetreat pins the train-member trigger of
+// the issue: a mob that chases the character (it targets self) arms
+// the retreat even while the fight target stays at range - the step
+// goes away from the CLOSER threat (the chasing member), not the
+// target the fight runs on.
+func TestKiteTrainMemberArmsTheRetreat(t *testing.T) {
+    // The fight target holds 440 units out: inside the bow engage
+    // radius (450), outside the retreat radius (250) - the target
+    // alone is the quiet standing fight.
+    bot, game, loop := kiteBowBot(t, 45440)
+    // A second mob aggros and closes to 200 units: a chase the
+    // character did not start (the server target of the mob is the
+    // character).
+    spawnMobAt(bot, 8, 45200)
+    mobChasesSelf(bot, 8, 45200, -3500)
+
+    loop.tick()
+    require.Len(t, game.walks, 1,
+        "a chasing train member inside the retreat radius must arm the kite")
+    step := game.walks[0]
+    // The step direction: straight away from the MEMBER on the x
+    // axis (self 45000, member 45200 -> the step lands west of the
+    // self), not away from the fight target at 45440.
+    require.Equal(t, int32(44600), step[0])
+    require.Empty(t, game.forces,
+        "the kite tick must not re-request the attack")
+}
+
+// TestKiteSkipsADeckGapTrainMember pins the deck guard of the train
+// member trigger: a mob on a deck the walk cannot reach (the z gap
+// past deckReachableZ) is no melee threat - it must not arm the
+// kite, the standing fight on the ranged target goes on.
+func TestKiteSkipsADeckGapTrainMember(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45440)
+    // The chasing member sits 500 units BELOW the character's deck
+    // (-3000 against -3500): past the deckReachableZ (400) gap, its
+    // swings cannot reach.
+    spawnMobAt(bot, 8, 45200)
+    mobChasesSelf(bot, 8, 45200, -3000)
+
+    loop.tick()
+    require.Empty(t, game.walks,
+        "a deck gap member must not arm the kite step")
+    require.Empty(t, game.forces,
+        "the standing bow fight keeps its re-request quiet")
+}

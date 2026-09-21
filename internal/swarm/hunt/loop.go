@@ -2115,12 +2115,13 @@ func (l *Loop) engage() {
         if l.fightClearedRefusal() {
             l.engageAt = now
         }
-        // The kite step of the archer (see kite.go): a bow target that
-        // closed inside the retreat radius steps the character clear
+        // The kite step of the archer (see kite.go): a hostile that
+        // closed inside the retreat radius - the bow fight target or
+        // a chasing train member - steps the character clear
         // before the melee blows land - the forced attack re-request
         // resumes the shooting once the step window ends. It outranks
-        // the impending-add scan: the closing target is the concrete
-        // damage, the add scan runs on the next tick when the target
+        // the impending-add scan: the closing hostile is the concrete
+        // damage, the add scan runs on the next tick when the threat
         // keeps its distance.
         if l.kiteFromTarget(now) {
             return
