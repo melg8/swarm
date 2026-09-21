@@ -8,6 +8,7 @@ import (
     "fmt"
     "sort"
     "strconv"
+    "sync"
     "time"
 
     "github.com/melg8/swarm/internal/swarm/npcdata"
@@ -484,13 +485,32 @@ func (b *Bot) characterSnapshotLocked(
 // decimal string for a clan carrier, an empty string for the clan
 // less npcs (most objects carry no clans, the empty string keeps the
 // wire lean and doubles as the falsy check of the web layer).
+//
+// The rendered strings come from a package level cache: the clan
+// mask space is tiny (the npcdata clan alphabet plus the ALL bit -
+// a few dozen distinct masks a fleet ever sees), while the live
+// snapshot encode path calls here once per world object per tick,
+// and an uncached strconv.FormatUint per object was 98% of the
+// encoder's allocations on the 100 bot fleet (see
+// BenchmarkFleetLiveEncodePressure). The cache turns that into one
+// allocation per DISTINCT mask for the whole process lifetime.
 func clanMaskString(mask uint64) string {
     if mask == 0 {
         return ""
     }
+    if cached, ok := clanMaskCache.Load(mask); ok {
+        return cached.(string)
+    }
+    rendered := strconv.FormatUint(mask, 10)
+    clanMaskCache.Store(mask, rendered)
 
-    return strconv.FormatUint(mask, 10)
+    return rendered
 }
+
+// clanMaskCache memoizes the decimal renderings of the clan masks
+// (see clanMaskString). Keyed by the mask itself - the value space
+// is bounded by the clan alphabet, no eviction needed.
+var clanMaskCache sync.Map
 
 // objectSnapshotLocked builds the object view of the snapshot from
 // the live hot and cold records. The value stays on the stack of the

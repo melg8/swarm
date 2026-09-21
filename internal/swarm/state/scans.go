@@ -824,13 +824,58 @@ func templateWanted(templateID int32, templates []int32) bool {
 // delevel policy compares the character level against it to detect a
 // hunting ground whose monsters are too low for the character. Nil zones
 // mean no limit and return zero.
+//
+// The scan runs on the delevel trigger gate of every hunt tick (the
+// cooldown gate ahead of it goes permanently open a minute after the
+// last delevel), so the levels slice it used to materialize per call
+// was a steady per tick allocation on every bot. The median now comes
+// from a stack bucket count (one pass, zero allocations); the sort
+// fallback only arms for a level past the bucket bound, which the C1
+// data never carries (the xml levels cap far below it).
 func (b *Bot) MedianZoneMobLevel(zone ZoneArea) int32 {
     b.mu.RLock()
     defer b.mu.RUnlock()
     if areaNil(zone) {
         return 0
     }
-    levels := make([]int32, 0, len(b.world.hot))
+    const levelBuckets = 256
+    var buckets [levelBuckets]int32
+    count := int32(0)
+    overflow := false
+    for i := range b.world.hot {
+        obj := &b.world.hot[i]
+        if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
+            obj.Level <= 0 {
+            continue
+        }
+        if !zone.Contains(obj.X, obj.Y) {
+            continue
+        }
+        count++
+        if obj.Level < levelBuckets {
+            buckets[obj.Level]++
+        } else {
+            overflow = true
+        }
+    }
+    if count == 0 {
+        return 0
+    }
+    if !overflow {
+        // The median rank of the ascending sequence is index
+        // count/2 (0 based) - the first level whose cumulative
+        // count passes it.
+        seen := int32(0)
+        for level := 1; level < levelBuckets; level++ {
+            seen += buckets[level]
+            if seen > count/2 {
+                return int32(level)
+            }
+        }
+
+        return 0
+    }
+    levels := make([]int32, 0, count)
     for i := range b.world.hot {
         obj := &b.world.hot[i]
         if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
@@ -841,9 +886,6 @@ func (b *Bot) MedianZoneMobLevel(zone ZoneArea) int32 {
             continue
         }
         levels = append(levels, obj.Level)
-    }
-    if len(levels) == 0 {
-        return 0
     }
     slices.Sort(levels)
 
