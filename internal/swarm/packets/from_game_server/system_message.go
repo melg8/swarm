@@ -27,11 +27,15 @@ const (
 )
 
 // SystemMessageParam is one parameter of a system message: the type
-// decides which value is valid (text or int).
+// decides which value is valid (text or int). The multi int
+// parameters carry their tail values in Level: the skill name
+// parameter writes the skill id and then the skill level
+// (SystemMessage.writeImpl of the Mobius server).
 type SystemMessageParam struct {
-    Type int32
-    Int  int32
-    Text string
+    Type  int32
+    Int   int32
+    Level int32
+    Text  string
 }
 
 // SystemMessagePacket is a client chat notification: the message id
@@ -62,6 +66,7 @@ func readSystemMessageParam(
 ) error {
     param.Text = ""
     param.Int = 0
+    param.Level = 0
     paramType, err := reader.ReadInt32()
     if err != nil {
         return fmt.Errorf("failed to read param type: %w", err)
@@ -78,8 +83,9 @@ func readSystemMessageParam(
         if err := readInt32Fields(reader, &param.Int); err != nil {
             return fmt.Errorf("failed to read skill param: %w", err)
         }
-        // Skip the skill level int.
-        if err := reader.Skip(4); err != nil {
+        // The skill level rides the second int (writeImpl writes
+        // skill id then skill level).
+        if err := readInt32Fields(reader, &param.Level); err != nil {
             return fmt.Errorf("failed to read skill param: %w", err)
         }
     case sysParamZoneName:

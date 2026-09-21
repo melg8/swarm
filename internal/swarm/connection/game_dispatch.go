@@ -98,9 +98,10 @@ func (gc *GameClient) applySystemMessage(payload []byte) {
         }
         for _, param := range gc.systemMessage.Params {
             message.Params = append(message.Params, state.ChatMessageParam{
-                Type: param.Type,
-                Int:  param.Int,
-                Text: param.Text,
+                Type:  param.Type,
+                Int:   param.Int,
+                Level: param.Level,
+                Text:  param.Text,
             })
         }
         gc.tracker.ApplySystemMessage(message)

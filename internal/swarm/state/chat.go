@@ -33,9 +33,10 @@ const socialWindow = 3 * time.Second
 // Parameter types of the SystemMessage packet (SystemMessage.java of
 // the Mobius server) that need special rendering.
 const (
-    chatParamText = 0
-    chatParamNpc  = 2
-    chatParamItem = 3
+    chatParamText  = 0
+    chatParamNpc   = 2
+    chatParamItem  = 3
+    chatParamSkill = 4
 )
 
 // ChatEvent is one line of the web chat window: a parsed system
@@ -106,11 +107,14 @@ func (b *Bot) ApplySay(s Say) {
 }
 
 // ChatMessageParam mirrors one SystemMessage packet parameter: the type
-// decides whether the int or the text value is meaningful.
+// decides whether the int or the text value is meaningful. Level
+// carries the second int of the multi int parameters (the skill level
+// of a skill name parameter).
 type ChatMessageParam struct {
-    Type int32
-    Int  int32
-    Text string
+    Type  int32
+    Int   int32
+    Level int32
+    Text  string
 }
 
 // SystemMessage carries the parsed SystemMessage packet: the id maps to
@@ -217,7 +221,10 @@ func (l *chatLog) appendAll(dst []ChatEvent) []ChatEvent {
 }
 
 // formatChatText substitutes the $sN and $cN placeholders of a system
-// message text with the packet parameters in their order.
+// message text with the packet parameters in their order. A missing
+// parameter renders as nothing (the server sendMessage texts ride the
+// generic "$s1 $s2" template with one parameter) and the trailing gap
+// it leaves is trimmed.
 func formatChatText(text string, params []ChatMessageParam) string {
     var out strings.Builder
     for i := 0; i < len(text); {
@@ -240,15 +247,17 @@ func formatChatText(text string, params []ChatMessageParam) string {
         i++
     }
 
-    return out.String()
+    return strings.TrimRight(out.String(), " ")
 }
 
-// renderChatParam renders one parameter for the chat text: item and npc
-// name parameters resolve through the generated dictionaries, everything
+// renderChatParam renders one parameter for the chat text: item, npc
+// and skill name parameters resolve through the generated
+// dictionaries, a missing parameter renders as nothing so the unused
+// tail placeholders of the server templates never surface, everything
 // else falls back to its raw value.
 func renderChatParam(params []ChatMessageParam, index int) string {
     if index >= len(params) {
-        return "?"
+        return ""
     }
     param := params[index]
     switch param.Type {
@@ -262,7 +271,27 @@ func renderChatParam(params []ChatMessageParam, index int) string {
         if name := npcdata.NPCName(param.Int + 1000000); name != "" {
             return name
         }
+    case chatParamSkill:
+        if name := skillChatName(param); name != "" {
+            return name
+        }
     }
 
     return strconv.Itoa(int(param.Int))
+}
+
+// skillChatName renders a skill name parameter as the generated
+// dictionary name with its level: "Power Strike lvl 3". The level
+// rides the second int of the packet parameter and a skill without
+// one renders the bare name.
+func skillChatName(param ChatMessageParam) string {
+    info, ok := npcdata.SkillInfoOf(param.Int)
+    if !ok || info.Name == "" {
+        return ""
+    }
+    if param.Level > 0 {
+        return info.Name + " lvl " + strconv.Itoa(int(param.Level))
+    }
+
+    return info.Name
 }

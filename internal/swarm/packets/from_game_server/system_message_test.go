@@ -65,3 +65,23 @@ func TestParseSystemMessagePacketRejectsImplausibleCount(t *testing.T) {
     p := NewSystemMessagePacket()
     require.Error(t, ParseSystemMessagePacket(p, writer.Bytes()))
 }
+
+func TestParseSystemMessageSkillParamCarriesLevel(t *testing.T) {
+    // The skill name parameter carries two ints on the wire: the
+    // skill id then the skill level (SystemMessage.writeImpl writes
+    // both; id 46 "Use $s1." with Power Strike 3 here).
+    writer := packet.NewWriter()
+    require.NoError(t, writer.WriteInt8(systemMessagePacketID))
+    require.NoError(t, writer.WriteInt32(46))
+    require.NoError(t, writer.WriteInt32(1))
+    require.NoError(t, writer.WriteInt32(sysParamSkillName))
+    require.NoError(t, writer.WriteInt32(3))
+    require.NoError(t, writer.WriteInt32(3))
+
+    p := NewSystemMessagePacket()
+    require.NoError(t, ParseSystemMessagePacket(p, writer.Bytes()))
+    require.Len(t, p.Params, 1)
+    require.Equal(t, int32(sysParamSkillName), p.Params[0].Type)
+    require.Equal(t, int32(3), p.Params[0].Int)
+    require.Equal(t, int32(3), p.Params[0].Level)
+}

@@ -168,3 +168,75 @@ func TestApplySystemMessageRecordsCannotSeeTarget(t *testing.T) {
     require.Len(t, lines, 2)
     require.Equal(t, "Cannot see target.", lines[1].Text)
 }
+
+func TestApplySystemMessageResolvesSkillNames(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+    // id 46: "Use $s1." with a skill name parameter: the generated
+    // skill dictionary resolves the id and the level rides the
+    // parameter's second int (Power Strike, skill id 3).
+    bot.ApplySystemMessage(SystemMessage{
+        ID: 46,
+        Params: []ChatMessageParam{
+            {Type: 4, Int: 3, Level: 3},
+        },
+    })
+    lines := chatLines(bot)
+    require.Len(t, lines, 1)
+    require.Equal(t, "Use Power Strike lvl 3.", lines[0].Text)
+
+    // A levelless skill parameter renders the name alone.
+    bot.ApplySystemMessage(SystemMessage{
+        ID:     46,
+        Params: []ChatMessageParam{{Type: 4, Int: 3}},
+    })
+    lines = chatLines(bot)
+    require.Len(t, lines, 2)
+    require.Equal(t, "Use Power Strike.", lines[1].Text)
+}
+
+func TestApplySystemMessageResolvesBuffEffectNames(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+    // id 110: "You can feel $s1's effect." with the Might buff (skill
+    // id 1068): the raw skill id never surfaces in the chat line.
+    bot.ApplySystemMessage(SystemMessage{
+        ID: 110,
+        Params: []ChatMessageParam{
+            {Type: 4, Int: 1068, Level: 1},
+        },
+    })
+    lines := chatLines(bot)
+    require.Len(t, lines, 1)
+    require.Equal(t, "You can feel Might lvl 1's effect.", lines[0].Text)
+}
+
+func TestApplySystemMessageMissingTailParamStaysEmpty(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+
+    // The sendMessage texts of the server ride the generic "$s1 $s2"
+    // template (id 614) with the whole sentence as the one text
+    // parameter; the missing tail renders as nothing - not as a stray
+    // "?" - and the template gap leaves no trailing space behind.
+    bot.ApplySystemMessage(SystemMessage{
+        ID: 614,
+        Params: []ChatMessageParam{
+            {Type: 0,
+                Text: "You are no longer protected from aggressive " +
+                    "monsters."},
+        },
+    })
+    lines := chatLines(bot)
+    require.Len(t, lines, 1)
+    require.Equal(t,
+        "You are no longer protected from aggressive monsters.",
+        lines[0].Text)
+}
+
+func TestRenderChatParamUnknownSkillFallsBackToRawID(t *testing.T) {
+    require.Equal(t, "999999", renderChatParam(
+        []ChatMessageParam{{Type: 4, Int: 999999, Level: 1}}, 0))
+}
