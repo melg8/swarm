@@ -11,6 +11,55 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in review): the dead mob icon style research - 30 variant comparison page (2026-09-21, branch feature/dead-mob-icon-research, issue #6)
+
+Started 2026-09-21 ~18:52 UTC. The source is the GitHub project board
+issue melg8/swarm#6 ("Bad dead mobs icon style research"): the live
+map corpse marker - the dead threat circle with the look tick at
+0.45 alpha - reads as a faded alive mob, so the issue asks for 30
+different icon ideas on a temporary page showing the same scene
+(multiple killed mobs, the character, some alive mobs nearby) with
+the ability to swap between the variants.
+
+Design decisions:
+
+- The page is a standalone research artifact under
+  `research/dead-mob-icons/` (next to the recast research): no
+  server mode, no shipped web code touched, opened straight from
+  disk. The background tries the real 21_19 keltir meadow tile
+  through a candidate path list and falls back to a procedural
+  meadow, so the page never depends on the tile being reachable.
+- Everything the scene paints mirrors map.js exactly: the mapColors
+  palette, the drawUnitTick geometry, the label halo, the fleet kill
+  skull (traceKillSkull), the world grid, the active hunting cell
+  hexagon, the dead-first draw order and the computeUnitScale clamp -
+  so a chosen variant ports into drawObjects almost line for line.
+- 31 variants: 0 is the current live map style (the baseline to
+  beat), 1..30 are the new ideas in seven families (skulls, crosses,
+  graves, ghosts, ground stains, fallen figures, symbols); three of
+  them animate (the dissolve, the ash smoke, the soul wisp).
+- The scene stays pixel identical while the variant swaps: character
+  with target link, aggressive/passive/combat/friendly/player mobs,
+  seven corpses (a fresh kill at melee distance, a two-corpse
+  cluster, one under the current target), two ground drops, three
+  kill skulls in three ages - two exactly on their corpses, the
+  overlap the live map shows.
+- A side by side gallery (the `g` key) lays all 31 icons at 2.5x over
+  the same tile crop, numbered and clickable; the kill skull toggle
+  (`k`) judges the variants with and without the orange company.
+- A built-in self test paints every variant on a fresh canvas and
+  counts the covered pixels: the 2026-09-21 run passed all 31
+  variants (0 failures), and a headless browser round captured the
+  scene and gallery screenshots (the pixel probes: the character
+  center reads exactly #1a73e8, the fresh corpse sits on the kill
+  skull orange).
+
+Status: the research page, the README (the variant catalog and the
+review protocol) and the screenshots are committed on
+feature/dead-mob-icon-research; the pull request references the
+issue, the findings comment asks the reviewer to pick the winners by
+number. The port of the chosen style into map.js is the follow-up
+task for the next session.
 ## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
 
 Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7);
