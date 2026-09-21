@@ -4720,10 +4720,15 @@ function labelColor(threat) {
 // the tick length, the ring radii and the line widths shrink with it so
 // a zoomed out marker stays a small circle with a proportionally small
 // tick instead of a dot with a fixed length stick.
+// A dead unit (a corpse) draws no look direction - the circle carries
+// the dead face instead (two small X eyes, the variant 26 of the dead
+// mob icon research of issue #6): a corpse does not look anywhere, and
+// the X eyes read "killed here" on the gray body where the faded alive
+// marker used to blend into the crowd.
 function drawUnitTick(ctx, x, y, heading, radius, fill, tick, opts) {
   const k = opts.scale || 1;
   const angle = (heading / 65536) * 2 * Math.PI;
-  const alpha = opts.dead ? 0.45 : 1;
+  const alpha = opts.dead ? 0.55 : 1;
 
   // Combat pulse ring and self ring for emphasis.
   if (opts.combat || opts.self) {
@@ -4756,6 +4761,32 @@ function drawUnitTick(ctx, x, y, heading, radius, fill, tick, opts) {
     ctx.arc(x, y, radius + 5 * k, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
+  }
+
+  // The dead face: the corpse keeps the circle footprint but loses the
+  // look direction - two small X eyes sit where the eyes of the dead
+  // mob would be, slightly above the center. The eyes are the only
+  // addition to the body: no skull, no symbol, the circle and its face
+  // stay inside the marker footprint of the alive units.
+  if (opts.dead) {
+    const eye = Math.max(0.7, radius * 0.16);
+    const eyY = y - radius * 0.12;
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = tick;
+    ctx.lineWidth = Math.max(0.7, 0.7 * k);
+    ctx.lineCap = "round";
+    for (const eyeX of [x - radius * 0.32, x + radius * 0.32]) {
+      ctx.beginPath();
+      ctx.moveTo(eyeX - eye, eyY - eye);
+      ctx.lineTo(eyeX + eye, eyY + eye);
+      ctx.moveTo(eyeX + eye, eyY - eye);
+      ctx.lineTo(eyeX - eye, eyY + eye);
+      ctx.stroke();
+    }
+    ctx.lineCap = "butt";
+    ctx.globalAlpha = 1;
+
+    return;
   }
 
   // The look direction tick, drawn only outside the circle: the circle

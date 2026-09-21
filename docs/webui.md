@@ -113,9 +113,10 @@ colors from the same variables).
 - Every unit (character, mob, player) is a circle with a short look
   direction tick from the center over the edge (L2Bot2.0 style),
   colored by threat: friendly gray, passive monster green, aggressive
-  amber, fighting red, dead gray-faded, players violet, self blue with
-  an accent ring; ground items are gold diamonds. The dashed square is
-  the server loaded zone: the 3x3 world region block (region size 2048,
+  amber, fighting red, dead gray with the X eyes face, players
+  violet, self blue with an accent ring; ground items are gold
+  diamonds. The dashed square is the server loaded zone: the 3x3
+  world region block (region size 2048,
   `World.broadcastPacket` reaches exactly these regions) around the
   character region - the server only spawns/updates objects inside it,
   and it scales with zoom like every world element.
@@ -136,7 +137,11 @@ colors from the same variables).
   order and overlapping units would flicker otherwise. A sitting
   character draws the breathing zZ marker above its dot. Unit markers
   draw the look direction tick only outside the circle; inside the
-  radius the marker is a solid fill. Overlapping markers never shrink
+  radius the marker is a solid fill. Dead units draw no look direction
+  at all: their circle carries the dead face - two small X eyes
+  slightly above the center, tick slate on the gray body (the issue #6
+  icon round, the "x eyes" variant) - so a corpse reads "killed here"
+  instead of a faded alive mob. Overlapping markers never shrink
   and never merge: the contact pass slides the overlapping pair apart
   at its full radii until the circles touch face to face, and a pair
   that meets too tight (closer than the packet jitter) separates along

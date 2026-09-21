@@ -62,7 +62,8 @@ const MARK = {
     passive: "#188038",
     aggressive: "#e37400",
     combat: "#d93025",
-    dead: "#80868b"
+    dead: "#80868b",
+    tick: "#39424e"
 };
 
 // canvas geometry of the harness
@@ -2022,6 +2023,92 @@ function runScenarioWalkCursor(mapFile) {
     return results;
 }
 
+// runScenarioDeadFace covers the corpse marker of the dead mob icon
+// round (issue #6, the variant 26 "x eyes" face of the research
+// gallery): a dead unit keeps its circle footprint but carries no
+// look direction tick - two small X eyes replace it, so a corpse
+// reads "killed here" instead of a faded alive mob. The checks pin
+// the geometry: the gray circle body at the dead radius, the two eye
+// X strokes at the eye line, and the absence of the radial heading
+// tick the alive units keep.
+function runScenarioDeadFace(mapFile) {
+    const { MapView, record } = loadMapJs(mapFile);
+    const results = [];
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    const corpse = {
+        objectId: 500, kind: "npc", name: "Dead Keltir",
+        x: WORLD.self.x + 200, y: WORLD.self.y + 150, z: -3500,
+        heading: 10000, moving: false, speed: 0, targetId: 0,
+        dead: true, attackable: true, aggressive: false,
+        inCombat: false, level: 3
+    };
+    snap.objects.push(corpse);
+    MapView.update(snap);
+    // update() already paints once through redraw(): clear the record
+    // so the checks read exactly one draw() frame.
+    record.strokes.length = 0;
+    record.fills.length = 0;
+    MapView.draw();
+
+    const p = worldToScreen(corpse.x, corpse.y);
+    // unitScale is 1 at the harness zoom (scale 0.12), so the corpse
+    // radius is the dead radiusOf of map.js: 4.
+    const r = 4;
+
+    // The circle body: the dead gray fill at the corpse position.
+    const bodyFill = record.fills.filter((fill) =>
+        fill.arcs.length === 1 && fill.style === MARK.dead
+        && Math.hypot(fill.arcs[0][0] - p.x, fill.arcs[0][1] - p.y) < 2
+        && Math.abs(fill.arcs[0][2] - r) < 1);
+    check(results, "the corpse body stays the gray circle",
+        bodyFill.length === 1,
+        "fills " + JSON.stringify(record.fills.filter((fill) =>
+            fill.style === MARK.dead).map((fill) => fill.arcs)));
+
+    // The eye line: two X strokes, one per eye, each two crossing
+    // segments of half size 0.7 around the eye centers (the x is
+    // +/-0.32r of the center, the y is 0.12r above it), in the tick
+    // slate like every marker detail.
+    const eye = 0.7;
+    const eyY = p.y - r * 0.12;
+    const eyeStrokes = record.strokes.filter((stroke) =>
+        stroke.segments.length === 2 && stroke.style === MARK.tick
+        && stroke.width === 0.7
+        && stroke.segments.every((seg) =>
+            Math.hypot((seg[0] + seg[2]) / 2
+                - (p.x + (seg[0] < p.x ? -r * 0.32 : r * 0.32)),
+                (seg[1] + seg[3]) / 2 - eyY) < 1.5)
+        && stroke.segments.every((seg) =>
+            Math.hypot(seg[0] - seg[2], seg[1] - seg[3]) > 2 * eye - 0.2));
+    check(results, "the corpse draws the two X eyes",
+        eyeStrokes.length === 2,
+        "eye strokes " + JSON.stringify(record.strokes.filter((stroke) =>
+            stroke.segments.length === 2).map((stroke) =>
+                stroke.segments)) + " at " + p.x + "," + p.y);
+
+    // The look direction tick is gone for the dead: no single segment
+    // stroke leaving the corpse circle edge along the heading (the
+    // old dead style drew the same radial tick as the alive units).
+    const angle = (corpse.heading / 65536) * 2 * Math.PI;
+    const tickStart = { x: p.x + Math.cos(angle) * r,
+        y: p.y + Math.sin(angle) * r };
+    const tickEnd = { x: p.x + Math.cos(angle) * (r + 4.5),
+        y: p.y + Math.sin(angle) * (r + 4.5) };
+    const corpseTicks = record.strokes.filter((stroke) =>
+        stroke.segments.length === 1 && stroke.style === MARK.tick
+        && Math.hypot(stroke.segments[0][0] - tickStart.x,
+            stroke.segments[0][1] - tickStart.y) < 1
+        && Math.hypot(stroke.segments[0][2] - tickEnd.x,
+            stroke.segments[0][3] - tickEnd.y) < 1);
+    check(results, "the corpse carries no look direction tick",
+        corpseTicks.length === 0,
+        "tick strokes " + JSON.stringify(corpseTicks.map((stroke) =>
+            stroke.segments)));
+
+    return results;
+}
+
 function main() {
     const args = process.argv.slice(2);
     const verbose = args.includes("--verbose");
@@ -2047,6 +2134,7 @@ function main() {
         ["cast icon", runScenarioCastIcon(mapFile)],
         ["bow shot", runScenarioBowShot(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
+        ["dead face", runScenarioDeadFace(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
         ["walk cursor", runScenarioWalkCursor(mapFile)],
         ["hunt zones view", runScenarioHuntZonesView(mapFile)],
