@@ -2880,3 +2880,14 @@ repro_gear, repro_movement). Docs: webui.md (chat window, kill
 skulls, banner), development_log.md Round 122 (the RCA classes: the
 dictionary/parameter-type gap behind every quoted server artifact,
 the harness stub honesty).
+
+### The review round (closed)
+
+The clean context critic verified all seven fixes pass with an
+independent verification matrix (the six harnesses plus
+buffs/fight_ui/stats, build, vet, five Go suites, the full lint gate,
+its own scroll stress probe). Follow ups landed as melg8 (87e7417):
+the acceptance botlog renderer resolves the skill name parameters
+through the dictionary now (the same class fix as the chat window),
+the stale cross comments follow the skull rename, the round report
+count is consistent.
