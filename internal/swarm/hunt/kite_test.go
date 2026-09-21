@@ -5,6 +5,7 @@
 package hunt
 
 import (
+    "math"
     "testing"
     "time"
 
@@ -14,10 +15,10 @@ import (
 
 // The kite behavior of the archer fight (issue #13): a bow user that
 // fights a mob steps clear when a hostile closes inside the retreat
-// radius (the fight target or a train member - the direction reads
-// the nearest chaser), the movement window pauses the forced attack
-// re-requests, and the shooting resumes once the step finished. The
-// tests pin the step geometry, the triggers that stay quiet, the
+// radius (the fight target or a train member - the direction weighs
+// the whole train, see the centroid tests), the movement window
+// pauses the forced attack re-requests, and the shooting resumes
+// once the step finished. The tests pin the step geometry, the triggers that stay quiet, the
 // streak limit and the re-request resume.
 
 // kiteBowBot builds the standard kite scene: a healthy character at
@@ -258,26 +259,38 @@ func TestKiteSkipsADeckGapTrainMember(t *testing.T) {
         "the standing bow fight keeps its re-request quiet")
 }
 
-// TestKiteDirectionReadsTheNearestChaser pins the direction choice of
-// a multi-chaser fight where BOTH hostiles sit inside the retreat
-// radius: the fight target closed at 240 units east, a train member
-// chases closer, at 180 west - the step reads the NEAREST hostile,
-// so the retreat goes away from the member (east) even though a step
-// away from the target alone would have gone west.
-func TestKiteDirectionReadsTheNearestChaser(t *testing.T) {
+// TestKiteDirectionWeighsTheWholeTrain pins the direction choice of
+// a multi-chaser fight (the edge case slice #19): the retreat
+// direction is the centroid away-vector of EVERY chaser, not the
+// armed threat alone. The fight target closes at 240 units east, a
+// train member chases at 180 units northeast - the centroid bends
+// the retreat west-southwest, away from both, instead of the pure
+// west of the target-only vector (and a train on OPPOSITE sides
+// cancels the vectors entirely - the encircled hold - which the
+// surrounded case of kite_edge_test.go pins).
+func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
     // The fight target closes at 240 units east: inside the radius,
     // a step away from it alone would land west (x 44600).
     bot, game, loop := kiteBowBot(t, 45240)
-    // The train member chases at 180 units west: the nearest
-    // hostile - a step away from it lands east (x 45400).
-    spawnMobAt(bot, 8, 44820)
-    mobChasesSelf(bot, 8, 44820, -3500)
+    // The train member chases at 180 units northeast (self-relative
+    // dx 127, dy 127): its away vector points southwest, the
+    // centroid drags the retreat off the pure west axis.
+    trainMember(bot, 45127, 50127)
 
     loop.tick()
     require.Len(t, game.walks, 1,
-        "the nearest chaser inside the radius must arm the kite")
+        "the closed hostiles must arm the kite")
     step := game.walks[0]
-    require.Equal(t, int32(45400), step[0],
-        "the step direction reads away from the nearest chaser, "+
-            "not away from the fight target")
+    // The centroid direction: away(target) = (-1, 0),
+    // away(member) = (-127, -127)/179.6 -> the sum normalized.
+    sumX := -1.0 - 127.0/math.Hypot(127, 127)
+    sumY := -127.0 / math.Hypot(127, 127)
+    sumLen := math.Hypot(sumX, sumY)
+    require.InDelta(t, 45000+sumX/sumLen*kiteStep, float64(step[0]), 1.0,
+        "the step direction is the centroid away-vector of the train")
+    require.InDelta(t, 50000+sumY/sumLen*kiteStep, float64(step[1]), 1.0,
+        "the step direction is the centroid away-vector of the train")
+    require.Less(t, step[1], int32(50000),
+        "the northeast member must drag the retreat south of the "+
+            "pure target axis")
 }
