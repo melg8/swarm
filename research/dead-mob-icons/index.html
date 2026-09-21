@@ -1,0 +1,298 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+
+SPDX-License-Identifier: MIT
+-->
+
+<!-- The temporary research page of issue #6 ("Bad dead mobs icon style
+     research"): the same hunting scene - the character, several killed
+     mobs, several alive mobs - painted with the live map's exact visual
+     language, while the corpse icon style swaps between 31 numbered
+     variants (0 is the current live map style, the baseline to beat).
+     Open it directly from disk (the background falls back to a
+     procedural meadow when the map tile is unreachable) or serve the
+     repository root with any static server. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>swarm - dead mob icon research (issue #6)</title>
+  <style>
+    :root {
+      --bg: #0f1216;
+      --panel: #17191d;
+      --panel2: #1d2025;
+      --border: #2b2f36;
+      --text: #c7cbd1;
+      --text-bright: #e8eaed;
+      --text-dim: #8a9099;
+      --accent: #f9ab00;
+      --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --mono: ui-monospace, "Cascadia Mono", Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 13px/1.45 var(--sans);
+    }
+    header {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--panel);
+      position: sticky;
+      top: 0;
+      z-index: 5;
+    }
+    header h1 { margin: 0; font-size: 15px; color: var(--text-bright); }
+    header .meta { color: var(--text-dim); font-size: 12px; }
+    header .meta b { color: var(--text); font-weight: 600; }
+    main {
+      display: flex;
+      gap: 0;
+      align-items: flex-start;
+      min-height: calc(100vh - 96px);
+    }
+    #stage {
+      flex: 1 1 auto;
+      padding: 14px;
+      min-width: 0;
+    }
+    #scene-wrap {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+    }
+    #scene {
+      display: block;
+      background: #202429;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      max-width: 100%;
+      height: auto;
+    }
+    #variant-card {
+      position: absolute;
+      left: 10px;
+      bottom: 10px;
+      background: rgba(15, 18, 22, 0.86);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      max-width: 340px;
+      backdrop-filter: blur(2px);
+    }
+    #variant-card .num {
+      font: 700 12px var(--mono);
+      color: var(--accent);
+    }
+    #variant-card .name {
+      font-weight: 600;
+      color: var(--text-bright);
+      margin-left: 6px;
+    }
+    #variant-card .family {
+      color: var(--text-dim);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-left: 8px;
+    }
+    #variant-card .note {
+      margin-top: 3px;
+      color: var(--text);
+      font-size: 12px;
+    }
+    aside#controls {
+      width: 264px;
+      flex: 0 0 264px;
+      border-left: 1px solid var(--border);
+      background: var(--panel);
+      padding: 12px 14px 24px;
+      position: sticky;
+      top: 46px;
+      max-height: calc(100vh - 46px);
+      overflow-y: auto;
+    }
+    aside#controls h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-dim);
+      margin: 16px 0 6px;
+    }
+    aside#controls h2:first-child { margin-top: 2px; }
+    .family-block { margin-bottom: 6px; }
+    .family-block .family-name {
+      color: var(--text-dim);
+      font-size: 11px;
+      margin: 2px 0 3px 2px;
+    }
+    .variant-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .variant-buttons button {
+      min-width: 34px;
+      padding: 3px 6px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--panel2);
+      color: var(--text);
+      font: 600 11px var(--mono);
+      cursor: pointer;
+    }
+    .variant-buttons button:hover { border-color: var(--accent); }
+    .variant-buttons button.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #171207;
+    }
+    .variant-buttons button.baseline { border-style: dashed; }
+    .toggle-row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+    .toggle-row label { color: var(--text); cursor: pointer; }
+    .toggle-row input { accent-color: var(--accent); }
+    .zoom-row { margin: 8px 0; }
+    .zoom-row input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .zoom-row .zoom-val {
+      font: 600 11px var(--mono);
+      color: var(--text-dim);
+    }
+    .hint {
+      color: var(--text-dim);
+      font-size: 11px;
+      margin-top: 8px;
+      border-top: 1px solid var(--border);
+      padding-top: 8px;
+    }
+    .hint kbd {
+      font: 600 10px var(--mono);
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0 4px;
+    }
+    #gallery {
+      display: none;
+      padding: 14px 16px 30px;
+    }
+    #gallery.open { display: block; }
+    #gallery h2 {
+      font-size: 13px;
+      color: var(--text-bright);
+      margin: 4px 0 10px;
+    }
+    #gallery h2 .sub { color: var(--text-dim); font-weight: 400; }
+    #gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(178px, 1fr));
+      gap: 10px;
+    }
+    .gallery-cell {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      background: var(--panel2);
+      overflow: hidden;
+      cursor: pointer;
+    }
+    .gallery-cell:hover { border-color: var(--accent); }
+    .gallery-cell.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .gallery-cell canvas { display: block; width: 100%; height: auto; background: #202429; }
+    .gallery-cell .cell-label {
+      display: flex;
+      align-items: baseline;
+      padding: 4px 8px;
+      gap: 6px;
+    }
+    .gallery-cell .cell-label .num { font: 700 11px var(--mono); color: var(--accent); }
+    .gallery-cell .cell-label .name { font-size: 11px; color: var(--text); }
+    #selftest {
+      display: none;
+      margin: 12px 16px;
+      padding: 10px 12px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font: 12px var(--mono);
+      white-space: pre-wrap;
+    }
+    #selftest.open { display: block; }
+    #selftest .ok { color: #34a853; }
+    #selftest .bad { color: #d93025; }
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 8px 16px;
+      color: var(--text-dim);
+      font-size: 11px;
+      background: var(--panel);
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>dead mob icon research</h1>
+    <span class="meta">issue <b>#6</b> &middot; branch <b>feature/dead-mob-icon-research</b>
+      &middot; scene = live map language (<b>map.js</b> palette, markers, labels, kill skulls)</span>
+    <span class="meta" style="margin-left:auto">variant <b id="head-variant">0 / 30</b></span>
+  </header>
+
+  <main>
+    <div id="stage">
+      <div id="scene-wrap">
+        <canvas id="scene" width="960" height="600"></canvas>
+        <div id="variant-card">
+          <div><span class="num" id="card-num">0</span><span class="name" id="card-name">current</span><span class="family" id="card-family">baseline</span></div>
+          <div class="note" id="card-note"></div>
+        </div>
+      </div>
+    </div>
+
+    <aside id="controls">
+      <h2>dead mob icon variant</h2>
+      <div id="variant-list"></div>
+      <h2>scene</h2>
+      <div class="toggle-row"><input type="checkbox" id="opt-kills" checked><label for="opt-kills">fleet kill skulls</label></div>
+      <div class="toggle-row"><input type="checkbox" id="opt-labels" checked><label for="opt-labels">unit labels</label></div>
+      <div class="toggle-row"><input type="checkbox" id="opt-cell" checked><label for="opt-cell">hunting cell hexagon</label></div>
+      <div class="toggle-row"><input type="checkbox" id="opt-grid" checked><label for="opt-grid">coordinate grid</label></div>
+      <div class="zoom-row">
+        <label for="opt-zoom">zoom</label>
+        <span class="zoom-val" id="zoom-val">0.35</span>
+        <input type="range" id="opt-zoom" min="0.14" max="0.84" step="0.01" value="0.35">
+      </div>
+      <h2>view</h2>
+      <div class="toggle-row"><input type="checkbox" id="opt-gallery"><label for="opt-gallery">all 31 side by side</label></div>
+      <div class="toggle-row"><input type="checkbox" id="opt-selftest"><label for="opt-selftest">run the self test</label></div>
+      <div class="hint">
+        <kbd>&larr;</kbd> <kbd>&rarr;</kbd> swap variant &middot; <kbd>0</kbd>&hellip;<kbd>9</kbd> jump &middot;
+        <kbd>g</kbd> gallery &middot; <kbd>k</kbd> kill skulls<br>
+        the dead mob count and their spots stay fixed while the icon style
+        swaps - judge each idea against the same scene, then post the
+        numbers you like to issue #6.
+      </div>
+    </aside>
+  </main>
+
+  <section id="gallery">
+    <h2>all 31 variants side by side <span class="sub">(the icons at 2.5x over the same tile crop - click one to open it in the scene view)</span></h2>
+    <div id="gallery-grid"></div>
+  </section>
+
+  <pre id="selftest"></pre>
+
+  <footer>
+    research artifact of issue #6 - temporary page, not shipped by the bot.
+    the palette, the marker geometry, the label halo, the kill skull and the
+    draw order mirror internal/swarm/webserver/web/map.js so the variants are
+    judged inside the real visual language.
+  </footer>
+
+  <script src="deadmob.js"></script>
+</body>
+</html>
