@@ -339,7 +339,7 @@ conversation or in a commit message: it lives in the registry below.
   If the reference stack moves the character, the silence is a
   deployment build difference; pin the build the owner runs and
   the packet that differs.
-- Status: open (the bot-side recovery shipped in 160d0e3; the
+- Status: open (the bot-side recovery shipped in 481dfdc and 8487365; the
   server side stays unobserved).
 
 ## Mandatory first step of every task: deploy and verify the environment
