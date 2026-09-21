@@ -161,6 +161,7 @@ one of them is the reference for its subsystem:
 | Document | What it covers |
 | --- | --- |
 | `docs/deployment.md` | Bringing the stack up (fast deploy, bootstrap, scripts), Windows host layout, stack logs, the Mobius operational pitfalls (flood protector, login re-registration, slow SIGTERM) |
+| `docs/launch_config.md` | The launch configuration file (the -config flag): the JSON format, the flag precedence rules, the fleet composition (bot types with counts), the default config |
 | `docs/hunting.md` | The autonomous hunt: hunt loop, combat safety, blind engage recovery, multi-zone hunting, the hexagon cell system, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
 | `docs/hunting_cells.md` | The hexagon cell hunting: the uniform ground partition, the visibility budget, the enemy-first roam, the ripeness-paced neighbor rotation, the mesh endpoint, the registry invariants |
 | `docs/shopping_strategy.md` | The shop strategy reasoning, prices, purchase phases and the was/is level journey comparison |

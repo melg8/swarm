@@ -11,6 +11,41 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in progress): the config-based launch - issue #12, the JSON launch file with the fleet composition (2026-09-21, branch feature/config-launch)
+
+Started 2026-09-21 ~19:35 UTC (the kanban claim of melg8/swarm#12).
+The owner ask: launch via a configuration file controlling the bot
+parameters - bot types, counts, related settings - with a default
+config shipped and a fallback to it when no file is given.
+
+Design (landed):
+
+- The format is JSON (the stdlib, zero new dependencies, the data
+  format the project already speaks): `launchConfig` carries the
+  shared launch parameters plus the `bots` composition array of
+  `{type, count}` specs (`cmd/swarm/launch_config.go`).
+- The `-config <file>` flag loads, validates (unknown fields refuse,
+  unknown bot types refuse with the implemented list, counts must be
+  positive, the composition non-empty) and folds the file into the
+  flag configuration: an explicitly set flag wins over the file
+  (flag.Visit names them), an omitted field keeps its flag default.
+- The composition expands over the account ladder (the plain -bots
+  rule carries over, the ladder walks the whole composition); every
+  launch normalizes to one fleet plan (`classicFleetPlan` /
+  `launchConfig.expand`) that the single bot path and the fleet path
+  share, so the flag form and the file form cannot drift.
+- The type registry lists `fighter` today; `archer` is reserved for
+  issue #13 and joins when it lands - a config naming it refuses
+  loudly instead of silently degrading.
+- `configs/swarm.json` ships the default (pinned equal to the
+  built-in default and the flag defaults by test), documented in
+  `docs/launch_config.md` (registered in the AGENTS.md and docs
+  README maps).
+
+Status: implementation complete - the cmd/swarm suite green, the
+lint gate clean (0 issues on the new code), a live smoke test of the
+binary verified the fleet launch off a file, the loud refusals and
+the exit codes; the branch pushed and the PR open for the issue.
 ## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
 
 Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7);
