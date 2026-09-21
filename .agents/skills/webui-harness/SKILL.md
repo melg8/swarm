@@ -18,28 +18,30 @@ framework, no bundler, no npm.
 
 ## The verification loop
 
-Five harnesses load the REAL `web/app.js` / `web/map.js` into a Node vm
-sandbox with a stub DOM and recording canvas. They exit 1 while their
-bug is present, so they are regression gates:
+Nine harnesses load the REAL `web/app.js` / `web/map.js` (and the
+panel modules) into a Node vm sandbox with a stub DOM and recording
+canvas. They exit 1 while their bug is present, so they are
+regression gates:
 
 ```bash
 node tools/repro_hud.js          # HUD, target panel, chat window
-node tools/repro_gear.js         # equipment widget (79 checks)
+node tools/repro_gear.js         # equipment widget, shop queue,
+                                 # quest tab, bot switch, panel
+                                 # placement (79+ checks)
+node tools/repro_buffs.js        # effects panel: the icon grid, the
+                                 # timer strips, the geometry, the
+                                 # tooltip card
 node tools/repro_map_render.js   # markers, links, camera, draw order
 node tools/repro_movement.js     # movement interpolation vs the
                                  # simulated Mobius server
 node tools/repro_stats.js        # statistics tab (fleet + bot views)
-```
-
-The fight FX gallery mode (`-test-fight-ui`, `web/fighttest.js`) has
-its own harness built the same way:
-
-```bash
-node tools/repro_fight_ui.js     # the 18x4 comparison grid: the
-                                 # structure, the per variant engagement
-                                 # during all four beats, the map tile
-                                 # background, the HP/lunge timeline, the
-                                 # scroll window and the controls
+node tools/repro_fight_ui.js     # the fight FX gallery: the 18x4
+                                 # comparison grid, the per variant
+                                 # engagement, the HP/lunge timeline
+node tools/repro_bot_switch.js   # the map state reset at the bot
+                                 # switch
+node tools/repro_zone_hover.js   # the hover, social and fleet kill
+                                 # layers of the map
 ```
 
 Run every harness you could plausibly have affected plus `go test

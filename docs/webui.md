@@ -806,7 +806,10 @@ overlaps it there and clears from a ~1370px wide map container up
 The panel renders strictly: no appear or disappear animation, no
 view morph - a change snaps (no transitions on the frame, no spawn
 keyframes; a buff joining or leaving touches only its own cell).
-The panel hides entirely while no effect runs.
+The panel hides entirely while no effect runs. Theme note: the equal
+2px bands read identically only in the light theme - on the dark
+theme the top band is the dark panel padding while the bottom band
+is the cells' pure white separator (the classic bar look, accepted).
 
 Hovering a cell opens the floating card (the `#buffs-tooltip`
 singleton of `buffs_tooltip.js`, the mechanics of the item tooltip):

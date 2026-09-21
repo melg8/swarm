@@ -44,7 +44,7 @@ in one atomic commit (this entry rides with it):
 Verification: `tools/repro_buffs.js` rewritten to the new reality
 (47 checks: markup, styles, render, ticker, tooltip, geometry,
 formats), `tools/repro_gear.js` stale two-view check replaced with
-the single grid pin, all seven harnesses green, `go vet`/`go test
+the single grid pin, all nine harnesses green, `go vet`/`go test
 ./internal/swarm/webserver/` green, `go build ./...` green. Live
 agent-browser verification on the static preview (the injected
 buffs, both themes): panel width 42/76/110/348 at 1/2/3/10 cells,

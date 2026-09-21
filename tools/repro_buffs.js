@@ -179,28 +179,19 @@ function makeElement() {
     };
 }
 
-// fire dispatches one stub DOM event on an element that records its
-// listeners.
-function fire(element, type) {
-    const handlers = (element.listeners || {})[type] || [];
-    for (const handler of handlers) { handler({}); }
-}
-
 function loadPanel(appFile) {
     const elements = new Map();
     const storage = new Map();
     const timers = { intervals: [], timeouts: [] };
-    const state = { hudStack: null };
     const document = {
         getElementById: (id) => {
             if (!elements.has(id)) { elements.set(id, makeElement()); }
 
             return elements.get(id);
         },
-        // The HUD stack answers a measurement only after the check
-        // arms it; the panel itself reads no measurements.
-        querySelector: (selector) => (selector === ".hud-stack" &&
-            state.hudStack) ? state.hudStack : null,
+        // The panel reads no layout (the arithmetic covers the stub
+        // DOM) and app.js queries nothing at load time.
+        querySelector: () => null,
         createElement: () => makeElement(),
         documentElement: { dataset: {} },
         // The tooltip card of the buffs appends here (the page body).
@@ -264,7 +255,7 @@ function loadPanel(appFile) {
         sandbox);
 
     return { api: sandbox.__buffs, elements, storage, timers, sandbox,
-        doc: document, state };
+        doc: document };
 }
 
 // readArg answers the --app override of the app.js path.
@@ -585,17 +576,13 @@ function checkBehavior(harness) {
         api.leftShort(5400) === "1h30" && api.leftShort(90000) === "\u2014");
 }
 
-// The stubs settle synchronously: the recorded enter timeouts flush
-// by hand so the checks see the settled classes.
+// The stubs of the sandbox answer no layout: the panel arithmetic
+// covers it (see syncBuffsPanelSize).
 process.exitCode = (function main() {
     const appFile = readArg();
     checkMarkup();
     checkStyles();
     const harness = loadPanel(appFile);
-    harness.flushTimeouts = () => {
-        const queued = harness.timers.timeouts.splice(0);
-        for (const fn of queued) { fn(); }
-    };
     checkBehavior(harness);
     console.log(failures === 0
         ? "repro_buffs: every check passed"

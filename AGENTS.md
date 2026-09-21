@@ -117,7 +117,7 @@ server is load-bearing for the task.
   `go` invocation inside the module switches to the go1.26.8
   toolchain, so the formatting and the gates agree on every host (the
   deb go1.24 GOROOT included). There is **no Rust, no Node, no C** in
-  the bot itself. Node is only used by the four `tools/repro_*.js`
+  the bot itself. Node is only used by the nine `tools/repro_*.js`
   web UI harnesses (plain JS, no npm).
 - **Module path**: `github.com/melg8/swarm`.
 - **Libraries**: `golang.org/x/crypto` (Blowfish), `golang.org/x/text`
