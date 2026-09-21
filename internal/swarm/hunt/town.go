@@ -2259,6 +2259,8 @@ func (l *Loop) waypointPassedBehind(
 // so the line it verifies is the one actually
 // being sent. Without a navigator the guard stays off (the walk was
 // planned elsewhere, the follower only walks it).
+//
+//nolint:funlen,cyclop // one linear gate chain; the split is issue #32
 func (l *Loop) clickWaypoint(
     selfX, selfY, selfZ int32, now time.Time,
 ) {
