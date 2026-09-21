@@ -22,23 +22,33 @@ type BuffEntry struct {
 }
 
 // buffRecord is the stored form of one active effect: the learned
-// level of the buff skill and the seconds it still had when the
-// server last refreshed the list.
+// level of the buff skill, the seconds it still had when the server
+// last refreshed the list and the seconds it had when it landed (the
+// denominator of the remaining time percent the web UI list draws).
 type buffRecord struct {
     level int32
     left  int32
+    total int32
 }
 
+// buffTotalGraceSeconds is the clock jitter grace of the recast
+// detection: a continuing effect reports its remaining time slightly
+// ahead of the local countdown now and then, and that jitter must not
+// read as a fresh cast.
+const buffTotalGraceSeconds = 2
+
 // BuffSnapshot is one active effect of the snapshot: the skill the
-// effect comes from with its level and the remaining seconds, plus
-// the resolved display data (name, icon). The web UI buffs widget
-// renders the list.
+// effect comes from with its level, the remaining seconds and the
+// seconds the effect had when it landed (Total, the denominator of
+// the remaining time percent), plus the resolved display data (name,
+// icon). The web UI buffs widget renders the list.
 type BuffSnapshot struct {
     SkillID int32  `json:"skillId"`
     Level   int32  `json:"level"`
     Name    string `json:"name"`
     Icon    string `json:"icon"`
     Left    int32  `json:"left"`
+    Total   int32  `json:"total"`
 }
 
 // SetBuffs applies the full active effect list of the server packet:
@@ -48,11 +58,25 @@ type BuffSnapshot struct {
 func (b *Bot) SetBuffs(buffs []BuffEntry) {
     b.mu.Lock()
     defer b.mu.Unlock()
+    elapsed := int32(0)
+    if !b.buffsAt.IsZero() {
+        elapsed = buffLeftCapped(int32(time.Since(b.buffsAt).Seconds()))
+    }
     entries := make(map[int32]buffRecord, len(buffs))
     for _, buff := range buffs {
+        total := buff.Time
+        // A continuing effect reports its current remaining time,
+        // which only sinks below the previous reading (plus the
+        // jitter grace); a reading above that marks a recast, and
+        // the total restarts from the fresh duration.
+        if prev, ok := b.buffs[buff.SkillID]; ok &&
+            buff.Time <= prev.left-elapsed+buffTotalGraceSeconds {
+            total = prev.total
+        }
         entries[buff.SkillID] = buffRecord{
             level: buff.Level,
             left:  buff.Time,
+            total: buffLeftCapped(total),
         }
     }
     b.buffs = entries
@@ -155,6 +179,7 @@ func (b *Bot) buffSnapshotsLocked(now time.Time) []BuffSnapshot {
             Name:    fmt.Sprintf("skill #%d", id),
             Icon:    "",
             Left:    left,
+            Total:   buffLeftCapped(buff.total),
         }
         if info, ok := npcdata.SkillInfoOf(id); ok {
             snapshot.Name = info.Name

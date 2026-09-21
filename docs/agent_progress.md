@@ -11,6 +11,64 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in progress): the effects panel round (2026-09-21, the webui buffs redesign)
+
+Started: 2026-09-21. Branch: `feature/improved-behaviour`, commits as
+melg8. Other agents may push to the same branch - rebase before every
+push. NOTE: the dependency bump / combat behaviour entry below belongs
+to another agent's round and stays untouched here. The owner report
+(this round): the webui buffs panel shows a detailed list by default;
+the request - the icon grid first (only the active buffs, 10 per row x
+2 rows, the icons tight with the thin white separators, the short
+remaining time on the cell), the vertical dock on the left with the
+clickable chevron (one row of cells docks one row tall, two rows dock
+two rows tall), the expand into the detailed list (the full rows as
+before plus the remaining time percent bar per row, the tighter
+rhythm, the scrollbar, never taller than the character widget), no
+EFFECTS label, the animated morph both ways, the chevron never moves.
+
+### State (landed, pushed)
+
+- `state`: BuffSnapshot carries `total` (the landed duration, the
+  percent bar denominator) - the recast detection in SetBuffs (a
+  reading above the counted down previous one + 2s jitter grace
+  restarts the total, a continuing reading keeps it), both encoders
+  (snapshot_json.go appendBuffSnapshotJSON + snapshot_live.go
+  appendLiveBuffsJSON) stay byte identical, the golden snapshot
+  gained a Buffs entry so the reflection parity covers the field.
+- `web/buffs.js` (new module, loaded before app.js): the panel with
+  the two views, the keyed cells and rows (a buff joining or leaving
+  touches only its own node), the countdown anchors + the 1 Hz local
+  ticker (the times run between the SSE pushes), the HUD height cap
+  (frame chrome subtracted), the localStorage choice
+  (swarm.buffsView, the icons default). app.js lost the old panel
+  section (the EFFECTS head, the collapse, the count chip).
+- `web/style.css`: the effects panel block rewritten (the 10 column
+  grid, the per cell white separator strips - a white grid background
+  left a white hole under the empty cells on the dark theme, the
+  morph transitions, the thin scrollbar, the enter pop-in).
+- `tools/repro_buffs.js` (new, `task repro:buffs`): 27 checks (the
+  markup, the styles, the render, the keyed holds, the bars, the
+  ticker, the toggle + persistence, the height fallbacks, the
+  formatters); repro_gear.js handed over the panel section.
+- Verified: go build/vet/test (state + webserver), all four webui
+  harnesses green, the browser preview on the static copy (both
+  themes, both states, the chevron spot measured equal 475,84 in
+  both, the panel height == the HUD height capped).
+
+### Open questions for the next agent
+
+- The two dock buttons (the chevron + the view switch) BOTH toggle
+  the same view pair - the owner text named both controls; if the
+  chevron was meant to gate something else (the second row, the
+  dock-only collapse), the flip closure in initBuffsPanel is the one
+  place to change.
+- The grid caps at 10x2 per the request; more than 20 effects wrap a
+  third row (the dock follows) - no hard clip decided.
+- `total` for an effect observed mid-flight (the tracker joined
+  after the cast) reads from the first list the tracker saw - the
+  bar may start short of 100 percent; honest to the data held.
+
 ## Active task (status: in progress): the dependency bump and the combat behaviour round (2026-09-21)
 
 Started: 2026-09-21. Branch: `feature/improved-behaviour` (fresh

@@ -117,6 +117,54 @@ func TestBuffsJSONShape(t *testing.T) {
     require.Contains(t, string(encoded), `"name":"Defense Aura"`)
     require.Contains(t, string(encoded), `"icon":"skill0091"`)
     require.Contains(t, string(encoded), `"left":1200`)
+    require.Contains(t, string(encoded), `"total":1200`)
+}
+
+// TestSetBuffsKeepsTheTotalOnRefresh pins the total tracking: a
+// continuing effect keeps the duration it landed with (the server
+// re-sends the list with the current remaining seconds only), while
+// a reading above the counted down previous one marks a recast and
+// restarts the total from the fresh duration.
+func TestSetBuffsKeepsTheTotalOnRefresh(t *testing.T) {
+    bot := NewBot("unittest1")
+    bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 1, Time: 1200}})
+    require.InDelta(t, 1200, bot.Snapshot().Buffs[0].Total, 1)
+
+    // A minute later the server re-sends the list: the effect is
+    // continuing, the total stays the landed duration.
+    bot.mu.Lock()
+    bot.buffsAt = time.Now().Add(-time.Minute)
+    bot.mu.Unlock()
+    bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 1, Time: 1140}})
+    require.InDelta(t, 1140, bot.Snapshot().Buffs[0].Left, 2)
+    require.InDelta(t, 1200, bot.Snapshot().Buffs[0].Total, 1)
+
+    // Four minutes later the same skill lands with a fresh duration
+    // above the counted down reading: a recast, the total restarts.
+    bot.mu.Lock()
+    bot.buffsAt = time.Now().Add(-4 * time.Minute)
+    bot.mu.Unlock()
+    bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 1, Time: 1180}})
+    require.InDelta(t, 1180, bot.Snapshot().Buffs[0].Left, 2)
+    require.InDelta(t, 1180, bot.Snapshot().Buffs[0].Total, 1)
+}
+
+// TestSetBuffsFreshSkillCarriesItsOwnTotal pins the per skill total:
+// a skill joining the list later starts from its own landed duration,
+// it never inherits the total of the running ones.
+func TestSetBuffsFreshSkillCarriesItsOwnTotal(t *testing.T) {
+    bot := NewBot("unittest1")
+    bot.SetBuffs([]BuffEntry{
+        {SkillID: 91, Level: 1, Time: 1200},
+        {SkillID: 77, Level: 2, Time: 300},
+    })
+    snaps := bot.Snapshot().Buffs
+    require.Len(t, snaps, 2)
+    // The snapshot sorts by skill id: 77 first, 91 second.
+    require.Equal(t, int32(77), snaps[0].SkillID)
+    require.InDelta(t, 300, snaps[0].Total, 1)
+    require.Equal(t, int32(91), snaps[1].SkillID)
+    require.InDelta(t, 1200, snaps[1].Total, 1)
 }
 
 // TestSelfManaPercent pins the mana percent accessor.

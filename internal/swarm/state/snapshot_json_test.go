@@ -259,6 +259,16 @@ func goldenSnapshot() Snapshot {
             },
         },
         HuntingZone: &Zone{CX: 45000, CY: 50000, Half: 1650},
+        Buffs: []BuffSnapshot{
+            {
+                SkillID: 91,
+                Level:   2,
+                Name:    "Defense Aura",
+                Icon:    "skill0091",
+                Left:    1195,
+                Total:   1200,
+            },
+        },
         HuntingZones: []ZoneView{
             {
                 ID:       "elven-gremlin-hollow",

@@ -730,6 +730,56 @@ regenerates with `tools/generate_skill_trees.sh` (skill stats + class
 trees of the Mobius C1 datapack into `npcdata/skill_trees.go`). The
 widget checks live in `tools/repro_gear.js`.
 
+## The effects panel (buffs.js)
+
+The floating frame right of the character HUD (left: 272, top: 10 of
+the map wrap) renders the server effect list (`snapshot.buffs`, the
+AbnormalStatusUpdate view: skillId, level, name, icon, the remaining
+seconds `left` and the landed duration `total`) in two view states
+that share one frame and morph into each other (the frame width and
+the body height transition, the layers cross-fade with a slight
+settle, the chevron rotates in place):
+
+- the icon grid (the default): one 32px cell per active effect, 10
+  columns wide and at most 2 rows for the classic buff bar, every
+  cell packs edge to edge and paints its own 2px white strip on the
+  right and the bottom edge (the separators run only between the
+  icons that actually show - a white grid background would leave a
+  white hole under the empty cells of a partially filled row on the
+  dark theme), the short remaining time overlays the cell bottom
+  edge and the level badge sits top right;
+- the detailed list: the full effect rows (icon, level badge, name,
+  the human remaining time) with the remaining time percent bar
+  pinned to every row bottom edge (left over total, the fill eases
+  toward the next tick), the tight vertical rhythm and the thin
+  scrollbar - the body height caps at the character HUD stack height
+  (synced on the view change, the window resize and the HUD
+  ResizeObserver, the frame chrome subtracted) so the expanded panel
+  never outgrows the character widget.
+
+Exactly the active effects show in both states (two effects build two
+cells and two rows); the panel hides entirely while no effect runs.
+The left dock is the slim vertical strip stretching with the frame
+(one row of cells docks one row tall, two rows dock two rows tall);
+it carries the expand chevron and the view switch icon, both buttons
+toggle between the states and neither ever moves (the chevron stays
+pinned to the top left corner in both states), so collapsing and
+expanding again needs no re-aim. The view choice persists in the
+localStorage (`swarm.buffsView`; the panel answers the restored
+choice on boot). The countdowns run locally: every snapshot entry
+anchors its reading (the anchor carries the skill fields plus the at
+timestamp) and a 1 Hz ticker counts the elapsed wall clock off it, so
+the times keep running between the server snapshots (the SSE poll
+pushes at most every ~300 ms while the bot runs and stops when it
+idles). The keyed rendering survives the module move: the cells and
+the rows are persistent DOM nodes keyed by the skill id, a buff
+joining or leaving touches only its own node (the icons never blink
+on a refresh), the panel holds the previous bot's content through
+the switch gap like every snapshot driven panel. The panel code
+lives in `web/buffs.js` (loaded before `app.js`, which calls its
+`renderBuffs` from the shared render path); the harness is
+`tools/repro_buffs.js` (`task repro:buffs`).
+
 ## Chat window
 
 The bottom left corner of the map shows the parsed system messages and
@@ -1104,6 +1154,13 @@ no bundler, no network dependency; every dynamic text lands through
   sandbox).
 - `tools/repro_hud.js` (`task repro:hud`) for the HUD and target panel
   rendering (stub DOM).
+- `tools/repro_buffs.js` (`task repro:buffs`) for the effects panel:
+  the markup (no EFFECTS head, the dock buttons, the layers), the
+  styles (the 10 column grid, the per cell white separators, the
+  scroll, the morph transitions), the render (exactly the active
+  effects, the keyed nodes surviving the refreshes, the percent bars
+  from left over total), the local countdown ticker, the view toggle
+  with the persistence and the height fallbacks (stub DOM).
 - `tools/repro_gear.js` (`task repro:gear`) for the equipment widget
   (paperdoll masks, either-or slot resolution, badges, slot counter,
   the keyed rendering, the pinned footer values, the floating placement
@@ -1111,7 +1168,9 @@ no bundler, no network dependency; every dynamic text lands through
   observed bot switch: the widget DOM survives the switch gap with
   the shared cells and icons kept, the in-flight drag and drop dialog
   cancel, and the new bot's first snapshot diffs the keyed cells in
-  place (the right side flicker fix).
+  place (the right side flicker fix). The effects panel checks live
+  in `tools/repro_buffs.js` since the panel code moved to
+  `web/buffs.js` (the gear sandbox loads app.js only).
 - `tools/repro_stats.js` for the statistics tab: the fleet overview
   (activation fetch, KPI cards, chart drawing, the bots table, the
   bot selector), the bot detail view (KPI cards, events, phase

@@ -413,16 +413,23 @@ SPDX-License-Identifier: MIT
             </div>
           </div>
 
-          <div id="buffs-panel" class="buffs-panel hidden"
+          <div id="buffs-panel" class="buffs-panel hidden view-icons"
             title="the active effects running on the bot - the buffs and the debuffs of the server effect list">
-            <button id="buffs-panel-head" class="buffs-panel-head"
-              type="button" title="collapse or expand the effect list">
-              <span class="buffs-panel-title">EFFECTS</span>
-              <span id="buffs-panel-count" class="buffs-panel-count"></span>
-              <span id="buffs-panel-chev" class="buffs-panel-chev">&#9656;</span>
-            </button>
+            <div class="buffs-dock">
+              <button id="buffs-toggle" class="buffs-dock-btn" type="button"
+                title="expand the detailed effect list">
+                <span id="buffs-chev" class="buffs-chev" aria-hidden="true">&#9662;</span>
+              </button>
+              <button id="buffs-view-btn" class="buffs-dock-btn" type="button"
+                title="switch to the detailed effect list">
+                <span class="buffs-view-icon" aria-hidden="true"></span>
+              </button>
+            </div>
             <div id="buffs-panel-body" class="buffs-panel-body">
-              <ul id="buffs-list" class="buffs-list"></ul>
+              <div id="buffs-grid" class="buffs-grid"></div>
+              <div id="buffs-list-wrap" class="buffs-list-wrap">
+                <ul id="buffs-list" class="buffs-list"></ul>
+              </div>
             </div>
           </div>
 
@@ -671,6 +678,7 @@ SPDX-License-Identifier: MIT
     aria-hidden="true"></div>
 </div>
 
+<script src="buffs.js"></script>
 <script src="app.js"></script>
 <script src="map.js"></script>
 <script src="stats.js"></script>

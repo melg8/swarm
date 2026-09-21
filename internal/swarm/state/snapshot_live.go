@@ -336,6 +336,7 @@ func (b *Bot) appendLiveBuffsJSON(
             Name:    fmt.Sprintf("skill #%d", id),
             Icon:    "",
             Left:    buffLeftCapped(buff.left - elapsed),
+            Total:   buffLeftCapped(buff.total),
         }
         if info, ok := npcdata.SkillInfoOf(id); ok {
             snapshot.Name = info.Name
