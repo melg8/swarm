@@ -413,12 +413,16 @@ func TestCellViewPublishesKillMarks(t *testing.T) {
     hunter.kills = append(hunter.kills, killRecord{
         cellID: "test-home", x: 46400, y: 41600, at: now,
         respawnAt: now.Add(17 * time.Second),
+        name:      "Keltir", level: 4,
     })
     hunter.viewAt = time.Time{}
     hunter.publishView(loop, now)
     marks := loop.tracker.KillMarks()
     require.Len(t, marks, 1)
     require.Equal(t, int32(46400), marks[0].X)
+    require.Equal(t, "Keltir", marks[0].Name,
+        "the kill mark carries the victim for the tooltip")
+    require.Equal(t, int32(4), marks[0].Level)
 }
 
 func TestCellMobRespawnLookup(t *testing.T) {
@@ -585,6 +589,10 @@ func TestCellKillAttributesToTheGroundOfTheCorpse(t *testing.T) {
     require.NotEmpty(t, hunter.kills)
     require.Equal(t, "test-rich", hunter.kills[0].cellID,
         "the kill record belongs to the ground of the corpse")
+    require.Equal(t, "Neighbor Wolf", hunter.kills[0].name,
+        "the kill record captures the victim name")
+    require.Positive(t, hunter.kills[0].level,
+        "the kill record captures the victim level")
     require.Equal(t, 1, hunter.metrics[1].visitKills,
         "the visit kills count on the neighbor ground")
     require.True(t, hunter.metrics[1].killPosKnown)

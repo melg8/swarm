@@ -117,13 +117,14 @@ func (h *cellHunter) publishView(l *Loop, now time.Time) {
     }
     l.tracker.SetHuntingCellLive(view)
 
-    // The kill ring: the fleet wide cross layer of the map.
+    // The kill ring: the fleet wide skull layer of the map.
     marks := make([]state.KillMarkView, 0, len(h.kills))
     for index := range h.kills {
         kill := &h.kills[index]
         //nolint:exhaustruct_v5 // BotID stays 0
         marks = append(marks, state.KillMarkView{
             X: kill.x, Y: kill.y, AtMs: kill.at.UnixMilli(),
+            Name: kill.name, Level: kill.level,
         })
     }
     l.tracker.SetKillMarks(marks)

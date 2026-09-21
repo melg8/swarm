@@ -154,14 +154,30 @@ function makeRecordingContext(record) {
 }
 
 function makeElementStub(checked) {
+    // The appended children and the removed classes record the DOM
+    // writes the scenarios assert on (the tooltip content, the hidden
+    // flips); the other stubs stay inert.
+    const children = [];
+    const removedClasses = [];
+    const addedClasses = [];
     return {
-        classList: { contains: () => true, add: () => {}, remove: () => {} },
+        _children: children,
+        _removedClasses: removedClasses,
+        _addedClasses: addedClasses,
+        classList: {
+            contains: () => true,
+            add: (c) => addedClasses.push(c),
+            remove: (c) => removedClasses.push(c)
+        },
         addEventListener: () => {},
-        appendChild: () => {},
-        append: () => {},
+        appendChild: (c) => children.push(c),
+        append: (c) => children.push(c),
         style: {},
         textContent: "",
-        innerHTML: "",
+        // The honest emulation of the browser clear: the innerHTML
+        // assignment drops the appended children.
+        set innerHTML(value) { children.length = 0; },
+        get innerHTML() { return ""; },
         title: "",
         checked: checked === undefined ? false : checked,
         clientWidth: CANVAS_W,
@@ -496,7 +512,7 @@ async function runScenarioHuntCells(mapFile) {
 // traced skulls in two fill passes (the orange body, the dark face) -
 // never as a stroke cross and never as a font glyph.
 function runScenarioKillMarks(mapFile) {
-    const { MapView, record, elements } = loadMapJs(mapFile);
+    const { MapView, record, elements, fireCanvas } = loadMapJs(mapFile);
     MapView.init();
     const snap = buildSnapshot();
     // The kill centroid of the active spot rides the registry: the
@@ -512,20 +528,23 @@ function runScenarioKillMarks(mapFile) {
     const centroid = worldToScreen(44500, 49500);
 
     MapView.setKillMarks([
-        { botId: "a", x: 45100, y: 50100, atMs: 0 },
+        { botId: "a", x: 45100, y: 50100, atMs: 0,
+            name: "Keltir", level: 4 },
         { botId: "b", x: 45300, y: 50300, atMs: -240000 },
         { botId: "a", x: 47000, y: 52000, atMs: -400000 }
     ]);
 
     // The skull passes land as fills: the body pass fills the head
     // and jaw circles in the marker orange, the face pass fills the
-    // eye dots and the mouth slots in the dark contrast color.
+    // eye dots and the mouth slots in the dark contrast color. The
+    // arc centers of the bigger skulls sit up to half the radius off
+    // the mark point, the filter reads 6px around it.
     const skullFills = (p, style) => record.fills.filter((fill) =>
         fill.style === style
         && fill.arcs.some(([ax, ay]) =>
-            Math.hypot(ax - p.x, ay - p.y) < 4));
+            Math.hypot(ax - p.x, ay - p.y) < 6));
     const headRadiusOf = (fill, p) => Math.max(...fill.arcs
-        .filter(([ax, ay]) => Math.hypot(ax - p.x, ay - p.y) < 4)
+        .filter(([ax, ay]) => Math.hypot(ax - p.x, ay - p.y) < 6)
         .map(([, , ar]) => ar));
 
     record.fills.length = 0;
@@ -551,6 +570,13 @@ function runScenarioKillMarks(mapFile) {
             + " vs fresh "
             + (freshBody.length > 0
                 ? headRadiusOf(freshBody[0], fresh).toFixed(2) : "-"));
+    check(results, "the fresh skull reads at the 2.5x size",
+        freshBody.length > 0
+        && headRadiusOf(freshBody[0], fresh) >= 7,
+        "fresh head radius "
+            + (freshBody.length > 0
+                ? headRadiusOf(freshBody[0], fresh).toFixed(2) : "-")
+            + " (want at least 7)");
     check(results, "the two segment cross stroke is gone",
         record.strokes.every((stroke) => stroke.style !== "#e37400"
             || stroke.dash.length > 0
@@ -568,6 +594,59 @@ function runScenarioKillMarks(mapFile) {
         skullFills(centroid, "#e37400").length > 0
         && skullFills(centroid, "#40230a").length > 0,
         "no skull at the centroid " + JSON.stringify(centroid));
+
+    // The hover pick resolves the fresh skull with its victim data
+    // (the empty map ground 60px away resolves nothing).
+    const picked = MapView.killMarkAt(fresh.x, fresh.y);
+    check(results, "the hover picks the kill skull with its victim",
+        picked && picked.name === "Keltir" && picked.level === 4,
+        "picked " + JSON.stringify(picked && picked.name));
+    check(results, "the empty ground picks no skull",
+        MapView.killMarkAt(fresh.x + 60, fresh.y + 60) === null,
+        "a skull picked on the empty ground");
+
+    // The tooltip of the hovered skull reads the victim (the name
+    // with the level) and the age of the kill; a mark without the
+    // captured victim falls back to the plain mob read.
+    MapView.showKillTooltip(picked, fresh.x, fresh.y);
+    const tooltip = elements.get("map-tooltip");
+    check(results, "the skull tooltip names the victim and level",
+        tooltip._children.length >= 2
+        && tooltip._children[0].textContent === "Keltir lvl 4",
+        "tooltip line " + (tooltip._children.length > 0
+            ? JSON.stringify(tooltip._children[0].textContent) : "-"));
+    check(results, "the skull tooltip reads the age",
+        tooltip._children.length >= 2
+        && tooltip._children[1].textContent === "killed 0s ago",
+        "tooltip line " + (tooltip._children.length > 1
+            ? JSON.stringify(tooltip._children[1].textContent) : "-"));
+    const unnamed = MapView.killMarks.find(
+        (mark) => !mark.name && mark.atMs === -240000);
+    MapView.showKillTooltip(unnamed, old.x, old.y);
+    check(results, "a victimless skull tooltip falls back",
+        tooltip._children.length >= 1
+        && tooltip._children[0].textContent === "a mob",
+        "tooltip line " + (tooltip._children.length > 0
+            ? JSON.stringify(tooltip._children[0].textContent) : "-"));
+
+    // The full hover flow: the pointer over the skull shows the
+    // tooltip (the hidden class drops), the pointer over the empty
+    // ground hides it again.
+    tooltip._removedClasses.length = 0;
+    tooltip._addedClasses.length = 0;
+    fireCanvas("mousemove", { clientX: fresh.x, clientY: fresh.y });
+    check(results, "the pointer on the skull shows the tooltip",
+        MapView.hoverMark === picked
+        && tooltip._removedClasses.includes("hidden"),
+        "hoverMark " + JSON.stringify(MapView.hoverMark
+            && MapView.hoverMark.name)
+        + ", removed " + tooltip._removedClasses.join(","));
+    fireCanvas("mousemove", { clientX: 10, clientY: 10 });
+    check(results, "leaving the skull hides the tooltip",
+        MapView.hoverMark === null
+        && tooltip._addedClasses.includes("hidden"),
+        "hoverMark " + JSON.stringify(MapView.hoverMark)
+        + ", added " + tooltip._addedClasses.join(","));
 
     // The layer toggle hides the fleet ring: the fleet skull fills and
     // the old solid cross strokes drop while the dashed social

@@ -2832,11 +2832,16 @@ type ZoneView struct {
 // alone carries.
 type KillMarkView struct {
     // BotID names the bot that landed the kill (the tooltip of
-    // the cross).
+    // the skull).
     BotID string `json:"botId"`
     X     int32  `json:"x"`
     Y     int32  `json:"y"`
     AtMs  int64  `json:"atMs"`
+    // Name and Level carry the victim the tooltip shows (the mob
+    // display name and its level, captured at the kill; the level is
+    // 0 when the corpse left the knownlist before the record).
+    Name  string `json:"name"`
+    Level int32  `json:"level"`
 }
 
 // SelfSnapshot returns the live character view of the played character

@@ -8,6 +8,7 @@ import (
     "math"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
@@ -717,9 +718,18 @@ func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
     }
     mid := time.Duration(rmin+rmax) * time.Second / 2
     cell := h.cells[ground]
+    name := l.tracker.ObjectName(objectID)
+    if name == "" && wire != 0 {
+        // The corpse vanished from the knownlist before the record:
+        // the generated npc dictionary resolves the display name of
+        // the species from the template id.
+        name = npcdata.NPCName(wire + 1000000)
+    }
+    level, _ := l.tracker.ObjectLevel(objectID)
     h.kills = append(h.kills, killRecord{
         cellID: cell.ID, x: x, y: y, at: now,
         respawnAt: now.Add(mid),
+        name:      name, level: level,
     })
     h.pruneKills(now)
     if len(h.kills) > cellKillLogCap {
@@ -1026,14 +1036,17 @@ func (l *Loop) minTargetLevel() int32 {
 
 // killRecord is one kill of the overlay: the corpse position (the
 // server default respawns the mob at its spawn point, the elven
-// windows are short), the species respawn window midpoint as the
-// predicted time.
+// windows are short), the victim the map tooltip shows (the name and
+// the level, captured while the corpse is still in the knownlist)
+// and the species respawn window midpoint as the predicted time.
 type killRecord struct {
     cellID    string
     x         int32
     y         int32
     at        time.Time
     respawnAt time.Time
+    name      string
+    level     int32
 }
 
 // pruneKills drops the overlay records the world already invalidated

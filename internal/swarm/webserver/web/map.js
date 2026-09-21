@@ -20,6 +20,10 @@ const MapView = {
   canvas: null,
   ctx: null,
   tooltip: null,
+  // The hovered kill skull and the age line element the tooltip
+  // refreshes (the age read ticks while the cursor rests on it).
+  hoverMark: null,
+  hoverAgeEl: null,
   scale: 0.12,
   panAnchor: { x: 0, y: 0 },
   drag: null,
@@ -2270,13 +2274,13 @@ const MapView = {
       ctx.fillStyle = killMarkColor;
       ctx.beginPath();
       for (const k of list) {
-        traceKillSkull(ctx, k[0], k[1], 5, false);
+        traceKillSkull(ctx, k[0], k[1], 12.5, false);
       }
       ctx.fill();
       ctx.fillStyle = killMarkDetailColor;
       ctx.beginPath();
       for (const k of list) {
-        traceKillSkull(ctx, k[0], k[1], 5, true);
+        traceKillSkull(ctx, k[0], k[1], 12.5, true);
       }
       ctx.fill();
     }
@@ -2474,12 +2478,14 @@ const MapView = {
       const age = nowMs - mark.atMs;
       if (!(age >= 0) || age > killMarkTTLms) { continue; }
       const p = this.worldToScreen(mark.x, mark.y);
-      if (p.x < -8 || p.y < -8
-        || p.x > rect.width + 8 || p.y > rect.height + 8) {
+      if (p.x < -14 || p.y < -14
+        || p.x > rect.width + 14 || p.y > rect.height + 14) {
         continue;
       }
       // The fresh kills read full strength, the old ones melt toward
-      // a quarter opacity and shrink before the ring drops them.
+      // a quarter opacity and shrink before the ring drops them. The
+      // fresh skull reads at 2.5x of the old cross size - a bit
+      // smaller than the mob dots of the map.
       const bucket = Math.min(killFadeBuckets - 1,
         Math.floor(age / killMarkTTLms * killFadeBuckets));
       (buckets[bucket] = buckets[bucket] || []).push(p);
@@ -2490,7 +2496,7 @@ const MapView = {
       if (!marks) { continue; }
       const fade = bucket / killFadeBuckets;
       ctx.globalAlpha = 0.95 - 0.7 * fade;
-      const size = 4 - 1.5 * fade;
+      const size = 10 - 3.75 * fade;
       // The body pass: the head and jaw silhouette in the orange.
       ctx.fillStyle = killMarkColor;
       ctx.beginPath();
@@ -3207,17 +3213,27 @@ const MapView = {
     this.hoverWp = wp;
     this.cursorWorld = world;
     this.updateCursorChip();
-    if (best !== this.hover || zone !== this.hoverZone || wpChanged) {
+    // The kill skulls pick only where no object does: the unit
+    // tooltips own their pixels, the skulls own the empty map ground.
+    const mark = best ? null : this.killMarkAt(mx, my);
+    if (best !== this.hover || zone !== this.hoverZone || wpChanged
+        || mark !== this.hoverMark) {
       this.hover = best;
       this.hoverZone = zone;
+      this.hoverMark = mark;
       if (best) {
         this.showTooltip(best, mx, my);
+      } else if (mark) {
+        this.showKillTooltip(mark, mx, my);
       } else {
         this.hideTooltip();
       }
       // The zone hover repaints the highlight and the name label, the
       // waypoint hover the coordinate label.
       this.draw();
+    } else if (mark) {
+      // The cursor rests on the same skull: keep the age read fresh.
+      this.refreshKillTooltipAge(mark);
     }
   },
 
@@ -3570,12 +3586,7 @@ const MapView = {
       div.textContent = line;
       this.tooltip.append(div);
     }
-    this.tooltip.classList.remove("hidden");
-    const wrap = this.canvas.parentElement.getBoundingClientRect();
-    const x = Math.min(mx + 14, wrap.width - 270);
-    const y = Math.min(my + 14, wrap.height - 130);
-    this.tooltip.style.left = x + "px";
-    this.tooltip.style.top = y + "px";
+    this.positionTooltip(mx, my);
   },
 
   // displayNameOf resolves the label of a target id for tooltips: the
@@ -3597,9 +3608,78 @@ const MapView = {
     return "object " + objectId;
   },
 
+  // hideTooltip closes the tooltip box and clears the whole hover
+  // state: the object, the kill skull and the age line reference.
   hideTooltip() {
     this.tooltip.classList.add("hidden");
     this.hover = null;
+    this.hoverMark = null;
+    this.hoverAgeEl = null;
+  },
+
+  // positionTooltip places the tooltip box near the cursor, clamped
+  // to the map wrap (the object and the kill tooltips share it).
+  positionTooltip(mx, my) {
+    this.tooltip.classList.remove("hidden");
+    const wrap = this.canvas.parentElement.getBoundingClientRect();
+    const x = Math.min(mx + 14, wrap.width - 270);
+    const y = Math.min(my + 14, wrap.height - 130);
+    this.tooltip.style.left = x + "px";
+    this.tooltip.style.top = y + "px";
+  },
+
+  // showKillTooltip shows the victim of a hovered kill skull: the
+  // name and level of the mob and how long ago it died (the raw
+  // object data never shows, a vanished corpse falls back to the
+  // plain mob read).
+  showKillTooltip(mark, mx, my) {
+    this.tooltip.innerHTML = "";
+    const name = document.createElement("div");
+    name.className = "tt-name";
+    name.textContent = (mark.name || "a mob")
+      + (mark.level > 0 ? " lvl " + mark.level : "");
+    this.tooltip.append(name);
+    const age = document.createElement("div");
+    age.textContent = killAgeText(
+      Date.now() + this.clockOffsetMs - mark.atMs);
+    this.tooltip.append(age);
+    this.hoverAgeEl = age;
+    this.positionTooltip(mx, my);
+  },
+
+  // refreshKillTooltipAge keeps the age read of the hovered skull
+  // fresh while the cursor rests on it (a text write only when the
+  // whole second stepped).
+  refreshKillTooltipAge(mark) {
+    if (!this.hoverAgeEl) { return; }
+    const text = killAgeText(
+      Date.now() + this.clockOffsetMs - mark.atMs);
+    if (this.hoverAgeEl.textContent !== text) {
+      this.hoverAgeEl.textContent = text;
+    }
+  },
+
+  // killMarkAt picks the kill skull under the cursor: the nearest
+  // fresh mark within the pick radius of the skull. Null when the
+  // layer is hidden or nothing sits close enough.
+  killMarkAt(mx, my) {
+    if (!this.layerChecked("show-kills")) { return null; }
+    if (!this.killMarks || this.killMarks.length === 0) { return null; }
+    const nowMs = Date.now() + this.clockOffsetMs;
+    let best = null;
+    let bestDist = killMarkPickRadius;
+    for (const mark of this.killMarks) {
+      const age = nowMs - mark.atMs;
+      if (!(age >= 0) || age > killMarkTTLms) { continue; }
+      const p = this.worldToScreen(mark.x, mark.y);
+      const dist = Math.hypot(p.x - mx, p.y - my);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = mark;
+      }
+    }
+
+    return best;
   },
 
   // ---- combat animation layer ----
@@ -4205,6 +4285,24 @@ const killMarkColor = "#e37400";
 // readable over the orange fill on the light map imagery, theme
 // independent like the rest of the kill marker palette.
 const killMarkDetailColor = "#40230a";
+
+// killMarkPickRadius bounds the hover pick of a kill skull: a touch
+// wider than the fresh skull so the tooltip is easy to aim at.
+const killMarkPickRadius = 13;
+
+// killAgeText renders the age of a kill mark for the skull tooltip:
+// a compact whole unit read (the map local helper - the HUD panels
+// use the formatAgeMs of app.js, the vm harness loads map.js alone).
+function killAgeText(ms) {
+  const secs = Math.max(0, Math.floor(ms / 1000));
+  if (secs < 60) { return "killed " + secs + "s ago"; }
+  if (secs < 3600) {
+    return "killed " + Math.floor(secs / 60) + "m ago";
+  }
+
+  return "killed " + Math.floor(secs / 3600) + "h "
+    + Math.floor((secs % 3600) / 60) + "m ago";
+}
 
 // killMarkTTLms bounds the life of a fleet kill skull: the fresh kill
 // reads full strength and melts away before the server ring drops
