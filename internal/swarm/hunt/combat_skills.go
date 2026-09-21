@@ -26,6 +26,7 @@ import (
 
     "github.com/melg8/swarm/internal/swarm/gear"
     "github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Timing and threshold constants of the combat casting.
@@ -79,38 +80,14 @@ func (l *Loop) maybeCastCombatSkill(now time.Time) {
     if !l.castAt.IsZero() && now.Sub(l.castAt) < castRetryPeriod {
         return
     }
-    skills := l.tracker.ActiveSkills()
     weapon, hasWeapon := l.tracker.SelfWeaponKind()
     caster := l.isCaster()
-    for _, skill := range skills {
-        cast, ok := npcdata.SkillCastOf(skill.SkillID)
-        if !ok || cast.Operate != "A1" || cast.Target != "ONE" {
+    for _, skill := range l.tracker.ActiveSkills() {
+        if !l.combatSkillCandidate(
+            skill, weapon, hasWeapon, caster, now) {
             continue
         }
-        if caster != cast.Magic {
-            // The warrior swings physical strikes, the mystic fires
-            // spells - never the other way around.
-            continue
-        }
-        if !cast.Magic && hasWeapon &&
-            !cast.UsableWithWeapon(weapon) {
-            continue
-        }
-        if float64(cast.MPCostOf(skill.Level)) >
-            l.tracker.SelfCurMP() {
-            continue
-        }
-        if l.skillOnReuse(skill.SkillID, now) {
-            continue
-        }
-        finisher := npcdata.OverhitSkill(skill.SkillID)
-        if finisher && l.targetAboveOverhitWindow() {
-            // The overhit hold: the strike waits for the finishing
-            // window (see overhitFinishPercent) - firing it into a
-            // healthy target would clear the server armed flag on
-            // the first non lethal damage and lose the bonus.
-            continue
-        }
+        cast, _ := npcdata.SkillCastOf(skill.SkillID)
         if err := l.game.UseMagicSkill(skill.SkillID); err != nil {
             l.logger.Printf("Hunt: cast of %d failed: %v",
                 skill.SkillID, err)
@@ -121,17 +98,55 @@ func (l *Loop) maybeCastCombatSkill(now time.Time) {
         l.skillReuse[skill.SkillID] = now.Add(
             time.Duration(cast.ReuseDelay)*time.Millisecond +
                 castReuseMargin)
+        aim := "at the target"
+        if npcdata.OverhitSkill(skill.SkillID) {
+            aim = "as the finishing blow"
+        }
         if info, ok := npcdata.SkillInfoOf(skill.SkillID); ok {
-            aim := "at the target"
-            if finisher {
-                aim = "as the finishing blow"
-            }
             l.logger.Printf("Hunt: casting %s level %d %s",
                 info.Name, skill.Level, aim)
         }
 
         return
     }
+}
+
+// combatSkillCandidate reports whether one learned skill is a
+// combat cast candidate of the running fight: an active ONE target
+// skill of the class role that accepts the weapon in hand, paid by
+// the mana, outside the local reuse window and - for the overhit
+// flagged strikes - inside the finishing window of the target bar
+// (an early cast would clear the server armed flag on the first
+// non lethal damage and lose the bonus).
+func (l *Loop) combatSkillCandidate(
+    skill state.LearnedSkill,
+    weapon string, hasWeapon, caster bool, now time.Time,
+) bool {
+    cast, ok := npcdata.SkillCastOf(skill.SkillID)
+    if !ok || cast.Operate != "A1" || cast.Target != "ONE" {
+        return false
+    }
+    if caster != cast.Magic {
+        // The warrior swings physical strikes, the mystic fires
+        // spells - never the other way around.
+        return false
+    }
+    if !cast.Magic && hasWeapon && !cast.UsableWithWeapon(weapon) {
+        return false
+    }
+    if float64(cast.MPCostOf(skill.Level)) >
+        l.tracker.SelfCurMP() {
+        return false
+    }
+    if l.skillOnReuse(skill.SkillID, now) {
+        return false
+    }
+    if npcdata.OverhitSkill(skill.SkillID) &&
+        l.targetAboveOverhitWindow() {
+        return false
+    }
+
+    return true
 }
 
 // targetAboveOverhitWindow reports whether the target of the running

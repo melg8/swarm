@@ -3139,3 +3139,14 @@ Verification: build, vet, the npcdata and hunt suites green,
 lint --new clean. Commits as melg8: 4ce5693 (the task entry),
 8b96cce (the implementation), a29e65e (the docs), the review fix
 commit on top. Round complete.
+
+Two more commits from the same pass: the maybeCastCombatSkill
+eligibility chain moved into combatSkillCandidate (the overhit
+gate pushed the cyclop complexity to 18 over the 15 cap; the
+helper drops the cast decision to a named predicate), and the
+full tree lint surfaced a PRE EXISTING debt of a parallel round:
+clickWaypoint (town.go) sits at cyclop 16 - the crude branch count
+shows it was already 17 before this session started, so the zero
+findings claim was stale. Refactoring a navigation critical
+function does not belong to the tail of this session - it is the
+first pick of the next one. 
