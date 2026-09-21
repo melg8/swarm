@@ -47,9 +47,9 @@ SPDX-License-Identifier: MIT
 //   wall clock off (a reading 61 seconds old at 120 left reads 59s
 //   and turns the fading mark on);
 // - the frame geometry: the width hugs the filled columns (1 cell
-//   42px, 5 cells 178px, the full row 348px), the body height hugs
-//   the filled rows capped at the classic two (36px one row, 70px
-//   two rows, still 70px at 25 buffs);
+//   32px, 5 cells 168px, the full row 338px), the body height hugs
+//   the filled rows capped at the classic two (32px one row, 66px
+//   two rows, still 66px at 25 buffs);
 // - the empty snapshot hides the panel and wipes the grid;
 // - the remaining time formatters keep the pinned readings.
 //
@@ -325,31 +325,33 @@ function checkMarkup() {
 
 function checkStyles() {
     const css = fs.readFileSync(path.join(WEB_DIR, "style.css"), "utf8");
-    check("styles: the grid packs 10 columns of 34px cells",
-        css.includes("grid-template-columns: repeat(10, 34px)") &&
-        css.includes("grid-auto-rows: 34px"));
+    check("styles: the grid packs 10 columns of bare 32px icons",
+        css.includes("grid-template-columns: repeat(10, 32px)") &&
+        css.includes("grid-auto-rows: 32px"));
     check("styles: the grid caps at the classic two rows and clips",
-        /\.buffs-grid \{[^}]*max-height: 68px;/s.test(css) &&
+        /\.buffs-grid \{[^}]*max-height: 66px;/s.test(css) &&
         /\.buffs-grid \{[^}]*overflow: hidden;/s.test(css));
     check("styles: the grid owns no scrollbar",
         !/\.buffs-grid \{[^}]*overflow-y:\s*auto;/s.test(css) &&
         !css.includes(".buffs-grid::-webkit-scrollbar") &&
         !/\.buffs-grid \{[^}]*scrollbar-width/s.test(css));
-    check("styles: no 30px cell of the scaled shape is left",
-        !css.includes("repeat(10, 30px)"));
-    check("styles: the body pads the top edge only",
-        /\.buffs-panel-body \{[^}]*padding: 2px 3px 0;/s.test(css));
-    check("styles: the cells paint the theme tinted separator strips",
-        /\.buff-cell \{[^}]*border-right: 2px solid var\(--buff-separator\);/s
-            .test(css) &&
-        /\.buff-cell \{[^}]*border-bottom: 2px solid var\(--buff-separator\);/s
-            .test(css) &&
-        /\.buffs-grid \{[^}]*gap: 0;/s.test(css));
-    check("styles: no hardcoded white separator is left",
-        !/\.buff-cell \{[^}]*#ffffff/s.test(css));
-    check("styles: the separator tint answers per theme",
-        css.includes("--buff-separator: #ffffff;") &&
-        css.includes("--buff-separator: var(--bg-panel);"));
+    check("styles: no 30px or 34px cell of the older shapes is left",
+        !css.includes("repeat(10, 30px)") &&
+        !css.includes("repeat(10, 34px)"));
+    check("styles: the body owns no padding at all",
+        /\.buffs-panel-body \{[^}]*padding: 0;/s.test(css));
+    check("styles: the cells are bare icons with separator gaps",
+        /\.buffs-grid \{[^}]*gap: 2px;/s.test(css) &&
+        !/\.buff-cell \{[^}]*border-right/s.test(css) &&
+        !/\.buff-cell \{[^}]*border-bottom/s.test(css) &&
+        !/\.buff-cell \{[^}]*background:/s.test(css));
+    check("styles: the panel owns no frame",
+        !/\.buffs-panel \{[^}]*background:/s.test(css) &&
+        !/\.buffs-panel \{[^}]*border:/s.test(css) &&
+        !/\.buffs-panel \{[^}]*box-shadow:/s.test(css) &&
+        !/\.buffs-panel \{[^}]*border-radius:/s.test(css));
+    check("styles: no separator tint var is left",
+        !css.includes("--buff-separator"));
     check("styles: the level badge reads white on its dark plate",
         /\.buff-cell \.badge-level \{[^}]*color: #ffffff;/s.test(css) &&
         /\.buff-cell \.badge-level \{[^}]*background: rgba\(0, 0, 0, 0\.55\);/s
@@ -581,8 +583,8 @@ function checkBehavior(harness) {
             api.panel({ buffs: [two[0]] });
             api.syncSize();
 
-            return body().style.height === (34 + 2) + "px" &&
-                panel().style.width === (1 * 34 + 8) + "px";
+            return body().style.height === (1 * 34 - 2) + "px" &&
+                panel().style.width === (1 * 34 - 2) + "px";
         })());
     check("size: the two rows grid body grows with the second row",
         (() => {
@@ -595,7 +597,7 @@ function checkBehavior(harness) {
             const height = body().style.height;
             api.panel({ buffs: two });
 
-            return height === (2 * 34 + 2) + "px";
+            return height === (2 * 34 - 2) + "px";
         })());
     check("size: the grid holds the two row cap past 20 buffs",
         (() => {
@@ -609,8 +611,8 @@ function checkBehavior(harness) {
             const width = panel().style.width;
             api.panel({ buffs: two });
 
-            return height === (2 * 34 + 2) + "px" &&
-                width === (10 * 34 + 8) + "px";
+            return height === (2 * 34 - 2) + "px" &&
+                width === (10 * 34 - 2) + "px";
         })());
     check("size: the frame hugs the filled columns",
         (() => {
@@ -626,8 +628,8 @@ function checkBehavior(harness) {
             const half = panel().style.width;
             api.panel({ buffs: two });
 
-            return one === (1 * 34 + 8) + "px" &&
-                half === (5 * 34 + 8) + "px";
+            return one === (1 * 34 - 2) + "px" &&
+                half === (5 * 34 - 2) + "px";
         })());
 
     api.panel({ buffs: [] });

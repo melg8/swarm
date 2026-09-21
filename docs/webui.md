@@ -438,7 +438,17 @@ the hurt unit (amber on mobs, red on the character) with a flash ring
 under it. The floats split by sides: the hits the character takes
 float to the LEFT of the fight, the damage it deals and its misses to
 the RIGHT (`floatSideOffset`, 15 unit scale pixels; the damage feed
-carries no attacker id, the target side IS the split).
+carries no attacker id, the target side IS the split). The critical
+blows read a slightly bigger number plus the italic ` Crit!` tail
+styled like the miss float - the server labels them through the
+Attack packet `HITFLAG_CRIT` (0x20, `state.Attack.CritFlags`): the
+tracker remembers the victim of the landed critical blows (500 ms
+window, one awaited drop per crit hit - a dual weapon can crit
+twice) and the next StatusUpdate HP drops of that victim consume the
+count and carry `crit: true` on the wire (the StatusUpdate itself
+carries no crit flag; the packets ride the same read loop back to
+back, so the correlation is deterministic for the server's own
+packet order).
 The server side is `state.CombatEvent` (the `combatEvents` ring of the
 tracker): `ApplyAttack` records the swings and the misses, the HP
 deltas of `ApplyStatusUpdate` record the damage (the Attack broadcast
@@ -567,7 +577,11 @@ between the snapshots, stopping itself once every window elapsed.
   map (`#bot-status` in index.html, `renderBotStatus` in app.js) shows
   the current activity of the active bot at a glance - hunting,
   looting, walking to town, selling, walking to farm spot, deleveling,
-  manual move, idle. The activity text and the data-kind attribute come
+  manual move, idle. The pill caps at 380px (min(380px, 60%)) and the
+  detail line wraps onto up to three lines (break-word, line clamp)
+  instead of clipping into an ellipsis - the long deleveling and town
+  trip reports read fully and the pill stops growing sideways into
+  the full effects bar. The activity text and the data-kind attribute come
   from `phaseLabel(snap)` which maps the hunt loop phase
   (`snapshot.phase`, published by `state.Bot.SetPhase` from the hunt
   loop tick through a defer) to a human readable label and color kind.
@@ -797,7 +811,7 @@ widget checks live in `tools/repro_gear.js`.
 
 ## The effects panel (buffs.js, buffs_tooltip.js)
 
-The floating frame right of the character HUD (left: 272, top: 10 of
+The bare icon bar right of the character HUD (left: 272, top: 10 of
 the map wrap) renders the server effect list (`snapshot.buffs`, the
 AbnormalStatusUpdate view: skillId, level, name, icon, the remaining
 seconds `left`, the duration `total` the percent rides against, the
@@ -805,25 +819,21 @@ generic level description `desc` and the numeric effect summary
 `effect`) as the single horizontal icon grid - the classic buff bar.
 The vertical detailed list, the toggle chevron, the dock strip and
 the view persistence are gone by decision: no view classes, no
-storage state, no control - the grid is all there is.
+storage state, no control - the grid is all there is. The FRAMING is
+gone too (the 2026-09-21 owner round): no panel background, border,
+radius, shadow or body padding, no cell plates and no painted
+separator strips - the bare 32px icons float over the map and only
+the 2px separator SPACE between neighbours stays.
 
-- one 34px cell per active effect (the 32px native icon art plus the
-  2px separator the cell paints on its right and bottom edges,
-  tinted by the `--buff-separator` variable: white in the light
-  theme, the panel chrome in the dark one - the hardcoded white read
-  as bright holes between and under the icons on the dark panel),
-  at most 10 columns wide and 2 rows for the classic buff
-  bar; more than the 20 visible slots stay clipped with no scrollbar
-  (the strict classic bar owns the cap, a clipped effect surfaces as
-  soon as a slot frees); the icons answer their art 1:1 - nothing
-  scales (the pixelated resample into the smaller box read ugly),
-  the frame hugs the filled columns and rows (syncBuffsPanelSize
-  pins the inline width from min(cells, 10) and the body height from
-  min(rows, 2) - one arithmetic code path for the real DOM and the
-  harness stub alike), the body pads 2px on the top edge, none on
-  the bottom (the cells' own separators answer the bottom
-  chrome, so the chrome below the icons reads the same 2px as the
-  chrome above them) and 3px on the sides;
+- one 32px cell per active effect, separated by a 2px grid gap (the
+  34px stride the size arithmetic rides with), at most 10 columns
+  wide and 2 rows for the classic buff bar; more than the 20 visible
+  slots stay clipped with no scrollbar (the strict classic bar owns
+  the cap, a clipped effect surfaces as soon as a slot frees); the
+  icons answer their art 1:1 - nothing scales, the grid hugs the
+  filled columns and rows (syncBuffsPanelSize pins the inline width
+  from cols*34-2 and the body height from rows*34-2 - one arithmetic
+  code path for the real DOM and the harness stub alike);
 - the remaining time does NOT overlay the cell by default - a hover
   chip appears whose darkening hugs only the digits (width
   max-content, centered, riding just above the strip), and a 3px

@@ -23,11 +23,6 @@ SPDX-License-Identifier: MIT
      accent drowned next to the white cell separators of the effects
      panel (see the .buff-strip rule). */
   --buff-strip: #f59e0b;
-  /* The separator chrome of the effects panel cells: the white
-     classic slot gaps of the light theme. The dark theme re-tints
-     them to the panel chrome - the hardcoded white read as bright
-     white holes between and under the icons on the dark panel. */
-  --buff-separator: #ffffff;
   --green: #1a7f37;
   --red: #cf222e;
   --blue: #0969da;
@@ -77,10 +72,6 @@ html[data-theme="dark"] {
   --text-bright: #eef1f5;
   --accent: #f0a03a;
   --buff-strip: #ffc061;
-  /* The dark separators melt into the panel frame: the gap areas
-     below and between the buffs darken with the rest of the panel
-     instead of staying white. */
-  --buff-separator: var(--bg-panel);
   --green: #3fb950;
   --red: #e5484d;
   --blue: #58a6ff;
@@ -290,33 +281,26 @@ body {
 .bot-list { list-style: none; overflow-y: auto; flex: 1; }
 
 /* ---- the effects panel (the server buff list) ----
-   A floating frame for the active effects of the bot (the
-   AbnormalStatusUpdate list: the self buffs the loop casts, the
-   debuffs the mobs land), docked to the RIGHT of the character HUD
-   (the HUD is at left:12 width:252, so its right edge sits at 264;
-   the panel docks at left:272 with an 8px gap). The single view is
-   the horizontal icon grid - the classic buff bar (the vertical
-   detailed list is gone by decision, no toggle control exists):
-   the active effects pack edge to edge as 34px cells (the 32px
-   native icon art plus the 2px separator strip each cell paints on
-   its right and bottom edge, tinted by --buff-separator - white in
-   the light theme, the panel chrome in the dark one - the icons
-   answer 1:1, nothing scales), 10 per row and at most 2 rows; more
-   than the 20 visible slots stay clipped, no scrollbar - the strict
-   classic bar owns the cap. The frame hugs the filled columns and
-   rows, the body pads 2px on the top edge only (the cells' own
-   separators answer the bottom chrome, so the chrome below the
-   icons reads the same 2px as the chrome above them). The panel
-   renders strictly: no appear or disappear animation, a change
-   snaps. It hides entirely while no effect runs. */
+   The active effects of the bot (the AbnormalStatusUpdate list: the
+   self buffs the loop casts, the debuffs the mobs land), docked to
+   the RIGHT of the character HUD (the HUD is at left:12 width:252,
+   so its right edge sits at 264; the panel docks at left:272 with an
+   8px gap). The single view is the horizontal icon grid - the
+   classic buff bar (the vertical detailed list is gone by decision,
+   no toggle control exists): the icons pack bare, 32px each, with
+   only a 2px separator SPACE between them (the owner stripped the
+   framing completely - no panel background, no border, no shadow,
+   no cell plates, no separator strips; the icons float over the
+   map), 10 per row and at most 2 rows; more than the 20 visible
+   slots stay clipped, no scrollbar - the strict classic bar owns
+   the cap. The grid hugs the filled columns and rows (the trailing
+   gap of each filled row drops out of the size arithmetic). The
+   panel renders strictly: no appear or disappear animation, a
+   change snaps. It hides entirely while no effect runs. */
 .buffs-panel {
   position: absolute;
   top: 10px;
   left: 272px;
-  background: var(--bg-panel);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: var(--shadow);
   z-index: 4;
   overflow: hidden;
 }
@@ -325,49 +309,37 @@ body.mode-pathfind .buffs-panel { display: none; }
 
 .buffs-panel-body {
   position: relative;
-  /* 2px on the top edge, none on the bottom (the cell separators
-     answer the bottom chrome), 3px on the sides. The explicit
-     height comes from syncBuffsPanelSize in buffs.js. */
-  padding: 2px 3px 0;
+  /* No padding at all: the icons own the whole panel box. The
+     explicit height comes from syncBuffsPanelSize in buffs.js. */
+  padding: 0;
   overflow: hidden;
 }
 
-/* The icon grid: 10 columns of 34px cells (the 32px native icon
-   plus the 2px separator), no grid gap - every cell paints its own
-   separator strip on the right and the bottom edge, so the
-   separators run only between (and under) the icons that actually
-   show and a partially filled row never leaves a chrome hole (the
-   grid background answer did exactly that on the dark theme).
-   The cap clips past the 20 visible slots without a scrollbar.
-   Keep in sync with the geometry constants in buffs.js. */
+/* The icon grid: 10 columns of bare 32px icons with a 2px gap
+   between them - the separator is a SPACE now, not a painted strip
+   (the cell border strips died with the frame; the gaps read over
+   the map in both themes). The cap clips past the 20 visible slots
+   without a scrollbar. Keep in sync with the geometry constants in
+   buffs.js. */
 .buffs-grid {
   display: grid;
-  grid-template-columns: repeat(10, 34px);
-  grid-auto-rows: 34px;
-  gap: 0;
+  grid-template-columns: repeat(10, 32px);
+  grid-auto-rows: 32px;
+  gap: 2px;
   justify-content: start;
   align-content: start;
-  max-height: 68px;
+  max-height: 66px;
   overflow: hidden;
 }
 
 .buff-cell {
   position: relative;
-  width: 34px;
-  height: 34px;
-  background: var(--bg-panel-2);
-  /* The separator strips ride the --buff-separator tint: the white
-     classic slot gaps of the light theme, the panel chrome of the
-     dark one (the hardcoded white stayed bright on the dark
-     panel). */
-  border-right: 2px solid var(--buff-separator);
-  border-bottom: 2px solid var(--buff-separator);
-  border-radius: 2px;
+  width: 32px;
+  height: 32px;
   overflow: hidden;
 }
 
-/* The icon answers its native 32px art 1:1 inside the cell (the
-   separator borders live outside the 32px box) - nothing scales. */
+/* The icon answers its native 32px art 1:1 - nothing scales. */
 .buff-cell img {
   display: block;
   width: 32px;
@@ -678,9 +650,11 @@ body.mode-pathfind .buffs-panel { display: none; }
   border-radius: 16px;
   box-shadow: var(--shadow);
   pointer-events: none;
-  max-width: 60%;
+  /* The width cap keeps the banner clear of the full effects bar:
+     the long activity lines (the deleveling report et al) wrap onto
+     up to three lines instead of growing the pill sideways. */
+  max-width: min(380px, 60%);
   font-size: 12px;
-  white-space: nowrap;
   overflow: hidden;
 }
 
@@ -697,13 +671,21 @@ body.mode-pathfind .buffs-panel { display: none; }
   font-weight: 700;
   color: var(--text-bright);
   letter-spacing: 0.3px;
+  white-space: nowrap;
 }
 
+/* The detail wraps onto up to three lines (the long deleveling and
+   town trip reports read fully instead of clipping into an
+   ellipsis), then clamps. */
 .bot-status-detail {
   color: var(--text-dim);
   font-size: 11px;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: break-word;
 }
 
 @keyframes bot-status-pulse {
@@ -2318,8 +2300,10 @@ body.mode-pathfind .gear-panel { display: none; }
    and weight numbers: dragging an item onto it destroys the item on
    the server. */
 .gear-trash {
-  width: 30px;
-  height: 38px;
+  /* Square, matching the item icon cells of the bag grid - the tall
+     30x38 dashed box read as a stretched bin. */
+  width: 36px;
+  height: 36px;
   flex-shrink: 0;
   display: flex;
   align-items: center;

@@ -839,6 +839,28 @@ function main() {
         css.includes(".gear-trash") &&
         css.includes(".gear-trash.drop-hover"),
         "missing trash css rules");
+    {
+        const trashBlock = css.slice(css.indexOf(".gear-trash {"),
+            css.indexOf(".gear-trash:hover"));
+        const w = trashBlock.match(/width:\s*(\d+)px/);
+        const h = trashBlock.match(/height:\s*(\d+)px/);
+        check(results, "the trash target is square like the item cells",
+            Boolean(w) && Boolean(h) && w[1] === h[1],
+            "trash box: " + (w && w[1]) + "x" + (h && h[1]));
+    }
+    {
+        const bannerBlock = css.slice(css.indexOf(".bot-status {"),
+            css.indexOf(".bot-status-dot"));
+        const detailBlock = css.slice(css.indexOf(".bot-status-detail {"),
+            css.indexOf("@keyframes bot-status-pulse"));
+        check(results,
+            "the status banner wraps long lines instead of clipping",
+            bannerBlock.includes("max-width: min(380px, 60%)") &&
+            !bannerBlock.includes("white-space: nowrap") &&
+            detailBlock.includes("-webkit-line-clamp: 3") &&
+            detailBlock.includes("overflow-wrap: break-word"),
+            "banner block: " + bannerBlock.slice(0, 120));
+    }
 
     // No cursor change over the item cells.
     const cursorBlock = css.slice(css.indexOf(".pd-cell, .inv-cell"),
@@ -2177,7 +2199,7 @@ function main() {
     check(results, "the effects panel renders the single icon grid",
         !css.includes(".buffs-panel.view-icons") &&
         !css.includes(".buffs-panel.view-list") &&
-        css.includes("grid-template-columns: repeat(10, 34px)"),
+        css.includes("grid-template-columns: repeat(10, 32px)"),
         "the single grid rules are missing");
 
     // The quest items sub tab: the QUEST switch sits right of the

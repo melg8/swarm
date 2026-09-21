@@ -8752,3 +8752,69 @@ state tracker, one new packet parser), the owner prompt of
   dictionary covers the C1 skills, the gap only shows for the
   unknown ids.
 
+
+## Round 124: the combat polish round - the crit floats, the melee contact circles, the bare buff bar, the wrapped banner, the square trash target (2026-09-21)
+
+Scope: the web UI combat and chrome polish (map.js, app.js side
+styles, buffs.js, style.css, the state tracker), the owner prompt of
+2026-09-21.
+
+- Problem statement: a critical blow drew the same float as a plain
+  one (the owner asked for the "Crit!" tail and a bigger number);
+  the melee fighters merged into one circle blob (the collision
+  distance is smaller than the two marker radii at most zooms); the
+  effects bar carried a full frame (background, border, shadow,
+  padding, painted separator strips) the owner wanted stripped to
+  bare icons with separator spaces; the status banner grew sideways
+  into the full effects bar on long deleveling lines; the inventory
+  trash target was a 30x38 stretched box next to the 36px square
+  item cells.
+
+- Root cause analysis:
+  1. The Attack packet flags (Hit.java HITFLAG_CRIT 0x20) were
+     parsed and discarded; the StatusUpdate HP drops that feed the
+     damage floats carry no crit flag - the label needs a
+     correlation. The Attack broadcast and its HP drops ride the
+     same read loop back to back, so the tracker remembers the
+     victim of the landed critical blows (with an awaited drop
+     count: a dual weapon crits twice) and the next drops of that
+     victim inside 500ms consume the count and label crit. The
+     count-consume design came out of the test round: the original
+     "sticky hint" labeled a plain follow-up hit of the same victim
+     as crit (the test caught it before the push).
+  2. The marker radii are importance sized (radiusOf), not
+     separation sized: screen distance = world distance x scale
+     shrinks linearly with the zoom while the radii shrink as
+     scale^0.6 - below the crossing the circles merge. The fix is
+     draw time: a per frame contact pass shrinks every overlapping
+     pair proportionally so the circles touch face to face (the
+     server positions stay untouched - only the marker bodies
+     yield).
+  3. The framing accumulated over the rounds (the white separator
+     strips became the bottom chrome, then the theme tinted
+     separators); the owner reversed the whole framing decision -
+     bare icons with 2px grid gaps, the stride arithmetic drops the
+     trailing gap of the last column and row.
+  4. The banner was a nowrap pill with an ellipsis detail; the wrap
+     (max-width 380px, 3 line clamp, break-word) reads the long
+     reports fully and bounds the width.
+
+- Fix: state (CritFlags + the crit hint + the wire crit bool),
+  connection (CritFromHitFlag copy), map.js (the crit tail render,
+  computeContactFactors + contactRadiusOf), buffs.js (the stride
+  arithmetic), style.css (the bare panel, the wrapped banner, the
+  square trash), repro_map_render (the crit + contact scenarios,
+  the font tracking per text entry), repro_buffs (the new geometry
+  pins), repro_gear (the square trash + banner wrap pins).
+
+- Verification: the state suite green (TestCritHintLabelsDamage,
+  TestCritHintLabelsSelfDamage), all eight harnesses green,
+  golangci-lint clean, gofmt-spaces clean.
+
+- Follow ups: the contact pass is O(n^2) over the alive units per
+  frame (fine at the observed counts, an n-body grid would split it
+  if the fleet views ever grow); the crit correlation is one slot -
+  two crits on different victims inside the window label the second
+  victim wrong (cosmetic, documented); the skill crits (no Attack
+  packet) label nothing - the same boundary the damage numbers
+  already have.

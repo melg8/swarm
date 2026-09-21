@@ -30,24 +30,21 @@
 // - the icons never blink), a buff joining or leaving the list
 // touches only its own node.
 
-// The panel geometry constants: the grid packs buffCellSize px icon
-// boxes at most buffGridColumns per row and at most buffGridRows rows
-// (the classic buff bar), every cell adds buffCellBorder px of
-// separator on its right and bottom edges (buffCellStep is the full
-// cell box the arithmetic rides with), the body adds buffBodyPaddingY
-// px of panel colored frame on the TOP edge only (the bottom edge
-// carries none - the cells' own separators answer the bottom
-// chrome, so the chrome below the icons reads the same 2px as the
-// chrome above them), the sides add 2 x 3px of body padding and the
-// frame 2 x 1px of borders (buffPanelSide). Keep in sync with the
+// The panel geometry constants: the grid packs buffCellSize px bare
+// icons at most buffGridColumns per row and at most buffGridRows rows
+// (the classic buff bar), every two neighbours separate by
+// buffCellGap px of empty space (buffCellStep is the full stride the
+// arithmetic rides with - the stride counts the gap once, so a filled
+// row measures cols*step - gap and a filled stack rows*step - gap).
+// The framing is gone by decision: no panel background, border,
+// shadow or padding - the icons float over the map and only the
+// small separator spaces between them stay. Keep in sync with the
 // .buffs-panel geometry in style.css.
 const buffGridColumns = 10;
 const buffGridRows = 2;
 const buffCellSize = 32;
-const buffCellBorder = 2;
-const buffCellStep = buffCellSize + buffCellBorder;
-const buffBodyPaddingY = 2;
-const buffPanelSide = 8;
+const buffCellGap = 2;
+const buffCellStep = buffCellSize + buffCellGap;
 
 // The effects panel state: the keyed cells of the icon grid and the
 // countdown anchors of the last snapshot (the server sent left
@@ -74,8 +71,9 @@ function initBuffsPanel() {
 // reserves dead space over the map, so the frame stays clear of the
 // central status banner for every count up to the full 10 column
 // row) and the body hugs the filled rows capped at the classic two.
-// The arithmetic covers the stub DOM of the harness and the real DOM
-// alike - one code path, no measurement dependency.
+// The stride arithmetic drops the trailing gap of the last column
+// and row. The arithmetic covers the stub DOM of the harness and the
+// real DOM alike - one code path, no measurement dependency.
 function syncBuffsPanelSize() {
   const body = document.getElementById("buffs-panel-body");
   const panel = document.getElementById("buffs-panel");
@@ -84,8 +82,8 @@ function syncBuffsPanelSize() {
     Math.max(1, BuffsPanel.cells.size));
   const rows = Math.min(buffGridRows, Math.max(1, Math.ceil(
     BuffsPanel.cells.size / buffGridColumns)));
-  panel.style.width = (cols * buffCellStep + buffPanelSide) + "px";
-  body.style.height = (rows * buffCellStep + buffBodyPaddingY) + "px";
+  panel.style.width = (cols * buffCellStep - buffCellGap) + "px";
+  body.style.height = (rows * buffCellStep - buffCellGap) + "px";
 }
 
 // buffLeftText formats the remaining seconds of an effect: the short
