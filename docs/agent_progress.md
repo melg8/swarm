@@ -11,6 +11,49 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: complete): the travel behaviour round (2026-09-21, branch feature/improved-behaviour)
+
+The owner prompt of 2026-09-21 assigned three behaviour features.
+All three landed and pushed on `feature/improved-behaviour` (commits
+6a39569, 2203086, 006f8cd, 005d6ee; rebased over the parallel webui
+rounds 81887cb and pushed again as 005d6ee..):
+
+- Target reset on travel (6a39569): `dropAttackTarget` on the loop
+  clears the held fight AND the server selection (the clear self
+  click - the engage re-adopt would resurrect the fight); it fires at
+  the trip start gates (inside maybeStartTownTrip after the trigger
+  gates), the zone switch, applyHuntingZone and the cell rotation
+  apply. The rotation guard chains no longer reset the empty timer on
+  a held fight (a stuck engage can no longer pin a cleared ground).
+  The loot and the blows landing still hold the trip start.
+  Tests: travel_target_reset_test.go + the rewritten
+  TestTripStartsThroughTheMidFightTarget.
+- SOE economy (2203086): the shopping queue leads with a keep one
+  scroll line (736, Herbiel list 3015000, 460 adena at the town
+  tax); the junk sell flow never offers it back; the trip start
+  prices the walk home (straight line x 1.4 / server run speed,
+  valued at the trusted measured adena per minute of the cell) and
+  spends the scroll when the walk is worth more - UseItem, the 20 s
+  skill 2013 cast, the wait for the village landing, then the normal
+  stop machinery from the respawn point. Tests: soe_test.go.
+- Newbie guide buffs (006f8cd, by the parallel subagent, cherry
+  picked): the guide stop (template 7599, DriveDialog with the two
+  SupportMagic links) rides the town sell stops after the learn
+  stops; guideWanted gates on the level 8-24 band, the missing
+  expected buffs (the 10-row table, Life Cubic excluded), the slot
+  occupancy and a 10 min refusal cooldown; the self buff collision
+  guard skips a self aura whose abnormal slot an active guide buff
+  holds (and the reverse seek direction). Tests: guide_buffs_test.go.
+
+Verified on the combined tree: go build ./..., the focused hunt test
+runs, golangci-lint 0 issues on hunt+state. NOT yet done (next
+session): the full `task verify` on the merged tree, a live E2E of
+the three behaviours against the deployed stack, the docs prose
+(hunting.md shopping/travel sections + development_log round), and
+the follow-up refactor candidate: the guide stop duplicates the
+teacher approach ring (~60 lines) - extract a shared approachNpc
+helper when the next town flow lands.
+
 ## Active task (status: in progress): the effects panel round (2026-09-21, the webui buffs redesign)
 
 Started: 2026-09-21. Branch: `feature/improved-behaviour`, commits as
