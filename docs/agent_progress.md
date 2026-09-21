@@ -2997,3 +2997,17 @@ CSS class collision (the bare .chat-whisper input selector matched
 the whisper kind rows, squeezing them to 90px) - found with the
 preview server plus a headless browser measuring the real boxes.
 Docs: webui.md, development_log.md Round 123.
+
+### The review round (closed)
+
+The clean context critic verified all seven fixes pass (nine Node
+harnesses, build, vet, four Go suites, the full lint gate at the
+single disclosed finding) and its follow ups landed as melg8
+(77620bc): the corpse on its own kill skull yields the tooltip to
+the victim read, the collapsed window skips the snapshot renders
+(the hidden box measured zero offsets and parked the reading
+position) and renders once on expand, the round entry renumbered to
+125. The open follow up: the live encoder crit flag (8b3d716) needs
+a fixture guard - liveSnapshotBot fires no critical hit, so a
+regression dropping Crit again would pass the suites; add a crit
+attack plus an HP drop to the fixture.
