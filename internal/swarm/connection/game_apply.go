@@ -289,6 +289,7 @@ func (gc *GameClient) applyAttack(payload []byte) {
             TargetZ:     gc.attack.TargetZ,
             TargetIDs:   [4]int32{},
             HitFlags:    [state.AttackTargets]int8{},
+            CritFlags:   [state.AttackTargets]bool{},
             TargetCount: count,
         }
         for i := range count {

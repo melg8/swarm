@@ -411,6 +411,7 @@ func (b *Bot) appendLiveCombatJSON(dst []byte, now time.Time) []byte {
             Y:          ev.Y,
             TargetX:    ev.TargetX,
             TargetY:    ev.TargetY,
+            Crit:       ev.Crit,
         })
     }
 
