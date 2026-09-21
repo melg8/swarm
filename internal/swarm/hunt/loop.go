@@ -878,6 +878,11 @@ type Loop struct {
     buffAt        time.Time
     skillReuse    map[int32]time.Time
     profilePicked bool
+    // healFlightUntil bounds the in-flight window of the recovery
+    // self heal (see recovery_heal.go): the sit request waits it
+    // out because the server refuses the sit of a casting
+    // character.
+    healFlightUntil time.Time
     // shoppingViewCache holds the built ShoppingPlanView that
     // corresponds to shoppingPlanCache. The view is rebuilt from the
     // cached plan every tick (200ms) without this cache, which on the

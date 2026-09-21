@@ -56,10 +56,13 @@ func (l *Loop) restSittingHeld(hp float64) bool {
 // again once recovered. The mana of a mystic rides the same toggles:
 // the dry caster sits down under the mana sit threshold and keeps
 // sitting until the mana recovered to the stand one (see
-// combat_skills.go), a fighter ignores the mana gates entirely. The
-// sit/stand action is a server side toggle, so every transition is
-// confirmed by the ChangeWaitType broadcast before the opposite one
-// is ever sent.
+// combat_skills.go), a fighter ignores the mana gates entirely. A
+// character that knows an instant self heal casts it instead of the
+// sit down while the mana pays and no blow is landing (see
+// recovery_heal.go) - standing up first when the rest already sat
+// it down. The sit/stand action is a server side toggle, so every
+// transition is confirmed by the ChangeWaitType broadcast before
+// the opposite one is ever sent.
 func (l *Loop) rest() {
     now := time.Now()
     if now.Sub(l.lastHit) < selectPeriod {
@@ -68,7 +71,16 @@ func (l *Loop) rest() {
     l.lastHit = now
     hp := l.tracker.SelfHealthPercent()
     wantSit := false
+    standToHeal := false
     switch {
+    case l.restSelfHeal(now, hp):
+        // The ready self heal replaced the sit down this window.
+        return
+    case l.restStandToHeal(now, hp):
+        // Sitting and the heal is ready: stand up to cast, the
+        // transition below runs with the heal reason, the cast
+        // itself fires on the next window.
+        standToHeal = true
     case l.restSittingHeld(hp):
         // The sit is confirmed and the regeneration is running -
         // the health or the mana of the caster still holds it.
@@ -88,6 +100,23 @@ func (l *Loop) rest() {
 
         return
     }
+    if wantSit && l.healInFlight(now) {
+        // The heal cast is still in flight: the server refuses the
+        // sit of a casting character without breaking the cast, so
+        // the landing flips the bar and the next window re-decides.
+        return
+    }
+    l.restToggleTo(now, wantSit, standToHeal, hp)
+}
+
+// restToggleTo sends one sit or stand transition of the rest logic
+// through its confirmation guard: the previous transition must be
+// confirmed (or have timed out) before the opposite one goes out,
+// so a slow ChangeWaitType broadcast can never double toggle. The
+// standToHeal flag only names the stand reason in the log.
+func (l *Loop) restToggleTo(
+    now time.Time, wantSit, standToHeal bool, hp float64,
+) {
     if l.tracker.SelfSitting() == wantSit {
         return
     }
@@ -100,15 +129,16 @@ func (l *Loop) rest() {
             return
         }
     }
-    if wantSit {
-        if hp < sitDownHealthPercent {
-            l.logf("Hunt: HP %.0f%% below %.0f%%, sitting down to regenerate",
-                hp, sitDownHealthPercent)
-        } else {
-            l.logf("Hunt: mana %.0f%% below %.0f%%, sitting down to regenerate",
-                l.tracker.SelfManaPercent(), manaSitPercent)
-        }
-    } else {
+    switch {
+    case wantSit && hp < sitDownHealthPercent:
+        l.logf("Hunt: HP %.0f%% below %.0f%%, sitting down to regenerate",
+            hp, sitDownHealthPercent)
+    case wantSit:
+        l.logf("Hunt: mana %.0f%% below %.0f%%, sitting down to regenerate",
+            l.tracker.SelfManaPercent(), manaSitPercent)
+    case standToHeal:
+        l.logf("Hunt: standing up to cast the recovery heal")
+    default:
         l.logf("Hunt: HP %.0f%% recovered, standing up", hp)
     }
     if err := l.game.ActionSitStand(); err != nil {

@@ -57,9 +57,22 @@ func equipSword(bot *state.Bot) {
     bot.ApplyPaperdoll(slots)
 }
 
+// setMobHP sets the vitals of the spawned mob (object 7): the
+// server refreshes the bar of the attacked mob over StatusUpdate.
+// The bar maximum is the 100 of every fight fixture, so the curHP
+// value reads as a percent.
+func setMobHP(bot *state.Bot, curHP int32) {
+    bot.ApplyStatusUpdate(7, []state.Attribute{
+        {ID: state.AttrCurHP, Value: curHP},
+        {ID: state.AttrMaxHP, Value: 100},
+    })
+}
+
 // TestLoopCastsStrikeOfEquippedWeapon pins the warrior path: the
 // learned Power Strike (a SWORD and BLUNT strike) fires at the
-// selected target while the fight runs and a sword is worn.
+// selected target while the fight runs and a sword is worn. The
+// target bar sits inside the overhit finish window (see
+// overhit_test.go) - a healthy bar holds the strike back.
 func TestLoopCastsStrikeOfEquippedWeapon(t *testing.T) {
     bot := newTestBot()
     bot.SetSkills([]state.LearnedSkill{
@@ -67,6 +80,7 @@ func TestLoopCastsStrikeOfEquippedWeapon(t *testing.T) {
     })
     equipSword(bot)
     spawnMob(bot)
+    setMobHP(bot, 15)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
 
@@ -166,6 +180,7 @@ func TestSkillReuseBlocksTheSecondCast(t *testing.T) {
     })
     equipSword(bot)
     spawnMob(bot)
+    setMobHP(bot, 15)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
 

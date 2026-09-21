@@ -49,6 +49,20 @@ const (
     // manaStandPercent is the mana fill the resting mystic waits for
     // before it stands up and re-engages.
     manaStandPercent = 60.0
+    // overhitFinishPercent is the target health below which the
+    // overhit-capable strike fires: the finishing blow. The server
+    // (Mobius C1, Attackable.calculateOverhitExp L1480) pays
+    // exp * min(overkill / maxHp, 0.25) when the cast of an
+    // overhit-flagged skill is the killing blow, and any non lethal
+    // hit clears the armed flag (AttackableStatus.reduceHp L40) -
+    // an early cast only burns the reuse window. In the low level
+    // band one melee swing takes 25-45 percent of the mob bar, so a
+    // cast request fired at 40 percent lands while the bar still
+    // holds a skill's worth of damage: the strike kills and the
+    // overkill reaches the cap. The trash that dies inside one
+    // swing never opens the window - the strike stays sheathed and
+    // the mana is saved.
+    overhitFinishPercent = 40.0
 )
 
 // maybeCastCombatSkill fires the combat skill of the running fight:
@@ -85,6 +99,14 @@ func (l *Loop) maybeCastCombatSkill(now time.Time) {
         if l.skillOnReuse(skill.SkillID, now) {
             continue
         }
+        finisher := npcdata.OverhitSkill(skill.SkillID)
+        if finisher && l.targetAboveOverhitWindow() {
+            // The overhit hold: the strike waits for the finishing
+            // window (see overhitFinishPercent) - firing it into a
+            // healthy target would clear the server armed flag on
+            // the first non lethal damage and lose the bonus.
+            continue
+        }
         if err := l.game.UseMagicSkill(skill.SkillID); err != nil {
             l.logger.Printf("Hunt: cast of %d failed: %v",
                 skill.SkillID, err)
@@ -96,12 +118,30 @@ func (l *Loop) maybeCastCombatSkill(now time.Time) {
             time.Duration(cast.ReuseDelay)*time.Millisecond +
                 castReuseMargin)
         if info, ok := npcdata.SkillInfoOf(skill.SkillID); ok {
-            l.logger.Printf("Hunt: casting %s level %d at the target",
-                info.Name, skill.Level)
+            aim := "at the target"
+            if finisher {
+                aim = "as the finishing blow"
+            }
+            l.logger.Printf("Hunt: casting %s level %d %s",
+                info.Name, skill.Level, aim)
         }
 
         return
     }
+}
+
+// targetAboveOverhitWindow reports whether the target of the running
+// fight still stands above the finishing window of the overhit
+// strike. The server refreshes the vitals of the attacked mob, so
+// the unknown answer means the fight just opened - the bar is still
+// full in practice and the strike holds.
+func (l *Loop) targetAboveOverhitWindow() bool {
+    hp := l.tracker.ObjectHealthPercent(l.target)
+    if hp < 0 {
+        return true
+    }
+
+    return hp > overhitFinishPercent
 }
 
 // maybeSelfBuff casts the missing self buffs between the fights: the
