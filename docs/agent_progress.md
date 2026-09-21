@@ -11,11 +11,46 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task (status: in review): the archer kite step - the bow user steps clear of a closed target (2026-09-21, branch feature/archer-kiting, issue #13)
+## Active task (status: in progress): the kiting parameters pinned - the optimal band and the re-engage delay (2026-09-21, branch feature/archer-kiting, issue #18)
+
+Started 2026-09-21 ~20:22 UTC, continuing the kite entry below on the
+same board issue melg8/swarm#18 ("Kiting core: retreat when the mob
+closes, re-engage at the optimal range"). A parallel round landed the
+train-member trigger mid flight (the hostile scan of kiteThreat,
+commit 5257564) - this round rebased on it and closes the remaining
+parameter task of the issue:
+
+- The optimal band is pinned in the constants block of kite.go as
+  the two edge references: the inner edge kiteRetreatRadius (a
+  hostile below it arms the next step), the outer edge
+  userBowEngageRadius (user.go, 450 - the re-request shoots from
+  range). A copied literal would drift from the radii the fight
+  actually fights with, so the band lives as the documented edge
+  pair.
+- The re-engage delay is a named constant now (kiteReengageDelay,
+  zero today) and rides the movement window timestamp
+  (combatAvoidUntil = window + delay): the window end IS the
+  re-engage today, the knob exists so the live tuning round (#20)
+  can hold the aim without touching the walk contract.
+- One test pins the direction choice the trigger round left open:
+  TestKiteDirectionReadsTheNearestChaser - both hostiles inside the
+  radius (the target 240 east, the chasing member 180 west), the
+  step goes away from the NEAREST one (east), not away from the
+  target (west).
+
+Verification: the kite suite is green (11 tests), `go build`,
+`go vet`, `golangci-lint run --new` clean, the gofmt-spaces check
+quiet. Status: pushed to PR #15; the PR body carries the issue
+marker ("Fixes #18") now. The centroid train steering and the
+retreat path quality stay with #19, the acceptance and the live
+tuning with #20.
+
+## Active task (status: in progress): the archer kite step - the bow user steps clear of a closed target (2026-09-21, branch feature/archer-kiting, issues #18, #13)
 
 Started 2026-09-21 ~19:35 UTC. The source is the project board issue
 melg8/swarm#13 ("Add support for archer warriors with kiting behavior
-against mobs"): an archer that fights a mob from the bow range never
+against mobs"), resumed 2026-09-21 ~20:20 UTC as the kiting core slice
+(the slice issue melg8/swarm#18, the first round in flight as PR #15): an archer that fights a mob from the bow range never
 wants the mob in its face - the Mobius server AI stands the archer
 still while the auto attack shoots, so a melee mob that closes simply
 swings away at a target it could outrange.
@@ -72,60 +107,6 @@ pull request references the issue. Follow-ups for the next rounds
 the deployed stack (the kite constants measured against the real mob
 speeds), the arrow-aware timing (a step that waits the flying shot),
 and the config launch wiring of the archer type once issue #12 lands.
-## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
-
-Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7);
-the review round 2026-09-21 ~19:52 UTC (the owner feedback on the
-first implementation).
-
-The owner ask: "Bot and npcs should not reduce their icon size even
-if they get close to each other. When bot fights and it is too
-close to enemy both icons should just touch facing each other, but
-should not change size." The review ask: a bot and a mob that meet
-too tight drifted apart SIDEWAYS (a north-south pair read west-east
-while both kept looking north-south) - the facing and the rendered
-positions must never mismatch.
-
-Design (verified against the Round 124 contact pass):
-
-- The shrink is replaced by a slide: the contact pass computes per
-  frame screen-space OFFSETS (computeContactOffsets) instead of
-  radii factors - every overlapping pair keeps both radii and
-  pushes apart along the axis that connects the two centers, so
-  the circles touch face to face with a 0.5px hair (contactGap).
-- Two Gauss-Seidel rounds over the deterministic snapshot order
-  (self first, then the sorted objects) so the offsets never
-  flicker; a cheap axis-aligned early-out guards the pair loop;
-  the per unit drift is capped at 2x its radius so a dense crowd
-  stays anchored near its true spot.
-- One new resolver (unitScreenPos) feeds every marker-anchored
-  visual - the circle body, the look tick, the name band, the
-  target rings, the combat floats and swings, the cast plate, the
-  social links, the hover hit test - so the whole unit slides
-  together. The world-anchored layers (the aggro range circles,
-  the kill marks, the walk plans) keep the true positions: they
-  are world facts, not unit plates.
-- The review round fix: the separation axis of a tight pair comes
-  from the LOOK DIRECTION, not the connecting centers. Under the
-  new contactAxisEpsilon (3px screen) the center-to-center
-  direction of a pair is packet jitter, not geometry - the old
-  code split a stacked pair on a fixed west-east fallback and a
-  sub pixel residual could aim the slide sideways, which read as
-  the icons drifting perpendicular to the facing. contactAxis
-  rotates the slide axis into the heading line of the pair (the
-  same 65536-step circle the tick renders, so the axis lives in
-  exactly the space the tick draws in), blending by the gap
-  fraction so a pair wobbling around the epsilon does not pop: a
-  pair that faces each other separates along the shared facing
-  line with each unit backing away from what it looks at, two
-  units facing the same way line up nose to tail, and the units
-  without heading data (heading 0) keep the old horizontal split.
-
-Status: the review round implementation complete, all nine web UI
-harnesses green (repro_map_render grown with the facing contact
-and the facing near contact scenarios - both fail on the pre-fix
-map.js, pinning the reported drift), the change is web only, the
-branch pushed for the PR review.
 
 Round 2 (2026-09-21 ~20:20 UTC, the kiting core slice issue #18):
 

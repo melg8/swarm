@@ -729,8 +729,10 @@ type Loop struct {
     // kiteAt paces the archer kite steps (see kite.go): one retreat
     // per period, the rest of the cycle stands and shoots.
     kiteAt time.Time
-    // kiteFor is the target the kite streak counts for: a fresh
-    // target resets the streak (kiteStreak).
+    // kiteFor is the fight the kite streak counts for (the hunt
+    // target): a fresh target resets the streak (kiteStreak). The
+    // armed threat may be a train member - the streak still counts
+    // the steps of the running fight.
     kiteFor int32
     // kiteStreak counts the consecutive kite steps of the kiteFor
     // target: past kiteStreakLimit the distance race is unwinnable
