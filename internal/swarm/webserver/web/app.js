@@ -3829,19 +3829,54 @@ function sendChatInput() {
 // messages and the social animations of the creatures around the bot,
 // oldest at the top, filtered by the active tab. The view scrolls to
 // the newest line only while the follow is stuck.
+// chatLineId is the stable identity of one chat line across the
+// snapshot re-renders: the ring serves the whole window every time,
+// and the id pins the line the user is reading (the time carries the
+// full precision of the tracker clock).
+function chatLineId(line) {
+  return line.time + "|" + line.kind + "|" + line.from + "|" +
+    line.text;
+}
+
+// chatCaptureAnchor reads the row the user is currently reading: the
+// topmost (possibly partially) visible row, its identity and its slot
+// inside the viewport. The follow state returns a null id - the next
+// render pins to the bottom.
+function chatCaptureAnchor(list) {
+  if (ChatWindow.stick) {
+    return { id: null, offset: 0, top: list.scrollTop };
+  }
+  for (const child of list.children) {
+    if (child.offsetTop + child.offsetHeight > list.scrollTop) {
+      return {
+        id: child.chatId || null,
+        offset: child.offsetTop - list.scrollTop,
+        top: list.scrollTop,
+      };
+    }
+  }
+
+  return { id: null, offset: 0, top: list.scrollTop };
+}
+
 function renderChat(snap) {
   const list = document.getElementById("chat-list");
   const lines = (snap && snap.chat) || [];
   // The rebuild collapses the content first and a real browser clamps
-  // the scrollTop of the emptied list to 0, so the reading offset of
-  // a scrolled up user must be captured before the clear and restored
-  // after the new rows are in.
-  const prevTop = list.scrollTop;
+  // the scrollTop of the emptied list to 0, so the reading position
+  // must be captured before the clear. The anchor row freezes the
+  // segment the user reads: the rows above it can drop out of the 64
+  // line ring, a raw pixel offset alone would drift with them - the
+  // scrollbar thumb still drifts up gradually as the new lines grow
+  // the content below the frozen segment.
+  const anchor = chatCaptureAnchor(list);
   list.innerHTML = "";
+  let anchorRow = null;
   for (const line of lines) {
     if (!chatTabAccepts(line.kind)) { continue; }
     const row = document.createElement("div");
     row.className = "chat-line chat-" + line.kind;
+    row.chatId = chatLineId(line);
     const time = document.createElement("span");
     time.className = "chat-time";
     time.textContent = new Date(line.time).toTimeString().slice(0, 8);
@@ -3856,16 +3891,26 @@ function renderChat(snap) {
     msg.className = "chat-msg";
     msg.textContent = line.text;
     row.append(msg);
+    if (anchor.id !== null && row.chatId === anchor.id) {
+      anchorRow = row;
+    }
     list.append(row);
   }
   if (ChatWindow.stick) {
     list.scrollTop = list.scrollHeight;
-  } else {
-    // Restore the reading offset, clamped to the content that is
-    // actually there now (a filtered tab may hold fewer lines).
-    list.scrollTop = Math.min(prevTop,
-      list.scrollHeight - list.clientHeight);
+
+    return;
   }
+  if (anchorRow) {
+    // The anchored row keeps its exact viewport slot.
+    list.scrollTop = Math.max(0, anchorRow.offsetTop - anchor.offset);
+
+    return;
+  }
+  // The anchored row left the ring or the tab filter dropped it: keep
+  // the raw reading offset, clamped to the content that is there now.
+  list.scrollTop = Math.min(anchor.top,
+    list.scrollHeight - list.clientHeight);
 }
 
 // Character status rendering on the map HUD: the map is the single source

@@ -470,15 +470,21 @@ function main() {
                 : ".chat-line missing"));
 
         // Auto scroll follows the newest line only while stuck: the
-        // default state scrolls to the bottom, a scrolled up user keeps
-        // the chosen view (the rebuild collapses the content and a real
-        // browser clamps the scrollTop of the emptied list to 0 - the
-        // render must capture and restore the offset), reaching the
-        // bottom resumes the follow.
+        // default state scrolls to the bottom, a scrolled up user
+        // freezes the read segment (the render anchors the topmost
+        // visible row and restores its exact viewport slot - the ring
+        // may drop rows above it and the view must not move), reaching
+        // the bottom resumes the follow. The rebuild collapses the
+        // content and a real browser clamps the scrollTop of the
+        // emptied list to 0 - the stub emulates that honestly.
         const scrollList = {
             scrollTop: 0, clientHeight: 300, scrollHeight: 500,
             children: [],
-            append(child) { this.children.push(child); },
+            append(child) {
+                child.offsetTop = this.children.length * 18;
+                child.offsetHeight = 18;
+                this.children.push(child);
+            },
             // The honest emulation of the browser clear: the innerHTML
             // assignment drops the children and clamps scrollTop to 0.
             set innerHTML(value) {
@@ -500,26 +506,52 @@ function main() {
         check(results, "stuck chat scrolls to the newest line",
             scrollList.scrollTop === scrollList.scrollHeight,
             "scrollTop " + scrollList.scrollTop);
+        const chatLines = (names, start) => names.map((name, i) => ({
+            time: "2026-09-06T10:00:" + String(start + i).padStart(2, "0")
+                + "Z", kind: "system", text: name
+        }));
         hud.ChatWindow.stick = false;
-        scrollList.scrollTop = 120;
-        hud.renderChat({ chat: [
-            { time: "2026-09-06T10:00:00Z", kind: "system", text: "l1" },
-            { time: "2026-09-06T10:00:01Z", kind: "system", text: "l2" }
-        ] });
+        scrollList.scrollTop = 100;
+        // No row straddles the top edge yet (one row cannot cover the
+        // offset): the raw offset restores through the clamp fallback.
+        hud.renderChat({ chat: chatLines(["l1", "l2", "l3", "l4",
+            "l5", "l6", "l7", "l8"], 0) });
         check(results,
-            "scrolled up chat keeps the offset on a re-render",
-            scrollList.scrollTop === 120,
+            "an offset below the first row restores by the clamp",
+            scrollList.scrollTop === 100,
             "scrollTop " + scrollList.scrollTop);
+        // Eight rows cover the offset now: the row straddling the top
+        // edge (l6, offset 90, cut by 10px) anchors the view.
+        hud.renderChat({ chat: chatLines(["l1", "l2", "l3", "l4",
+            "l5", "l6", "l7", "l8", "l9"], 0) });
+        check(results,
+            "the anchored row keeps its viewport slot",
+            scrollList.scrollTop === 100,
+            "scrollTop " + scrollList.scrollTop);
+        // The ring drops the two oldest lines: the pixel offset alone
+        // would drift the view up 36px, the anchor keeps l6 frozen
+        // (its new offset 54 restores the same -10px viewport slot).
+        hud.renderChat({ chat: chatLines(["l3", "l4", "l5", "l6",
+            "l7", "l8", "l9"], 2) });
+        check(results,
+            "a ring drop above the anchor never moves the view",
+            scrollList.scrollTop === 64,
+            "scrollTop " + scrollList.scrollTop + " (want 64)");
         check(results, "scrolled up chat keeps the rendered lines",
-            scrollList.children.length === 2,
+            scrollList.children.length === 7,
             "got " + scrollList.children.length + " lines");
+        // The anchored line itself left the ring: the raw offset
+        // (the view sat at 64) restores, clamped to the maximum of
+        // the current content.
+        hud.renderChat({ chat: chatLines(["l8", "l9"], 7) });
+        check(results,
+            "a dropped anchor restores the offset by the clamp",
+            scrollList.scrollTop === 64,
+            "scrollTop " + scrollList.scrollTop);
         // The lines may also shrink (a tab filter or a snapshot drop):
         // the restore clamps to the maximum offset of the new content.
         scrollList.scrollHeight = 350;
-        scrollList.scrollTop = 120;
-        hud.renderChat({ chat: [
-            { time: "2026-09-06T10:00:02Z", kind: "system", text: "l3" }
-        ] });
+        hud.renderChat({ chat: chatLines(["l9"], 8) });
         check(results, "a smaller content clamps the restored offset",
             scrollList.scrollTop === 50,
             "scrollTop " + scrollList.scrollTop + " (want 50)");

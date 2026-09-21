@@ -1084,8 +1084,11 @@ body.mode-pathfind .bot-status { display: none; }
    pitch: the content box is 190 - 2 * 1 (borders) - 2 * 6 (padding)
    = 176px, minus the pinned head (18px + 4px margin) and the pinned
    input row (24px + 4px margin) the leftover is 176 - 22 - 28 = 126px
-   = 18 * 7 exactly - seven whole chat rows, no cut-off line on top. */
+   = 18 * 7 exactly - seven whole chat rows, no cut-off line on top.
+   The relative positioning makes the row offsetTop list relative -
+   the scroll anchor math of renderChat reads it. */
 .chat-list {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
