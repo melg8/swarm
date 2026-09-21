@@ -20,6 +20,12 @@ import (
 
 var errInjected = errors.New("injected write failure")
 
+// packetBuilder is the minimal contract the failure walk needs: any
+// builder that serializes itself through the packet writer.
+type packetBuilder interface {
+    ToBytes(writer *packet.Writer) error
+}
+
 // TestEveryAuthBuilderPropagatesTheArmedWriteFailure walks the four
 // auth builders: at every arm position the injected error must
 // surface from ToBytes, and the walk ends on the first clean pass
@@ -27,20 +33,18 @@ var errInjected = errors.New("injected write failure")
 func TestEveryAuthBuilderPropagatesTheArmedWriteFailure(t *testing.T) {
     builders := []struct {
         name  string
-        build func() interface {
-            ToBytes(writer *packet.Writer) error
-        }
+        build func() packetBuilder
     }{
-        {"RequestAuthLogin", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestAuthLogin", func() packetBuilder {
             return &RequestAuthLogin{Account: "unittest1", Password: "pw"}
         }},
-        {"RequestGGAuth", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestGGAuth", func() packetBuilder {
             return NewDefaultRequestGGAuth(0x11223344)
         }},
-        {"RequestServerList", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestServerList", func() packetBuilder {
             return NewRequestServerList(1, 2)
         }},
-        {"RequestServerLogin", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestServerLogin", func() packetBuilder {
             return &RequestServerLogin{LoginOkID1: 1, LoginOkID2: 2,
                 ServerID: 1}
         }},

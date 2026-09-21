@@ -21,90 +21,80 @@ import (
 
 var errInjected = errors.New("injected write failure")
 
+// packetBuilder is the minimal contract the failure walk needs: any
+// builder that serializes itself through the packet writer.
+type packetBuilder interface {
+    ToBytes(writer *packet.Writer) error
+}
+
 // builder pairs a packet builder with the wire name the failure test
 // reports.
 type builder struct {
     name  string
-    build func() interface {
-        ToBytes(writer *packet.Writer) error
-    }
+    build func() packetBuilder
 }
 
 // allBuilders enumerates every request builder of the package (the
 // struct literals cover the ones without a constructor).
 func allBuilders() []builder {
     return []builder{
-        {"ProtocolVersion", func() interface{ ToBytes(writer *packet.Writer) error } {
-            return &ProtocolVersion{}
-        }},
-        {"AuthLogin", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"ProtocolVersion", func() packetBuilder { return &ProtocolVersion{} }},
+        {"AuthLogin", func() packetBuilder {
             return &AuthLogin{Login: "unittest1", PlayOkID1: 1,
                 PlayOkID2: 2, LoginOkID1: 3, LoginOkID2: 4}
         }},
-        {"CharacterCreate", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"CharacterCreate", func() packetBuilder {
             return &CharacterCreate{Name: "name"}
         }},
-        {"CharacterSelect", func() interface{ ToBytes(writer *packet.Writer) error } {
-            return &CharacterSelect{}
-        }},
-        {"EnterWorld", func() interface{ ToBytes(writer *packet.Writer) error } {
-            return &EnterWorld{}
-        }},
-        {"RequestNetPing", func() interface{ ToBytes(writer *packet.Writer) error } {
-            return &RequestNetPing{}
-        }},
-        {"Logout", func() interface{ ToBytes(writer *packet.Writer) error } {
-            return &Logout{}
-        }},
-        {"AttackRequest", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"CharacterSelect", func() packetBuilder { return &CharacterSelect{} }},
+        {"EnterWorld", func() packetBuilder { return &EnterWorld{} }},
+        {"RequestNetPing", func() packetBuilder { return &RequestNetPing{} }},
+        {"Logout", func() packetBuilder { return &Logout{} }},
+        {"AttackRequest", func() packetBuilder {
             return NewAttackRequestPacket()
         }},
-        {"ActionRequest", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"ActionRequest", func() packetBuilder {
             return NewActionRequestPacket()
         }},
-        {"RequestDestroyItem", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestDestroyItem", func() packetBuilder {
             return NewRequestDestroyItem()
         }},
-        {"Appearing", func() interface{ ToBytes(writer *packet.Writer) error } {
-            return NewAppearingPacket()
-        }},
-        {"RequestUseItem", func() interface{ ToBytes(writer *packet.Writer) error } {
-            return NewRequestUseItem()
-        }},
-        {"RequestDropItem", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"Appearing", func() packetBuilder { return NewAppearingPacket() }},
+        {"RequestUseItem", func() packetBuilder { return NewRequestUseItem() }},
+        {"RequestDropItem", func() packetBuilder {
             return NewRequestDropItem()
         }},
-        {"MoveToLocation", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"MoveToLocation", func() packetBuilder {
             return NewMoveToLocationRequestPacket()
         }},
-        {"RequestAcquireSkill", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestAcquireSkill", func() packetBuilder {
             return NewRequestAcquireSkillPacket()
         }},
-        {"RequestActionUse", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestActionUse", func() packetBuilder {
             return NewRequestActionUsePacket()
         }},
-        {"RequestBuyItem", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestBuyItem", func() packetBuilder {
             return NewRequestBuyItemPacket()
         }},
-        {"RequestBypassToServer", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestBypassToServer", func() packetBuilder {
             return &RequestBypassToServer{Command: "player_help"}
         }},
-        {"RequestMagicSkillUse", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestMagicSkillUse", func() packetBuilder {
             return NewRequestMagicSkillUsePacket()
         }},
-        {"RequestRestartPoint", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestRestartPoint", func() packetBuilder {
             return NewRequestRestartPointPacket()
         }},
-        {"RequestSellItem", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"RequestSellItem", func() packetBuilder {
             return NewRequestSellItemPacket()
         }},
-        {"Say", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"Say", func() packetBuilder {
             return NewSay("hello", SayChannelGeneral)
         }},
-        {"ValidatePosition", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"ValidatePosition", func() packetBuilder {
             return NewValidatePositionPacket()
         }},
-        {"ChangeMoveType", func() interface{ ToBytes(writer *packet.Writer) error } {
+        {"ChangeMoveType", func() packetBuilder {
             return NewChangeMoveTypePacket()
         }},
     }
