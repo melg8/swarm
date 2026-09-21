@@ -3726,7 +3726,10 @@ const MapView = {
   // with a bow in hand: the snapshot inventory marks the paperdoll
   // items with equipped and the bows carry the BOW weapon type (the
   // same fields the gear widget reads). A snapshot without the
-  // inventory field reads as bare handed - the melee path.
+  // inventory field reads as bare handed - the melee path. The read
+  // is one snapshot stale (the combat events ingest before the
+  // snapshot lands), so the first shot right after the equip renders
+  // as a swing - a cosmetic one event lag.
   selfBowEquipped() {
     const items = this.lastSnap && this.lastSnap.inventory;
     if (!Array.isArray(items)) { return false; }
@@ -3877,14 +3880,16 @@ const MapView = {
   },
 
   // updateCastIconSide picks the side the cast icon hangs on from
-  // the enemy mass: the mean screen dx of the visible hostiles moves
-  // the icon to the side AWAY from the fight (the fight floats and
-  // the combat labels crowd the enemy side). Without hostiles or
-  // inside the dead band the previous side survives, so a scattered
-  // pack never flips the icon from frame to frame.
+  // the nearest hostile: the screen dx of the closest living
+  // attackable object moves the icon to the side AWAY from the fight
+  // (the fight floats and the combat labels crowd the enemy side).
+  // The nearest fight decides - a distant pack must never outvote
+  // the mob the character stands against - and inside the dead band
+  // the previous side survives, so a crossing mob does not flip the
+  // icon from frame to frame.
   updateCastIconSide(p) {
-    let sum = 0;
-    let count = 0;
+    let nearestDx = 0;
+    let nearestD2 = Infinity;
     for (const obj of this.sortedObjects) {
       if (!obj.attackable || obj.dead) { continue; }
       // The interpolated position source of drawObjects: the moving
@@ -3892,13 +3897,16 @@ const MapView = {
       const rt = this.runtime.get(obj.objectId);
       const s = this.worldToScreen(
         rt ? rt.drawX : obj.x, rt ? rt.drawY : obj.y);
-      sum += s.x - p.x;
-      count += 1;
+      const dx = s.x - p.x;
+      const d2 = dx * dx + (s.y - p.y) * (s.y - p.y);
+      if (d2 < nearestD2) {
+        nearestD2 = d2;
+        nearestDx = dx;
+      }
     }
-    if (count === 0) { return; }
-    const meanDx = sum / count;
-    if (Math.abs(meanDx) <= 10) { return; }
-    this.castIconSide = meanDx > 0 ? -1 : 1;
+    if (nearestD2 === Infinity) { return; }
+    if (Math.abs(nearestDx) <= 10) { return; }
+    this.castIconSide = nearestDx > 0 ? -1 : 1;
   },
 
   // drawSelfCast draws the cast icon beside the character while it
@@ -3932,14 +3940,17 @@ const MapView = {
     const size = Math.max(14, Math.min(30, 17 * k));
     const progress = Math.max(0, Math.min(1,
       1 - (this.selfCast.endsAt - nowMs) / this.selfCast.totalMs));
-    // The plate center rides the marker side: the inner edge lands
-    // selfRadius + 5k from the center, clearing the pulse ring. The
-    // vertical centering on the marker clears the name band (the
-    // band bottom sits at selfRadius + 4 above the center; the
-    // worst case at the smallest zoom touches the band padding, not
-    // the glyphs).
+    // The plate center rides the marker side, dropped below the
+    // combat float lane: the damage floats spawn 8k above the center
+    // and rise, so a plate centered on the marker shared its first
+    // frames with the number. The vertical dodge keeps the plate out
+    // of both lanes (taken flies left, dealt flies right) at every
+    // zoom; the name band above stays clear the same way. The inner
+    // edge lands selfRadius + 5k from the center, clearing the pulse
+    // ring while the marker is not contact-shrunk.
+    const dodgeY = 10 * k;
     const x = pos.x + side * (selfRadius + 5 * k + size / 2) - size / 2;
-    const y = pos.y - size / 2;
+    const y = pos.y + dodgeY - size / 2;
     ctx.save();
     // The dotted connector from the marker edge to the plate: the
     // attachment read while the icon hangs beside the character.
@@ -3949,7 +3960,8 @@ const MapView = {
     ctx.setLineDash([2, 2]);
     ctx.beginPath();
     ctx.moveTo(pos.x + side * (selfRadius + 1), pos.y);
-    ctx.lineTo(pos.x + side * (selfRadius + 5 * k - 1), pos.y);
+    ctx.lineTo(pos.x + side * (selfRadius + 5 * k - 1),
+      pos.y + dodgeY);
     ctx.stroke();
     ctx.setLineDash([]);
     // The dim plate with the icon (or the plain fallback).
@@ -3989,17 +4001,21 @@ const MapView = {
     ctx.strokeRect(x, y, size, size);
     // The cast ring inside the marker circle: the faint track plus
     // the bright progress arc sweeping clockwise from the top - the
-    // circle fills rotationally while the cast runs.
+    // circle fills rotationally while the cast runs. The radius
+    // follows the drawn marker, whose contact shrink the raw
+    // selfMarkerUnits math would ignore.
+    const ringR = Math.max(2 * k, this.contactRadiusOf("self",
+      selfMarkerUnits * k) - 2 * k);
     ctx.strokeStyle = "#7cc4ff";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.globalAlpha = 0.25;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, selfRadius - 2 * k, 0, Math.PI * 2);
+    ctx.arc(pos.x, pos.y, ringR, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 0.9;
     ctx.beginPath();
-    ctx.arc(pos.x, pos.y, selfRadius - 2 * k,
+    ctx.arc(pos.x, pos.y, ringR,
       -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
     ctx.stroke();
     ctx.restore();

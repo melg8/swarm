@@ -113,3 +113,32 @@ func TestUserAttackBowFightInsideWeaponRangeStaysQuiet(t *testing.T) {
     require.Len(t, game.forces, 1,
         "a running bow fight must not re-request the attack")
 }
+
+// The radius pick rides the weapon in hand: a bagged (unequipped)
+// bow keeps the melee radii, an equipped bow switches both the
+// engage and the stall boundary to the ranged values.
+func TestEngageRadiiPickByTheWeaponInHand(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+
+    require.InDelta(t, userEngageRadius, loop.engageRadiusFor(), 0.0001,
+        "a bare handed character engages at the melee distance")
+    require.InDelta(t, userEngageRadius, loop.stallRadiusFor(), 0.0001,
+        "a bare handed character stalls at the melee boundary")
+
+    // A bow in the bag changes nothing: only the paperdoll counts.
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 98, ItemID: 13, Equipped: false, Change: 1},
+    })
+    require.InDelta(t, userEngageRadius, loop.engageRadiusFor(), 0.0001,
+        "a bagged bow must not move the engage distance")
+
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: true, Change: 1},
+    })
+    require.InDelta(t, userBowEngageRadius, loop.engageRadiusFor(), 0.0001,
+        "an equipped bow engages at the weapon range")
+    require.InDelta(t, userBowStallRadius, loop.stallRadiusFor(), 0.0001,
+        "an equipped bow stalls beyond the weapon range")
+}

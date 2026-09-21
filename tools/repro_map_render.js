@@ -650,14 +650,18 @@ function runScenarioCastIcon(mapFile) {
         "ring sweeps: "
         + ring.map((s) => sweepOf(s).toFixed(2)).join(", "));
 
-    // The enemy mass moves the icon: a hostile west of the character
-    // pulls the mean hostile dx negative and the plate to the RIGHT
-    // side, a hostile pack east pulls it back to the LEFT (away from
-    // the fight floats and the combat labels).
+    // The enemy mass moves the icon: the NEAREST hostile decides the
+    // side (a hostile west of the character pulls the plate to the
+    // RIGHT side, a hostile pack east pulls it back to the LEFT -
+    // away from the fight floats and the combat labels). The swap
+    // rounds strip the base hostiles so the injected fight is the
+    // decisive nearest one.
     const injectHostile = (objectId, x) => {
         const next = buildSnapshot(0, false);
         next.skills = snap.skills;
         next.skillStates = snap.skillStates;
+        next.objects = next.objects.filter(
+            (obj) => !obj.attackable || obj.dead);
         next.objects.push({
             objectId, kind: "npc", name: "Orc", x, y: WORLD.self.y,
             z: -3500, heading: 0, moving: false, speed: 0, targetId: 0,
@@ -691,9 +695,9 @@ function runScenarioCastIcon(mapFile) {
         dash.length === 2 && dash[0] === 2 && dash[1] === 2);
     const linked = [
         { from: { x: self.x + 7, y: self.y },
-          to: { x: self.x + 10, y: self.y } },
+          to: { x: self.x + 10, y: self.y + 10 } },
         { from: { x: self.x - 7, y: self.y },
-          to: { x: self.x - 10, y: self.y } }
+          to: { x: self.x - 10, y: self.y + 10 } }
     ].some((side) =>
         findSegment(record, side.from, side.to, "#7cc4ff").length > 0);
     check(results, "the cast connector draws dashed to the marker",

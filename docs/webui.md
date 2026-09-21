@@ -437,9 +437,15 @@ colored streak runs from the attacker to the hit target, light blue
 for the own attacks, red for the mob ones, with a windup swoosh at
 the attacker and a white impact starburst on the target; the packet
 carries the Mobius miss flag per hit and an evaded blow records a
-`miss` event instead, drawn as a plain gray white "Miss" float on the
-unit the blow was thrown at (no streak, no flash ring - nothing
-landed); every `StatusUpdate` HP drop floats a damage number above
+`miss` event instead, drawn as a plain gray white "Miss" float on
+the unit the blow was thrown at (no streak, no flash ring - nothing
+landed). A dealt swing of a character wearing a bow renders as a
+projectile instead: a 500 ms eased arrow with a short trail flies
+from the shooter to the target and flashes on arrival (the server
+broadcasts the Attack packet at the wind-up start, the damage
+numbers land after the full bow wind-up, so the arrow is the
+immediate read of the shot; the equipped-weapon read is one
+snapshot stale). Every `StatusUpdate` HP drop floats a damage number above
 the hurt unit (amber on mobs, red on the character) with a flash ring
 under it. The floats split by sides: the hits the character takes
 float to the LEFT of the fight, the damage it deals and its misses to

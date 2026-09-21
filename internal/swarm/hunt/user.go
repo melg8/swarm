@@ -898,6 +898,30 @@ func (l *Loop) publishedSegmentSearch() *state.WalkSearch {
     return l.segmentSearch
 }
 
+// engageRadiusFor picks the approach distance of an attack request
+// by the weapon in hand: a bow user shoots from the weapon range
+// (the Mobius bow attack range is ~500 units), a melee fighter
+// closes to the swing distance.
+func (l *Loop) engageRadiusFor() float64 {
+    if l.bowEquipped() {
+        return userBowEngageRadius
+    }
+
+    return userEngageRadius
+}
+
+// stallRadiusFor picks the chase stall boundary by the weapon in
+// hand: a bow fight stands and shoots inside the weapon range and
+// closes no chase distance while doing it, which is progress, not a
+// stalled chase.
+func (l *Loop) stallRadiusFor() float64 {
+    if l.bowEquipped() {
+        return userBowStallRadius
+    }
+
+    return userEngageRadius
+}
+
 // bowEquipped reports whether the paperdoll weapon is a bow: a bow
 // user engages and fights at the weapon range, not at the melee
 // distance, so the attack order and the chase stall watchdog use the
@@ -964,13 +988,9 @@ func (l *Loop) tickUserAttack(now time.Time) {
     dist := math.Hypot(float64(x-selfX), float64(y-selfY))
     // A bow in hand shoots from the weapon range: the forced request
     // starts the shot immediately, the melee distance walk would only
-    // delay it (the Mobius bow attack range is ~500 units).
-    engageRadius := userEngageRadius
-    stallRadius := userEngageRadius
-    if l.bowEquipped() {
-        engageRadius = userBowEngageRadius
-        stallRadius = userBowStallRadius
-    }
+    // delay it (see the userBow radii).
+    engageRadius := l.engageRadiusFor()
+    stallRadius := l.stallRadiusFor()
     fighting := l.tracker.SelfFighting(l.userTarget)
     if fighting || l.tracker.SelfWalking() {
         // A running fight or walk refreshes the manual deadline: a

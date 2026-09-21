@@ -254,7 +254,10 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
     if !ok {
         return errors.New("no self position for the fight")
     }
-    if math.Hypot(float64(x-selfX), float64(y-selfY)) > userEngageRadius {
+    // The weapon in hand picks the engage distance: a bow user
+    // shoots from the weapon range, the melee walk would only delay
+    // the shot (see engageRadiusFor).
+    if math.Hypot(float64(x-selfX), float64(y-selfY)) > l.engageRadiusFor() {
         if time.Since(l.questWalkAt) < walkRequestPeriod {
             return nil
         }

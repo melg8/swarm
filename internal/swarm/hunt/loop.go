@@ -2136,11 +2136,8 @@ func (l *Loop) engage() {
                     float64(x-selfX), float64(y-selfY))
                 // A bow fight stands and shoots inside the weapon
                 // range: the stall watchdog only owns the stretches
-                // beyond it (see the userBow radii).
-                stallRadius := userEngageRadius
-                if l.bowEquipped() {
-                    stallRadius = userBowStallRadius
-                }
+                // beyond it (see stallRadiusFor).
+                stallRadius := l.stallRadiusFor()
                 if dist > stallRadius &&
                     !l.lureArmed() &&
                     !l.chaseProgress(
