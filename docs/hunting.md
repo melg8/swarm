@@ -89,6 +89,27 @@ would have paid for.
   (RequestRestartPoint 0x6D type 0, GameClient.RestartAtVillage,
   retried every 5 s until the server revives it) so a 24/7 session
   survives a death.
+- **The self heal recovery (hunt/recovery_heal.go)**: a character
+  that knows an instant self heal (npcdata.SelfHealSkill - the
+  verified C1 SELF target Heal skills: Divine Heal 45, Elemental
+  Heal 58, Self Heal 1216) casts it instead of sitting down while
+  the mana pays the cost, the local reuse window is clear and no
+  blow is landing (SelfUnderAttack). The cast recovers the chunk of
+  the bar in one hit time where the sitting regeneration grinds for
+  half a minute, and a standing character keeps the flee option the
+  sit gives up. The verified server refusals shape the flow
+  (Mobius C1 Player.useMagic L7537 and Player.sitDown L2383): a
+  sitting character cannot cast, so the deep rest (below the sit
+  threshold) stands up first and casts on the next window; a
+  casting character cannot sit, so the sit transition waits the
+  heal flight (hit time plus a 1 s margin) out instead of bouncing
+  off the server. The mana rest of the mystic is untouched - a dry
+  caster needs the sitting mana regeneration, a heal only spends
+  it - and the post relogin settle needs no heal branch: a cast is
+  one of the five packets that burn the spawn protection (see
+  settle.go), so while aggressive mobs stand in reach the settle
+  keeps sitting, and once the ground is clear the settle ends and
+  this flow owns the recovery.
 - The nearest target ranking uses the projected current positions of
   moving npcs (state.projectedPosition), not the stale movement packet
   starts. The hunt chain behavior is covered by
@@ -151,6 +172,32 @@ would have paid for.
   leaves the square); a target one swing from dead is finished
   instead. A hurt character under attack keeps fleeing instead of
   standing in the blows.
+- **The overhit finishing blow (hunt/combat_skills.go)**: the bot
+  farms the server overhit experience bonus deliberately. The
+  verified mechanic (Mobius C1): a skill whose stats carry
+  `<overHit>true</overHit>` arms the overhit flag on its attackable
+  target when the cast resolves (Creature.callSkill L6043); the
+  flag is consumed by the FIRST damage event after it, and only a
+  killing blow pays - any non lethal hit clears it
+  (AttackableStatus.reduceHp L40). The bonus is
+  `exp * min(overkillDamage / mobMaxHp, 0.25)`
+  (Attackable.calculateOverhitExp L1480), capped at +25 percent of
+  the base share, and the killer must be the player character
+  itself (summon kills pay nothing). The overhit skill set lives in
+  npcdata.OverhitSkill (21 verified C1 skills; the deployment
+  classes meet Power Strike 3 and Power Shot 56). The combat cast
+  therefore holds the flagged strike while the target stands above
+  the 40 percent finish window (`overhitFinishPercent`) and fires
+  it once the bar drops into it: in the low level band one melee
+  swing takes 25-45 percent of the mob bar, so the cast lands while
+  the bar still holds a skill's worth of damage - the strike kills
+  and the overkill reaches the cap, and the trash that dies inside
+  one swing never opens the window (the strike stays sheathed, the
+  mana is saved). An "Over-hit!" system message (id 361) confirms a
+  landed overhit on the wire. The follow up: a skill damage
+  estimate from the observed swing damage would let the bot open
+  the very small bars (one autoattack swing away from death) with
+  the cast at full health for the same capped bonus.
 - Two triggers end the session: critical health (12%) under attack, or
   a social pile up - two or more living attackable mobs holding the
   character as their target (`SelfAttackerCount`; a chasing mob

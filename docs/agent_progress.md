@@ -3068,8 +3068,36 @@ reset with it). Two combat behavior features:
    it ends on a clear ground and hands the recovery to the rest
    flow, and a heal cast would burn the spawn protection it holds.
 
-Status: the research round is done (two Explore agents: the Mobius
-overhit flow with line references, the hunt code map with the
-insertion points). Implementation next: npcdata skill sets, the
-combat_skills.go hold gate, the recovery heal in loop_actions.go,
-tests beside combat_skills_test.go, docs/hunting.md sections.
+Status: implemented and pushed as melg8 (8b96cce):
+
+- `npcdata/skill_flags.go`: the hand-verified flag sets -
+  OverhitSkill (21 C1 ids with the source line trail) and
+  SelfHealSkill (45, 58, 1216).
+- `hunt/combat_skills.go`: the overhit hold gate inside
+  maybeCastCombatSkill (the strike waits under the 40 percent
+  finish window, targetAboveOverhitWindow holds on unknown vitals),
+  the finishing blow log line.
+- `hunt/recovery_heal.go` + the rest() integration
+  (loop_actions.go restToggleTo split out for the funlen gate):
+  heal instead of sit while the mana pays, reuse clear, no blows
+  landing; the sitting character stands to cast; the sit waits out
+  the heal flight (the server refuses "Cannot sit while casting");
+  the mystic mana rest and the spawn settle untouched by design.
+- Tests: overhit_test.go (hold healthy/unknown, release + log
+  naming, the unflagged spell unaffected), recovery_heal_test.go
+  (replace, flight wait, no mana, reuse, stand to cast, under
+  attack, mystic mana rest, no skill regression), the two fight
+  fixtures gained mob vitals (the hold changes the fight start
+  behavior). hunt/connection/state/npcdata suites green,
+  lint --new clean.
+- docs/hunting.md: the self heal recovery bullet and the overhit
+  finishing blow section (the verified mechanic with the source
+  lines, the 40 percent window rationale, the follow up damage
+  estimate idea).
+
+Observed: the connection suite failed once in a parallel combined
+run right after "Sent enter world request" and passed twice since
+(isolated and combined) - a load flake, watch it, no ledger row
+until it repeats.
+
+Next: the fresh context review round, then the session close.
