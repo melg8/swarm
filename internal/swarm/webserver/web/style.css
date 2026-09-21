@@ -1899,6 +1899,9 @@ body.mode-pathfind .gear-panel { display: none; }
    change. */
 .gear-main.mode-skills #gear-view { visibility: hidden; }
 
+.gear-main.mode-quest #gear-view,
+.gear-main.mode-skills #quest-view { visibility: hidden; }
+
 /* The overlay paints above every gear child: the paperdoll icons,
    glyphs and badges carry positive z-index values (1..3) that would
    otherwise bleed through a z-index auto sibling - the tab switch
@@ -1913,7 +1916,39 @@ body.mode-pathfind .gear-panel { display: none; }
   z-index: 4;
 }
 
+/* The quest tab overlay: the same overlay contract as the skills
+   view, the grid reuses the bag cell metrics. */
+.quest-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  overflow: hidden;
+  z-index: 4;
+}
+
+.quest-note {
+  color: var(--text-dim);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quest-grid { flex: 1; min-height: 0; }
+
+.quest-view .skill-empty {
+  position: absolute;
+  inset: auto 0 0 0;
+  text-align: center;
+  color: var(--text-dim);
+  padding: 8px 0;
+}
+
 .skills-view.hidden { display: none; }
+
+.quest-view.hidden { display: none; }
 
 /* The ACTIVE / PASSIVE filter row of the learned list, the same
    chrome height as the INVENTORY title row it replaces. */

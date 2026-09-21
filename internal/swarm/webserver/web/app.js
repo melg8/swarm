@@ -520,6 +520,7 @@ function renderSnapshot() {
   renderHUD(snap);
   renderTarget(snap);
   renderGear(snap);
+  renderQuest(snap);
   renderShopping(snap);
   renderSkills(snap);
   renderSkillQueue(snap);
@@ -1639,6 +1640,80 @@ function renderGear(snap) {
   renderGearFoot(snap);
 }
 
+// ---- quest items tab ----
+
+// QuestCells is the keyed cell registry of the quest item grid: one
+// persistent record per object id, separate from the bag registry
+// (the same quest item lives in the bag too and one element cannot
+// sit in two grids at once - appendChild would move it out of the
+// bag).
+const QuestCells = {
+  inv: new Map(),
+  order: ""
+};
+
+// isQuestItem reports whether the inventory item belongs to the quest
+// family (the type2 value 3 of the Mobius item packets).
+function isQuestItem(item) {
+  return Boolean(item) && item.type2 === 3;
+}
+
+// renderQuest refreshes the quest tab of the equipment widget: the
+// keyed grid shows only the type2 quest items of the inventory, the
+// tab badge carries their count. The bag keeps showing them too (the
+// trash and the drop flows work from it), the tab answers the
+// "what does my character carry for the running quests" question at
+// one glance.
+function renderQuest(snap) {
+  const grid = document.getElementById("quest-grid");
+  const badge = document.getElementById("gear-mode-quest-badge");
+  if (!grid) { return; }
+
+  const questItems = (snap.inventory || []).filter(isQuestItem);
+  if (badge) {
+    badge.textContent = String(questItems.length);
+    badge.classList.toggle("hidden", questItems.length === 0);
+  }
+
+  const order = [];
+  const seen = new Set();
+  for (const item of questItems) {
+    seen.add(item.objectId);
+    order.push(item.objectId);
+    let record = QuestCells.inv.get(item.objectId);
+    if (!record) {
+      record = makeCellRecord("inv-cell", null);
+      QuestCells.inv.set(item.objectId, record);
+    }
+    applyItemCell(record, item);
+    grid.append(record.cell);
+  }
+  for (const [id, record] of Array.from(QuestCells.inv)) {
+    if (!seen.has(id)) {
+      if (TooltipState.cell === record.cell) { hideItemTooltip(); }
+      record.cell.remove();
+      QuestCells.inv.delete(id);
+    }
+  }
+  const orderSig = order.join(",");
+  if (QuestCells.order !== orderSig) {
+    QuestCells.order = orderSig;
+    for (const id of order) {
+      const record = QuestCells.inv.get(id);
+      if (record) { grid.append(record.cell); }
+    }
+  }
+
+  const count = document.getElementById("quest-count");
+  if (count) {
+    count.textContent = String(questItems.length);
+  }
+  const empty = document.getElementById("quest-empty");
+  if (empty) {
+    empty.classList.toggle("hidden", questItems.length !== 0);
+  }
+}
+
 // ---- weight gauge coloring ----
 
 // The weight penalty thresholds of the Mobius C1 server (Player
@@ -2252,12 +2327,18 @@ const SKILL_CATEGORY_LABELS = ["attack power", "defense", "other"];
 function initGearMode() {
   const equipBtn = document.getElementById("gear-mode-equip");
   const skillsBtn = document.getElementById("gear-mode-skills");
+  const questBtn = document.getElementById("gear-mode-quest");
   if (equipBtn && skillsBtn) {
     equipBtn.addEventListener("click", () => {
       setGearMode("gear");
     });
     skillsBtn.addEventListener("click", () => {
       setGearMode("skills");
+    });
+  }
+  if (questBtn) {
+    questBtn.addEventListener("click", () => {
+      setGearMode("quest");
     });
   }
   const activeBtn = document.getElementById("skill-tab-active");
@@ -2272,7 +2353,9 @@ function initGearMode() {
   }
   try {
     const storedMode = window.localStorage.getItem("swarm.gearMode");
-    if (storedMode === "skills") { GearMode.mode = "skills"; }
+    if (storedMode === "skills" || storedMode === "quest") {
+      GearMode.mode = storedMode;
+    }
     const storedFilter = window.localStorage.getItem("swarm.skillFilter");
     if (storedFilter === "passive") { GearMode.filter = "passive"; }
   } catch (err) { /* storage unavailable - defaults stay */ }
@@ -2332,22 +2415,33 @@ function applyGearMode() {
   const main = document.getElementById("gear-main");
   const equipBtn = document.getElementById("gear-mode-equip");
   const skillsBtn = document.getElementById("gear-mode-skills");
+  const questBtn = document.getElementById("gear-mode-quest");
   const skillsView = document.getElementById("skills-view");
+  const questView = document.getElementById("quest-view");
   if (main) {
     main.classList.toggle("mode-skills", GearMode.mode === "skills");
+    main.classList.toggle("mode-quest", GearMode.mode === "quest");
   }
   if (equipBtn) {
-    equipBtn.classList.toggle("active", GearMode.mode !== "skills");
+    equipBtn.classList.toggle("active", GearMode.mode === "gear");
     equipBtn.setAttribute("aria-selected",
-      GearMode.mode !== "skills" ? "true" : "false");
+      GearMode.mode === "gear" ? "true" : "false");
   }
   if (skillsBtn) {
     skillsBtn.classList.toggle("active", GearMode.mode === "skills");
     skillsBtn.setAttribute("aria-selected",
       GearMode.mode === "skills" ? "true" : "false");
   }
+  if (questBtn) {
+    questBtn.classList.toggle("active", GearMode.mode === "quest");
+    questBtn.setAttribute("aria-selected",
+      GearMode.mode === "quest" ? "true" : "false");
+  }
   if (skillsView) {
     skillsView.classList.toggle("hidden", GearMode.mode !== "skills");
+  }
+  if (questView) {
+    questView.classList.toggle("hidden", GearMode.mode !== "quest");
   }
   const activeBtn = document.getElementById("skill-tab-active");
   const passiveBtn = document.getElementById("skill-tab-passive");

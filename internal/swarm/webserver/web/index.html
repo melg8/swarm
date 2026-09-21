@@ -311,6 +311,13 @@ SPDX-License-Identifier: MIT
                 <span id="gear-mode-skill-badge"
                   class="gear-mode-badge hidden"></span>
               </button>
+              <button id="gear-mode-quest" class="gear-mode-btn"
+                type="button" role="tab" aria-selected="false"
+                title="the quest items of the inventory">
+                QUEST
+                <span id="gear-mode-quest-badge"
+                  class="gear-mode-badge hidden"></span>
+              </button>
             </div>
             <div id="gear-main" class="gear-main">
               <div id="gear-view" class="gear-view">
@@ -368,6 +375,18 @@ SPDX-License-Identifier: MIT
                     <b id="skill-next" class="skill-next-val">—</b>
                   </div>
                 </div>
+              </div>
+              <div id="quest-view" class="quest-view hidden"
+                title="the quest items of the inventory">
+                <div class="skill-filter" role="tablist"
+                  aria-label="quest item header">
+                  <span class="skill-count" id="quest-count">0</span>
+                  <span class="quest-note">quest items carry the
+                    progress of the running quests</span>
+                </div>
+                <div id="quest-grid" class="inv-grid quest-grid"></div>
+                <div id="quest-empty" class="skill-empty hidden">no quest
+                  items yet</div>
               </div>
             </div>
             <button id="shop-tab" class="shop-tab hidden" type="button"

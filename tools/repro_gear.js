@@ -208,6 +208,10 @@ function loadAppJs(appFile) {
         "globalThis.__gear = {" +
         " renderGear: typeof renderGear === 'function'" +
         " ? renderGear : undefined," +
+        " renderQuest: typeof renderQuest === 'function'" +
+        " ? renderQuest : undefined," +
+        " isQuestItem: typeof isQuestItem === 'function'" +
+        " ? isQuestItem : undefined," +
         " assignPaperdoll: typeof assignPaperdoll === 'function'" +
         " ? assignPaperdoll : undefined," +
         " dropItemOnMap: typeof dropItemOnMap === 'function'" +
@@ -2056,6 +2060,87 @@ function main() {
         css.includes(".buffs-panel.view-icons") &&
         css.includes(".buffs-panel.view-list"),
         "the view rules are missing");
+
+    // The quest items tab: the third mode button shows only the type2
+    // quest family items in its own keyed grid, the tab badge carries
+    // the count, the empty note covers the empty state, and the bag
+    // keeps its own cells (one element cannot sit in two grids).
+    if (typeof gear.renderQuest !== "function"
+        || typeof gear.isQuestItem !== "function") {
+        check(results, "the quest tab renders the quest items", false,
+            "renderQuest/isQuestItem missing from app.js");
+    } else {
+        check(results, "the quest family filter follows the type2 id",
+            gear.isQuestItem({ type2: 3 })
+            && !gear.isQuestItem({ type2: 0 })
+            && !gear.isQuestItem(null),
+            "the filter is not the type2 === 3 pin");
+
+        sandbox.document.getElementById("quest-view");
+        sandbox.document.getElementById("quest-grid");
+        sandbox.document.getElementById("gear-mode-quest-badge");
+        sandbox.document.getElementById("quest-empty");
+        const questView = elements.get("quest-view");
+        const questGrid = elements.get("quest-grid");
+        const questBadge = elements.get("gear-mode-quest-badge");
+        const questEmpty = elements.get("quest-empty");
+        const questInv = [
+            item(1, 0, false),
+            item(2, 0, false, { type2: 3, name: "Bone Fragment" }),
+            item(3, 0, false, { type2: 3, name: "Plague Dust" })
+        ];
+        gear.renderQuest(gearSnapshot(questInv, 3));
+        check(results, "the quest grid keeps only the quest items",
+            questGrid.children.length === 2 &&
+            findImg(questGrid, 2) !== null &&
+            findImg(questGrid, 3) !== null &&
+            findImg(questGrid, 1) === null,
+            "grid cells: " + questGrid.children.length);
+        check(results, "the quest tab badge carries the quest count",
+            questBadge.textContent === "2" &&
+            !questBadge.classList.contains("hidden"),
+            "badge: " + questBadge.textContent);
+        check(results, "the quest empty note hides with items",
+            questEmpty.classList.contains("hidden"),
+            "the empty note showed with items present");
+
+        gear.renderQuest(gearSnapshot([item(1, 0, false)], 1));
+        check(results, "the quest grid drops the consumed quest items",
+            questGrid.children.length === 0,
+            "grid cells: " + questGrid.children.length);
+        check(results, "the quest tab badge empties with the items",
+            questBadge.textContent === "0" &&
+            questBadge.classList.contains("hidden"),
+            "badge: " + questBadge.textContent);
+        check(results, "the quest empty note covers the empty state",
+            !questEmpty.classList.contains("hidden"),
+            "the empty note stayed hidden");
+
+        // The mode switch: the quest overlay replaces the gear
+        // content and the markup pins the third tab.
+        gear.setGearMode("quest");
+        const questMain = elements.get("gear-main");
+        check(results, "the quest mode shows the quest overlay",
+            questMain.classList.contains("mode-quest") &&
+            !questView.classList.contains("hidden") &&
+            !questMain.classList.contains("mode-skills"),
+            "the mode switch did not toggle the quest overlay");
+        check(results, "the quest tab markup carries the badge span",
+            html.includes('id="gear-mode-quest"') &&
+            html.includes('id="gear-mode-quest-badge"') &&
+            html.includes('id="quest-grid"'),
+            "the quest tab markup is incomplete");
+        check(results, "the quest overlay css follows the overlay contract",
+            css.includes(".gear-main.mode-quest #gear-view") &&
+            /\.quest-view\s*\{[^}]*z-index:\s*4/.test(css) &&
+            css.includes(".quest-view.hidden { display: none; }"),
+            "the quest overlay css drifted");
+        gear.setGearMode("gear");
+        check(results, "leaving the quest mode restores the gear view",
+            !questMain.classList.contains("mode-quest") &&
+            questView.classList.contains("hidden"),
+            "the gear view stayed hidden");
+    }
 
     let failed = 0;
     for (const result of results) {
