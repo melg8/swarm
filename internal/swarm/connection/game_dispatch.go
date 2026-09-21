@@ -40,25 +40,41 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
         gc.logger.Println("Server confirmed leave world")
     case serverCloseID:
         gc.logger.Println("Server is closing the connection")
-    case systemMessageID:
-        gc.applySystemMessage(payload)
-    case creatureSayID:
-        gc.applyCreatureSay(payload)
     case skillListID:
         gc.applySkillList(payload)
     case questListID:
         gc.applyQuestList(payload)
     case abnormalStatusID:
         gc.applyAbnormalStatusUpdate(payload)
+    case npcHTMLMessageID:
+        gc.applyNpcHTMLMessage(payload)
+    default:
+        if gc.handleChatPacket(payload) {
+            return
+        }
+        gc.handleWorldPacket(payload)
+    }
+}
+
+// handleChatPacket dispatches the chat and the interaction feedback
+// packets: the system message, the world chat line, the social
+// action and the action refusal. Returns false when the packet id is
+// not one of them so the caller falls through to the world dispatch.
+func (gc *GameClient) handleChatPacket(payload []byte) bool {
+    switch payload[0] {
+    case systemMessageID:
+        gc.applySystemMessage(payload)
+    case creatureSayID:
+        gc.applyCreatureSay(payload)
     case socialActionID:
         gc.applySocialAction(payload)
     case actionFailedID:
         gc.applyActionFailed(payload)
-    case npcHTMLMessageID:
-        gc.applyNpcHTMLMessage(payload)
     default:
-        gc.handleWorldPacket(payload)
+        return false
     }
+
+    return true
 }
 
 // applyActionFailed validates the refusal answer of the server and

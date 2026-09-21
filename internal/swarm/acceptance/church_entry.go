@@ -125,6 +125,23 @@ func startChurchSession(
     return cancelSession, sessionDone
 }
 
+// pushChurchWalk queues the manual walk command of the scenario: the
+// plain move to the interior cell (the chat fields of the command
+// stay at their documented zero values - a move carries no message).
+func pushChurchWalk(tracker *state.Bot) {
+    tracker.PushCommand(state.Command{
+        Kind:     state.CommandMove,
+        ObjectID: 0,
+        Count:    0,
+        X:        churchTargetX,
+        Y:        churchTargetY,
+        Z:        churchTargetZ,
+        Text:     "",
+        Target:   "",
+        Channel:  0,
+    })
+}
+
 // churchEntryScenario runs the temple entrance round: the temp
 // character wakes on the plaza cell of the report, the manual walk
 // command aims the interior cell next to the hierarch Asterios and
@@ -157,14 +174,7 @@ func churchEntryScenario(ctx context.Context, m *Manager, t *Test) error {
         return err
     }
 
-    tracker.PushCommand(state.Command{
-        Kind:     state.CommandMove,
-        ObjectID: 0,
-        Count:    0,
-        X:        churchTargetX,
-        Y:        churchTargetY,
-        Z:        churchTargetZ,
-    })
+    pushChurchWalk(tracker)
     test.appendLog("acceptance: the walk command to the temple " +
         "interior (44718 52291 -2792) is queued, watching the walk")
 

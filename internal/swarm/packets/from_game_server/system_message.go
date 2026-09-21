@@ -125,9 +125,10 @@ func ParseSystemMessagePacket(p *SystemMessagePacket, data []byte) error {
     p.Params = p.Params[:0]
     for i := range count {
         p.Params = append(p.Params, SystemMessageParam{
-            Type: 0,
-            Int:  0,
-            Text: "",
+            Type:  0,
+            Int:   0,
+            Level: 0,
+            Text:  "",
         })
         if err := readSystemMessageParam(reader, &p.Params[i]); err != nil {
             return err
