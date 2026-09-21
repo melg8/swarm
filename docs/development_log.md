@@ -8604,7 +8604,7 @@ Result: 22 red -> 0 red, the whole hunt suite green (73.7 s).
 
 ## Round 122: the chat reads the skill names, the map draws the skulls (2026-09-21)
 
-- Report: four owner reports landed together, all web UI. The map kill
+- Report: five owner reports landed together, all web UI. The map kill
   markers drew as red-orange crosses where small stylized skulls were
   wanted. The fight banner named the hunted mob without its level. The
   chat window clipped its topmost visible row (the widget height is

@@ -207,6 +207,42 @@ func TestRecvDecodeNpcInfo(t *testing.T) {
     }
 }
 
+// buildSystemMessageSkillUse builds the "Use $s1." notification with
+// one skill name parameter (Power Strike, skill id 3, level 3): the
+// skill name parameter carries two ints on the wire (the skill id
+// then the skill level).
+func buildSystemMessageSkillUse(t *testing.T) []byte {
+    t.Helper()
+    data := []byte{0x7A}
+    data = appendInt32(data, 46)
+    data = appendInt32(data, 1)
+    data = appendInt32(data, 4)
+    data = appendInt32(data, 3)
+    data = appendInt32(data, 3)
+
+    return data
+}
+
+// TestRecvDecodeSystemMessageSkillName verifies the system message
+// line resolves the skill name parameter through the generated skill
+// dictionary: the raw skill id never surfaces in the terminal line.
+func TestRecvDecodeSystemMessageSkillName(t *testing.T) {
+    dir := t.TempDir()
+    log, err := botlog.Open(dir, botlog.Header{TestID: "t"})
+    if err != nil {
+        t.Fatalf("open: %v", err)
+    }
+    log.Recv(buildSystemMessageSkillUse(t))
+    log.Close()
+    body := readLog(t, log.Path())
+    if !strings.Contains(body, "Use Power Strike lvl 3.") {
+        t.Error("the recv line misses the resolved skill name")
+    }
+    if strings.Contains(body, "Use 3.") {
+        t.Error("the recv line carries the raw skill id")
+    }
+}
+
 // TestUnknownPacketFallsBackToHex verifies the unrecognized opcode
 // keeps a readable fallback instead of an empty line.
 func TestUnknownPacketFallsBackToHex(t *testing.T) {

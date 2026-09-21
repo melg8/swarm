@@ -645,8 +645,15 @@ func decodeRecvSystemMessage(payload []byte) []string {
         strconv.Itoa(int(packet.MessageID)) + ")"}
 }
 
+// sysParamSkillName is the skill name parameter type of the
+// SystemMessage packet (SystemMessage.java writeImpl of the Mobius
+// server): the int pair carries the skill id then the skill level.
+const sysParamSkillName = 4
+
 // substituteMessageText renders the message text with its $sN
-// placeholders replaced by the packet parameters.
+// placeholders replaced by the packet parameters. A skill name
+// parameter resolves through the generated skill dictionary like the
+// chat window does - the raw id never surfaces in the terminal line.
 func substituteMessageText(
     packet *fromgameserver.SystemMessagePacket,
 ) string {
@@ -657,11 +664,33 @@ func substituteMessageText(
         value := param.Text
         if value == "" {
             value = strconv.Itoa(int(param.Int))
+            if param.Type == sysParamSkillName {
+                if name := skillParamName(param); name != "" {
+                    value = name
+                }
+            }
         }
         text = strings.ReplaceAll(text, placeholder, value)
     }
 
     return text
+}
+
+// skillParamName renders one skill name parameter as the dictionary
+// name with its level ("Power Strike lvl 3", the bare name without a
+// level).
+func skillParamName(
+    param *fromgameserver.SystemMessageParam,
+) string {
+    info, ok := npcdata.SkillInfoOf(param.Int)
+    if !ok || info.Name == "" {
+        return ""
+    }
+    if param.Level > 0 {
+        return info.Name + " lvl " + strconv.Itoa(int(param.Level))
+    }
+
+    return info.Name
 }
 
 // decodeRecvAbnormalStatus renders the buff and debuff list.

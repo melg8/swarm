@@ -1247,7 +1247,7 @@ const MapView = {
     // run without a real offscreen canvas). The hunt zones and the
     // kill marks stay per frame on purpose: the zone labels carry the
     // live economy fields (the respawn countdown, the adena rate) and
-    // the kill crosses fade with age - freezing either in a cache
+    // the kill skulls fade with age - freezing either in a cache
     // would need a re-render per snapshot and eat the win.
     if (!this.blitBackground(ctx, rect)) {
       ctx.clearRect(0, 0, rect.width, rect.height);
