@@ -1458,7 +1458,7 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
         }
         if !l.panicAt.IsZero() ||
             (l.tracker.SelfAttackerCount() >= panicLogoutAttackers &&
-                !l.pileUpWinnable()) {
+                !l.pileUpWinnable() && !l.settleHolding()) {
             l.panicPileUpRun(time.Now())
 
             return

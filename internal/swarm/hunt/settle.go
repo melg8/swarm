@@ -77,28 +77,10 @@ func (l *Loop) settleAfterLogin(now time.Time) bool {
 
         return false
     }
-    hp := l.tracker.SelfHealthPercent()
-    if hp >= standUpHealthPercent {
-        // The regeneration is done: stand up first (the server
-        // refuses the attack requests of a sitting character, the
-        // stand window of the rest guard paces the transition) and
-        // open with the first strike.
-        if l.settleSitPending(now) {
-            // The sit request is still unconfirmed: hold until the
-            // server answers before the stand and strike sequence.
-            return true
-        }
-        if l.tracker.SelfSitting() || (!l.restActionAt.IsZero() &&
-            !l.restActionSit) {
-            if !l.standUpGuarded(now) {
-                return true
-            }
-        }
-        l.endSettle("")
-        l.maybeBeginFirstStrike(now)
-
-        return false
+    if l.tracker.SelfHealthPercent() >= standUpHealthPercent {
+        return l.settleRecovered(now)
     }
+    hp := l.tracker.SelfHealthPercent()
     if l.settleHoldAt.IsZero() {
         l.settleHoldAt = now
         l.logf("Hunt: holding the spawn protection at %.0f%% HP, "+
@@ -120,6 +102,28 @@ func (l *Loop) endSettle(reason string) {
     if reason != "" {
         l.logf("Hunt: the spawn settle ended: %s", reason)
     }
+}
+
+// settleRecovered finishes the settle on a recovered health bar: the
+// stand transition runs first (the server refuses the attack requests
+// of a sitting character, the stand window of the rest guard paces
+// the transition), then the first strike opens the fight.
+func (l *Loop) settleRecovered(now time.Time) bool {
+    if l.settleSitPending(now) {
+        // The sit request is still unconfirmed: hold until the
+        // server answers before the stand and strike sequence.
+        return true
+    }
+    if l.tracker.SelfSitting() || (!l.restActionAt.IsZero() &&
+        !l.restActionSit) {
+        if !l.standUpGuarded(now) {
+            return true
+        }
+    }
+    l.endSettle("")
+    l.maybeBeginFirstStrike(now)
+
+    return false
 }
 
 // settleRest manages the sit/stand toggles of the settle hold: the
