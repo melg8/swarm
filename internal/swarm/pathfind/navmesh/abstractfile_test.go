@@ -11,6 +11,7 @@ import (
     "testing"
     "time"
 
+    "github.com/klauspost/compress/zstd"
     "github.com/stretchr/testify/require"
 )
 
@@ -114,4 +115,61 @@ func TestAbstractSidecarServesCoarse(t *testing.T) {
     require.NotNil(t, stale)
     require.Zero(t, stale.TileSize)
     require.Equal(t, rebuilt.edges, stale.edges)
+}
+
+// TestAbstractSidecarZstdServesCoarse pins the compressed sidecar
+// load path of the pack round (issue #11): the zstd wrapped sidecar
+// serves the coarse graph through the magic word branch (the same
+// wrapping the tiles carry), while the plain sidecar of the older
+// packs keeps loading - both answer the graph the tile scan builds.
+func TestAbstractSidecarZstdServesCoarse(t *testing.T) {
+    tile := clusterSplitWorld()
+    dir := writeTiles(t, tile)
+    key := RegionKey{Col: tile.Col, Row: tile.Row}
+
+    tilePath := filepath.Join(dir,
+        fmt.Sprintf("%d_%d%s", tile.Col, tile.Row, tileFileExt))
+    info, err := os.Stat(tilePath)
+    require.NoError(t, err)
+    abstract := BuildAbstract(tile)
+    abstract.TileSize = info.Size()
+    abstract.TileModTime = info.ModTime()
+    data, err := EncodeAbstract(abstract)
+    require.NoError(t, err)
+
+    // The compressed form: the zstd frame around the same bytes.
+    writer, err := zstd.NewWriter(nil,
+        zstd.WithEncoderConcurrency(1))
+    require.NoError(t, err)
+    framed := writer.EncodeAll(data, nil)
+    require.True(t, isZstdFrame(framed))
+    require.Less(t, len(framed), len(data),
+        "the synthetic sidecar must compress at all")
+
+    writeSidecar := func(payload []byte) {
+        require.NoError(t, os.WriteFile(filepath.Join(dir,
+            fmt.Sprintf("%d_%d%s", tile.Col, tile.Row, abstractFileExt)),
+            payload, 0o600))
+    }
+
+    // The framed sidecar serves: the mesh loads it through the magic
+    // branch and the stat guard passes (the TileSize answers).
+    writeSidecar(framed)
+    fresh := NewMesh(dir)
+    served := fresh.abstractOf(key)
+    require.NotNil(t, served)
+    require.Equal(t, info.Size(), served.TileSize,
+        "the compressed sidecar must serve the coarse graph")
+    rebuilt := BuildAbstract(tile)
+    require.Equal(t, rebuilt.edges, served.edges)
+    require.Equal(t, rebuilt.comps, served.comps)
+
+    // The plain sidecar of the older packs keeps loading.
+    writeSidecar(data)
+    plain := NewMesh(dir)
+    legacy := plain.abstractOf(key)
+    require.NotNil(t, legacy)
+    require.Equal(t, info.Size(), legacy.TileSize,
+        "the plain legacy sidecar must keep serving")
+    require.Equal(t, rebuilt.edges, legacy.edges)
 }

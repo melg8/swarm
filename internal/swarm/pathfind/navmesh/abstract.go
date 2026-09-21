@@ -274,6 +274,16 @@ func (m *Mesh) abstractSidecarOf(key RegionKey) *regionAbstract {
     if err != nil {
         return nil
     }
+    // The sidecar may carry the zstd wrapping (the pack compression
+    // round of issue #11): the magic word decides, the plain sidecars
+    // of the older packs keep decoding as they were.
+    if isZstdFrame(data) {
+        raw, zsErr := decodeZstdFrame(data)
+        if zsErr != nil {
+            return nil
+        }
+        data = raw
+    }
     abstract, err := DecodeAbstract(data)
     if err != nil || abstract == nil {
         return nil

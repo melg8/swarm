@@ -61,6 +61,19 @@ the corridor (1.8 MB average against the 27 MB average tile). The
 remaining cold cost is the gunzip tile decode of the refinement hops
 - the price of the 2.6x disk saving.
 
+The size round of issue #11 compressed the sidecars too (they had
+outgrown the "few hundred kilobytes" note above - the 164 region
+pack measured 405.9 MB plain, dominated by the 64 byte edge records
+that are mostly zero and repeated fields): the sidecars ride the
+same zstd frame as their tile (72.6 MB framed, -82 percent), the
+tile wrapping moved to the best compression level (881.5 -> 770.4
+MB, -12.6 percent - the zstd decode speed does not move with the
+encode level, so the ratio is free at runtime), and the loader
+unwraps both on the magic word with the plain legacy files of the
+older packs still loading. `cmd/navsize` measures a pack directory
+(the per section wire breakdown and the level sweep), the pack
+rebuild keeps the same command.
+
 ## 3. The flow field verdict: not the tool for this query shape
 
 The flow field (the Dijkstra/BFS flood from the target over every
