@@ -1045,6 +1045,12 @@ body.mode-pathfind .bot-status { display: none; }
   flex-direction: column;
 }
 
+/* The collapse button folds the box through the hidden class: the
+   compound selector outranks the base .chat-box display so the
+   collapsed window really disappears (the plain .hidden rule loses
+   the cascade to the later .chat-box display, see issue #4). */
+.chat-box.hidden { display: none; }
+
 /* The filter tabs of the chat window (the skill filter tab idiom).
    The head pins a whole pixel height so the list below inherits a
    predictable leftover; align-items centers the tabs inside it. */
