@@ -1,0 +1,116 @@
+# SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+#
+# SPDX-License-Identifier: MIT
+
+# The shared verification gate of the swarm repository. Every gate
+# used to live in the local agent's honesty (the go-verify-loop
+# skill prose); this workflow makes the same order (build, vet,
+# test, whitespace, the full uncapped lint, the race slice of the
+# networked packages, the vulnerability scan) run on the push itself,
+# so a red commit is caught by the runner instead of the next
+# session's budget. The tool versions come from
+# tools/install_dev_tools.sh - the same pins the dev hosts install,
+# one source of version truth.
+name: ci
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install the pinned dev tools (task, golangci-lint, gci, gofmt-spaces)
+        run: bash tools/install_dev_tools.sh
+
+      - name: Add the tool bin to PATH
+        run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -count=1
+
+      - name: Whitespace (spaces only, no tabs)
+        run: task fmt:check
+
+      - name: Lint (the full uncapped gate - the tracked debt was paid 2026-09-19)
+        run: golangci-lint run
+
+      - name: Race the networked packages (connection, pathfind, state, webserver)
+        run: CGO_ENABLED=1 go test ./internal/swarm/connection/... ./internal/swarm/pathfind/... ./internal/swarm/state/... ./internal/swarm/webserver/... -race -count=1
+
+      - name: Vulnerability scan (govulncheck, reachable symbols only)
+        run: govulncheck ./...
+
+      - name: Log conventions (the logfmt scan)
+        run: go test ./internal/logfmt/ -count=1 -run TestRepoLogConventions
+
+  acceptance-list:
+    # The headless acceptance CLI answers `-acceptance list` without
+    # the live stack: the smoke check keeps the discovery surface
+    # (the scenario ids the docs promise) compiled and honest.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: The acceptance CLI lists the scenarios
+        run: |
+          output=$(go run ./cmd/swarm -acceptance list -web "" 2>&1)
+          echo "$output"
+          for id in soak farm-readiness bot-lifetime proxy-relay; do
+            echo "$output" | grep -q "$id" || { echo "Error missing scenario id $id"; exit 1; }
+          done
+
+  coverage:
+    # The coverage report of the issue #9 baseline: the suite runs
+    # with -cover, the per package summary compares against the
+    # committed runs/coverage-latest.txt (the coverage_delta.sh gate
+    # fails the job on a per package drop beyond 2.0 pp) and the HTML
+    # profile uploads as an artifact for the drill down. The ranked
+    # worst-first table lands in the job log (the audit view of
+    # tools/coverage_report.sh), so the next tests to write name
+    # themselves on every push.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Coverage with the per package delta gate
+        run: bash tools/coverage_delta.sh
+
+      - name: The worst-first audit report
+        run: bash tools/coverage_report.sh
+
+      - name: Upload the HTML coverage profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: runs/cover.out
