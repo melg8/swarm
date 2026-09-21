@@ -538,7 +538,13 @@ grow by the 2 s window, so the payload stays small.
   from `phaseLabel(snap)` which maps the hunt loop phase
   (`snapshot.phase`, published by `state.Bot.SetPhase` from the hunt
   loop tick through a defer) to a human readable label and color kind.
-  The session status takes precedence when no phase is published (the
+  The detail stays straight to the point: the goal phrase and the
+  measured progress only (the engagement age, the waypoints left, the
+  trip age, the eta) - the fighting detail resolves the mob name from
+  the snapshot objects exactly like the target panel does (the raw
+  object id never shows), and the context restatements ("in the zone"
+  and the like) stay out. The session status takes precedence when no
+  phase is published (the
   manual only sessions never set the phase): the banner falls back to
   the connecting/offline text. The dot pulses while the bot is active
   so the banner reads as live; the pathfind test mode hides it.
@@ -698,14 +704,20 @@ must carry that id in the markup). The skills view carries the ACTIVE
 / PASSIVE filter tabs, the learned skill grid and the pinned sp/next
 foot (the SP wallet and the head of the learning queue, anchored at
 the panel bottom like the adena/weight footer); the mode and the
-filter persist in localStorage. The QUEST tab is the third overlay
-(`#quest-view`): the keyed grid (`QuestCells`, its own registry - one
-element cannot sit in the bag grid and the quest grid at once) shows
-only the type2 quest family items of the inventory (`isQuestItem`,
-type2 === 3 of the Mobius item packets), the tab badge carries their
-the count, the empty note covers the empty state; the bag keeps
+filter persist in localStorage. The QUEST items are not a widget mode:
+they are the second tab of the inventory area - the INVENTORY / QUEST
+tab pair (the `.skill-filter-btn` idiom, plus the count badge) sits in
+the inventory title row, and the quest grid (`#quest-grid`, the keyed
+`QuestCells` registry - one element cannot sit in the bag grid and the
+quest grid at once) is a sibling of the bag grid inside the gear view,
+so the swap never changes the panel height (`.inv-grid.hidden` leaves
+the flow; the absolute `.quest-empty` note covers the empty state).
+The grid shows only the type2 quest family items of the inventory
+(`isQuestItem`, type2 === 3 of the Mobius item packets); the bag keeps
 showing
 the quest items too (the trash and the drop flows work from it).
+The sub tab persists in `swarm.invTab`; the retired "quest" widget
+mode value in `swarm.gearMode` migrates to it on boot.
 The learned grid is a small fixed
 grid - the same six 36px column metric as the bag and the same four
 visible rows (153px) - one keyed cell per skill with the icon and the
@@ -823,7 +835,13 @@ party, clan, trade, announcement - the channel to kind mapping lives
 in `state.ChatEvent`), SYSTEM keeps the bot system messages and the
 social lines. A world chat line renders the sender as its own column
 (`ChatEvent.from`) and colors by channel (shout/whisper/trade stand
-out). The input row below the list sends a chat message through the
+out). Every row pins the same whole pixel line height (18px on
+`.chat-line`): a unitless ratio (the earlier 1.6 at 11px = 17.6px)
+rounds per row at paint time and the vertical distance between the
+lines drifted apart on some rows - taller glyph fallback boxes (emoji,
+arrows) widen the line box the same way; the wrapped message lines
+follow the same 18px rhythm. The input row below the list sends a chat
+message through the
 bot: the channel select (all, shout, trade, party, clan, whisper),
 the whisper recipient input (whisper only), the 105 character bound
 of Say2 and the empty text refusal are validated on both the client

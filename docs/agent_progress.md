@@ -116,7 +116,85 @@ and after - zero new). NOT yet done: the live E2E against the
 deployed stack on the merged tree (the parallel rounds own the
 same debt), and the H-006 server side observation.
 
-## Active task (status: in progress): the webui chat round, the quest tab and the ETA round (2026-09-21)
+## Active task (status: in progress): the webui refinement round - the chat rhythm, the quest tab placement and the banner wording (2026-09-21)
+
+Started: 2026-09-21 ~09:28 UTC. Branch: `feature/improved-behaviour`,
+commits as melg8. Other agents push to the same branch - rebase before
+every push. The owner feedback on the landed chat/quest/ETA round
+(three defects, all in `internal/swarm/webserver/web/`):
+
+1. the vertical distance between the chat lines drifts apart in some
+   cases - it must stay identical everywhere;
+2. the quest items tab sits at the top of the equipment widget - it
+   must sit right of INVENTORY as the inventory sub tab switch;
+3. the fighting banner detail shows the raw object id ("fighting
+   #345345345 ... in the zone") - it must show the mob name the
+   target panel shows, and the filler words ("in the zone" and
+   similar) must go: always straight to the point.
+
+### Goal
+
+The chat rows pin one whole pixel line height (18px); the quest grid
+becomes a sibling of the bag grid switched by the INVENTORY / QUEST
+tab pair in the inventory title row; the banner detail resolves the
+target name from the snapshot objects and carries only the measured
+progress and the goal.
+
+### Progress
+
+- Root causes pinned: the chat rhythm came from the unitless
+  line-height 1.6 at 11px = 17.6px (per row paint rounding drifts the
+  gaps apart, taller glyph fallback boxes widen the line box the same
+  way); the quest tab was a top level widget mode (an overlay view);
+  the banner detail rendered "#" + c.targetId and appended " in the
+  zone" (app.js engageFightDetail).
+- app.js: engageFightDetail(snap, c, hunt) resolves the name exactly
+  like renderTarget does (snap.objects, the dead ones skipped, the
+  fallback stays "a target" - the raw id never shows); etaSuffix
+  became etaText (no leading comma, the callers join the parts);
+  walkDetail joins the parts with commas (the empty destination
+  phrase of townReturn no longer produces a leading comma); the
+  filler pass tightened loot/townSell/townWalk/townReturn/idle/user
+  details ("looting the last kill", "selling at the trader",
+  "heading to the trader", no townReturn phrase, "waiting for a
+  command", the manual attack reuses the fight detail, the bare
+  manual shows no detail).
+- The quest tab: index.html swaps the top QUEST button for the
+  INVENTORY / QUEST tab pair in the inventory title row (the
+  skill-filter-btn idiom, the badge rides the quest tab) and moves
+  quest-grid + the quest-empty note into the gear view as the bag
+  grid siblings; the old quest-view overlay is gone. app.js adds
+  InvTab (the persisted sub tab + the quest count), setInvTab,
+  applyInvTab (the single place toggling the grids, the tabs and the
+  empty note), the "quest" widget mode migration (the stored
+  swarm.gearMode value moves to swarm.invTab); renderQuest fills the
+  cells and the badge only. style.css drops the overlay rules and
+  adds .inv-tabs, .inv-grid.hidden and the absolute .quest-empty note
+  (the panel height stays constant across the switch).
+- style.css pins .chat-line line-height at 18px (the whole pixel
+  rhythm, wrapped lines included).
+- Harnesses: repro_hud.js checks the fight detail name resolution,
+  the raw id ban, the empty fallback walk detail and reads the real
+  style.css to pin the whole pixel .chat-line rule (86 checks);
+  repro_gear.js rewritten quest block covers the sub tab swap, the
+  persistence, the badge, the empty note, the markup placement and
+  the retired overlay css (199 checks); all 8 harnesses pass.
+- Verified live in a headless browser against
+  tools/webui_preview_server.js with a synthetic snapshot
+  (scripts/verify_webui_fixes.sh + inject/measure helpers): the
+  banner reads "fighting Keltir for 34s, eta ~12s", every chat row is
+  an exact 18px multiple with gap == previous row height
+  (RHYTHM_OK), the quest switch swaps the grids with the panel height
+  stable at 410px (QUEST_TAB_OK); screenshots under logs/.
+- go build ./..., go vet, golangci-lint --new clean, webserver tests
+  green, tools/prepush.sh green.
+
+### Next
+
+- Land the atomic commits (webui fix + harness gates + docs), push,
+  run the final review sub agent on the whole round.
+
+## Active task (status: complete): the webui chat round, the quest tab and the ETA round (2026-09-21)
 
 Started: 2026-09-21 ~07:57 UTC. Branch: `feature/improved-behaviour`,
 commits as melg8. Other agents push to the same branch - rebase before
