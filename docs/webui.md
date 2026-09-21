@@ -741,13 +741,14 @@ the body height transition, the layers cross-fade with a slight
 settle, the chevron rotates in place):
 
 - the icon grid (the default): one 32px cell per active effect, 10
-  columns wide and at most 2 rows for the classic buff bar, every
-  cell packs edge to edge and paints its own 2px white strip on the
-  right and the bottom edge (the separators run only between the
-  icons that actually show - a white grid background would leave a
-  white hole under the empty cells of a partially filled row on the
-  dark theme), the short remaining time overlays the cell bottom
-  edge and the level badge sits top right;
+  columns wide and at most 2 rows for the classic buff bar (more
+  than 20 active effects scroll inside the grid, the dock keeps the
+  two row height), every cell packs edge to edge and paints its own
+  2px white strip on the right and the bottom edge (the separators
+  run only between the icons that actually show - a white grid
+  background would leave a white hole under the empty cells of a
+  partially filled row on the dark theme), the short remaining time
+  overlays the cell bottom edge and the level badge sits top right;
 - the detailed list: the full effect rows (icon, level badge, name,
   the human remaining time) with the remaining time percent bar
   pinned to every row bottom edge (left over total, the fill eases
@@ -764,8 +765,10 @@ The left dock is the slim vertical strip stretching with the frame
 it carries the expand chevron and the view switch icon, both buttons
 toggle between the states and neither ever moves (the chevron stays
 pinned to the top left corner in both states), so collapsing and
-expanding again needs no re-aim. The view choice persists in the
-localStorage (`swarm.buffsView`; the panel answers the restored
+expanding again needs no re-aim (the entering layer cancels the
+visibility delay - the fade-in paints immediately, the hiding layer
+finishes its fade before it un-hooks). The view choice persists in
+the localStorage (`swarm.buffsView`; the panel answers the restored
 choice on boot). The countdowns run locally: every snapshot entry
 anchors its reading (the anchor carries the skill fields plus the at
 timestamp) and a 1 Hz ticker counts the elapsed wall clock off it, so

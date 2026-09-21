@@ -68,8 +68,12 @@ func (b *Bot) SetBuffs(buffs []BuffEntry) {
         // A continuing effect reports its current remaining time,
         // which only sinks below the previous reading (plus the
         // jitter grace); a reading above that marks a recast, and
-        // the total restarts from the fresh duration.
+        // the total restarts from the fresh duration. A different
+        // level is a replaced effect (another cast overwriting the
+        // same skill id) - always a recast, even when the fresh
+        // duration fits under the counted down previous one.
         if prev, ok := b.buffs[buff.SkillID]; ok &&
+            prev.level == buff.Level &&
             buff.Time <= prev.left-elapsed+buffTotalGraceSeconds {
             total = prev.total
         }

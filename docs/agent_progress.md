@@ -90,10 +90,11 @@ EFFECTS label, the animated morph both ways, the chevron never moves.
   grid, the per cell white separator strips - a white grid background
   left a white hole under the empty cells on the dark theme, the
   morph transitions, the thin scrollbar, the enter pop-in).
-- `tools/repro_buffs.js` (new, `task repro:buffs`): 27 checks (the
-  markup, the styles, the render, the keyed holds, the bars, the
-  ticker, the toggle + persistence, the height fallbacks, the
-  formatters); repro_gear.js handed over the panel section.
+- `tools/repro_buffs.js` (new, `task repro:buffs`): 42 checks (the
+  markup, the styles, the render, the keyed holds incl. the anchor
+  field refresh, the bars, the ticker, the toggle + persistence, the
+  height fallbacks and the measured HUD cap, the two row grid cap,
+  the formatters); repro_gear.js handed over the panel section.
 - Verified: go build/vet/test (state + webserver), all four webui
   harnesses green, the browser preview on the static copy (both
   themes, both states, the chevron spot measured equal 475,84 in
@@ -106,11 +107,29 @@ EFFECTS label, the animated morph both ways, the chevron never moves.
   chevron was meant to gate something else (the second row, the
   dock-only collapse), the flip closure in initBuffsPanel is the one
   place to change.
-- The grid caps at 10x2 per the request; more than 20 effects wrap a
-  third row (the dock follows) - no hard clip decided.
+- "Full description as now" maps to name + level + time + tooltip
+  (the old panel never carried description text either);
+  npcdata.SkillDescription(id, level) exists, a `desc` field on
+  BuffSnapshot would deliver the real skill text if the owner wants
+  it.
 - `total` for an effect observed mid-flight (the tracker joined
   after the cast) reads from the first list the tracker saw - the
   bar may start short of 100 percent; honest to the data held.
+
+### The review round (same session)
+
+A fresh-context critic pass tagged five should-fix findings; all
+landed in the follow up commit: the entering layer now cancels the
+visibility delay (the fade-in painted only after a 0.3s pop before),
+the anchor refreshes every snapshot field (a stronger recast over
+the same skill id kept the stale level/name/icon before), the grid
+caps at the two classic rows with an inner scrollbar (25 effects
+grew a third row before), the icons frame width matches the
+border-box arithmetic (349px, the 367px carried an 18px dead strip)
+and the recast detection respects a level change (another caster
+overwriting the same skill id kept the stale total before). The
+storage reads/writes guard like setGearMode and initBuffsPanel grew
+the re-init guard; the harness pins every fix (42 checks).
 
 ## Active task (status: in progress): the dependency bump and the combat behaviour round (2026-09-21)
 

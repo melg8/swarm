@@ -147,6 +147,15 @@ func TestSetBuffsKeepsTheTotalOnRefresh(t *testing.T) {
     bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 1, Time: 1180}})
     require.InDelta(t, 1180, bot.Snapshot().Buffs[0].Left, 2)
     require.InDelta(t, 1180, bot.Snapshot().Buffs[0].Total, 1)
+
+    // A different level is a replaced effect: the total restarts
+    // even when the fresh duration fits under the countdown.
+    bot.mu.Lock()
+    bot.buffsAt = time.Now().Add(-time.Minute)
+    bot.mu.Unlock()
+    bot.SetBuffs([]BuffEntry{{SkillID: 91, Level: 2, Time: 60}})
+    require.Equal(t, int32(2), bot.Snapshot().Buffs[0].Level)
+    require.InDelta(t, 60, bot.Snapshot().Buffs[0].Total, 1)
 }
 
 // TestSetBuffsFreshSkillCarriesItsOwnTotal pins the per skill total:

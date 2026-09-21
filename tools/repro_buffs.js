@@ -79,6 +79,7 @@ function makeElement() {
         alt: "",
         title: "",
         className: "",
+        dataset: {},
         children: [],
         listeners: {},
         offsetHeight: 0,
@@ -142,15 +143,18 @@ function loadPanel(appFile) {
     const elements = new Map();
     const storage = new Map();
     const timers = { intervals: [], timeouts: [] };
+    const state = { hudStack: null };
     const document = {
         getElementById: (id) => {
             if (!elements.has(id)) { elements.set(id, makeElement()); }
 
             return elements.get(id);
         },
-        // The HUD stack stays unmeasurable here (no .hud-stack
-        // element): the panel answers with its height fallbacks.
-        querySelector: () => null,
+        // The HUD stack answers a measurement only after the check
+        // arms it (hudStack.offsetHeight > 0): until then the panel
+        // runs on its height fallbacks.
+        querySelector: (selector) => (selector === ".hud-stack" &&
+            state.hudStack) ? state.hudStack : null,
         createElement: () => makeElement(),
         documentElement: { dataset: {} },
         listeners: {},
@@ -207,7 +211,7 @@ function loadPanel(appFile) {
         sandbox);
 
     return { api: sandbox.__buffs, elements, storage, timers, sandbox,
-        doc: document };
+        doc: document, state };
 }
 
 // readArg answers the --app override of the app.js path.
@@ -248,6 +252,9 @@ function checkStyles() {
     check("styles: the grid packs 10 columns of 32px cells",
         css.includes("grid-template-columns: repeat(10, 32px)") &&
         css.includes("grid-auto-rows: 32px"));
+    check("styles: the grid caps at the classic two rows",
+        /\.buffs-grid \{[^}]*max-height: 64px;/s.test(css) &&
+        /\.buffs-grid \{[^}]*overflow-y: auto;/s.test(css));
     check("styles: the cells paint the white separator strips",
         /\.buff-cell \{[^}]*border-right: 2px solid #ffffff;/s.test(css) &&
         /\.buff-cell \{[^}]*border-bottom: 2px solid #ffffff;/s.test(css) &&
@@ -262,6 +269,8 @@ function checkStyles() {
         css.includes(".view-list .buffs-grid") &&
         css.includes(".view-icons .buffs-list-wrap") &&
         /visibility 0s linear 0\.3s/.test(css));
+    check("styles: the entering layer cancels the visibility delay",
+        /\.view-icons \.buffs-grid,[\s\S]*?\.view-list \.buffs-list-wrap \{[\s\S]*?visibility 0s;/.test(css));
     check("styles: the chevron rotates in the list view",
         css.includes(".buffs-panel.view-list .buffs-chev") &&
         css.includes("rotate(180deg)"));
@@ -328,6 +337,15 @@ function checkBehavior(harness) {
     check("keyed: the row keeps the name and the level",
         api.state.rows.get(91).name.textContent === "Defense Aura" &&
         api.state.rows.get(91).level.textContent === "1");
+
+    api.panel({ buffs: [
+        buff(91, 3, 1100, 1200, "Greater Defense Aura", "skill0091")
+    ] });
+    harness.flushTimeouts();
+    check("keyed: a stronger recast refreshes the anchor fields",
+        api.state.rows.get(91).level.textContent === "3" &&
+        api.state.rows.get(91).name.textContent ===
+            "Greater Defense Aura");
 
     api.panel({ buffs: [
         buff(91, 1, 1190, 1200, "Defense Aura", "skill0091"),
@@ -425,7 +443,45 @@ function checkBehavior(harness) {
             api.panel({ buffs: two });
             harness.flushTimeouts();
 
-            return height === (2 * 32 + 2 + 6) + "px";
+            return height === (2 * 32 + 6) + "px";
+        })());
+
+    check("size: the grid holds the two row cap past 20 buffs",
+        (() => {
+            const many = [];
+            for (let i = 0; i < 25; i += 1) {
+                many.push(buff(2000 + i, 1, 600, 1200, "m" + i, ""));
+            }
+            api.panel({ buffs: many });
+            harness.flushTimeouts();
+            api.setView("icons");
+            api.syncSize();
+            const height = body().style.height;
+            api.panel({ buffs: two });
+            harness.flushTimeouts();
+
+            return height === (2 * 32 + 6) + "px";
+        })());
+    check("size: the list body caps at the measured HUD stack",
+        (() => {
+            const stack = makeElement();
+            stack.offsetHeight = 224;
+            harness.state.hudStack = stack;
+            const many = [];
+            for (let i = 0; i < 30; i += 1) {
+                many.push(buff(3000 + i, 1, 600, 1200, "h" + i, ""));
+            }
+            api.panel({ buffs: many });
+            harness.flushTimeouts();
+            api.setView("list");
+            api.syncSize();
+            const height = body().style.height;
+            harness.state.hudStack = null;
+            api.setView("icons");
+            api.panel({ buffs: two });
+            harness.flushTimeouts();
+            // 224 - 8 (the frame chrome) + 6 (the body padding).
+            return height === (224 - 8 + 6) + "px";
         })());
 
     api.panel({ buffs: [] });

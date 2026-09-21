@@ -304,10 +304,11 @@ body {
 }
 
 /* The frame widths per view state: the grid fits 10 columns of
-   32px cells with 2px separators plus the dock and the frame; the
-   list keeps the compact reading width. Keep in sync with the
-   geometry constants in buffs.js. */
-.buffs-panel.view-icons { width: 367px; }
+   32px cells (the separator borders ride inside the border-box
+   cells, so the grid content is 320px) plus the dock, the body
+   padding and the frame; the list keeps the compact reading width.
+   Keep in sync with the geometry constants in buffs.js. */
+.buffs-panel.view-icons { width: 349px; }
 
 .buffs-panel.view-list { width: 244px; }
 
@@ -405,6 +406,17 @@ body.mode-pathfind .buffs-panel { display: none; }
   transform: translateY(8px);
 }
 
+/* The entering layer must not inherit the hide delay: the visible
+   state cancels it, so the fade-in paints immediately (the hidden
+   destination keeps the delay - the fade-out finishes before the
+   layer un-hooks). */
+.view-icons .buffs-grid,
+.view-list .buffs-list-wrap {
+  transition: opacity 0.2s ease,
+    transform 0.3s cubic-bezier(0.33, 1, 0.5, 1),
+    visibility 0s;
+}
+
 /* The icon grid (the default state): 10 columns of tight 32px
    cells, no grid gap - every cell paints its own 2px white strip on
    the right and the bottom edge, so the separators run only between
@@ -418,6 +430,20 @@ body.mode-pathfind .buffs-panel { display: none; }
   gap: 0;
   justify-content: start;
   align-content: start;
+  /* The classic buff bar shape: 10 x 2. More than 20 active
+     effects scroll inside the grid (the dock keeps the two row
+     height, the detailed list answers the overflow). */
+  max-height: 64px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.buffs-grid::-webkit-scrollbar { width: 6px; }
+
+.buffs-grid::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 
 .buff-cell {

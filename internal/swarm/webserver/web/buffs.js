@@ -8,10 +8,11 @@
 // AbnormalStatusUpdate list in two view states that share one frame:
 //
 // - the icon grid (the default): one cell per active effect, at most
-//   10 columns by 2 rows for the classic buff bar, every cell packs
-//   edge to edge with the thin white separator strips between the
-//   cells and carries the icon with the level badge and the short
-//   remaining time overlaid at its bottom edge;
+//   10 columns by 2 rows for the classic buff bar (a longer list
+//   scrolls inside the grid), every cell packs edge to edge with the
+//   thin white separator strips on its right and bottom edges and
+//   carries the icon with the level badge and the short remaining
+//   time overlaid at its bottom edge;
 // - the detailed list: the full effect rows (icon, level, name, the
 //   remaining time) with the remaining time percent bar under every
 //   row, the tighter vertical rhythm and the scrollbar - the panel
@@ -32,14 +33,16 @@
 // the equipment widget - the icons never blink), a buff joining or
 // leaving the list touches only its own node.
 
-// The panel geometry constants: the grid packs buffBuffsCellSize px
-// cells with buffSepSize px white separator strips between them, at
-// most buffGridColumns per row; the body adds buffBodyPadding px of
-// panel colored frame around the content. The panel frame width per
-// view state lives in the CSS next to these numbers.
+// The panel geometry constants: the grid packs buffCellSize px
+// cells at most buffGridColumns per row and at most two rows (the
+// classic buff bar; the white separator strips ride inside the cell
+// borders and the longer lists scroll inside the grid), the body
+// adds buffBodyPadding px of panel colored frame around the content.
+// The panel frame width per view state lives in the CSS next to
+// these numbers.
 const buffGridColumns = 10;
+const buffGridRows = 2;
 const buffCellSize = 32;
-const buffSepSize = 2;
 const buffBodyPadding = 3;
 // The detailed list row pitch (the row box plus its tight padding)
 // for the height fallback when the DOM does not answer measurements.
@@ -69,10 +72,9 @@ const BuffsPanel = {
 // server snapshots.
 function initBuffsPanel() {
   const panel = document.getElementById("buffs-panel");
-  if (!panel) { return; }
-  BuffsPanel.view = window.localStorage.getItem("swarm.buffsView") === "list"
-    ? "list"
-    : "icons";
+  if (!panel || panel.dataset.buffsInit) { return; }
+  panel.dataset.buffsInit = "1";
+  BuffsPanel.view = buffsStoredView() === "list" ? "list" : "icons";
   const flip = () => {
     setBuffsView(BuffsPanel.view === "icons" ? "list" : "icons");
   };
@@ -90,13 +92,28 @@ function initBuffsPanel() {
   applyBuffsPanelState();
 }
 
+// buffsStoredView answers the persisted view choice (the storage
+// can be blocked - the panel answers the icons default instead of
+// dying, the same guard the gear mode carries).
+function buffsStoredView() {
+  try {
+    return window.localStorage.getItem("swarm.buffsView");
+  } catch (_e) {
+    return null;
+  }
+}
+
 // setBuffsView switches the panel between the icon grid and the
 // detailed list (the CSS transition morphs the frame both ways) and
-// persists the choice.
+// persists the choice (best effort, see buffsStoredView).
 function setBuffsView(view) {
   if (view !== "icons" && view !== "list") { return; }
   BuffsPanel.view = view;
-  window.localStorage.setItem("swarm.buffsView", view);
+  try {
+    window.localStorage.setItem("swarm.buffsView", view);
+  } catch (_e) {
+    // The choice lives for the session only then.
+  }
   applyBuffsPanelState();
 }
 
@@ -147,9 +164,12 @@ function syncBuffsPanelSize() {
     const grid = document.getElementById("buffs-grid");
     height = grid ? grid.offsetHeight : 0;
     if (!height) {
-      const rows = Math.max(1, Math.ceil(BuffsPanel.cells.size /
-        buffGridColumns));
-      height = rows * buffCellSize + (rows - 1) * buffSepSize;
+      // The grid CSS caps the shape at the classic two rows (a
+      // longer list scrolls inside it), the arithmetic mirrors the
+      // cap for the stub DOM that answers no measurements.
+      const rows = Math.min(buffGridRows, Math.max(1, Math.ceil(
+        BuffsPanel.cells.size / buffGridColumns)));
+      height = rows * buffCellSize;
     }
   } else {
     const list = document.getElementById("buffs-list");
@@ -208,9 +228,9 @@ function buffLeftShort(left) {
 function buffAnchorOf(skillId, buff) {
   const anchor = BuffsPanel.anchors.get(skillId);
   if (anchor) {
-    anchor.left = buff.left;
-    anchor.total = buff.total;
-    anchor.at = Date.now();
+    // Every snapshot field refreshes: another cast can overwrite
+    // the same skill id with a new level, name or icon.
+    Object.assign(anchor, buff, { at: Date.now() });
 
     return anchor;
   }
