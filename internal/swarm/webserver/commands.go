@@ -8,12 +8,15 @@ import (
     "encoding/json"
     "net/http"
     "strconv"
+    "unicode/utf8"
 
+    togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // commandRequest mirrors state.Command: the manual command posted by
-// the web UI (map clicks, equipment widget drags and double clicks).
+// the web UI (map clicks, equipment widget drags, double clicks and
+// the chat input of the chat window).
 type commandRequest struct {
     Kind     string `json:"kind"`
     ObjectID int32  `json:"objectId"`
@@ -21,6 +24,9 @@ type commandRequest struct {
     X        int32  `json:"x"`
     Y        int32  `json:"y"`
     Z        int32  `json:"z"`
+    Text     string `json:"text"`
+    Target   string `json:"target"`
+    Channel  int32  `json:"channel"`
 }
 
 // validCommand reports whether the request carries the fields its kind
@@ -36,6 +42,30 @@ func validCommand(cmd commandRequest) bool {
         return cmd.ObjectID != 0 && cmd.Count >= 1
     case state.CommandZone:
         return cmd.Count >= 0
+    case state.CommandSay:
+        // The Say packet validation mirrors the Say2.runImpl refusals:
+        // an empty text or an unknown channel would disconnect the
+        // session, the 105 character limit is the client keyboard
+        // input bound and a whisper names its recipient.
+        return cmd.Text != "" &&
+            utf8.RuneCountInString(cmd.Text) <=
+                togameserver.SayMaxTextRunes &&
+            validSayChannel(cmd.Channel) &&
+            (cmd.Channel != togameserver.SayChannelWhisper ||
+                cmd.Target != "")
+    default:
+        return false
+    }
+}
+
+// validSayChannel reports whether the channel id is one of the
+// player chat channels (ChatType.java of the Mobius server).
+func validSayChannel(channel int32) bool {
+    switch channel {
+    case togameserver.SayChannelGeneral, togameserver.SayChannelShout,
+        togameserver.SayChannelWhisper, togameserver.SayChannelParty,
+        togameserver.SayChannelClan, togameserver.SayChannelTrade:
+        return true
     default:
         return false
     }
@@ -64,6 +94,13 @@ func describeCommand(cmd commandRequest) string {
             " of item " + strconv.Itoa(int(cmd.ObjectID))
     case state.CommandZone:
         return "user command: hunt in zone " + strconv.Itoa(int(cmd.Count))
+    case state.CommandSay:
+        text := []rune(cmd.Text)
+        if len(text) > 40 {
+            text = append(text[:40], []rune("...")...)
+        }
+
+        return "user command: say " + strconv.Quote(string(text))
     default:
         return "user command: " + cmd.Kind
     }
@@ -95,6 +132,9 @@ func (s *Server) handleBotCommand(w http.ResponseWriter, r *http.Request) {
         X:        request.X,
         Y:        request.Y,
         Z:        request.Z,
+        Text:     request.Text,
+        Target:   request.Target,
+        Channel:  request.Channel,
     })
     bot.RecordEvent(describeCommand(request))
     w.WriteHeader(http.StatusAccepted)

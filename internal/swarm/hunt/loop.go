@@ -104,6 +104,10 @@ type GameAPI interface {
     // command is the raw bypass string (the client strips the
     // "bypass -h " prefix the html button carries).
     SendBypass(command string) error
+    // Say sends a chat message on the given ChatType client channel
+    // (the web UI chat input). The whisper channel carries the
+    // recipient name, every other channel an empty target.
+    Say(text string, channel int32, target string) error
     // LastHTMLDialog returns the npc object id and the html body of
     // the last NpcHTMLMessage the server sent (the gatekeeper dialog
     // the bot reads the bypass buttons from). A zero npcObjID means

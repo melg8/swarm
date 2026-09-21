@@ -1,3 +1,11 @@
+//go:build drill2
+
+// Each drill file is a standalone main of the same stage: the build
+// tag keeps them out of the normal package build (and out of go build
+// ./... and the lint typecheck, which one package of three mains
+// breaks). Run one with:
+//   go run -tags drill2 ./benchmarks/agent-bench/01-producer-consumer/drill/go
+
 // Multi-threaded producer-consumer queue.
 //
 // Bounded queue built on sync.Mutex + sync.Cond (mirrors Arc<Mutex>+Condvar):

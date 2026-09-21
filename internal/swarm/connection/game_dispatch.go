@@ -42,6 +42,8 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
         gc.logger.Println("Server is closing the connection")
     case systemMessageID:
         gc.applySystemMessage(payload)
+    case creatureSayID:
+        gc.applyCreatureSay(payload)
     case skillListID:
         gc.applySkillList(payload)
     case questListID:
@@ -102,6 +104,25 @@ func (gc *GameClient) applySystemMessage(payload []byte) {
             })
         }
         gc.tracker.ApplySystemMessage(message)
+    }
+}
+
+// applyCreatureSay parses CreatureSay and forwards the world chat
+// line to the tracker chat window.
+func (gc *GameClient) applyCreatureSay(payload []byte) {
+    if err := fromgameserver.ParseCreatureSayPacket(
+        &gc.creatureSay, payload); err != nil {
+        gc.logger.Printf("Failed to parse creature say: %v", err)
+
+        return
+    }
+    if gc.tracker != nil {
+        gc.tracker.ApplySay(state.Say{
+            ObjectID: gc.creatureSay.ObjectID,
+            Channel:  gc.creatureSay.Channel,
+            From:     gc.creatureSay.From,
+            Text:     gc.creatureSay.Text,
+        })
     }
 }
 

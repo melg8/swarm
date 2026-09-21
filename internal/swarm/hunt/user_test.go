@@ -54,6 +54,45 @@ func TestUserDropCommandDropsAtSelfPosition(t *testing.T) {
     require.Equal(t, phaseEngage, loop.phase)
 }
 
+// TestUserSayCommandSendsChat pins the say semantics: the command is a
+// one shot request that forwards text, channel and whisper target to
+// the game session and never switches the phase.
+func TestUserSayCommandSendsChat(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    spawnMob(bot)
+    loop.lastHit = time.Now().Add(-time.Minute)
+
+    pushCommand(bot, state.Command{
+        Kind: state.CommandSay, Text: "hello world",
+        Channel: 0, Target: "",
+    })
+    loop.tick()
+
+    require.Len(t, game.says, 1)
+    require.Equal(t, sayCall{
+        Text: "hello world", Channel: 0, Target: "",
+    }, game.says[0])
+    require.Equal(t, phaseEngage, loop.phase,
+        "a say command must not switch the phase")
+
+    // A whisper keeps the recipient, an empty text never reaches the
+    // game session (the Say packet would refuse it anyway).
+    pushCommand(bot, state.Command{
+        Kind: state.CommandSay, Text: "psst",
+        Channel: 2, Target: "Melg",
+    })
+    loop.tick()
+    pushCommand(bot, state.Command{Kind: state.CommandSay, Text: ""})
+    loop.tick()
+
+    require.Len(t, game.says, 2)
+    require.Equal(t, sayCall{
+        Text: "psst", Channel: 2, Target: "Melg",
+    }, game.says[1])
+}
+
 // TestUserMoveCommandSwitchesToManualPhase pins the move semantics: the
 // click switches the loop into the manual phase and the walk request
 // goes to the clicked point; arrival ends the manual phase.

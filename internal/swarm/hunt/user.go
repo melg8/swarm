@@ -208,10 +208,27 @@ func (l *Loop) applyUserCommand(cmd state.Command) {
         l.userDrop(cmd)
     case state.CommandDestroy:
         l.userDestroy(cmd)
+    case state.CommandSay:
+        l.userSay(cmd)
     case state.CommandMove, state.CommandAttack, state.CommandPickup:
         l.userMovement(cmd)
     default:
         l.logf("Hunt: unknown user command %q", cmd.Kind)
+    }
+}
+
+// userSay sends one chat message through the character. The command is
+// a one shot request like the inventory actions: the web UI validated
+// the message against the Say2 refusals already, the packet validates
+// itself again (an invalid chat would disconnect the session).
+func (l *Loop) userSay(cmd state.Command) {
+    if cmd.Text == "" {
+        return
+    }
+    l.logf("Hunt: user command: say %q on channel %d",
+        cmd.Text, cmd.Channel)
+    if err := l.game.Say(cmd.Text, cmd.Channel, cmd.Target); err != nil {
+        l.logf("Hunt: say failed: %v", err)
     }
 }
 

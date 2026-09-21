@@ -51,15 +51,16 @@ func (s *sinkGame) SellItems(_ []state.InventoryItem) error {
 func (s *sinkGame) BuyItems(_ int32, _ []gear.Purchase) error {
     return nil
 }
-func (s *sinkGame) UseItem(_ int32) error              { return nil }
-func (s *sinkGame) ClickObject(_ int32) error          { return nil }
-func (s *sinkGame) InteractPull(_ int32) error         { return nil }
-func (s *sinkGame) ClearTarget() error                 { return nil }
-func (s *sinkGame) AcquireSkill(_, _ int32) error      { return nil }
-func (s *sinkGame) UseMagicSkill(_ int32) error        { return nil }
-func (s *sinkGame) DropItem(_, _, _, _, _ int32) error { return nil }
-func (s *sinkGame) RequestLogout() error               { return nil }
-func (s *sinkGame) SendBypass(_ string) error          { return nil }
+func (s *sinkGame) UseItem(_ int32) error                 { return nil }
+func (s *sinkGame) ClickObject(_ int32) error             { return nil }
+func (s *sinkGame) InteractPull(_ int32) error            { return nil }
+func (s *sinkGame) ClearTarget() error                    { return nil }
+func (s *sinkGame) AcquireSkill(_, _ int32) error         { return nil }
+func (s *sinkGame) UseMagicSkill(_ int32) error           { return nil }
+func (s *sinkGame) DropItem(_, _, _, _, _ int32) error    { return nil }
+func (s *sinkGame) RequestLogout() error                  { return nil }
+func (s *sinkGame) SendBypass(_ string) error             { return nil }
+func (s *sinkGame) Say(_ string, _ int32, _ string) error { return nil }
 func (s *sinkGame) LastHTMLDialog() (int32, string) {
     return 0, ""
 }

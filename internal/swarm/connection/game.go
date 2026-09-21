@@ -150,6 +150,7 @@ const (
     stopRotationID     = 0x78
     myTargetSelectedID = 0xBF
     systemMessageID    = 0x7A
+    creatureSayID      = 0x5D
     skillListID        = 0x6D
     questListID        = 0x98
     abnormalStatusID   = 0x97
@@ -214,6 +215,7 @@ type GameClient struct {
     targetSelected fromgameserver.TargetSelectedPacket
     targetDropped  fromgameserver.TargetUnselectedPacket
     systemMessage  fromgameserver.SystemMessagePacket
+    creatureSay    fromgameserver.CreatureSayPacket
     socialAction   fromgameserver.SocialActionPacket
     actionFailed   fromgameserver.ActionFailedPacket
     itemList       fromgameserver.ItemListPacket
@@ -299,6 +301,7 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
         targetSelected:  *fromgameserver.NewTargetSelectedPacket(),
         targetDropped:   *fromgameserver.NewTargetUnselectedPacket(),
         systemMessage:   *fromgameserver.NewSystemMessagePacket(),
+        creatureSay:     *fromgameserver.NewCreatureSayPacket(),
         socialAction:    *fromgameserver.NewSocialActionPacket(),
         actionFailed:    *fromgameserver.NewActionFailedPacket(),
         itemList:        *fromgameserver.NewItemListPacket(),
@@ -507,6 +510,21 @@ func (gc *GameClient) UseItem(objectID int32) error {
         return fmt.Errorf("failed to use item: %w", err)
     }
     gc.tracker.RecordEvent("using item " + strconv.Itoa(int(objectID)))
+
+    return nil
+}
+
+// Say sends a chat message on the given ChatType client channel: the
+// web UI chat input drives it through the say command of the hunt
+// loop. The whisper channel carries the recipient name, every other
+// channel leaves it empty. The Say2 packet validates itself (an
+// invalid chat disconnects the session server side).
+func (gc *GameClient) Say(text string, channel int32, target string) error {
+    request := togameserver.NewSay(text, channel)
+    request.Target = target
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to send chat: %w", err)
+    }
 
     return nil
 }

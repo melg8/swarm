@@ -57,6 +57,7 @@ type fakeGame struct {
     noTargets   bool
     logouts     int
     bypasses    []string
+    says        []sayCall
     // htmlMu guards the html dialog pair: the production await loop
     // polls LastHTMLDialog from the loop goroutine while the test
     // server simulation writes the reply from its own goroutine.
@@ -199,6 +200,24 @@ func (f *fakeGame) SendBypass(command string) error {
     f.bypasses = append(f.bypasses, command)
 
     return nil
+}
+
+func (f *fakeGame) Say(text string, channel int32, target string) error {
+    if f.lastError != nil {
+        return f.lastError
+    }
+    f.says = append(f.says, sayCall{
+        Text: text, Channel: channel, Target: target,
+    })
+
+    return nil
+}
+
+// sayCall records one queued chat send of the fake game.
+type sayCall struct {
+    Text    string
+    Channel int32
+    Target  string
 }
 
 func (f *fakeGame) LastHTMLDialog() (int32, string) {

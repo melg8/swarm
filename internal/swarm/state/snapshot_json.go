@@ -70,7 +70,8 @@ func snapshotJSONSize(s Snapshot) int {
         size += len(s.Events[i].Message)
     }
     for i := range s.Chat {
-        size += len(s.Chat[i].Text) + len(s.Chat[i].Kind)
+        size += len(s.Chat[i].Text) + len(s.Chat[i].Kind) +
+            len(s.Chat[i].From)
     }
 
     return size
@@ -454,6 +455,8 @@ func appendChatEventJSON(dst []byte, line ChatEvent) []byte {
     dst = appendJSONString(dst, line.Kind)
     dst = append(dst, `,"text":`...)
     dst = appendJSONString(dst, line.Text)
+    dst = append(dst, `,"from":`...)
+    dst = appendJSONString(dst, line.From)
 
     return append(dst, '}')
 }

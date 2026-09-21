@@ -34,16 +34,17 @@ func (b *benchGame) SellItems(_ []state.InventoryItem) error {
 func (b *benchGame) BuyItems(_ int32, _ []gear.Purchase) error {
     return nil
 }
-func (b *benchGame) UseItem(_ int32) error              { return nil }
-func (b *benchGame) ClickObject(_ int32) error          { return nil }
-func (b *benchGame) InteractPull(_ int32) error         { return nil }
-func (b *benchGame) ClearTarget() error                 { return nil }
-func (b *benchGame) AcquireSkill(_, _ int32) error      { return nil }
-func (b *benchGame) UseMagicSkill(_ int32) error        { return nil }
-func (b *benchGame) DropItem(_, _, _, _, _ int32) error { return nil }
-func (b *benchGame) RequestLogout() error               { return nil }
-func (b *benchGame) SendBypass(_ string) error          { return nil }
-func (b *benchGame) LastHTMLDialog() (int32, string)    { return 0, "" }
+func (b *benchGame) UseItem(_ int32) error                 { return nil }
+func (b *benchGame) ClickObject(_ int32) error             { return nil }
+func (b *benchGame) InteractPull(_ int32) error            { return nil }
+func (b *benchGame) ClearTarget() error                    { return nil }
+func (b *benchGame) AcquireSkill(_, _ int32) error         { return nil }
+func (b *benchGame) UseMagicSkill(_ int32) error           { return nil }
+func (b *benchGame) DropItem(_, _, _, _, _ int32) error    { return nil }
+func (b *benchGame) RequestLogout() error                  { return nil }
+func (b *benchGame) SendBypass(_ string) error             { return nil }
+func (b *benchGame) Say(_ string, _ int32, _ string) error { return nil }
+func (b *benchGame) LastHTMLDialog() (int32, string)       { return 0, "" }
 
 // benchWorldBot builds a bot with npcCount living attackable mobs
 // around the character and two skipped targets, the steady engage

@@ -562,7 +562,7 @@ func (b *Bot) snapshotJSONSizeLocked() int {
         index := (b.chat.head - b.chat.length + i + chatCapacity) %
             chatCapacity
         size += len(b.chat.ring[index].Text) +
-            len(b.chat.ring[index].Kind)
+            len(b.chat.ring[index].Kind) + len(b.chat.ring[index].From)
     }
 
     return size

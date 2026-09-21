@@ -103,6 +103,48 @@ func TestChatWindowRollsOver(t *testing.T) {
         lines[len(lines)-1].Text)
 }
 
+func TestApplySayMapsChannelsToKinds(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.ApplySay(Say{
+        ObjectID: 7, Channel: 0, From: "Melg", Text: "hello",
+    })
+    bot.ApplySay(Say{
+        ObjectID: 8, Channel: 1, From: "Trader", Text: "WTS bow",
+    })
+    bot.ApplySay(Say{
+        ObjectID: 9, Channel: 2, From: "Ghost", Text: "psst",
+    })
+    bot.ApplySay(Say{
+        ObjectID: 10, Channel: 8, From: "Merchant", Text: "selling",
+    })
+    bot.ApplySay(Say{
+        ObjectID: 11, Channel: 42, From: "Odd", Text: "unknown channel",
+    })
+
+    lines := chatLines(bot)
+    require.Len(t, lines, 5)
+    kinds := make([]string, 0, len(lines))
+    for _, line := range lines {
+        kinds = append(kinds, line.Kind)
+    }
+    require.Equal(t,
+        []string{"say", "shout", "whisper", "trade", "say"}, kinds)
+    require.Equal(t, "Melg", lines[0].From)
+    require.Equal(t, "hello", lines[0].Text)
+    require.Equal(t, "Ghost", lines[2].From)
+}
+
+func TestApplySaySystemAndSocialLinesKeepEmptyFrom(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.ApplySystemMessage(SystemMessage{ID: 181})
+    bot.ApplySay(Say{ObjectID: 7, Channel: 0, From: "Melg", Text: "hi"})
+
+    lines := chatLines(bot)
+    require.Len(t, lines, 2)
+    require.Empty(t, lines[0].From)
+    require.Equal(t, "Melg", lines[1].From)
+}
+
 func TestApplySystemMessageRecordsCannotSeeTarget(t *testing.T) {
     bot := NewBot("acc1")
     bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)

@@ -39,11 +39,70 @@ const (
 )
 
 // ChatEvent is one line of the web chat window: a parsed system
-// message or a social animation of a creature around the bot.
+// message, a social animation of a creature around the bot or a
+// world chat line of the CreatureSay packet. The From field carries
+// the sender name of the chat lines and stays empty for the system
+// and social kinds.
 type ChatEvent struct {
     Time time.Time `json:"time"`
     Kind string    `json:"kind"`
     Text string    `json:"text"`
+    From string    `json:"from"`
+}
+
+// ChatType client ids of the CreatureSay packet (ChatType.java of the
+// Mobius server).
+const (
+    chatChannelGeneral      = 0
+    chatChannelShout        = 1
+    chatChannelWhisper      = 2
+    chatChannelParty        = 3
+    chatChannelClan         = 4
+    chatChannelTrade        = 8
+    chatChannelAnnouncement = 10
+)
+
+// chatKindForChannel maps a CreatureSay channel to the chat line kind
+// the web UI styles by. Unknown channels degrade to the plain say
+// kind instead of being dropped: the text still matters.
+func chatKindForChannel(channel int32) string {
+    switch channel {
+    case chatChannelShout:
+        return "shout"
+    case chatChannelWhisper:
+        return "whisper"
+    case chatChannelParty:
+        return "party"
+    case chatChannelClan:
+        return "clan"
+    case chatChannelTrade:
+        return "trade"
+    case chatChannelAnnouncement:
+        return "announcement"
+    default:
+        return "say"
+    }
+}
+
+// Say carries the parsed CreatureSay packet: one world chat line of
+// a creature (the own sends of the character echo back through the
+// same broadcast).
+type Say struct {
+    ObjectID int32
+    Channel  int32
+    From     string
+    Text     string
+}
+
+// ApplySay appends a world chat line to the chat window log. The
+// sender name rides the From field of the chat event: the web UI
+// renders it as its own column.
+func (b *Bot) ApplySay(s Say) {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    b.chat.record(chatKindForChannel(s.Channel), s.Text, s.From,
+        time.Now())
+    b.touch()
 }
 
 // ChatMessageParam mirrors one SystemMessage packet parameter: the type
@@ -112,7 +171,7 @@ func (b *Bot) ApplySocialAction(a SocialAction) {
 // recordChatLocked appends one line to the chat ring buffer. The caller
 // must hold the state write lock.
 func (b *Bot) recordChatLocked(kind string, text string) {
-    b.chat.record(kind, text, time.Now())
+    b.chat.record(kind, text, "", time.Now())
     b.touch()
 }
 
@@ -134,11 +193,13 @@ func newChatLog() chatLog {
 
 // record appends one chat line. The caller must hold the bot write
 // lock.
-func (l *chatLog) record(kind string, text string, at time.Time) {
+func (l *chatLog) record(
+    kind string, text string, from string, at time.Time,
+) {
     if l.ring == nil {
         l.ring = make([]ChatEvent, chatCapacity)
     }
-    l.ring[l.head] = ChatEvent{Time: at, Kind: kind, Text: text}
+    l.ring[l.head] = ChatEvent{Time: at, Kind: kind, Text: text, From: from}
     l.head = (l.head + 1) % chatCapacity
     if l.length < chatCapacity {
         l.length++

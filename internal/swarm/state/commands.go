@@ -24,11 +24,15 @@ const (
     // CommandZone selects the hunting zone of the registry (the zone
     // list order indexes the selection, carried by the count field).
     CommandZone = "zone"
+    // CommandSay sends a chat message through the character (the
+    // channel select and the text input of the web chat window).
+    CommandSay = "say"
 )
 
 // Command is one manual command of the web interface, queued on the bot
 // by the web server and consumed by the hunt loop of the session. The
 // JSON tags match the POST /api/bots/{id}/commands request body.
+// Text, Target and Channel carry the chat message of a say command.
 type Command struct {
     Kind     string `json:"kind"`
     ObjectID int32  `json:"objectId"`
@@ -36,6 +40,9 @@ type Command struct {
     X        int32  `json:"x"`
     Y        int32  `json:"y"`
     Z        int32  `json:"z"`
+    Text     string `json:"text"`
+    Target   string `json:"target"`
+    Channel  int32  `json:"channel"`
 }
 
 // commandQueueCapacity bounds the queued manual commands: the queue is
