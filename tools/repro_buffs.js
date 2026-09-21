@@ -33,7 +33,8 @@ SPDX-License-Identifier: MIT
 //   sits in the snapshot order moves no node (a move detaches the
 //   node, the browser drops its :hover state and the hover chip
 //   flickered on every 300 ms snapshot), a reorder moves only the
-//   out of place nodes and lands in the snapshot order, a buff
+//   out of place nodes straight to their snapshot indexes and lands
+//   in the snapshot order, a buff
 //   leaving the list drops only its own node, a joining one snaps
 //   in with no spawn class and no queued animation timer;
 // - the grid cells carry the mini time strip (left over total), a
@@ -180,6 +181,24 @@ function makeElement() {
                 this.children.push(child);
                 child._parent = this;
             }
+        },
+        // insertBefore mirrors the real DOM: the node leaves its
+        // current position, a null reference node appends at the
+        // end, a reference outside the children is ignored (the
+        // panel never does that).
+        insertBefore(node, reference) {
+            const at = this.children.indexOf(node);
+            if (at >= 0) { this.children.splice(at, 1); }
+            const before = reference === null || reference === undefined
+                ? -1 : this.children.indexOf(reference);
+            if (before >= 0) {
+                this.children.splice(before, 0, node);
+            } else {
+                this.children.push(node);
+            }
+            node._parent = this;
+
+            return node;
         }
     };
 }
@@ -420,12 +439,12 @@ function checkBehavior(harness) {
     const cell91 = api.state.cells.get(91).item;
     check("keyed: the in place refresh moves no cell", (() => {
         const gridEl = grid();
-        const realAppend = gridEl.append;
+        const realInsert = gridEl.insertBefore;
         let moves = 0;
-        gridEl.append = (...added) => {
-            moves += added.length;
+        gridEl.insertBefore = (node, reference) => {
+            moves += 1;
 
-            return realAppend.apply(gridEl, added);
+            return realInsert.call(gridEl, node, reference);
         };
         // The same list again: every node already sits at its
         // snapshot index, the 300 ms snapshot stream may not touch
@@ -446,10 +465,10 @@ function checkBehavior(harness) {
         const reorderMoves = moves;
         const order = gridEl.children.map((cell) =>
             cell.getAttribute("data-skill-id")).join(",");
-        gridEl.append = realAppend;
+        gridEl.insertBefore = realInsert;
         api.panel({ buffs: two });
 
-        return steadyMoves === 0 && reorderMoves > 0 && order === "77,91";
+        return steadyMoves === 0 && reorderMoves === 1 && order === "77,91";
     })());
     api.panel({ buffs: [
         buff(91, 1, 1190, 1200, "Defense Aura", "skill0091"),

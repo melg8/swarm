@@ -197,12 +197,13 @@ function applyBuffCell(cell, buff) {
 // moment - the browser then drops its :hover state until the next
 // real mouse move, which flickered the hover countdown chip on every
 // snapshot of the 300 ms event stream under a stationary cursor. So
-// a node already sitting at its snapshot index stays untouched and
-// only the out of place ones move (the icons never re-decode for a
-// reorder either way). No spawn or leave animation runs - a change
-// snaps, the strict classic read. Every node carries its skill id in
-// the data-skill-id attribute - the hover tooltip card resolves the
-// anchor through it.
+// a node already sitting at its snapshot index stays untouched, an
+// out of place one inserts directly at its snapshot index (insert
+// before the node that sits there now - one move lands it, no matter
+// the permutation), and the icons never re-decode for a reorder.
+// No spawn or leave animation runs - a change snaps, the strict
+// classic read. Every node carries its skill id in the data-skill-id
+// attribute - the hover tooltip card resolves the anchor through it.
 function syncBuffsKeyed(container, buffs, store, make, apply) {
   const seen = new Set();
   for (const buff of buffs) { seen.add(buff.skillId); }
@@ -224,7 +225,8 @@ function syncBuffsKeyed(container, buffs, store, make, apply) {
     const anchor = buffAnchorOf(buff.skillId, buff);
     apply(entry, anchor);
     if (container.children[index] !== entry.item) {
-      container.append(entry.item);
+      container.insertBefore(entry.item,
+        container.children[index] || null);
     }
     index += 1;
   }
