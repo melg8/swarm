@@ -245,6 +245,12 @@ const MapView = {
   selfCast: null,
   skillIconCache: null,
 
+  // castIconSide is the horizontal side the cast icon hangs on (+1
+  // right, -1 left): updateCastIconSide moves it away from the enemy
+  // mass so the plate overlaps no name band nor fight float, and the
+  // default keeps it on the right when no hostiles are visible.
+  castIconSide: 1,
+
   // The per frame contact shrink factors of the unit circles (key ->
   // factor, see computeContactFactors): the melee combatants touch
   // face to face instead of merging into one blob. Null until the
@@ -458,6 +464,7 @@ const MapView = {
     this.combatAnims = [];
     this.lastCombatSeq = 0;
     this.selfCast = null;
+    this.castIconSide = 1;
     this.userMark = null;
     this.redraw();
   },
@@ -3715,17 +3722,48 @@ const MapView = {
     }
   },
 
+  // selfBowEquipped reports whether the observed character fights
+  // with a bow in hand: the snapshot inventory marks the paperdoll
+  // items with equipped and the bows carry the BOW weapon type (the
+  // same fields the gear widget reads). A snapshot without the
+  // inventory field reads as bare handed - the melee path.
+  selfBowEquipped() {
+    const items = this.lastSnap && this.lastSnap.inventory;
+    if (!Array.isArray(items)) { return false; }
+
+    return items.some((item) => item && item.equipped
+      && item.weaponType === "BOW");
+  },
+
   // spawnCombatAnim turns one fresh combat event into an animation
   // entry: a swing streak from the attacker to the hit target, a
-  // floating damage number on the hurt unit, or a miss float on the
-  // unit an evaded blow was thrown at. The entry captures the event
-  // placement so the effect still renders after the unit despawns;
-  // while the unit stays on the map the effect follows its
-  // interpolated position.
+  // flying arrow when the character attacks with a bow (the damage
+  // lands only after the server bow wind-up, so the shot must read
+  // as a projectile, not as a melee dash), a floating damage number
+  // on the hurt unit, or a miss float on the unit an evaded blow was
+  // thrown at. The entry captures the event placement so the effect
+  // still renders after the unit despawns; while the unit stays on
+  // the map the effect follows its interpolated position.
   spawnCombatAnim(ev) {
     const selfId = this.lastSnap.character
       && this.lastSnap.character.objectId;
     if (ev.kind === "attack") {
+      const onSelf = ev.targetId === selfId;
+      const bySelf = ev.attackerId === selfId;
+      // The dealt bow shots fly as projectiles; the taken swings (the
+      // mob attacks on the character) and the melee cases keep the
+      // swing reading.
+      if (bySelf && !onSelf && this.selfBowEquipped()) {
+        this.combatAnims.push({
+          kind: "bowshot", at: performance.now(), seq: ev.seq,
+          attackerId: ev.attackerId, targetId: ev.targetId,
+          fromWorld: { x: ev.x, y: ev.y },
+          toWorld: { x: ev.targetX, y: ev.targetY },
+          bySelf: true, onSelf: false
+        });
+
+        return;
+      }
       this.combatAnims.push({
         kind: "swing", at: performance.now(), seq: ev.seq,
         attackerId: ev.attackerId, targetId: ev.targetId,
@@ -3764,7 +3802,7 @@ const MapView = {
   // ingestSkillStates reads the running self cast from the snapshot
   // skillStates (the tracker publishes only the played character's
   // windows): the entry with a live cast window becomes the cast
-  // icon above the character, the end time lands on the local
+  // icon beside the character, the end time lands on the local
   // performance clock so the fill runs smoothly between the
   // snapshots. A snapshot without a live cast clears the icon. The
   // server runs one cast per creature at a time; if two states ever
@@ -3838,12 +3876,41 @@ const MapView = {
     return "";
   },
 
-  // drawSelfCast draws the cast icon above the character while it
+  // updateCastIconSide picks the side the cast icon hangs on from
+  // the enemy mass: the mean screen dx of the visible hostiles moves
+  // the icon to the side AWAY from the fight (the fight floats and
+  // the combat labels crowd the enemy side). Without hostiles or
+  // inside the dead band the previous side survives, so a scattered
+  // pack never flips the icon from frame to frame.
+  updateCastIconSide(p) {
+    let sum = 0;
+    let count = 0;
+    for (const obj of this.sortedObjects) {
+      if (!obj.attackable || obj.dead) { continue; }
+      // The interpolated position source of drawObjects: the moving
+      // hostiles weigh with their drawn spot, not their snapshot one.
+      const rt = this.runtime.get(obj.objectId);
+      const s = this.worldToScreen(
+        rt ? rt.drawX : obj.x, rt ? rt.drawY : obj.y);
+      sum += s.x - p.x;
+      count += 1;
+    }
+    if (count === 0) { return; }
+    const meanDx = sum / count;
+    if (Math.abs(meanDx) <= 10) { return; }
+    this.castIconSide = meanDx > 0 ? -1 : 1;
+  },
+
+  // drawSelfCast draws the cast icon beside the character while it
   // casts: the skill icon in a small plate, dimmed, with the bright
   // portion rising bottom up by the cast progress (the same reading
-  // as the skills widget cast fill). Before the icon art arrives
-  // (and in the icon-less sandboxes) a plain accent plate shows the
-  // same fill.
+  // as the skills widget cast fill). The plate hangs off the marker
+  // side that points away from the enemy mass (centering it above
+  // the marker used to sit inside the self name band), a dotted
+  // connector keeps it attached and a thin ring fills rotationally
+  // inside the marker circle to mark the caster itself. Before the
+  // icon art arrives (and in the icon-less sandboxes) a plain accent
+  // plate shows the same fill.
   drawSelfCast(ctx) {
     if (!this.selfCast) { return; }
     const nowMs = performance.now();
@@ -3859,12 +3926,32 @@ const MapView = {
       y: this.lastChar ? this.lastChar.y : 0
     });
     const k = this.unitScale || 1;
+    const selfRadius = selfMarkerUnits * k;
+    this.updateCastIconSide(pos);
+    const side = this.castIconSide;
     const size = Math.max(14, Math.min(30, 17 * k));
     const progress = Math.max(0, Math.min(1,
       1 - (this.selfCast.endsAt - nowMs) / this.selfCast.totalMs));
-    const x = pos.x - size / 2;
-    const y = pos.y - (selfMarkerUnits + 17) * k;
+    // The plate center rides the marker side: the inner edge lands
+    // selfRadius + 5k from the center, clearing the pulse ring. The
+    // vertical centering on the marker clears the name band (the
+    // band bottom sits at selfRadius + 4 above the center; the
+    // worst case at the smallest zoom touches the band padding, not
+    // the glyphs).
+    const x = pos.x + side * (selfRadius + 5 * k + size / 2) - size / 2;
+    const y = pos.y - size / 2;
     ctx.save();
+    // The dotted connector from the marker edge to the plate: the
+    // attachment read while the icon hangs beside the character.
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = "#7cc4ff";
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath();
+    ctx.moveTo(pos.x + side * (selfRadius + 1), pos.y);
+    ctx.lineTo(pos.x + side * (selfRadius + 5 * k - 1), pos.y);
+    ctx.stroke();
+    ctx.setLineDash([]);
     // The dim plate with the icon (or the plain fallback).
     ctx.globalAlpha = 0.85;
     ctx.fillStyle = "rgba(15, 18, 22, 0.72)";
@@ -3900,15 +3987,30 @@ const MapView = {
     ctx.strokeStyle = "#7cc4ff";
     ctx.lineWidth = 1.2;
     ctx.strokeRect(x, y, size, size);
+    // The cast ring inside the marker circle: the faint track plus
+    // the bright progress arc sweeping clockwise from the top - the
+    // circle fills rotationally while the cast runs.
+    ctx.strokeStyle = "#7cc4ff";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, selfRadius - 2 * k, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, selfRadius - 2 * k,
+      -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * progress);
+    ctx.stroke();
     ctx.restore();
   },
 
   // drawCombatEffects renders the live combat animation layer on
-  // top of the units: the swing streaks of the landed hits, the
-  // floating damage numbers of the HP deltas and the miss floats of
-  // the evaded blows. Finished entries drop out here;
-  // needsMoreFrames keeps the render loop alive while any of them
-  // are still running.
+  // top of the units: the swing streaks of the landed hits, the bow
+  // arrows of the dealt bow shots, the floating damage numbers of
+  // the HP deltas and the miss floats of the evaded blows. Finished
+  // entries drop out here; needsMoreFrames keeps the render loop
+  // alive while any of them are still running.
   drawCombatEffects(ctx) {
     if (this.combatAnims.length === 0) {
       return;
@@ -3917,12 +4019,15 @@ const MapView = {
     const keep = [];
     for (const anim of this.combatAnims) {
       const life = anim.kind === "swing" ? swingMs
+        : anim.kind === "bowshot" ? bowShotMs
         : anim.kind === "miss" ? missMs : damageMs;
       const age = nowMs - anim.at;
       if (age >= life) { continue; }
       keep.push(anim);
       if (anim.kind === "swing") {
         this.drawSwingEffect(ctx, anim, age / life);
+      } else if (anim.kind === "bowshot") {
+        this.drawBowShotEffect(ctx, anim, age / life);
       } else if (anim.kind === "miss") {
         this.drawMissEffect(ctx, anim, age / life);
       } else {
@@ -4015,6 +4120,62 @@ const MapView = {
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(to.x, to.y, 3 + 10 * burst, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  },
+
+  // drawBowShotEffect draws one dealt bow attack as a flying arrow:
+  // a short bright shaft oriented along the flight direction travels
+  // from the shooter to the target over the whole flight time (the
+  // damage lands with the arrow, not with the attack order), a faint
+  // trail segment trails behind it and a small crossing stroke flash
+  // blooms at the target end as the arrow arrives.
+  drawBowShotEffect(ctx, anim, t) {
+    const from = this.effectScreenPos(anim.attackerId, anim.fromWorld);
+    const to = this.effectScreenPos(anim.targetId, anim.toWorld);
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 2) { return; }
+    const k = this.unitScale || 1;
+    const ux = dx / dist;
+    const uy = dy / dist;
+    const head = 10 * k;
+    const hx = from.x + dx * easeOutQuad(t);
+    const hy = from.y + dy * easeOutQuad(t);
+    ctx.save();
+    ctx.strokeStyle = swingSelfColor;
+    ctx.lineCap = "round";
+    // The arrow shaft: a short segment on the flight line.
+    ctx.globalAlpha = 0.95;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(hx - ux * head / 2, hy - uy * head / 2);
+    ctx.lineTo(hx + ux * head / 2, hy + uy * head / 2);
+    ctx.stroke();
+    // The trail: a fainter segment behind the shaft tail.
+    ctx.globalAlpha = 0.3;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(hx - ux * head / 2, hy - uy * head / 2);
+    ctx.lineTo(hx - ux * (head / 2 + 8 * k),
+      hy - uy * (head / 2 + 8 * k));
+    ctx.stroke();
+    // The arrival flash: two short crossing strokes at the target.
+    if (t > 0.85) {
+      const burst = (t - 0.85) / 0.15;
+      const len = 3 + 5 * burst;
+      ctx.globalAlpha = (1 - burst) * 0.9;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(to.x - len, to.y);
+      ctx.lineTo(to.x + len, to.y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(to.x, to.y - len);
+      ctx.lineTo(to.x, to.y + len);
       ctx.stroke();
     }
     ctx.restore();
@@ -4337,6 +4498,12 @@ const socialWarnFactor = 1.25;
 // swing a second, so the effects of a running fight never overlap
 // into one smear).
 const swingMs = 340;
+
+// bowShotMs is the flight time of one bow projectile: the arrow
+// crosses from the shooter to the target while the server bow
+// wind-up runs, so the arrival flash lands with the damage, not
+// with the attack order.
+const bowShotMs = 500;
 
 // damageMs is the life of one floating damage number: it pops in,
 // rises above the hurt unit and melts away.

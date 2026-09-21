@@ -470,9 +470,12 @@ snapshots only grow by the 2 s window, so the payload stays small.
 ## Self cast icon (map.js + state skillStates)
 
 While the character casts, the map draws the skill icon in a small
-plate above the self marker with the bright portion rising bottom up
-by the cast progress (before the icon art loads a plain accent plate
-shows the same fill). The backend reads it from the Mobius C1
+plate beside the self marker (on the side that points away from the
+enemy mass, attached with a dotted connector, while a thin ring
+fills rotationally inside the marker circle) with the bright portion
+rising bottom up by the cast progress (before the icon art loads a
+plain accent plate shows the same fill). The backend reads it from
+the Mobius C1
 `MagicSkillUse` (0x5A) broadcast: a self cast opens the cast window
 (the packet hit time) and the cooldown window (the packet reuse
 delay), the snapshot publishes them as `skillStates` (`SkillStateView`:

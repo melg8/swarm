@@ -128,8 +128,10 @@ function makeRecordingContext(record) {
                 pending = [x, y];
             }
         },
-        arc: (x, y, r) => {
-            if (current) { current.arcs.push([x, y, r]); }
+        arc: (x, y, r, a0, a1) => {
+            // The start and the end angle ride the record too: the
+            // cast ring scenario asserts the progress sweep.
+            if (current) { current.arcs.push([x, y, r, a0, a1]); }
         },
         stroke: () => {
             if (current) {
@@ -186,7 +188,10 @@ function makeRecordingContext(record) {
             });
         },
         measureText: (text) => ({ width: (text || "").length * 6 }),
-        setLineDash: (dash) => { record.dash = dash.slice(); },
+        setLineDash: (dash) => {
+            record.dash = dash.slice();
+            record.dashes.push(dash.slice());
+        },
         // The background cache blit: the arguments land in the record
         // so a scenario can assert what was composited and where.
         drawImage: (...args) => { record.blits.push(args); },
@@ -226,7 +231,8 @@ function makeElementStub(checked) {
 function loadMapJs(mapFile) {
     const record = {
         strokes: [], fills: [], texts: [], blits: [], rects: [],
-        style: "", fillStyle: "", width: 1, dash: [], font: ""
+        style: "", fillStyle: "", width: 1, dash: [], dashes: [],
+        font: ""
     };
     const listeners = { canvas: {}, window: {} };
     const listen = (registry) => (type, fn) => {
@@ -297,7 +303,8 @@ function loadMapJs(mapFile) {
                 if (tag !== "canvas") { return makeElementStub(false); }
                 const bgRecord = {
                     strokes: [], fills: [], texts: [], blits: [], rects: [],
-                    style: "", fillStyle: "", width: 1, dash: []
+                    style: "", fillStyle: "", width: 1, dash: [],
+                    dashes: []
                 };
 
                 return {
@@ -545,8 +552,10 @@ function runScenarioCombatFloats(mapFile) {
 }
 
 // runScenarioCastIcon covers the self cast icon: a snapshot skill
-// state with a live cast window draws the icon plate above the
-// character with the fill rising by the cast progress, the fill
+// state with a live cast window draws the icon plate beside the
+// character with the fill rising by the cast progress, the plate
+// clears the name band, the enemy mass moves the icon to the far
+// side, the dotted connector and the cast ring paint, the fill
 // anchor survives the snapshot re-reads and the icon clears when the
 // cast ends.
 function runScenarioCastIcon(mapFile) {
@@ -580,25 +589,117 @@ function runScenarioCastIcon(mapFile) {
         "endsAt moved from " + anchorBefore + " to "
         + (MapView.selfCast && MapView.selfCast.endsAt));
 
-    // Half the cast in: the plate draws above the self marker (the
-    // sandbox owns no Image, so the fallback plate paints).
+    // Half the cast in: the plate draws beside the self marker (the
+    // sandbox owns no Image, so the fallback plate paints). The base
+    // snapshot mobs sit east of the character, so the enemy mass
+    // parks the icon on the LEFT side here.
     advanceClock(375);
+    record.rects.length = 0;
     MapView.draw();
     const self = worldToScreen(WORLD.self.x, WORLD.self.y);
     const size = 17;
-    const plate = record.rects.filter((rect) => !rect.stroked
+    const plateFilter = (rect) => !rect.stroked
         && Math.abs(rect.w - (size - 4)) < 1
-        && Math.abs((rect.x + rect.w / 2) - self.x) < 2
-        && rect.y < self.y);
-    check(results, "the cast plate draws above the character",
-        plate.length >= 2,
-        "expected the dim and the bright plate near x="
-        + self.x + " (got " + record.rects.length + " rects)");
+        && Math.abs((rect.y + rect.h / 2) - self.y) < 20
+        && (rect.x > self.x || rect.x + rect.w < self.x);
+    const plate = record.rects.filter(plateFilter);
+    check(results, "the cast plate draws beside the character",
+        plate.length >= 2 && plate.every((rect) => Math.min(
+            Math.abs(rect.x - self.x),
+            Math.abs(rect.x + rect.w - self.x)) > 6),
+        "expected the dim and the bright plate beside x="
+        + self.x + " y=" + self.y + " (got "
+        + record.rects.length + " rects)");
+
+    // The name band rect of the self label (the same math drawLabels
+    // runs: the candidate sits at the marker top minus 6, the band
+    // spans y-12..y+2 around it, the width is measureText + 6) must
+    // stay clear of the plate.
+    const nameW = WORLD.self.name.length * 6 + 6;
+    const candY = self.y - 6 - 6;
+    const band = {
+        left: self.x - nameW / 2, right: self.x + nameW / 2,
+        top: candY - 12, bottom: candY + 2
+    };
+    const bandHit = plate.some((rect) => rect.x < band.right
+        && rect.x + rect.w > band.left
+        && rect.y < band.bottom && rect.y + rect.h > band.top);
+    check(results, "the cast plate clears the name band",
+        plate.length >= 2 && !bandHit,
+        "plate rect intersects the band " + JSON.stringify(band));
 
     // The render loop stays alive while the cast runs.
     check(results, "the cast keeps the render loop alive",
         MapView.needsMoreFrames() === true,
         "needsMoreFrames went false during the cast");
+
+    // The cast ring fills rotationally inside the marker circle: a
+    // bright arc of radius selfRadius - 2 sweeping by the progress
+    // (0.75 at this clock) on top of the faint full track.
+    const ring = record.strokes.filter((stroke) =>
+        stroke.style === "#7cc4ff" && stroke.arcs.length === 1
+        && Math.hypot(stroke.arcs[0][0] - self.x,
+            stroke.arcs[0][1] - self.y) < 2
+        && Math.abs(stroke.arcs[0][2] - 4) < 0.75);
+    const sweepOf = (stroke) => stroke.arcs[0][4] - stroke.arcs[0][3];
+    check(results, "the cast ring arc fills inside the marker circle",
+        ring.some((stroke) =>
+            Math.abs(sweepOf(stroke) - Math.PI * 2 * 0.75) < 0.05)
+        && ring.some((stroke) =>
+            Math.abs(sweepOf(stroke) - Math.PI * 2) < 0.05),
+        "ring sweeps: "
+        + ring.map((s) => sweepOf(s).toFixed(2)).join(", "));
+
+    // The enemy mass moves the icon: a hostile west of the character
+    // pulls the mean hostile dx negative and the plate to the RIGHT
+    // side, a hostile pack east pulls it back to the LEFT (away from
+    // the fight floats and the combat labels).
+    const injectHostile = (objectId, x) => {
+        const next = buildSnapshot(0, false);
+        next.skills = snap.skills;
+        next.skillStates = snap.skillStates;
+        next.objects.push({
+            objectId, kind: "npc", name: "Orc", x, y: WORLD.self.y,
+            z: -3500, heading: 0, moving: false, speed: 0, targetId: 0,
+            dead: false, attackable: true, aggressive: true,
+            inCombat: false, level: 3
+        });
+        MapView.update(next);
+    };
+    injectHostile(501, WORLD.self.x - 1000);
+    record.rects.length = 0;
+    MapView.draw();
+    const rightPlate = record.rects.filter(plateFilter);
+    check(results, "the enemies on the left push the cast icon right",
+        rightPlate.length >= 2
+        && rightPlate.every((rect) => rect.x > self.x),
+        "plate x: " + rightPlate.map((r) => r.x) + " self x=" + self.x);
+    injectHostile(502, WORLD.self.x + 1000);
+    injectHostile(503, WORLD.self.x + 1200);
+    record.rects.length = 0;
+    MapView.draw();
+    const leftPlate = record.rects.filter(plateFilter);
+    check(results, "the enemies on the right push the cast icon left",
+        leftPlate.length >= 2
+        && leftPlate.every((rect) => rect.x + rect.w < self.x),
+        "plate right edges: "
+        + leftPlate.map((r) => r.x + r.w) + " self x=" + self.x);
+
+    // The dotted connector: a dashed short stroke between the marker
+    // edge and the plate on whichever side the icon hangs.
+    const dashed = record.dashes.some((dash) =>
+        dash.length === 2 && dash[0] === 2 && dash[1] === 2);
+    const linked = [
+        { from: { x: self.x + 7, y: self.y },
+          to: { x: self.x + 10, y: self.y } },
+        { from: { x: self.x - 7, y: self.y },
+          to: { x: self.x - 10, y: self.y } }
+    ].some((side) =>
+        findSegment(record, side.from, side.to, "#7cc4ff").length > 0);
+    check(results, "the cast connector draws dashed to the marker",
+        dashed && linked,
+        "dash [2 2] seen: " + dashed + ", short stroke seen: "
+        + linked);
 
     // Past the cast end the icon clears.
     record.rects.length = 0;
@@ -607,13 +708,126 @@ function runScenarioCastIcon(mapFile) {
     check(results, "the cast icon clears when the cast ends",
         MapView.selfCast === null,
         "selfCast survived the cast end");
-    const plateAfter = record.rects.filter((rect) => !rect.stroked
-        && Math.abs(rect.w - (size - 4)) < 1
-        && Math.abs((rect.x + rect.w / 2) - self.x) < 2
-        && rect.y < self.y - 20);
+    const plateAfter = record.rects.filter(plateFilter);
     check(results, "the expired cast paints no plate",
         plateAfter.length === 0,
         "plate rects survived: " + plateAfter.length);
+
+    return results;
+}
+
+// runScenarioBowShot covers the bow projectile: a dealt attack of a
+// bow wielding character spawns a bowshot anim instead of the melee
+// swing (the damage lands only after the server bow wind-up), the
+// arrow paints along the flight path and flashes at the arrival,
+// while the bare handed character and the taken swings keep the
+// melee swing reading.
+function runScenarioBowShot(mapFile) {
+    const { MapView, record, advanceClock } = loadMapJs(mapFile);
+    MapView.init();
+    const selfId = WORLD.self.objectId;
+    const mob = WORLD.playerTargetMob;
+    const attack = (seq) => ({
+        seq, kind: "attack", attackerId: selfId,
+        targetId: mob.objectId, amount: 24, atMs: 0,
+        x: WORLD.self.x, y: WORLD.self.y,
+        targetX: mob.x, targetY: mob.y
+    });
+    const bowInventory = [
+        { objectId: 74, name: "Hunter's Bow", equipped: true,
+          weaponType: "BOW" },
+        { objectId: 10, name: "Sword of Reflection", equipped: true,
+          weaponType: "SWORD" }
+    ];
+    const animKinds = () => MapView.combatAnims.map(
+        (a) => a.kind + ":" + a.seq).join(", ");
+
+    // The bare handed baseline: the melee swing keeps its dash.
+    MapView.update(buildSnapshot(0, false));
+    const bare = buildSnapshot(0, false);
+    bare.combatEvents = [attack(1)];
+    MapView.update(bare);
+
+    const results = [];
+    check(results, "the bare handed attack spawns the melee swing",
+        MapView.combatAnims.some((a) => a.kind === "swing" && a.seq === 1)
+        && !MapView.combatAnims.some((a) => a.kind === "bowshot"),
+        "anims: " + animKinds());
+
+    // With a bow equipped the same event becomes a projectile: the
+    // inventory snapshot lands first (the arm step, the inventory
+    // rides this.lastSnap at the event ingest), the attack event
+    // rides the next one.
+    advanceClock(400);
+    const armed = buildSnapshot(0, false);
+    armed.inventory = bowInventory;
+    MapView.update(armed);
+    const bow = buildSnapshot(0, false);
+    bow.inventory = bowInventory;
+    bow.combatEvents = [attack(2)];
+    MapView.update(bow);
+    check(results, "the bow attack spawns a projectile",
+        MapView.combatAnims.some((a) => a.kind === "bowshot"
+          && a.seq === 2)
+        && !MapView.combatAnims.some((a) => a.kind === "swing"
+          && a.seq === 2),
+        "anims: " + animKinds());
+
+    // The arrow crosses the flight path while the wind-up runs: the
+    // shaft segment rides the eased position a quarter into the
+    // flight (the swing self color, no melee starburst at the target
+    // yet).
+    advanceClock(125);
+    record.strokes.length = 0;
+    MapView.draw();
+    const from = worldToScreen(WORLD.self.x, WORLD.self.y);
+    const to = worldToScreen(mob.x, mob.y);
+    const t = 0.25;
+    const eased = 1 - (1 - t) * (1 - t);
+    const dist = Math.hypot(to.x - from.x, to.y - from.y);
+    const ux = (to.x - from.x) / dist;
+    const uy = (to.y - from.y) / dist;
+    const hx = from.x + (to.x - from.x) * eased;
+    const hy = from.y + (to.y - from.y) * eased;
+    const shaft = 10;
+    check(results, "the bow projectile paints along the flight path",
+        findSegment(record,
+            { x: hx - ux * shaft / 2, y: hy - uy * shaft / 2 },
+            { x: hx + ux * shaft / 2, y: hy + uy * shaft / 2 },
+            "#7cc4ff").length > 0,
+        "no arrow shaft near the eased flight position");
+
+    // The arrival flash: past 85% of the flight the crossing strokes
+    // bloom at the target end.
+    advanceClock(310);
+    record.strokes.length = 0;
+    MapView.draw();
+    const flashLen = 3 + 5 * ((500 * 0.87 - 500 * 0.85)
+      / (500 * 0.15));
+    check(results, "the bow arrival flashes at the target",
+        findSegment(record, { x: to.x - flashLen, y: to.y },
+            { x: to.x + flashLen, y: to.y }, "#ffffff").length > 0
+        && findSegment(record, { x: to.x, y: to.y - flashLen },
+            { x: to.x, y: to.y + flashLen }, "#ffffff").length > 0,
+        "no crossing flash strokes at the target");
+
+    // The taken swing (a mob attack on the character) keeps the
+    // melee reading even with the bow in hand.
+    advanceClock(600);
+    const taken = buildSnapshot(0, false);
+    taken.inventory = bowInventory;
+    taken.combatEvents = [{
+        seq: 3, kind: "attack", attackerId: mob.objectId,
+        targetId: selfId, amount: 9, atMs: 0,
+        x: mob.x, y: mob.y,
+        targetX: WORLD.self.x, targetY: WORLD.self.y
+    }];
+    MapView.update(taken);
+    check(results, "the taken swing keeps the melee reading",
+        MapView.combatAnims.some((a) => a.kind === "swing" && a.seq === 3)
+        && !MapView.combatAnims.some((a) => a.kind === "bowshot"
+          && a.seq === 3),
+        "anims: " + animKinds());
 
     return results;
 }
@@ -1612,6 +1826,7 @@ function main() {
         ["combat floats", runScenarioCombatFloats(mapFile)],
         ["melee contact", runScenarioMeleeContact(mapFile)],
         ["cast icon", runScenarioCastIcon(mapFile)],
+        ["bow shot", runScenarioBowShot(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
         ["walk cursor", runScenarioWalkCursor(mapFile)],
