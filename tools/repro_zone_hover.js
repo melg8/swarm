@@ -648,6 +648,18 @@ function runScenarioKillMarks(mapFile) {
         "hoverMark " + JSON.stringify(MapView.hoverMark)
         + ", added " + tooltip._addedClasses.join(","));
 
+    // The corpse sits exactly on its own kill skull: the victim
+    // tooltip with the kill age wins over the dead unit tooltip (the
+    // living units keep their tooltips everywhere).
+    snap.objects.push({ objectId: 999, kind: "npc", name: "Dead Wolf",
+        level: 3, dead: true, x: 45100, y: 50100 });
+    MapView.update(snap);
+    fireCanvas("mousemove", { clientX: fresh.x, clientY: fresh.y });
+    check(results, "the corpse skull tooltip wins the dead unit",
+        MapView.hoverMark === picked,
+        "hoverMark " + JSON.stringify(MapView.hoverMark
+            && MapView.hoverMark.name));
+
     // The layer toggle hides the fleet ring: the fleet skull fills and
     // the old solid cross strokes drop while the dashed social
     // warnings (they share the orange) keep drawing - the dash based

@@ -2984,8 +2984,8 @@ count is consistent.
 ## Active task (status: complete): the web UI feedback round - the skull tooltips, the anchored scroll, the collapsible chat (2026-09-21, branch feature/improved-behaviour)
 
 Started 2026-09-21 ~13:20 UTC, closed ~14:40 UTC. Seven owner reports
-landed as melg8 (8ea1771 the anchored scroll, 0e3ceae the skull size
-and the victim tooltip, 6a96d7c the collapse and the channel colors,
+landed as melg8 (8ea1771 the anchored scroll, 1317c20 the skull size
+and the victim tooltip, 5ae1918 the collapse and the channel colors,
 b143f09 the whisper root cause), rebased over the parallel pushes.
 The highlights: the kill marks carry the victim name and level now
 (the kill record captures them at the kill, the npc dictionary

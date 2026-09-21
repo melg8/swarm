@@ -3218,15 +3218,20 @@ const MapView = {
     this.hoverWp = wp;
     this.cursorWorld = world;
     this.updateCursorChip();
-    // The kill skulls pick only where no object does: the unit
-    // tooltips own their pixels, the skulls own the empty map ground.
-    const mark = best ? null : this.killMarkAt(mx, my);
+    // The kill skulls pick where no LIVING object does: the unit
+    // tooltips own their pixels, but a dead mob (the corpse) sits
+    // exactly on its own kill skull - the victim tooltip with the
+    // kill age owns that spot until the corpse despawns.
+    let mark = null;
+    if (!best || best.dead) {
+      mark = this.killMarkAt(mx, my);
+    }
     if (best !== this.hover || zone !== this.hoverZone || wpChanged
         || mark !== this.hoverMark) {
       this.hover = best;
       this.hoverZone = zone;
       this.hoverMark = mark;
-      if (best) {
+      if (best && !(mark && best.dead)) {
         this.showTooltip(best, mx, my);
       } else if (mark) {
         this.showKillTooltip(mark, mx, my);

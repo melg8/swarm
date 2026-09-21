@@ -3747,7 +3747,7 @@ initGearMode();
 // Chat window state: the active filter tab, and auto scroll follows
 // the newest line while the user stays at the bottom; scrolling up
 // reads the history, scrolling back to the bottom resumes the follow.
-const ChatWindow = { stick: true, tab: "all" };
+const ChatWindow = { stick: true, tab: "all", collapsed: false };
 
 // Chat line kind families: the world chat lines (the CreatureSay
 // packets) split from the bot system messages in the tabs.
@@ -3791,10 +3791,17 @@ function setChatTab(tab) {
 // storage stays optional (the harness sandbox and strict privacy
 // settings have none) - the flags flip regardless.
 function setChatCollapsed(collapsed) {
+  ChatWindow.collapsed = Boolean(collapsed);
   const box = document.getElementById("chat-box");
   const restore = document.getElementById("chat-restore");
   if (box) { box.classList.toggle("hidden", Boolean(collapsed)); }
   if (restore) { restore.classList.toggle("hidden", !collapsed); }
+  if (!ChatWindow.collapsed) {
+    // The collapsed window skipped the snapshot renders (a hidden
+    // box measures 0 offsets and the scroll restore would park the
+    // view at the oldest lines): render once on the way back out.
+    renderChat(App.snapshot);
+  }
   if (typeof localStorage === "undefined") { return; }
   try {
     window.localStorage.setItem("swarm.chatCollapsed",
@@ -3904,6 +3911,12 @@ function chatCaptureAnchor(list) {
 }
 
 function renderChat(snap) {
+  if (ChatWindow.collapsed) {
+    // The hidden box measures zero offsets: the scroll anchor math
+    // would park the reading position at the top every snapshot.
+    // The expand path renders the fresh snapshot instead.
+    return;
+  }
   const list = document.getElementById("chat-list");
   const lines = (snap && snap.chat) || [];
   // The rebuild collapses the content first and a real browser clamps

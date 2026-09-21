@@ -8819,7 +8819,7 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
   packet) label nothing - the same boundary the damage numbers
   already have.
 
-## Round 123: the skull tooltips, the anchored chat scroll and the whisper selector collision (2026-09-21)
+## Round 125: the skull tooltips, the anchored chat scroll and the whisper selector collision (2026-09-21)
 
 - Report: seven owner reports. The skulls wanted 2.5x size and a
   hover tooltip with the victim (name, level, age). The previous
