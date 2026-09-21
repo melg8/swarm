@@ -619,7 +619,14 @@ func (l *Loop) tripCooldownOver() bool {
         return true
     }
     cooldown := tripCooldown
-    if l.weaponlessRunWanted() || l.gearDebtRunWanted() {
+    if l.weaponlessRunWanted() || l.gearDebtRunWanted() ||
+        l.guideRunWanted() {
+        // The guide run shares the short window: the support magic
+        // lapses by the server push and the refill must not wait out
+        // the five minute cooldown of the last ordinary trip - the
+        // owner rule of farming under the buffs (the 2026-09-21
+        // guide priority round). No oscillation: the landed buffs
+        // keep guideWanted false for the whole 1200 seconds.
         cooldown = weaponRunCooldown
     } else if l.tripAbortRun > tripAbortEscalateAfter {
         // The abort streak escalates: a trip that keeps failing

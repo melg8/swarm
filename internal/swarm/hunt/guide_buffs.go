@@ -110,13 +110,16 @@ var guideStopNpc = townNpc{
 // the elven village guide serves the elven region (the default when
 // the loop carries no region yet), the regions without a mapped
 // guide answer none - a stop planned for a foreign region would walk
-// the Dion trips back to the elven village across the whole map.
+// the Dion trips back to the elven village across the whole map. The
+// allowlist shape keeps the future regions honest: a new region
+// stays guide-less until its guide spawn is mapped here.
 func guideForRegion(region string) (townNpc, bool) {
-    if region == regionDion {
+    switch region {
+    case regionElven, "":
+        return guideStopNpc, true
+    default:
         return zeroTownNpc, false
     }
-
-    return guideStopNpc, true
 }
 
 // guideStop reports whether the current trip stop is the Newbie
@@ -278,6 +281,12 @@ func (l *Loop) handleGuideStop(now time.Time) bool {
         return false
     }
     l.guideID = -1
+    // The no-show arms the refusal cooldown too: a spawn absent from
+    // the tracker would otherwise end the trip normally (the abort
+    // escalation never sees it) and the next guide run would walk
+    // the same empty square every short cooldown - the loop bound of
+    // the refused gate applies to the invisible one as well.
+    l.armGuideRefusal("the Newbie Guide never showed up")
     l.logger.Printf("Hunt: guide: the Newbie Guide never showed up, " +
         "skipping it")
 
