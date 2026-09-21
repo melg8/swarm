@@ -62,6 +62,7 @@ func snapshotJSONSize(s Snapshot) int {
         size += 256 * len(s.SkillPlan.Entries)
     }
     size += 160 * len(s.CombatEvents)
+    size += 80 * len(s.SkillStates)
     size += 160 * len(s.HuntingZones)
     size += 320
     size += 320
@@ -110,6 +111,8 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
     dst = appendSkillPlanJSON(dst, s.SkillPlan)
     dst = append(dst, `,"buffs":`...)
     dst = appendBuffsJSON(dst, s.Buffs)
+    dst = append(dst, `,"skillStates":`...)
+    dst = appendSkillStatesJSON(dst, s.SkillStates)
     dst = append(dst, `,"combatEvents":`...)
     dst = appendCombatEventsJSON(dst, s.CombatEvents)
     dst = append(dst, `,"huntingZone":`...)
@@ -781,6 +784,42 @@ func appendBuffSnapshotJSON(dst []byte, buff BuffSnapshot) []byte {
     dst = appendJSONString(dst, buff.Desc)
     dst = append(dst, `,"effect":`...)
     dst = appendJSONString(dst, buff.Effect)
+    dst = append(dst, '}')
+
+    return dst
+}
+
+// appendSkillStatesJSON writes the live cast and reuse windows (null
+// when no window runs).
+func appendSkillStatesJSON(dst []byte, states []SkillStateView) []byte {
+    if states == nil {
+        return append(dst, `null`...)
+    }
+    dst = append(dst, '[')
+    for i := range states {
+        if i > 0 {
+            dst = append(dst, ',')
+        }
+        dst = appendSkillStateViewJSON(dst, states[i])
+    }
+    dst = append(dst, ']')
+
+    return dst
+}
+
+// appendSkillStateViewJSON writes one skill cast and reuse window.
+// The live state encoder reuses it with a stack allocated view.
+func appendSkillStateViewJSON(dst []byte, state SkillStateView) []byte {
+    dst = append(dst, `{"skillId":`...)
+    dst = strconv.AppendInt(dst, int64(state.SkillID), 10)
+    dst = append(dst, `,"castLeftMs":`...)
+    dst = strconv.AppendInt(dst, state.CastLeftMs, 10)
+    dst = append(dst, `,"castTotalMs":`...)
+    dst = strconv.AppendInt(dst, state.CastTotalMs, 10)
+    dst = append(dst, `,"reuseLeftMs":`...)
+    dst = strconv.AppendInt(dst, state.ReuseLeftMs, 10)
+    dst = append(dst, `,"reuseTotalMs":`...)
+    dst = strconv.AppendInt(dst, state.ReuseTotalMs, 10)
     dst = append(dst, '}')
 
     return dst

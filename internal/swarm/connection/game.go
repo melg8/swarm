@@ -151,6 +151,7 @@ const (
     myTargetSelectedID = 0xBF
     systemMessageID    = 0x7A
     creatureSayID      = 0x5D
+    magicSkillUseID    = 0x5A
     skillListID        = 0x6D
     questListID        = 0x98
     abnormalStatusID   = 0x97
@@ -216,6 +217,7 @@ type GameClient struct {
     targetDropped  fromgameserver.TargetUnselectedPacket
     systemMessage  fromgameserver.SystemMessagePacket
     creatureSay    fromgameserver.CreatureSayPacket
+    magicSkillUse  fromgameserver.MagicSkillUsePacket
     socialAction   fromgameserver.SocialActionPacket
     actionFailed   fromgameserver.ActionFailedPacket
     itemList       fromgameserver.ItemListPacket
@@ -302,6 +304,7 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
         targetDropped:   *fromgameserver.NewTargetUnselectedPacket(),
         systemMessage:   *fromgameserver.NewSystemMessagePacket(),
         creatureSay:     *fromgameserver.NewCreatureSayPacket(),
+        magicSkillUse:   *fromgameserver.NewMagicSkillUsePacket(),
         socialAction:    *fromgameserver.NewSocialActionPacket(),
         actionFailed:    *fromgameserver.NewActionFailedPacket(),
         itemList:        *fromgameserver.NewItemListPacket(),

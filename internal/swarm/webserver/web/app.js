@@ -2354,6 +2354,22 @@ const SkillCells = {
   blanks: []
 };
 
+// SKILL_STATE_TICK_MS paces the countdown ticker of the skill cells:
+// the cast fill and the cooldown countdown read honest at a quarter
+// second, the CSS transitions smooth the steps in between.
+const SKILL_STATE_TICK_MS = 250;
+
+// SkillLive holds the countdown anchors of the last snapshot skill
+// states (skillId -> the window remainders at the `at` wall clock)
+// and the running ticker handle. The same anchor pattern the buffs
+// panel uses: the server sent the remainders at the snapshot, the
+// local ticker counts the elapsed wall clock off that reading
+// between the snapshots.
+const SkillLive = {
+  anchors: new Map(),
+  timer: null
+};
+
 // SKILL_CATEGORY_LABELS names the warrior priority categories of the
 // generated skill dictionary (0 attack power, 1 defense, 2 other).
 const SKILL_CATEGORY_LABELS = ["attack power", "defense", "other"];
@@ -2573,6 +2589,11 @@ function renderSkills(snap) {
   }
   if (!grid) { return; }
 
+  // The cast and cooldown overlays live outside the grid signature:
+  // they change at the snapshot cadence while the learned set holds
+  // still, so the anchor refresh runs before the signature gate.
+  renderSkillStates(snap);
+
   const signature = skillGridSignature(skills, GearMode.filter);
   if (GearMode.gridSignature === signature) {
     renderSkillsFoot(snap, plan);
@@ -2670,6 +2691,9 @@ function renderSkills(snap) {
     count.textContent = wanted.length + "/" + skills.length;
   }
   renderSkillsFoot(snap, plan);
+  // The cells re-attached above (a filter swap re-docks the cached
+  // ones) carry their overlays fresh from the anchors.
+  updateSkillCellStates();
 }
 
 // SKILL_GRID_COLUMNS is the fixed column count of the learned grid
@@ -2707,7 +2731,10 @@ function setSkillBlanks(count) {
 function makeSkillCell(skill) {
   const cell = document.createElement("div");
   cell.className = "skill-cell";
-  const row = { cell, img: null, glyph: null, level: null, skill: null };
+  const row = {
+    cell, img: null, glyph: null, level: null, skill: null,
+    castFill: null, cool: null, coolFill: null, coolTime: null
+  };
   cell.addEventListener("mouseenter", () => {
     showSkillTooltip(row.skill, cell);
   });
@@ -2753,6 +2780,171 @@ function applySkillCell(record, skill) {
   record.level.textContent = String(skill.level);
   record.cell.title = (skill.name || ("skill #" + skill.skillId)) +
     " lvl " + skill.level;
+  // The cast and cooldown overlays: built once per cell (the keyed
+  // rule - no element is ever recreated by a re-render), refreshed
+  // in place by updateSkillCellStates.
+  if (!record.castFill) {
+    const castFill = document.createElement("div");
+    castFill.className = "skill-cast-fill";
+    record.cell.append(castFill);
+    record.castFill = castFill;
+  }
+  if (!record.cool) {
+    const cool = document.createElement("div");
+    cool.className = "skill-cool hidden";
+    const coolFill = document.createElement("div");
+    coolFill.className = "skill-cool-fill";
+    const coolTime = document.createElement("span");
+    coolTime.className = "skill-cool-time";
+    cool.append(coolFill);
+    cool.append(coolTime);
+    record.cell.append(cool);
+    record.cool = cool;
+    record.coolFill = coolFill;
+    record.coolTime = coolTime;
+  }
+  updateSkillCellState(record);
+}
+
+// ---- skill cast and cooldown overlays ----
+//
+// The snapshot skillStates section carries the live cast and reuse
+// windows of the learned skills (the remainders at the snapshot
+// moment plus the totals). The keyed cells render them: the cast
+// fill rises bottom up while the character casts, the cooldown dim
+// with the restore fill and the remaining seconds covers the cell
+// while the skill is unavailable.
+
+// renderSkillStates refreshes the countdown anchors from one
+// snapshot: every state entry re-anchors its skill window at the
+// current wall clock, the skills that left the section (both windows
+// elapsed server side) drop their anchors. It then syncs the cells
+// once - the ticker keeps them honest between the snapshots.
+function renderSkillStates(snap) {
+  const states = snap.skillStates || [];
+  const now = Date.now();
+  const seen = new Set();
+  for (const state of states) {
+    seen.add(state.skillId);
+    const anchor = {
+      castLeftMs: state.castLeftMs || 0,
+      castTotalMs: state.castTotalMs || 0,
+      reuseLeftMs: state.reuseLeftMs || 0,
+      reuseTotalMs: state.reuseTotalMs || 0,
+      at: now
+    };
+    const existing = SkillLive.anchors.get(state.skillId);
+    if (existing && Math.abs(existing.at - now) < 1000
+      && skillAnchorClose(existing, anchor)) {
+      // The same reading within a second: keep the older anchor so
+      // the running countdown never jumps backwards on a re-read.
+      continue;
+    }
+    SkillLive.anchors.set(state.skillId, anchor);
+  }
+  for (const id of Array.from(SkillLive.anchors.keys())) {
+    if (!seen.has(id)) { SkillLive.anchors.delete(id); }
+  }
+  updateSkillCellStates();
+  ensureSkillStateTicker();
+}
+
+// skillAnchorClose reports whether two anchor readings agree within
+// the countdown tolerance (the drift a re-read may not reset).
+function skillAnchorClose(a, b) {
+  return Math.abs(a.castLeftMs - b.castLeftMs) < 400
+    && Math.abs(a.reuseLeftMs - b.reuseLeftMs) < 400;
+}
+
+// skillLiveLeft reads the live remainder of one anchored window: the
+// snapshot reading minus the wall clock since it arrived, floored at
+// zero.
+function skillLiveLeft(anchor, leftKey) {
+  const left = anchor[leftKey] - (Date.now() - anchor.at);
+
+  return Math.max(0, left);
+}
+
+// skillCoolText formats the remaining cooldown milliseconds for the
+// cell overlay: the compact seconds form under a minute, then the
+// minutes, then the hours.
+function skillCoolText(leftMs) {
+  const secs = Math.ceil(leftMs / 1000);
+  if (secs < 60) { return secs + "s"; }
+  if (secs < 3600) { return Math.floor(secs / 60) + "m"; }
+
+  return Math.floor(secs / 3600) + "h";
+}
+
+// updateSkillCellStates syncs every cached cell overlay with the
+// anchors. The cells of the opposite filter stay cached but detached;
+// updating them is a cheap style write and keeps them ready for the
+// re-attach.
+function updateSkillCellStates() {
+  for (const record of SkillCells.cells.values()) {
+    updateSkillCellState(record);
+  }
+}
+
+// updateSkillCellState syncs one cell overlay: the cast fill rises
+// bottom up by the cast progress, the cooldown dim covers the cell
+// with the restore fill and the remaining seconds. A skill without
+// anchors (or with both windows elapsed) shows neither.
+function updateSkillCellState(record) {
+  if (!record.castFill || !record.cool) { return; }
+  const anchor = record.skill
+    ? SkillLive.anchors.get(record.skill.skillId) : null;
+  if (!anchor) {
+    record.castFill.style.height = "0%";
+    record.cool.classList.add("hidden");
+
+    return;
+  }
+  const castLeft = skillLiveLeft(anchor, "castLeftMs");
+  if (castLeft > 0 && anchor.castTotalMs > 0) {
+    const progress = 1 - castLeft / anchor.castTotalMs;
+    record.castFill.style.height =
+      (Math.min(100, Math.round(progress * 100))) + "%";
+  } else {
+    record.castFill.style.height = "0%";
+  }
+  const reuseLeft = skillLiveLeft(anchor, "reuseLeftMs");
+  if (reuseLeft > 0 && anchor.reuseTotalMs > 0) {
+    const restored = 1 - reuseLeft / anchor.reuseTotalMs;
+    record.cool.classList.remove("hidden");
+    record.coolFill.style.height =
+      (Math.min(100, Math.round(restored * 100))) + "%";
+    record.coolTime.textContent = skillCoolText(reuseLeft);
+  } else {
+    record.cool.classList.add("hidden");
+  }
+}
+
+// ensureSkillStateTicker runs the quarter second countdown while any
+// anchor is live and stops itself once every window elapsed (the
+// idle ticks would be pure wakeups).
+function ensureSkillStateTicker() {
+  if (typeof window.setInterval !== "function"
+    || typeof window.clearInterval !== "function") {
+    return;
+  }
+  const live = Array.from(SkillLive.anchors.values()).some((anchor) =>
+    skillLiveLeft(anchor, "castLeftMs") > 0
+    || skillLiveLeft(anchor, "reuseLeftMs") > 0);
+  if (live && SkillLive.timer === null) {
+    SkillLive.timer = window.setInterval(() => {
+      updateSkillCellStates();
+      if (!Array.from(SkillLive.anchors.values()).some((anchor) =>
+        skillLiveLeft(anchor, "castLeftMs") > 0
+        || skillLiveLeft(anchor, "reuseLeftMs") > 0)) {
+        window.clearInterval(SkillLive.timer);
+        SkillLive.timer = null;
+      }
+    }, SKILL_STATE_TICK_MS);
+  } else if (!live && SkillLive.timer !== null) {
+    window.clearInterval(SkillLive.timer);
+    SkillLive.timer = null;
+  }
 }
 
 // renderSkillsFoot refreshes the pinned footer of the skills view:

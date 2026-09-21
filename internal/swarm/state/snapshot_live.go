@@ -219,15 +219,17 @@ func (b *Bot) appendLiveShoppingJSON(dst []byte, now time.Time) []byte {
     return appendShoppingPlanJSON(dst, b.shopping)
 }
 
-// appendLiveSkillBlockJSON writes the learning queue and the active
-// effect list that follow the learned skills in the live view. The
-// caller must hold a lock.
+// appendLiveSkillBlockJSON writes the learning queue, the active
+// effect list and the live skill windows that follow the learned
+// skills in the live view. The caller must hold a lock.
 func (b *Bot) appendLiveSkillBlockJSON(dst []byte, now time.Time) []byte {
     dst = append(dst, `,"skillPlan":`...)
     dst = b.appendLiveSkillPlanJSON(dst)
     dst = append(dst, `,"buffs":`...)
+    dst = b.appendLiveBuffsJSON(dst, now)
+    dst = append(dst, `,"skillStates":`...)
 
-    return b.appendLiveBuffsJSON(dst, now)
+    return b.appendLiveSkillStatesJSON(dst, now)
 }
 
 // appendLiveSkillsJSON writes the learned skill list (null when the
@@ -309,6 +311,27 @@ func (b *Bot) appendLiveSkillPlanJSON(dst []byte) []byte {
     dst = append(dst, `]}`...)
 
     return dst
+}
+
+// appendLiveSkillStatesJSON writes the live cast and reuse windows
+// (null when no window runs, the nil semantics of the Snapshot view).
+// The caller must hold a lock.
+func (b *Bot) appendLiveSkillStatesJSON(
+    dst []byte, now time.Time,
+) []byte {
+    views := b.skillStateViewsLocked(now)
+    if views == nil {
+        return append(dst, `null`...)
+    }
+    dst = append(dst, '[')
+    for i := range views {
+        if i > 0 {
+            dst = append(dst, ',')
+        }
+        dst = appendSkillStateViewJSON(dst, views[i])
+    }
+
+    return append(dst, ']')
 }
 
 // appendLiveBuffsJSON writes the active effect list (null when the
@@ -555,6 +578,7 @@ func (b *Bot) snapshotJSONSizeLocked() int {
         size += 256 * len(queue)
     }
     size += 160 * len(b.combat.events)
+    size += 80 * len(b.skillCasts)
     size += 160 * len(b.zoneViews)
     size += 320
     for i := count; i > 0; i-- {

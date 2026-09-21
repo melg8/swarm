@@ -457,6 +457,33 @@ the Mobius C1 skill stats (`npcdata.SkillDescription`).
 | 1 | 4 | Skill count |
 | 5 | 12 | Per skill: passive flag (0/1), level, skill id |
 
+### MagicSkillUse (0x5A)
+
+The skill cast broadcast (`MagicSkillUse.writeImpl`): the server
+sends it for every creature that starts a skill cast, the played
+character included. The `hitTime` field is the cast animation length
+in milliseconds (the skill resolves when it elapses) and the
+`reuseDelay` field is the cooldown the server opened for the skill.
+The bot parses both into the tracker skill windows (`ApplySkillCast`)
+and the web view drives the cast fill icon and the cooldown countdown
+from them (see docs/webui.md, the self cast icon section). The
+critical branch pads an extra int16 before the target location - the
+parser skips it.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x5A |
+| 1 | 4 | Caster object id |
+| 5 | 4 | Target object id |
+| 9 | 4 | Skill id |
+| 13 | 4 | Skill level |
+| 17 | 4 | Hit time (ms) |
+| 21 | 4 | Reuse delay (ms) |
+| 25 | 12 | Caster X, Y, Z |
+| 37 | 4 | Critical flag (0/1) |
+| 41 | 2 | Pad, only when critical flag is 1 |
+| 41/43 | 12 | Target X, Y, Z |
+
 ### GetItem (0x17) position semantics
 
 `GetItem` carries the position of the ITEM, not of the picker

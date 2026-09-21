@@ -8664,3 +8664,91 @@ Result: 22 red -> 0 red, the whole hunt suite green (73.7 s).
   acceptance/webserver suites green, golangci-lint full run down to
   the single pre-existing disclosed finding (clickWaypoint cyclop,
   the corridor extraction stays queued), all six Node harnesses pass.
+
+## Round 123: the combat feedback round - the miss floats, the side split, the mob parity circle, the cast icon and the cooldown countdown (2026-09-21)
+
+Scope: the web UI combat visuals (map.js, app.js, style.css, the
+state tracker, one new packet parser), the owner prompt of
+2026-09-21.
+
+- Problem statement: an evaded blow drew nothing (the miss flagged
+  hits were dropped in `recordSwingEventsLocked`), so a fight went
+  dark exactly when the blows started missing; the damage numbers
+  popped straight above the hurt unit with no side reading; the self
+  marker circle (7 units) dwarfed the mob circles (6 combat units);
+  a skill cast showed nowhere - not above the character, not in the
+  skills widget - and a cooling skill looked exactly like a ready
+  one.
+
+- Root cause analysis:
+  1. The miss drop was a deliberate 2026-09 rendering decision
+     ("an evaded blow draws nothing", docs/webui.md) - the owner
+     reversed it: the viewer must see that the bot swings even when
+     the blow misses.
+  2. The damage feed never carries an attacker id (`AttackerID: 0`
+     in both HP drop recorders - StatusUpdate cannot attribute), so
+     the requested "damage to the player left, damage of the player
+     right" split rides the existing `onSelf` flag (the target side
+     IS the split the owner described).
+  3. The self marker size was an emphasis decision of the original
+     marker painter (drawSelf 7 units vs `radiusOf` mob combat 6) -
+     the owner dropped the emphasis.
+  4. Nothing parsed `MagicSkillUse` (0x5A): it fell into
+     `logUnknownPacket`. The Mobius C1 source
+     (`MagicSkillUse.writeImpl`) carries `hitTime` and `reuseDelay`
+     in milliseconds - exactly the two windows the cast fill and the
+     cooldown countdown need, no extra packet required.
+
+- Fix:
+  - `state`: the miss flag records `CombatEventMiss` into the feed
+    (no wire schema change, a new kind string);
+    `ApplySkillCast` (`state/skill_cast.go`) opens the cast and
+    reuse windows per self skill, prunes the elapsed ones and
+    publishes `skillStates` (`SkillStateView`, the milliseconds
+    left plus the totals at the snapshot moment, sorted by skill
+    id) in both encoders (the hand written one and the live one,
+    byte identical, pinned by the encoder tests).
+  - `connection`: the MagicSkillUse parser
+    (`packets/from_game_server/magic_skill_use.go`, the critical
+    branch pads an extra int16) with the dispatch entry and the
+    `applyMagicSkillUse` forward.
+  - `map.js`: the miss float (`drawMissEffect`, plain gray white
+    text, pop/rise/melt, no streak no ring); the side split
+    (`floatSideOffset` 15, onSelf left / else right) on the damage
+    and the miss floats; the self marker at `selfMarkerUnits` 6
+    (the mob combat parity, the target link ring follows); the cast
+    icon above the self marker (`drawSelfCast`, the icon plate with
+    the bottom up bright fill, the icon art lazily loaded through
+    the `skillIcon` cache, the fallback plate before it arrives),
+    fed by `ingestSkillStates` with the re-read anchor guard;
+    `needsMoreFrames` and `resetBot` know the cast.
+  - `app.js` + `style.css`: the keyed skill cells grow the cast
+    fill (`.skill-cast-fill`, bottom up) and the cooldown dim
+    (`.skill-cool` with the restore fill and the
+    `skillCoolText` seconds), built once per cell, refreshed in
+    place outside the grid signature gate, paced by the self
+    stopping quarter second ticker.
+
+- Reproduction and verification: `tools/repro_map_render.js` grows
+  the combat floats scenario (7 checks: the miss floats on both
+  anchors, the direction split, the melt order) and the cast icon
+  scenario (6 checks: the state machine, the re-read anchor, the
+  plate draw, the loop liveness, the expiry); the recording context
+  folds the translate stack into the recorded text positions and
+  records the rects (the float layer asserts were impossible
+  before). `tools/repro_gear.js` renders the skillStates on the
+  learned cells (the cast fill height, the cooldown dim, the 4s
+  reading, the ready cell clean). Go: `TestApplyAttackRecordsMisses`
+  (the renamed miss contract), the `TestApplySkillCast*` family
+  (windows, self filter, expiry, recast, JSON round trip), the
+  state/webserver/connection suites green, `golangci-lint` clean,
+  `gofmt-spaces` clean.
+
+- Follow ups: the widget cooldown could blend the restore fill with
+  a radial sweep for the sub-second tails; the mob casts ride the
+  parser already - a mob cast indicator above the caster is a small
+  follow up once the owner asks for it; the cast icon falls back to
+  the plate when a skill owns no icon art - the generated
+  dictionary covers the C1 skills, the gap only shows for the
+  unknown ids.
+

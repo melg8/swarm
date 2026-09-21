@@ -1640,6 +1640,61 @@ function main() {
         !badge.classList.contains("hidden"),
         "badge: " + badge.textContent);
 
+    // The cast and cooldown overlays of the learned cells: the
+    // snapshot skillStates carry the live windows, the casting cell
+    // fills bottom up, the cooling cell dims with the remaining
+    // seconds and the ready cell shows neither.
+    const stateful = skillsSnapshot();
+    stateful.skillStates = [
+        { skillId: 3, castLeftMs: 1000, castTotalMs: 2000,
+            reuseLeftMs: 3500, reuseTotalMs: 12000 },
+        { skillId: 16, castLeftMs: 0, castTotalMs: 0,
+            reuseLeftMs: 0, reuseTotalMs: 0 }
+    ];
+    gear.renderSkills(stateful);
+    const cellByTitle = (prefix) => Array.from(skillGrid.children)
+        .find((cell) => cell.title && cell.title.startsWith(prefix));
+    // The overlay finder walks the cell subtree: the seconds span
+    // nests inside the cooldown dim.
+    const overlayOf = (node, cls) => {
+        if (!node) { return null; }
+        for (const child of node.children) {
+            if (String(child.className).includes(cls)) { return child; }
+            const nested = overlayOf(child, cls);
+            if (nested) { return nested; }
+        }
+
+        return null;
+    };
+    const strikeCell = cellByTitle("Power Strike");
+    const blowCell = cellByTitle("Mortal Blow");
+    const castFill = overlayOf(strikeCell, "skill-cast-fill");
+    const strikeCool = overlayOf(strikeCell, "skill-cool");
+    const strikeCoolTime = overlayOf(strikeCell, "skill-cool-time");
+    const blowCool = overlayOf(blowCell, "skill-cool");
+    const castHeight = castFill
+        ? Number.parseInt(castFill.style.height, 10) : -1;
+    check(results, "the casting skill cell shows the cast fill",
+        Boolean(castFill) && castHeight >= 49 && castHeight <= 62,
+        "cast fill height: " + (castFill && castFill.style.height));
+    check(results, "the cooling skill cell dims the icon",
+        Boolean(strikeCool) &&
+        !strikeCool.classList.contains("hidden"),
+        "the cooldown overlay stayed hidden on the cooling skill");
+    check(results, "the cooldown cell reads the remaining seconds",
+        Boolean(strikeCoolTime) &&
+        strikeCoolTime.textContent === "4s",
+        "cool time: " + (strikeCoolTime && strikeCoolTime.textContent));
+    check(results, "the ready skill cell shows no cooldown",
+        Boolean(blowCool) && blowCool.classList.contains("hidden"),
+        "the ready cell owns a visible cooldown overlay");
+    check(results, "the cast and cooldown css exists",
+        css.includes(".skill-cell .skill-cast-fill") &&
+        css.includes(".skill-cell .skill-cool") &&
+        css.includes(".skill-cool-time") &&
+        css.includes(".skill-cool.hidden"),
+        "the overlay styles are missing from style.css");
+
     // Switching to the skills mode: the overlay appears, the gear
     // content keeps the flow (the panel size stays).
     gear.setGearMode("skills");

@@ -233,6 +233,14 @@ const MapView = {
   combatAnims: [],
   lastCombatSeq: 0,
 
+  // The running self cast read from the snapshot skillStates (see
+  // ingestSkillStates): the skill id, the cast total and the cast
+  // end on the local performance clock. Null when nothing casts.
+  // skillIconCache lazily loads the skill icon art of the cast icon
+  // (name -> {img, ready, missing}, the geoTiles pattern).
+  selfCast: null,
+  skillIconCache: null,
+
   // The server world region grid: every region is 2048 units and every
   // object within the 3x3 region block around the player is loaded (see
   // World.broadcastPacket of the Mobius server).
@@ -394,6 +402,7 @@ const MapView = {
       if (!alive.has(id)) { this.projectionCache.delete(id); }
     }
     this.ingestCombatEvents(snapshot);
+    this.ingestSkillStates(snapshot);
     this.lastSnap = snapshot;
     this.huntKey = this.huntZoneVisualKey(snapshot);
     this.syncHuntMesh(snapshot);
@@ -438,6 +447,7 @@ const MapView = {
     this.objectsText = "";
     this.combatAnims = [];
     this.lastCombatSeq = 0;
+    this.selfCast = null;
     this.userMark = null;
     this.redraw();
   },
@@ -640,7 +650,8 @@ const MapView = {
       if (obj.moving && obj.speed > 0) { return true; }
     }
 
-    return this.combatAnims.length > 0 || this.smoothingPending() ||
+    return this.combatAnims.length > 0 || this.selfCast !== null ||
+      this.smoothingPending() ||
       this.userMarkAge() < 2500 || this.hasWalkPlan();
   },
 
@@ -1257,6 +1268,7 @@ const MapView = {
     this.drawSocialLinks(ctx, rect);
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
+    this.drawSelfCast(ctx);
     this.drawCombatEffects(ctx);
     this.drawWalkPlan(ctx);
     this.drawUserIntent(ctx);
@@ -3593,6 +3605,145 @@ const MapView = {
       world: { x: ev.x, y: ev.y }, onSelf: ev.targetId === selfId,
       jitter
     });
+  },
+
+  // ingestSkillStates reads the running self cast from the snapshot
+  // skillStates (the tracker publishes only the played character's
+  // windows): the entry with a live cast window becomes the cast
+  // icon above the character, the end time lands on the local
+  // performance clock so the fill runs smoothly between the
+  // snapshots. A snapshot without a live cast clears the icon.
+  ingestSkillStates(snapshot) {
+    const states = snapshot.skillStates || [];
+    let live = null;
+    for (const state of states) {
+      if (state.castLeftMs > 0
+        && (!live || state.skillId < live.skillId)) {
+        live = state;
+      }
+    }
+    if (!live) {
+      this.selfCast = null;
+
+      return;
+    }
+    const endsAt = performance.now() + live.castLeftMs;
+    const current = this.selfCast;
+    if (current && current.skillId === live.skillId
+      && Math.abs(current.endsAt - endsAt) < 400) {
+      // The same cast re-read: keep the anchor (the fill never jumps
+      // backwards on a re-read).
+      current.totalMs = live.castTotalMs;
+
+      return;
+    }
+    this.selfCast = {
+      skillId: live.skillId,
+      totalMs: live.castTotalMs,
+      endsAt
+    };
+  },
+
+  // skillIcon returns the icon image entry of one skill icon name,
+  // starting the background load once (the geoTiles pattern). The
+  // vm sandboxes own no Image constructor - the entry stays
+  // not-ready there and the draw falls back to the plain plate.
+  skillIcon(name) {
+    if (!this.skillIconCache) {
+      this.skillIconCache = new Map();
+    }
+    let entry = this.skillIconCache.get(name);
+    if (entry) { return entry; }
+    entry = { img: null, ready: false, missing: false };
+    this.skillIconCache.set(name, entry);
+    if (typeof Image === "undefined") { return entry; }
+    const img = new Image();
+    img.onload = () => {
+      entry.ready = true;
+      entry.img = img;
+      this.kickAnimation();
+    };
+    img.onerror = () => { entry.missing = true; };
+    img.src = "/icons/" + name + ".png";
+
+    return entry;
+  },
+
+  // selfCastIconName resolves the icon file name of the running
+  // cast from the learned skill list of the last snapshot.
+  selfCastIconName() {
+    if (!this.selfCast || !this.lastSnap) { return ""; }
+    const id = this.selfCast.skillId;
+    for (const skill of this.lastSnap.skills || []) {
+      if (skill.skillId === id) { return skill.icon || ""; }
+    }
+
+    return "";
+  },
+
+  // drawSelfCast draws the cast icon above the character while it
+  // casts: the skill icon in a small plate, dimmed, with the bright
+  // portion rising bottom up by the cast progress (the same reading
+  // as the skills widget cast fill). Before the icon art arrives
+  // (and in the icon-less sandboxes) a plain accent plate shows the
+  // same fill.
+  drawSelfCast(ctx) {
+    if (!this.selfCast) { return; }
+    const nowMs = performance.now();
+    if (nowMs >= this.selfCast.endsAt) {
+      this.selfCast = null;
+
+      return;
+    }
+    const selfId = this.lastSnap.character
+      && this.lastSnap.character.objectId;
+    const pos = this.effectScreenPos(selfId, {
+      x: this.lastChar ? this.lastChar.x : 0,
+      y: this.lastChar ? this.lastChar.y : 0
+    });
+    const k = this.unitScale || 1;
+    const size = Math.max(14, Math.min(30, 17 * k));
+    const progress = Math.max(0, Math.min(1,
+      1 - (this.selfCast.endsAt - nowMs) / this.selfCast.totalMs));
+    const x = pos.x - size / 2;
+    const y = pos.y - (selfMarkerUnits + 17) * k;
+    ctx.save();
+    // The dim plate with the icon (or the plain fallback).
+    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = "rgba(15, 18, 22, 0.72)";
+    ctx.fillRect(x, y, size, size);
+    const iconName = this.selfCastIconName();
+    const entry = iconName ? this.skillIcon(iconName) : null;
+    if (entry && entry.ready) {
+      ctx.globalAlpha = 0.45;
+      ctx.drawImage(entry.img, x, y, size, size);
+    } else {
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "#7cc4ff";
+      ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+    }
+    // The bright fill rising bottom up by the cast progress.
+    const fillH = size * progress;
+    if (fillH > 0.5) {
+      ctx.beginPath();
+      ctx.rect(x, y + size - fillH, size, fillH);
+      ctx.clip();
+      ctx.globalAlpha = 1;
+      if (entry && entry.ready) {
+        ctx.drawImage(entry.img, x, y, size, size);
+      } else {
+        ctx.fillStyle = "#9fd4ff";
+        ctx.fillRect(x + 2, y + 2, size - 4, size - 4);
+      }
+      ctx.restore();
+      ctx.save();
+    }
+    // The plate border.
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = "#7cc4ff";
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(x, y, size, size);
+    ctx.restore();
   },
 
   // drawCombatEffects renders the live combat animation layer on

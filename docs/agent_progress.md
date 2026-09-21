@@ -51,7 +51,24 @@ Design (verified against the code):
   keyed skill cells (a bottom-up cast fill + a dim overlay with the
   buffLeftShort style seconds countdown).
 
-Status: commit 1 (miss + direction + circle parity) in flight.
+Status: complete. Both commits pushed to
+origin/feature/improved-behaviour:
+- Commit 1 (68d49a7 after the rebase): the miss floats (the
+  `CombatEventMiss` feed kind + `drawMissEffect`), the side split of
+  the damage and miss floats (taken left, dealt right), the self
+  marker at the mob parity (6 units), the harness combat floats
+  scenario with the translate aware recording context.
+- Commit 2: the MagicSkillUse (0x5A) parser + dispatch +
+  `ApplySkillCast` + the `skillStates` snapshot section (both
+  encoders byte identical), the map cast icon (`drawSelfCast` +
+  `ingestSkillStates` + the skillIcon cache), the skills widget cast
+  fill and cooldown countdown (the keyed overlays, the self stopping
+  ticker), the harness scenarios (cast icon, skillStates cells),
+  docs (webui.md the miss/cast sections, protocol_description.md the
+  MagicSkillUse entry, development_log.md Round 122).
+Verification: state/webserver/connection suites green, all eight
+repro harnesses green, `golangci-lint` + `gofmt-spaces` + `go vet`
+clean.
 
 ## Active task (status: complete): the effects panel fix round (2026-09-21, branch feature/improved-behaviour)
 

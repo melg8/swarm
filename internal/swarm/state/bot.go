@@ -534,6 +534,11 @@ type Bot struct {
     // views count down from (see SetBuffs).
     buffs   map[int32]buffRecord
     buffsAt time.Time
+    // skillCasts holds the cast and reuse windows the self
+    // MagicSkillUse broadcasts opened (skill id -> the window): the
+    // cast fill and the cooldown countdown of the web view read it
+    // through the skillStates snapshot section (see skill_cast.go).
+    skillCasts map[int32]skillCastWindow
     // loginCooldownUntil holds the reconnect pause the supervisor
     // honors after an emergency logout. The tracker outlives the
     // sessions, so the cooldown spans them (see SetLoginCooldown).
@@ -2644,6 +2649,13 @@ type Snapshot struct {
     // seconds, resolved with the display data of the generated
     // dictionary. The web UI buffs widget renders it.
     Buffs []BuffSnapshot `json:"buffs"`
+    // SkillStates carries the live cast and reuse windows of the
+    // learned skills (see ApplySkillCast): the milliseconds left of
+    // the cast and the cooldown at the snapshot moment plus the
+    // window totals. The web UI cast fills and the cooldown
+    // countdowns of the skills widget render it; the map cast icon
+    // reads the running cast from it.
+    SkillStates []SkillStateView `json:"skillStates"`
     // CombatEvents carries the recent swings and damage
     // landings of the animation layer: the last
     // combatEventTTL window, in chronological order,
@@ -2889,6 +2901,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
     snap.Skills = b.skillSnapshotsLocked()
     snap.SkillPlan = b.skillPlanViewLocked()
     snap.Buffs = b.buffSnapshotsLocked(now)
+    snap.SkillStates = b.skillStateViewsLocked(now)
     nowNano := now.UnixNano()
     var counts worldCounts
     for i := range b.world.hot {

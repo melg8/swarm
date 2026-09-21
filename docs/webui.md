@@ -426,24 +426,52 @@ a bare x y pair inherits the z from the other line.
 ## Combat animation layer (map.js + state combatEvents)
 
 The map plays the combat the tracker observes: every `Attack`
-broadcast lands as one swing per hit that actually connected (the
-packet carries the Mobius miss flag per hit - an evaded blow draws
-nothing) - a colored streak runs from the attacker to the hit target,
-light blue for the own attacks, red for the mob ones, with a windup
-swoosh at the attacker and a white impact starburst on the target;
-every `StatusUpdate` HP drop floats a damage number above the hurt
-unit (amber on mobs, red on the character) with a flash ring under it.
+broadcast lands as one swing per hit that actually connected - a
+colored streak runs from the attacker to the hit target, light blue
+for the own attacks, red for the mob ones, with a windup swoosh at
+the attacker and a white impact starburst on the target; the packet
+carries the Mobius miss flag per hit and an evaded blow records a
+`miss` event instead, drawn as a plain gray white "Miss" float on the
+unit the blow was thrown at (no streak, no flash ring - nothing
+landed); every `StatusUpdate` HP drop floats a damage number above
+the hurt unit (amber on mobs, red on the character) with a flash ring
+under it. The floats split by sides: the hits the character takes
+float to the LEFT of the fight, the damage it deals and its misses to
+the RIGHT (`floatSideOffset`, 15 unit scale pixels; the damage feed
+carries no attacker id, the target side IS the split).
 The server side is `state.CombatEvent` (the `combatEvents` ring of the
-tracker): `ApplyAttack` records the swings, the HP deltas of
-`ApplyStatusUpdate` record the damage (the Attack broadcast carries no
-damage value, heals record nothing), the snapshot carries the last 2 s
-with a monotonic `seq` and the client dedupes on it across the SSE
-snapshots (the first snapshot after a page load only accepts the
-cursor). The effects track the interpolated runtime positions while
-the units stay on the map and fall back to the event placement after
-they despawn; `needsMoreFrames` keeps the render loop alive while any
-effect lives. The feed is bounded (64 events) and the snapshots only
-grow by the 2 s window, so the payload stays small.
+tracker): `ApplyAttack` records the swings and the misses, the HP
+deltas of `ApplyStatusUpdate` record the damage (the Attack broadcast
+carries no damage value, heals record nothing), the snapshot carries
+the last 2 s with a monotonic `seq` and the client dedupes on it
+across the SSE snapshots (the first snapshot after a page load only
+accepts the cursor). The effects track the interpolated runtime
+positions while the units stay on the map and fall back to the event
+placement after they despawn; `needsMoreFrames` keeps the render loop
+alive while any effect lives. The feed is bounded (64 events) and the
+snapshots only grow by the 2 s window, so the payload stays small.
+
+## Self cast icon (map.js + state skillStates)
+
+While the character casts, the map draws the skill icon in a small
+plate above the self marker with the bright portion rising bottom up
+by the cast progress (before the icon art loads a plain accent plate
+shows the same fill). The backend reads it from the Mobius C1
+`MagicSkillUse` (0x5A) broadcast: a self cast opens the cast window
+(the packet hit time) and the cooldown window (the packet reuse
+delay), the snapshot publishes them as `skillStates` (`SkillStateView`:
+the skill id plus the milliseconds left and the totals of both
+windows, computed at the snapshot moment). The map picks the entry
+with a live cast (`ingestSkillStates`, the fill end anchored on the
+local performance clock so it runs smoothly between the snapshots and
+never jumps backwards on a re-read). The skills widget renders the
+same section on its keyed cells: the cast fill (`.skill-cast-fill`)
+rises bottom up while the cast runs and the cooldown dim
+(`.skill-cool`) covers the icon with the restore fill and the
+remaining seconds (`skillCoolText`) while the skill is unavailable;
+the overlays are built once per cell (the keyed rendering rule) and a
+quarter second ticker (`SKILL_STATE_TICK_MS`) keeps them honest
+between the snapshots, stopping itself once every window elapsed.
 
 ## HUD, target panel and the status banner
 

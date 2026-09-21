@@ -152,7 +152,27 @@ function makeRecordingContext(record) {
             }
             current = null;
         },
-        fillRect: () => {},
+        fillRect: (x, y, w, h) => {
+            record.rects.push({ x, y, w, h, style: record.fillStyle });
+        },
+        // The cast icon plate border (the strokeRect of drawSelfCast)
+        // records like a fillRect with the stroke flag.
+        strokeRect: (x, y, w, h) => {
+            record.rects.push({ x, y, w, h, style: record.style,
+                stroked: true });
+        },
+        // The clip region path of the cast icon fill: the rect joins
+        // the current path (nothing strokes it), clip itself is a
+        // no-op for the record.
+        rect: (x, y, w, h) => {
+            if (current) {
+                current.segments.push([x, y, x + w, y],
+                    [x + w, y, x + w, y + h],
+                    [x + w, y + h, x, y + h],
+                    [x, y + h, x, y]);
+            }
+        },
+        clip: () => {},
         fillText: (text, x, y) => {
             record.texts.push({
                 text, x: x + origin.x, y: y + origin.y,
@@ -205,7 +225,7 @@ function makeElementStub(checked) {
 // together with the stroke record.
 function loadMapJs(mapFile) {
     const record = {
-        strokes: [], fills: [], texts: [], blits: [], style: "",
+        strokes: [], fills: [], texts: [], blits: [], rects: [], style: "",
         fillStyle: "", width: 1, dash: []
     };
     const listeners = { canvas: {}, window: {} };
@@ -276,7 +296,7 @@ function loadMapJs(mapFile) {
             createElement: (tag) => {
                 if (tag !== "canvas") { return makeElementStub(false); }
                 const bgRecord = {
-                    strokes: [], fills: [], texts: [], blits: [],
+                    strokes: [], fills: [], texts: [], blits: [], rects: [],
                     style: "", fillStyle: "", width: 1, dash: []
                 };
 
@@ -491,6 +511,80 @@ function runScenarioCombatFloats(mapFile) {
     check(results, "the miss float melts before the damage number",
         floats("Miss").length === 0 && floats("-42").length > 0,
         "Miss survived " + floats("Miss").length + " texts");
+
+    return results;
+}
+
+// runScenarioCastIcon covers the self cast icon: a snapshot skill
+// state with a live cast window draws the icon plate above the
+// character with the fill rising by the cast progress, the fill
+// anchor survives the snapshot re-reads and the icon clears when the
+// cast ends.
+function runScenarioCastIcon(mapFile) {
+    const { MapView, record, advanceClock } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    snap.skills = [{
+        skillId: 1077, level: 3, passive: false,
+        name: "Focus", icon: "skill1077"
+    }];
+    snap.skillStates = [{
+        skillId: 1077, castLeftMs: 750, castTotalMs: 1500,
+        reuseLeftMs: 5750, reuseTotalMs: 6000
+    }];
+    MapView.update(buildSnapshot(0, false));
+    MapView.update(snap);
+
+    const results = [];
+    check(results, "the running cast reads from the skill states",
+        MapView.selfCast !== null && MapView.selfCast.skillId === 1077
+        && MapView.selfCast.totalMs === 1500,
+        JSON.stringify(MapView.selfCast));
+
+    // The re-read of the same cast (the next snapshot carries the
+    // same window) keeps the anchor: the fill never jumps backwards.
+    const anchorBefore = MapView.selfCast.endsAt;
+    MapView.update(snap);
+    check(results, "the cast anchor survives the re-read",
+        MapView.selfCast !== null
+        && MapView.selfCast.endsAt === anchorBefore,
+        "endsAt moved from " + anchorBefore + " to "
+        + (MapView.selfCast && MapView.selfCast.endsAt));
+
+    // Half the cast in: the plate draws above the self marker (the
+    // sandbox owns no Image, so the fallback plate paints).
+    advanceClock(375);
+    MapView.draw();
+    const self = worldToScreen(WORLD.self.x, WORLD.self.y);
+    const size = 17;
+    const plate = record.rects.filter((rect) => !rect.stroked
+        && Math.abs(rect.w - (size - 4)) < 1
+        && Math.abs((rect.x + rect.w / 2) - self.x) < 2
+        && rect.y < self.y);
+    check(results, "the cast plate draws above the character",
+        plate.length >= 2,
+        "expected the dim and the bright plate near x="
+        + self.x + " (got " + record.rects.length + " rects)");
+
+    // The render loop stays alive while the cast runs.
+    check(results, "the cast keeps the render loop alive",
+        MapView.needsMoreFrames() === true,
+        "needsMoreFrames went false during the cast");
+
+    // Past the cast end the icon clears.
+    record.rects.length = 0;
+    advanceClock(1200);
+    MapView.draw();
+    check(results, "the cast icon clears when the cast ends",
+        MapView.selfCast === null,
+        "selfCast survived the cast end");
+    const plateAfter = record.rects.filter((rect) => !rect.stroked
+        && Math.abs(rect.w - (size - 4)) < 1
+        && Math.abs((rect.x + rect.w / 2) - self.x) < 2
+        && rect.y < self.y - 20);
+    check(results, "the expired cast paints no plate",
+        plateAfter.length === 0,
+        "plate rects survived: " + plateAfter.length);
 
     return results;
 }
@@ -1429,6 +1523,7 @@ function main() {
         ["social animation marker", runScenarioSocialMarker(mapFile)],
         ["stable draw order", runScenarioStableOrder(mapFile)],
         ["combat floats", runScenarioCombatFloats(mapFile)],
+        ["cast icon", runScenarioCastIcon(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
         ["walk cursor", runScenarioWalkCursor(mapFile)],

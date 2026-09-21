@@ -159,6 +159,28 @@ func (gc *GameClient) applySocialAction(payload []byte) {
     }
 }
 
+// applyMagicSkillUse parses MagicSkillUse and forwards the cast to
+// the tracker: the played character's casts open the cast and reuse
+// windows the web view renders.
+func (gc *GameClient) applyMagicSkillUse(payload []byte) {
+    if err := fromgameserver.ParseMagicSkillUsePacket(
+        &gc.magicSkillUse, payload); err != nil {
+        gc.logger.Printf("Failed to parse magic skill use: %v", err)
+
+        return
+    }
+    if gc.tracker != nil {
+        gc.tracker.ApplySkillCast(state.SkillCast{
+            CasterID:     gc.magicSkillUse.CasterID,
+            TargetID:     gc.magicSkillUse.TargetID,
+            SkillID:      gc.magicSkillUse.SkillID,
+            SkillLevel:   gc.magicSkillUse.SkillLevel,
+            HitTimeMs:    gc.magicSkillUse.HitTime,
+            ReuseDelayMs: gc.magicSkillUse.ReuseDelay,
+        })
+    }
+}
+
 // handleWorldPacket dispatches the packets that carry the observed world
 // state: characters, npcs, items, movement and combat.
 func (gc *GameClient) handleWorldPacket(payload []byte) {
@@ -256,6 +278,8 @@ func (gc *GameClient) handleCombatPacket(payload []byte) bool {
         gc.applyAutoAttackStop(payload)
     case myTargetSelectedID:
         gc.applyMyTargetSelected(payload)
+    case magicSkillUseID:
+        gc.applyMagicSkillUse(payload)
     case targetSelectedID:
         gc.applyTargetSelected(payload)
     case targetUnselectedID:
