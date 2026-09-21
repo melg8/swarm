@@ -8927,3 +8927,16 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
   repro_map_render grown to 102 checks (the lateral cast scenario,
   the bow shot scenario), the neighbor harnesses green; the lint
   gate back to the single pre-existing disclosed finding.
+
+- Critic round (ffa6309, the clean context review of the round):
+  the icon side reads the NEAREST hostile now (a distant pack
+  outvoted the adjacent fight in the mean), the plate dodges the
+  combat float lane (10k below the marker - the floats spawn 8k
+  above it and rise), the cast ring follows the contact-shrunk
+  marker radius, the quest transit fights convert to the weapon
+  aware engage radius (the third call site of the same disease), the
+  radius pick is unit tested (bare handed / bagged bow / equipped
+  bow) and the docs name the projectile. Unfixed polish from the
+  review: the bow attribution approximates when two weapons ride
+  the paperdoll (no weapon id in the event), the connector stroke
+  degrades at the smallest zooms.

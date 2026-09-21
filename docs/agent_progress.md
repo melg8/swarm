@@ -25,9 +25,11 @@ prompt assigned three asks, all landed and pushed:
 3. Selecting a buffer/folk npc must not show combat: a self pawn
    movement toward a known non attackable npc marks no fight.
 
-Commits: 435abe4 (hunt+state, the radii and the interact walk), then
-the map round (cast icon side + bow projectile + repro_map_render 102
-checks) and this docs entry on top. Verification: state+hunt suites,
+Commits: 435abe4 (hunt+state, the radii and the interact walk),
+39ca6a2 (the map round: cast icon side + bow projectile +
+repro_map_render 102 checks), e3e6e7a (docs), ffa6309 (the critic
+round: the nearest fight picks the icon side, the float lane dodge,
+the quest fight conversion, the radius unit tests). Verification: state+hunt suites,
 repro_map_render/bot_switch/zone_hover/fight_ui green, lint at the
 single pre-existing finding. Details in development_log Round 126.
 
