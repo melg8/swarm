@@ -207,10 +207,21 @@ progress and the goal.
 - go build ./..., go vet, golangci-lint --new clean, webserver tests
   green, tools/prepush.sh green.
 
-### Next
+- The clean context review sub agent (all three owner requirements
+  PASS, process PASS) raised one defect and one nit, both applied in
+  862fb19: the quest empty note anchored to the gear-main flow bottom
+  painted over the adena/weight footer (it now lives inside the
+  quest grid, centered, live verified EMPTY_NOTE_OK) and the fight
+  detail could render "for 0s" on the first diagnostics tick (the
+  age part waits for a positive targetForMs). The verify tool takes
+  the PORT env; the repro_gear css gate pins the note anchoring.
 
-- Land the atomic commits (webui fix + harness gates + docs), push,
-  run the final review sub agent on the whole round.
+### Status: done (2026-09-21 ~10:35 UTC)
+
+Landed commits 25e5976, e7b7e86, aa922de, 862fb19 pushed on
+`feature/improved-behaviour` as melg8; the harness gates (86 + 199
+checks), the prepush gate and the live browser measurements all
+green on the merged tree.
 
 ## Active task (status: complete): the webui chat round, the quest tab and the ETA round (2026-09-21)
 
