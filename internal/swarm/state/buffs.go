@@ -130,6 +130,17 @@ func (b *Bot) SelfCurMP() float64 {
     return b.char.CurMP
 }
 
+// SelfRunSpeed returns the running speed of the character the server
+// reported (the UserInfo character data): the travel economy prices
+// the walking legs with it. The zero answer marks the speed the
+// server has not sent yet.
+func (b *Bot) SelfRunSpeed() float64 {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.char.RunSpeed
+}
+
 // SelfWeaponKind returns the weapon family of the equipped weapon
 // (SWORD, BLUNT, DAGGER, BOW, POLE): the weapon of the right hand
 // paperdoll slot resolved through the item stats of the generated

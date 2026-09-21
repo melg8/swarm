@@ -720,6 +720,13 @@ func (l *Loop) maybeStartTownTrip() {
     // re-bought the piece the trip had just sold and planned
     // purchases whose displaced pieces were never queued - the
     // 2026-09-11 two pairs of gloves report).
+    // The scroll of escape leg runs before the plan freeze: the
+    // escape replaces the walk to the village only when the bag
+    // holds a scroll and the ground pays a trusted income worth more
+    // than the scroll costs - the arrival lands the character at the
+    // village respawn and the walk planning below prices the short
+    // residual leg from there.
+    l.maybeEscapeWithSOE(merchant)
     l.tripPlan = l.shoppingPlan()
     // The gear the trip starts with is the baseline the trip exits
     // compare against: a slot the trip empties without landing the
@@ -3739,16 +3746,18 @@ func (l *Loop) selectMerchant(now time.Time) bool {
 }
 
 // sellableJunk lists the inventory junk of the sell trips without
-// the newbie kit: the starter items are unsellable on the server
-// (is_sellable=false - every offer of them is silently skipped), so
-// offering them only wastes a transaction window of the flood
-// protector once per trip - the destroy flow of the replaced starters
-// owns them instead.
+// the newbie kit and the escape scroll: the starter items are
+// unsellable on the server (is_sellable=false - every offer of them
+// is silently skipped), so offering them only wastes a transaction
+// window of the flood protector once per trip - the destroy flow of
+// the replaced starters owns them instead. The Scroll of Escape the
+// keep one rule buys never sells back (the 200 adena sale of a
+// 460 adena scroll would burn the rule every trip).
 func (l *Loop) sellableJunk() []state.InventoryItem {
     junk := make([]state.InventoryItem, 0, 8)
     for _, entry := range l.tracker.SellableItemsExcluding(
         l.plannedEquipKeeps()) {
-        if gear.IsStarterItem(entry.ItemID) {
+        if gear.IsStarterItem(entry.ItemID) || keepSOE(entry) {
             continue
         }
         junk = append(junk, entry)

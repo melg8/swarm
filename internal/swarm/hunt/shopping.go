@@ -235,10 +235,18 @@ func (l *Loop) shoppingQueue() []gear.Purchase {
     if adena < 0 {
         adena = 0
     }
-
-    return gear.PlanPurchaseQueue(
+    queue := gear.PlanPurchaseQueue(
         l.equip.profile, l.equipment(),
         shopCatalogForRegion(l.zoneRegion), adena)
+    // The keep one scroll line leads the queue: the escape economy
+    // spends the scroll on every profitable trip and the stock must
+    // never run dry (the safety item outranks the gear leftover, the
+    // 460 adena price is noise against the walk it replaces).
+    if soe, ok := l.soePurchaseLine(); ok {
+        queue = append([]gear.Purchase{soe}, queue...)
+    }
+
+    return queue
 }
 
 // pendingBookBudget prices the spellbooks the learning queue demands
