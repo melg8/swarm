@@ -3560,7 +3560,7 @@ func (l *Loop) handleMerchant(now time.Time, templates []int32) bool {
         templates, merchantFindRadius)
     if ok {
         l.merchantID = merchant.ObjectID
-        l.logf("Hunt: trading with " + merchant.Name)
+        l.logf("Hunt: trading with %s", merchant.Name)
 
         return false
     }
@@ -3951,7 +3951,7 @@ func (l *Loop) endTownTrip(reason string) {
         l.journal.TripEnd(l.tracker.ID(), reason,
             time.Since(l.tripStart))
     }
-    l.logf("Hunt: town trip ended: " + reason)
+    l.logf("Hunt: town trip ended: %s", reason)
 }
 
 // noteTripAbortRun maintains the consecutive abort streak of the trip

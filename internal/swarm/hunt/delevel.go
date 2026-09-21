@@ -370,7 +370,7 @@ func (l *Loop) planDelevelWalk() {
 
         return
     }
-    l.logf("Hunt: walking to the guard " + guard.Name)
+    l.logf("Hunt: walking to the guard %s", guard.Name)
 }
 
 // nearestDelevelGuard returns the guard closest to the character,
@@ -434,7 +434,7 @@ func (l *Loop) fightDelevelGuard(now time.Time) {
         }
         l.delevelGuard = guard.ObjectID
         l.delevelFight = now
-        l.logf("Hunt: provoking the guard " + guard.Name)
+        l.logf("Hunt: provoking the guard %s", guard.Name)
     }
     x, y, z, ok := l.tracker.ObjectPosition(l.delevelGuard)
     if !ok {

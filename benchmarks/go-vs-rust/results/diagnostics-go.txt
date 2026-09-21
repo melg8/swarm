@@ -5,5 +5,5 @@
 ./main.go:32:18: cannot use "seven" (untyped string constant) as int value in variable declaration
 ./main.go:33:14: undefined: undeclaredVar
 ./main.go:34:21: not enough arguments in call to strings.Repeat
-	have (string)
-	want (string, int)
+    have (string)
+    want (string, int)

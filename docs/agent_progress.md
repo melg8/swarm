@@ -11,7 +11,50 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task (status: in progress): the farm readiness frame round (2026-09-20)
+## Active task (status: in progress): the dependency bump and the combat behaviour round (2026-09-21)
+
+Started: 2026-09-21. Branch: `feature/improved-behaviour` (fresh
+branch off main 2fda7ff), commits as melg8. Other agents may push to
+the same branch - rebase before every push. The owner report: three
+dependabot bumps (sergi/go-diff 1.3.1->1.4.0, x/crypto 0.28.0->0.57.0,
+x/text 0.19.0->0.42.0) plus three hunt behaviour problems: the
+two-mob pile up softlock (panic logout, relogin into the same pack,
+immediate walk, re-aggro, repeat), a pick that can outrank an already
+aggroed attacker while the character approaches a peaceful target,
+and the unused spawn protection window after a relogin.
+
+### Goal
+
+The dependencies are bumped and verified (build, vet, lint, tests,
+e2e). The hunt loop answers an aggroed mob during a peaceful
+approach, tanks a winnable pile up instead of panicking (the
+relog-after-kill escape stays for the unwinnable ones), uses the
+verified spawn protection window after a relogin to regenerate
+stationary (sitting is safe: the sit packet never clears the
+protection) and opens with the bow first strike instead of walking
+into a pack.
+
+### Progress
+
+- Landed: the three dependency bumps (go mod tidy raised the go
+  directive 1.23.2 -> 1.26.0, required by the new x/crypto and
+  x/text), the five non-constant format string vet findings the
+  version bump surfaced (delevel.go, town.go, acceptance/manager.go),
+  and the whitespace normalization of the benchmark drill files the
+  2fda7ff commit left tab formatted. NOTE for the next agent: the
+  `go build ./...` of the whole tree fails on the PRE-EXISTING
+  benchmark drill package (g1/g2/g3.go redeclare the same symbols in
+  one package, 2fda7ff) - unrelated to this round, the drill files
+  look like deliberate per-stage artifacts, left untouched.
+- Verified facts this round (see docs/hunting.md and the H-005
+  entry): Mobius C1 spawn protection is REAL and ENABLED in the
+  deployed stack (PlayerSpawnProtection = 600 s in Player.ini, armed
+  by EnterWorld, cleared ONLY by MoveToLocation / AttackRequest /
+  Action / UseItem / RequestMagicSkillUse; the sit toggle is not in
+  the list, so a sitting character keeps the protection and
+  regenerates).
+
+## Active task (other branch, 2026-09-20): the farm readiness frame round (2026-09-20)
 
 Round 106 landed (commits 471abc6, c922461, 290b763): the follower
 keeps one oracle end to end - the advance gate obeys the same

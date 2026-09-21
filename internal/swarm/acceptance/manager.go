@@ -244,7 +244,7 @@ func (t *Test) appendLog(line string) {
         if strings.HasPrefix(line, huntLinePrefix) {
             runLog.Hunt(line)
         } else {
-            runLog.Event(line)
+            runLog.Event("%s", line)
         }
     }
     t.mu.Lock()
