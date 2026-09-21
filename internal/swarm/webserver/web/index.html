@@ -18,7 +18,6 @@ SPDX-License-Identifier: MIT
   <header class="app-header">
     <div class="brand">
       <span class="brand-mark">SWARM</span>
-      <span class="brand-sub">bot control</span>
     </div>
     <nav class="tabs">
       <button class="tab active" data-tab="map">Map</button>
@@ -462,6 +461,8 @@ SPDX-License-Identifier: MIT
               <button id="chat-tab-all" class="chat-tab active" role="tab" aria-selected="true">ALL</button>
               <button id="chat-tab-chat" class="chat-tab" role="tab" aria-selected="false">CHAT</button>
               <button id="chat-tab-system" class="chat-tab" role="tab" aria-selected="false">SYSTEM</button>
+              <button id="chat-collapse" class="chat-tab chat-collapse" aria-label="collapse"
+                title="collapse the chat">–</button>
             </div>
             <div id="chat-list" class="chat-list"></div>
             <div class="chat-input-row">
@@ -480,6 +481,8 @@ SPDX-License-Identifier: MIT
               <button id="chat-send" class="chat-send" title="send through the bot">send</button>
             </div>
           </div>
+          <button id="chat-restore" class="chat-restore hidden" aria-label="open the chat"
+            title="open the chat">▤</button>
         </div>
       </section>
 

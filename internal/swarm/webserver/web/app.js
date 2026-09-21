@@ -3781,8 +3781,38 @@ function setChatTab(tab) {
   renderChat(App.snapshot);
 }
 
-// initChat attaches the scroll tracking, the filter tabs and the chat
-// input of the chat window.
+// setChatCollapsed folds the chat window into the corner restore
+// button (and back). The choice persists across the sessions; the
+// storage stays optional (the harness sandbox and strict privacy
+// settings have none) - the flags flip regardless.
+function setChatCollapsed(collapsed) {
+  const box = document.getElementById("chat-box");
+  const restore = document.getElementById("chat-restore");
+  if (box) { box.classList.toggle("hidden", Boolean(collapsed)); }
+  if (restore) { restore.classList.toggle("hidden", !collapsed); }
+  if (typeof localStorage === "undefined") { return; }
+  try {
+    window.localStorage.setItem("swarm.chatCollapsed",
+      collapsed ? "1" : "0");
+  } catch (err) {
+    // The persistence is best effort: a blocked storage only drops
+    // the saved state, the collapse itself stays.
+  }
+}
+
+// chatCollapsedSaved reads the persisted collapse state ("1" while
+// collapsed): absent or broken storage reads as expanded.
+function chatCollapsedSaved() {
+  if (typeof localStorage === "undefined") { return false; }
+  try {
+    return window.localStorage.getItem("swarm.chatCollapsed") === "1";
+  } catch (err) {
+    return false;
+  }
+}
+
+// initChat attaches the scroll tracking, the filter tabs, the chat
+// input and the collapse button of the chat window.
 function initChat() {
   const list = document.getElementById("chat-list");
   list.addEventListener("scroll", () => {
@@ -3792,6 +3822,15 @@ function initChat() {
     document.getElementById("chat-tab-" + name)
       .addEventListener("click", () => setChatTab(name));
   }
+  const collapse = document.getElementById("chat-collapse");
+  if (collapse) {
+    collapse.addEventListener("click", () => setChatCollapsed(true));
+  }
+  const restore = document.getElementById("chat-restore");
+  if (restore) {
+    restore.addEventListener("click", () => setChatCollapsed(false));
+  }
+  setChatCollapsed(chatCollapsedSaved());
 
   const input = document.getElementById("chat-input");
   const send = () => sendChatInput();

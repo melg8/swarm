@@ -34,6 +34,14 @@ SPDX-License-Identifier: MIT
   --violet: #8250df;
   --gold: #9a6700;
   --gray: #6e7781;
+  /* Chat channel colors (the client conventions): the shout reads as
+     the orange-brown of the classic client, the trade as its pink. */
+  --chat-shout: #a8652c;
+  --chat-trade: #c2548f;
+  /* The announcement color: --warn was referenced by the shout and
+     announcement rules without ever being defined - declare it like
+     --red so the references resolve. */
+  --warn: #cf222e;
   --grid: rgba(21, 34, 50, 0.10);
   --grid-text: rgba(60, 72, 90, 0.55);
   --mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -79,6 +87,12 @@ html[data-theme="dark"] {
   --violet: #a371f7;
   --gold: #d29922;
   --gray: #8b949e;
+  /* Dark mirrors of the chat channel colors: lighter on the dark
+     panel so the contrast stays readable. --warn mirrors --red (it
+     was an undefined reference before, see the light theme). */
+  --chat-shout: #c98a52;
+  --chat-trade: #e07ba5;
+  --warn: #e5484d;
   --grid: rgba(58, 66, 82, 0.35);
   --grid-text: rgba(125, 133, 144, 0.5);
   --shadow: none;
@@ -122,8 +136,6 @@ body {
   letter-spacing: 2px;
   color: var(--accent);
 }
-
-.brand-sub { color: var(--text-dim); font-size: 11px; }
 
 .tabs {
   display: flex;
@@ -1074,6 +1086,31 @@ body.mode-pathfind .bot-status { display: none; }
 
 .chat-tab:hover { color: var(--text); background: var(--bg-panel-2); }
 
+/* The collapse button rides the head row right aligned: the head
+   keeps its pinned 18px height (see the .chat-list arithmetic). */
+.chat-collapse { margin-left: auto; }
+
+/* The collapsed chat restores from the square button of the same
+   corner: themed like the panels so it reads as the folded chat. */
+.chat-restore {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  width: 40px;
+  height: 40px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+  z-index: 4;
+}
+
+.chat-restore:hover { color: var(--text); border-color: var(--text-dim); }
+
 .chat-tab.active {
   color: var(--accent);
   background: var(--bg-panel-2);
@@ -1108,24 +1145,38 @@ body.mode-pathfind .bot-status { display: none; }
 
 .chat-time { color: var(--text-dim); flex-shrink: 0; }
 
-.chat-from { color: var(--text-bright); flex-shrink: 0; }
+/* The sender column never pushes the row wide: a long whisper name
+   truncates with an ellipsis instead of squeezing the message span
+   down to its one character min-content width. */
+.chat-from {
+  color: var(--text-bright);
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-.chat-msg { color: var(--text); word-break: break-word; }
+/* The message span owns the remaining row width (flex-basis 0 and a
+   min-width of 0): break-word alone let the flex collapse shrink it
+   to one letter per line once time and sender filled the row. */
+.chat-msg { color: var(--text); flex: 1 1 0; min-width: 0; word-break: break-word; }
 
 .chat-line.chat-social .chat-msg { color: var(--violet); }
 
-/* World chat lines: the channel colors mirror the client conventions,
-   the whisper and the trade stand out from the plain say. */
+/* World chat lines: the channel colors mirror the client conventions
+   (the shout orange-brown, the trade pink), the whisper and the
+   trade stand out from the plain say. */
 .chat-line.chat-say .chat-from { color: var(--text-bright); }
 
 .chat-line.chat-shout .chat-from,
-.chat-line.chat-shout .chat-msg { color: var(--warn); }
+.chat-line.chat-shout .chat-msg { color: var(--chat-shout); }
 
 .chat-line.chat-whisper .chat-from,
 .chat-line.chat-whisper .chat-msg { color: var(--violet); }
 
 .chat-line.chat-trade .chat-from,
-.chat-line.chat-trade .chat-msg { color: var(--accent); }
+.chat-line.chat-trade .chat-msg { color: var(--chat-trade); }
 
 .chat-line.chat-announcement .chat-msg { color: var(--warn); }
 
@@ -1306,6 +1357,7 @@ body.mode-pathfind #view-tests,
 body.mode-pathfind .sidebar-foot,
 body.mode-pathfind .hud-stack,
 body.mode-pathfind .chat-box,
+body.mode-pathfind .chat-restore,
 body.mode-pathfind .follow-check,
 body.mode-pathfind .view-menu .bot-layer,
 body.mode-pathfind .tab[data-tab="log"],
@@ -2490,6 +2542,7 @@ body.mode-fight #view-tests,
 body.mode-fight .sidebar-foot,
 body.mode-fight .hud-stack,
 body.mode-fight .chat-box,
+body.mode-fight .chat-restore,
 body.mode-fight .follow-check,
 body.mode-fight .view-menu,
 body.mode-fight .map-legend,
@@ -2679,6 +2732,7 @@ body.mode-test-fight .sidebar,
 body.mode-test-fight .hud-stack,
 body.mode-test-fight .bot-status,
 body.mode-test-fight .chat-box,
+body.mode-test-fight .chat-restore,
 body.mode-test-fight #live-indicator,
 body.mode-test-fight #live-label,
 body.mode-test-fight #foot-packets,

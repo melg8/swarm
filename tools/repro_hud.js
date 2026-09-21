@@ -164,6 +164,8 @@ function loadAppJs(appFile) {
         " ? setChatTab : undefined," +
         " sendChatInput: typeof sendChatInput === 'function'" +
         " ? sendChatInput : undefined," +
+        " setChatCollapsed: typeof setChatCollapsed === 'function'" +
+        " ? setChatCollapsed : undefined," +
         " walkDetail: typeof walkDetail === 'function'" +
         " ? walkDetail : undefined," +
         " engageFightDetail: typeof engageFightDetail === 'function'" +
@@ -469,6 +471,35 @@ function main() {
             "rule: " + (chatLineRule ? chatLineRule[0]
                 : ".chat-line missing"));
 
+        // The whisper rows collapsed to one letter per line: the
+        // message span was the only shrinkable item of the flex row
+        // and break-word lowered its min-content width to a single
+        // character. The rule must give the span the remaining width
+        // (flex 1 1 0 with a min-width of 0) and cap the sender with
+        // an ellipsis so a long name can never squeeze the row.
+        const chatMsgRule = chatCss.match(/\.chat-msg\s*\{[^}]*\}/);
+        check(results, "chat message spans take the remaining width",
+            Boolean(chatMsgRule) && /flex:\s*1\s+1\s+0/.test(chatMsgRule[0])
+            && /min-width:\s*0/.test(chatMsgRule[0]),
+            "rule: " + (chatMsgRule ? chatMsgRule[0]
+                : ".chat-msg missing"));
+        const chatFromRule = chatCss.match(/\.chat-from\s*\{[^}]*\}/);
+        check(results, "long chat senders truncate with an ellipsis",
+            Boolean(chatFromRule)
+            && /text-overflow:\s*ellipsis/.test(chatFromRule[0]),
+            "rule: " + (chatFromRule ? chatFromRule[0]
+                : ".chat-from missing"));
+
+        // The shout orange-brown and the trade pink ride theme
+        // variables (both themes tint them), and the announcement
+        // --warn reference resolves in the default theme now.
+        const rootRule = chatCss.match(/:root\s*\{[^}]*\}/);
+        check(results, "the chat shout and trade colors are themed",
+            Boolean(rootRule) && rootRule[0].includes("--chat-shout")
+            && rootRule[0].includes("--chat-trade")
+            && rootRule[0].includes("--warn"),
+            "rule: " + (rootRule ? "found" : ":root missing"));
+
         // Auto scroll follows the newest line only while stuck: the
         // default state scrolls to the bottom, a scrolled up user
         // freezes the read segment (the render anchors the topmost
@@ -618,6 +649,33 @@ function main() {
                 "got " + sysOnly.children[0].children.length
                 + " columns");
             hud.setChatTab("all");
+        }
+
+        // The collapse folds the chat window into the corner restore
+        // button: the hidden flags flip together so exactly one of
+        // the two elements shows, and flipping back restores both.
+        if (typeof hud.setChatCollapsed !== "function") {
+            check(results, "chat collapse toggles the hidden flags",
+                false, "setChatCollapsed missing from app.js");
+        } else {
+            sandbox.document.getElementById("chat-box");
+            sandbox.document.getElementById("chat-restore");
+            const chatBox = elements.get("chat-box");
+            const chatRestore = elements.get("chat-restore");
+            hud.setChatCollapsed(true);
+            check(results, "collapsing hides the chat box",
+                chatBox.classList.contains("hidden")
+                && !chatRestore.classList.contains("hidden"),
+                "box hidden=" + chatBox.classList.contains("hidden")
+                + " restore hidden="
+                + chatRestore.classList.contains("hidden"));
+            hud.setChatCollapsed(false);
+            check(results, "restoring shows the chat box again",
+                !chatBox.classList.contains("hidden")
+                && chatRestore.classList.contains("hidden"),
+                "box hidden=" + chatBox.classList.contains("hidden")
+                + " restore hidden="
+                + chatRestore.classList.contains("hidden"));
         }
 
         // The chat input posts a say command for the active bot: the
