@@ -69,14 +69,23 @@ suite green, task prepush green, `lint --new` 0 issues.
 
 - Docs updated: docs/hunting.md (the Newbie Guide buff run block of
   the town trips section), docs/development_log.md (Round 114).
-- Follow ups for the next session: the scroll round reserves no
-  wallet share for the scroll before the gear plan (the gear
-  affordability computes against the full wallet); the guide run
+- The critic round (a fresh-context review sub-agent, mutation
+  verified) landed three fixes in 785e13d: the guide run rides the
+  short trip cooldown (the refill never waits the five minutes out),
+  the guide no-show skip arms the refusal cooldown (no indefinite
+  village loops on an invisible spawn), guideForRegion is an
+  allowlist (the future regions stay guide-less until mapped).
+- Follow ups for the next session: a test driving the full
+  recoverFromDeath -> guide run flow (the current death test seeds
+  the post-revive state manually); the scroll round reserves no
+  wallet share for the scroll before the gear plan; the guide run
   has no expiry anticipation (the server's removal push starts the
   refill - anticipating the last minute of the 1200 s buffs would
-  tighten the buff uptime); the full-lint findings of the parallel
-  rounds (clickWaypoint cyclop 16, handleServerPacket cyclop 16,
-  church_entry exhaustruct) belong to their owning rounds.
+  tighten the buff uptime); the doubling of the refusal cooldown
+  for a permanently refused account; the full-lint findings of the
+  parallel rounds (clickWaypoint cyclop 16, handleServerPacket
+  cyclop 16, church_entry exhaustruct) belong to their owning
+  rounds.
 
 ## Active task (status: complete): the frozen skip storm round (2026-09-21, branch feature/improved-behaviour)
 
