@@ -297,6 +297,19 @@ const AttackTargets = 4
 // int8, so the flag reads as a negative value.
 const attackHitMissFlag int8 = -128
 
+// attackHitCritFlag mirrors the Mobius Hit flag of a critical blow
+// (Hit.java HITFLAG_CRIT, bit pattern 0x20): the Attack packet
+// carries it per hit, so the tracker can label the damage float of
+// that blow as a critical one.
+const attackHitCritFlag int8 = 0x20
+
+// CritFromHitFlag reports the Mobius HITFLAG_CRIT verdict of one raw
+// hit flags byte (the connection layer reads the parsed hits of the
+// Attack packet and copies the verdict into state.Attack.CritFlags).
+func CritFromHitFlag(flag int8) bool {
+    return flag&attackHitCritFlag != 0
+}
+
 // Attack describes an Attack packet of one attacker.
 type Attack struct {
     AttackerID int32
@@ -307,9 +320,12 @@ type Attack struct {
     TargetY    int32
     TargetZ    int32
     TargetIDs  [AttackTargets]int32
-    // HitFlags carries the per hit flags (see attackHitMissFlag) of
-    // the TargetIDs entries.
-    HitFlags    [AttackTargets]int8
+    // HitFlags carries the per hit flags (see attackHitMissFlag and
+    // attackHitCritFlag) of the TargetIDs entries.
+    HitFlags [AttackTargets]int8
+    // CritFlags carries the per hit critical verdicts derived from
+    // HitFlags (the web view labels the damage floats with them).
+    CritFlags   [AttackTargets]bool
     TargetCount int
 }
 
@@ -331,16 +347,18 @@ const (
 )
 
 // CombatEvent is one observed beat of the combat animation feed
-// of the web view: an attack swing of the Attack broadcast or a
-// damage landing of a StatusUpdate HP drop. The monotonic
-// sequence lets the client replay every event exactly once across
-// the repeated snapshots of the event stream.
+// of the web view: an attack swing of the Attack broadcast, a
+// damage landing of a StatusUpdate HP drop (Crit marks the blows
+// the server resolved as critical) or a miss float of an evaded
+// blow. The monotonic sequence lets the client replay every event
+// exactly once across the repeated snapshots of the event stream.
 type CombatEvent struct {
     Seq        uint64
     Kind       string
     AttackerID int32
     TargetID   int32
     Amount     float64
+    Crit       bool
     At         time.Time
     X          int32
     Y          int32
@@ -539,6 +557,19 @@ type Bot struct {
     // cast fill and the cooldown countdown of the web view read it
     // through the skillStates snapshot section (see skill_cast.go).
     skillCasts map[int32]skillCastWindow
+    // critVictim/critVictimAt/critVictimHits carry the critical hit
+    // hint of the last Attack broadcast: the victim of the landed
+    // critical blows, the moment they landed and how many of them
+    // await their HP drop (a dual weapon can crit twice in one
+    // broadcast). The next HP drops of that victim within
+    // critHintWindow consume the count and label their damage float
+    // as critical (the StatusUpdate HP drops carry no crit flag -
+    // see recordCharDamageLocked). One slot: the bursts that overlap
+    // two crits on different victims inside the window are rare and
+    // the wrong label is cosmetic only.
+    critVictim     int32
+    critVictimAt   time.Time
+    critVictimHits int
     // loginCooldownUntil holds the reconnect pause the supervisor
     // honors after an emergency logout. The tracker outlives the
     // sessions, so the cooldown spans them (see SetLoginCooldown).
@@ -1947,6 +1978,7 @@ func (b *Bot) ApplyAttack(a Attack) {
         b.touch()
     }
     b.recordSwingEventsLocked(a, now)
+    b.noteCritHintLocked(a, now)
     b.noteSwingsLocked(a)
     for i := range a.TargetCount {
         if a.TargetIDs[i] == b.selfID {
@@ -2011,6 +2043,52 @@ func (b *Bot) recordSwingEventsLocked(a Attack, now time.Time) {
             At:         now,
         })
     }
+}
+
+// critHintWindow bounds the critical correlation: the Attack
+// broadcast and its StatusUpdate HP drops ride the same read loop
+// back to back, so half a second is generous while the false
+// positives (an unrelated hit on the same victim inside the window)
+// stay rare. The wrong "Crit!" label is cosmetic only.
+const critHintWindow = 500 * time.Millisecond
+
+// noteCritHintLocked remembers the victims of the landed critical
+// blows of an Attack broadcast (the hint the next HP drops read): a
+// dual weapon critting twice counts two awaited drops. The caller
+// must hold the write lock.
+func (b *Bot) noteCritHintLocked(a Attack, now time.Time) {
+    for i := range a.TargetCount {
+        if a.CritFlags[i] && a.HitFlags[i]&attackHitMissFlag == 0 {
+            if b.critVictim != a.TargetIDs[i] || b.critVictimAt.IsZero() ||
+                now.Sub(b.critVictimAt) > critHintWindow {
+                b.critVictim = a.TargetIDs[i]
+                b.critVictimAt = now
+                b.critVictimHits = 0
+            }
+            b.critVictimHits++
+        }
+    }
+}
+
+// critHintLocked reports whether the observed HP drop of the given
+// victim labels as a critical blow: the hint matches the victim, the
+// window is live and an awaited drop count remains (each labeled
+// drop consumes one - a plain follow-up hit of the same victim stays
+// plain). The caller must hold the write lock.
+func (b *Bot) critHintLocked(victimID int32, now time.Time) bool {
+    if b.critVictim != victimID || b.critVictimAt.IsZero() ||
+        b.critVictimHits <= 0 {
+        return false
+    }
+    if now.Sub(b.critVictimAt) > critHintWindow {
+        b.critVictim = 0
+        b.critVictimHits = 0
+
+        return false
+    }
+    b.critVictimHits--
+
+    return true
 }
 
 // ApplyAutoAttackStart marks an object as auto attacking.
@@ -2568,6 +2646,7 @@ type CombatEventView struct {
     AttackerID int32   `json:"attackerId"`
     TargetID   int32   `json:"targetId"`
     Amount     float64 `json:"amount"`
+    Crit       bool    `json:"crit"`
     AtMs       int64   `json:"atMs"`
     X          int32   `json:"x"`
     Y          int32   `json:"y"`

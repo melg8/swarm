@@ -6,6 +6,7 @@ package state
 
 import (
     "testing"
+    "time"
 
     "github.com/stretchr/testify/require"
 )
@@ -246,4 +247,105 @@ func countMisses(views []CombatEventView) []CombatEventView {
     }
 
     return misses
+}
+
+// TestCritHintLabelsDamage pins the critical correlation: the Attack
+// broadcast carries the Mobius HITFLAG_CRIT per hit, the StatusUpdate
+// HP drops carry no crit flag, so the tracker remembers the victim of
+// a landed critical blow and labels the next HP drop of that victim
+// inside the window as a critical damage float.
+func TestCritHintLabelsDamage(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    spawnNpcInfo(bot, 7, 1000001, 45300)
+    bot.ApplyStatusUpdate(7, []Attribute{
+        {ID: AttrMaxHP, Value: 100},
+        {ID: AttrCurHP, Value: 100},
+    })
+
+    // The character lands a critical blow on the mob.
+    bot.ApplyAttack(Attack{
+        AttackerID: 100, X: 45000, Y: 50000, Z: -3500,
+        TargetX: 45300, TargetY: 50000, TargetZ: -3500,
+        TargetIDs:   [AttackTargets]int32{7},
+        HitFlags:    [AttackTargets]int8{attackHitCritFlag},
+        CritFlags:   [AttackTargets]bool{true},
+        TargetCount: 1,
+    })
+    bot.ApplyStatusUpdate(7, []Attribute{{ID: AttrCurHP, Value: 62}})
+    events := bot.Snapshot().CombatEvents
+    require.Len(t, events, 2)
+    require.Equal(t, CombatEventDamage, events[1].Kind)
+    require.True(t, events[1].Crit,
+        "the HP drop right after the critical swing labels crit")
+
+    // A plain blow does not label: no crit hint was set.
+    bot.ApplyAttack(Attack{
+        AttackerID: 100, X: 45000, Y: 50000, Z: -3500,
+        TargetX: 45300, TargetY: 50000, TargetZ: -3500,
+        TargetIDs:   [AttackTargets]int32{7},
+        TargetCount: 1,
+    })
+    bot.ApplyStatusUpdate(7, []Attribute{{ID: AttrCurHP, Value: 40}})
+    events = bot.Snapshot().CombatEvents
+    require.Len(t, events, 4)
+    require.False(t, events[3].Crit,
+        "the blow without the crit flag labels plain")
+
+    // A missed blow sets no hint even with the crit bit set (the
+    // server never sends that combination, the guard costs nothing).
+    bot.ApplyAttack(Attack{
+        AttackerID: 100, X: 45000, Y: 50000, Z: -3500,
+        TargetX: 45300, TargetY: 50000, TargetZ: -3500,
+        TargetIDs:   [AttackTargets]int32{7},
+        HitFlags:    [AttackTargets]int8{attackHitMissFlag},
+        CritFlags:   [AttackTargets]bool{true},
+        TargetCount: 1,
+    })
+    bot.ApplyStatusUpdate(7, []Attribute{{ID: AttrCurHP, Value: 30}})
+    events = bot.Snapshot().CombatEvents
+    require.Len(t, events, 6)
+    require.False(t, events[5].Crit,
+        "the evaded blow labels no critical damage")
+
+    // A stale hint (past the window) labels nothing.
+    bot.ApplyAttack(Attack{
+        AttackerID: 100, X: 45000, Y: 50000, Z: -3500,
+        TargetX: 45300, TargetY: 50000, TargetZ: -3500,
+        TargetIDs:   [AttackTargets]int32{7},
+        HitFlags:    [AttackTargets]int8{attackHitCritFlag},
+        CritFlags:   [AttackTargets]bool{true},
+        TargetCount: 1,
+    })
+    time.Sleep(critHintWindow + 50*time.Millisecond)
+    bot.ApplyStatusUpdate(7, []Attribute{{ID: AttrCurHP, Value: 20}})
+    events = bot.Snapshot().CombatEvents
+    require.Len(t, events, 8)
+    require.False(t, events[7].Crit,
+        "the HP drop past the window labels plain")
+}
+
+// TestCritHintLabelsSelfDamage pins the character side: the mob's
+// critical swing labels the HP drop the character takes.
+func TestCritHintLabelsSelfDamage(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.ApplyStatusUpdate(100, []Attribute{
+        {ID: AttrMaxHP, Value: 200},
+        {ID: AttrCurHP, Value: 200},
+    })
+    bot.ApplyAttack(Attack{
+        AttackerID: 7, X: 46000, Y: 50000, Z: -3500,
+        TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+        TargetIDs:   [AttackTargets]int32{100},
+        HitFlags:    [AttackTargets]int8{attackHitCritFlag},
+        CritFlags:   [AttackTargets]bool{true},
+        TargetCount: 1,
+    })
+    bot.ApplyStatusUpdate(100, []Attribute{{ID: AttrCurHP, Value: 160}})
+    events := bot.Snapshot().CombatEvents
+    require.Len(t, events, 2)
+    require.Equal(t, CombatEventDamage, events[1].Kind)
+    require.True(t, events[1].Crit,
+        "the damage the character takes from the critical swing labels crit")
 }

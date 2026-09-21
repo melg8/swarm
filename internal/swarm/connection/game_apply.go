@@ -294,6 +294,8 @@ func (gc *GameClient) applyAttack(payload []byte) {
         for i := range count {
             attack.TargetIDs[i] = gc.attack.Hits[i].TargetID
             attack.HitFlags[i] = gc.attack.Hits[i].Flags
+            attack.CritFlags[i] = state.CritFromHitFlag(
+                gc.attack.Hits[i].Flags)
         }
         gc.tracker.ApplyAttack(attack)
     }

@@ -11,7 +11,53 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task (status: in progress): the combat feedback round - miss floats, directional damage, circle parity, skill cast and cooldown (2026-09-21, branch feature/improved-behaviour)
+## Active task (status: in progress): the combat polish round - crit floats, melee contact circles, bare buff bar, wrapped status banner, square trash target (2026-09-21, branch feature/improved-behaviour)
+
+Started 2026-09-21 ~13:35 UTC. The owner prompt assigned five web UI
+asks:
+
+1. A "Crit!" suffix after the damage number when the hit was a
+   critical, styled like the "Miss" float, crit numbers slightly
+   bigger than normal ones.
+2. Melee circles (character vs mob) must touch face to face instead
+   of merging into one blob, especially zoomed out.
+3. The buffs bar loses its framing completely - only the small
+   separator spaces between the icons stay.
+4. The center status banner wraps too-long lines (deleveling et al)
+   onto 2-3 lines so it stops colliding with the full buffs bar.
+5. The inventory widget's trash target (the urn) becomes square like
+   the item icons instead of the tall 30x38 dashed box.
+
+Design (verified against the code and the Mobius C1 sources):
+
+- Crit: `Hit.java` carries `HITFLAG_CRIT = 0x20` per hit of the
+  Attack packet (parsed today, discarded). The damage AMOUNT comes
+  from the StatusUpdate HP drops (no crit flag there), so the
+  tracker correlates: `ApplyAttack` remembers the last crit victim
+  and the moment (`critVictim`/`critVictimAt`, 500 ms window - the
+  packets ride the same read loop back to back); the next HP drop
+  of that victim labels its `CombatEventDamage` with `Crit: true`
+  (the wire gains a `"crit"` bool; dual crit hits both label - the
+  hint is not consumed). The client renders "-123" plus an italic
+  " Crit!" tail and a +3 unit scale font bump for crits.
+- Melee contact: a per frame contact pass over the alive units
+  computes a shrink factor per unit so overlapping circles touch
+  (factor = dist/(r1+r2), floored at 0.25, times 0.95 for a hair of
+  separation); drawObjects/drawSelf multiply their radiusOf based
+  radii by it. Dead units, items and decorations stay out of it.
+- Buffs bar: `.buffs-panel` loses background/border/radius/shadow,
+  the body padding dies, the cells lose their plate background and
+  the border-painted separator strips; the grid switches to a 2px
+  gap (step stays 34: 32px icon + 2px space), the panel size
+  arithmetic becomes cols*34-2 x rows*34-2.
+- Banner: `.bot-status` keeps the centered pill but the detail
+  span wraps (max-width ~380px on the banner, 3 line clamp,
+  break-word) instead of the nowrap ellipsis clip.
+- Trash: `.gear-trash` 30x38 -> 36x36.
+
+Status: commit A (crit floats) in flight.
+
+## Active task (status: complete): the combat feedback round - miss floats, directional damage, circle parity, skill cast and cooldown (2026-09-21, branch feature/improved-behaviour)
 
 Started 2026-09-21 ~11:45 UTC. The owner prompt assigned five web UI
 asks around the combat visuals, all English-only as usual:
