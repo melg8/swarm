@@ -19,6 +19,10 @@ SPDX-License-Identifier: MIT
   --text-dim: #67707e;
   --text-bright: #111722;
   --accent: #d97706;
+  /* The buff time strip rides brighter than the accent: the plain
+     accent drowned next to the white cell separators of the effects
+     panel (see the .buff-strip rule). */
+  --buff-strip: #f59e0b;
   --green: #1a7f37;
   --red: #cf222e;
   --blue: #0969da;
@@ -59,6 +63,7 @@ html[data-theme="dark"] {
   --text-dim: #7d8590;
   --text-bright: #eef1f5;
   --accent: #f0a03a;
+  --buff-strip: #ffc061;
   --green: #3fb950;
   --red: #e5484d;
   --blue: #58a6ff;
@@ -268,186 +273,66 @@ body {
    AbnormalStatusUpdate list: the self buffs the loop casts, the
    debuffs the mobs land), docked to the RIGHT of the character HUD
    (the HUD is at left:12 width:252, so its right edge sits at 264;
-   the panel docks at left:272 with an 8px gap). Two view states
-   share the frame and morph into each other (the frame width and
-   the body height transition, the layers cross-fade, the chevron
-   flips with a springy ease) while the visible icons fly from their
-   old spots to the new ones (the FLIP morph of buffs_flip.js):
-   - the icon grid (the default): the active effects pack edge to
-     edge as 30px cells (the same box as the detailed list icon, ten
-     across keep the frame clear of the central status banner), 10
-     per row and at most 2 rows, the thin white strips between the
-     cells are the separators (the grid gap lets the white cell
-     borders show through), every cell overlays the remaining time
-     chip on hover only and the mini time strip on its bottom
-     pixels;
-   - the detailed list: the full effect rows with the remaining time
-     percent bars, the tight vertical rhythm and the scrollbar - the
-     body height pins EXACTLY to the character HUD stack height
-     (synced by buffs.js), so the list never reads shorter than the
-     character widget.
-   The left dock is the slim vertical strip carrying the single
-   expand chevron (the old view switch is gone): the button stays
-   pinned to the top, so it never moves between the states and
-   flipping it needs no re-aim. The panel hides entirely while no
-   effect runs. */
+   the panel docks at left:272 with an 8px gap). The single view is
+   the horizontal icon grid - the classic buff bar (the vertical
+   detailed list is gone by decision, no toggle control exists):
+   the active effects pack edge to edge as 34px cells (the 32px
+   native icon art plus the 2px white separator strip each cell
+   paints on its right and bottom edge - the icons answer 1:1,
+   nothing scales), 10 per row and at most 2 rows; more than the 20
+   visible slots stay clipped, no scrollbar - the strict classic bar
+   owns the cap. The frame hugs the filled columns and rows, the
+   body pads 2px on the top edge only (the cells' own white
+   separators answer the bottom chrome, so the white below the icons
+   reads the same 2px as the white above them). The panel renders
+   strictly: no appear or disappear animation, a change snaps. It
+   hides entirely while no effect runs. */
 .buffs-panel {
   position: absolute;
   top: 10px;
   left: 272px;
-  display: flex;
-  align-items: stretch;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 6px;
   box-shadow: var(--shadow);
   z-index: 4;
   overflow: hidden;
-  /* The view morph: the frame glides between the grid width and the
-     list width while the layers cross-fade. */
-  transition: width 0.3s cubic-bezier(0.33, 1, 0.5, 1);
 }
-
-/* The frame widths per view state: the grid hugs the filled columns
-   (the inline width from syncBuffsPanelSize; the declared width is
-   the full 10 column shape - 10 x 30px cells plus the dock, the side
-   padding and the frame - and the cap for the arithmetic), the list
-   keeps the compact reading width. Keep in sync with the geometry
-   constants in buffs.js. */
-.buffs-panel.view-icons { width: 335px; }
-
-.buffs-panel.view-list { width: 244px; }
 
 body.mode-pathfind .buffs-panel { display: none; }
 
-.buffs-dock {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 2px;
-  background: var(--bg-panel-2);
-  border-right: 1px solid var(--border);
-}
-
-.buffs-dock-btn {
-  flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-dim);
-  font-size: 10px;
-  line-height: 1;
-  cursor: pointer;
-}
-
-.buffs-dock-btn:hover {
-  color: var(--text-bright);
-  background: var(--bg-panel);
-  border-color: var(--border);
-}
-
-/* The chevron is the single control of the panel: the bigger
-   triangle flips 180 degrees toward the next state with a springy
-   overshoot and never leaves its spot (the rotation happens around
-   the fixed button center). */
-.buffs-chev {
-  font-size: 15px;
-  line-height: 1;
-  transition: transform 0.34s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.buffs-panel.view-list .buffs-chev { transform: rotate(180deg); }
-
 .buffs-panel-body {
   position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  /* 2px on the top and the bottom edges, 3px on the sides. */
-  padding: 2px 3px;
+  /* 2px on the top edge, none on the bottom (the cell separators
+     answer the bottom chrome), 3px on the sides. The explicit
+     height comes from syncBuffsPanelSize in buffs.js. */
+  padding: 2px 3px 0;
   overflow: hidden;
-  /* The height morph between the grid rows and the exact HUD
-     height; the explicit height comes from syncBuffsPanelSize in
-     buffs.js. */
-  transition: height 0.3s cubic-bezier(0.33, 1, 0.5, 1);
 }
 
-/* The two content layers stack in the body; the inactive one fades
-   out, un-hooks the pointer and flips its visibility only after the
-   fade finishes - no positional settle, the icons fly on their own
-   (the FLIP morph of buffs_flip.js). */
-.buffs-grid,
-.buffs-list-wrap {
-  position: absolute;
-  top: 2px;
-  left: 3px;
-  right: 3px;
-  transition: opacity 0.2s ease,
-    visibility 0s linear 0.3s;
-}
-
-.view-list .buffs-grid {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.view-icons .buffs-list-wrap {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-/* The entering layer must not inherit the hide delay: the visible
-   state cancels it, so the fade-in paints immediately (the hidden
-   destination keeps the delay - the fade-out finishes before the
-   layer un-hooks). */
-.view-icons .buffs-grid,
-.view-list .buffs-list-wrap {
-  transition: opacity 0.2s ease,
-    visibility 0s;
-}
-
-/* The icon grid (the default state): 10 columns of tight 30px
-   cells (the same box as the detailed list icon), no grid gap -
-   every cell paints its own 2px white strip on the right and the
-   bottom edge, so the separators run only between (and under) the
-   icons that actually show and a partially filled row never leaves
-   a white hole (the white grid background answer did exactly that
-   on the dark theme). */
+/* The icon grid: 10 columns of 34px cells (the 32px native icon
+   plus the 2px white separator), no grid gap - every cell paints
+   its own white strip on the right and the bottom edge, so the
+   separators run only between (and under) the icons that actually
+   show and a partially filled row never leaves a white hole (the
+   white grid background answer did exactly that on the dark theme).
+   The cap clips past the 20 visible slots without a scrollbar.
+   Keep in sync with the geometry constants in buffs.js. */
 .buffs-grid {
   display: grid;
-  grid-template-columns: repeat(10, 30px);
-  grid-auto-rows: 30px;
+  grid-template-columns: repeat(10, 34px);
+  grid-auto-rows: 34px;
   gap: 0;
   justify-content: start;
   align-content: start;
-  /* The classic buff bar shape: 10 x 2. More than 20 active
-     effects scroll inside the grid (the dock keeps the two row
-     height, the detailed list answers the overflow). */
-  max-height: 60px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-}
-
-.buffs-grid::-webkit-scrollbar { width: 6px; }
-
-.buffs-grid::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+  max-height: 68px;
+  overflow: hidden;
 }
 
 .buff-cell {
   position: relative;
-  width: 30px;
-  height: 30px;
+  width: 34px;
+  height: 34px;
   background: var(--bg-panel-2);
   border-right: 2px solid #ffffff;
   border-bottom: 2px solid #ffffff;
@@ -455,10 +340,12 @@ body.mode-pathfind .buffs-panel { display: none; }
   overflow: hidden;
 }
 
+/* The icon answers its native 32px art 1:1 inside the cell (the
+   separator borders live outside the 32px box) - nothing scales. */
 .buff-cell img {
   display: block;
-  width: 100%;
-  height: 100%;
+  width: 32px;
+  height: 32px;
   image-rendering: pixelated;
   pointer-events: none;
 }
@@ -479,11 +366,11 @@ body.mode-pathfind .buffs-panel { display: none; }
 /* The remaining time chip: hidden until the cell is hovered, and
    the darkening hugs only the digits (the chip shrinks to the text
    width and centers over the icon instead of spanning the whole
-   bottom edge). */
+   bottom edge). It rides just above the 3px time strip. */
 .buff-cell .buff-left {
   position: absolute;
   left: 50%;
-  bottom: 2px;
+  bottom: 4px;
   transform: translateX(-50%);
   width: max-content;
   max-width: 100%;
@@ -503,144 +390,20 @@ body.mode-pathfind .buffs-panel { display: none; }
 
 .buff-cell .buff-left.fading { color: #e2b455; }
 
-/* The mini time strip of a grid cell: a 2px sliver pinned to the
+/* The mini time strip of a grid cell: a 3px sliver pinned to the
    bottom pixels of the icon, its width is the remaining share of
-   the duration the effect landed with (the same reading the list
-   bars draw, compressed to the classic buff bar shape). */
+   the duration the effect landed with. The dedicated bright color
+   (one tint per theme) keeps it clearly visible over the icon art
+   and next to the white separators. */
 .buff-cell .buff-strip {
   position: absolute;
   left: 0;
   bottom: 0;
-  height: 2px;
+  height: 3px;
   width: 0%;
   max-width: 100%;
-  background: var(--accent);
-  opacity: 0.9;
+  background: var(--buff-strip);
   pointer-events: none;
-}
-
-/* The detailed list: the full effect rows with the remaining time
-   percent bar, the tight rhythm and the scrollbar. */
-.buffs-list-wrap {
-  bottom: 2px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-}
-
-.buffs-list-wrap::-webkit-scrollbar { width: 6px; }
-
-.buffs-list-wrap::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
-}
-
-.buffs-list { list-style: none; }
-
-.buff-item {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 3px 10px 4px;
-}
-
-.buff-icon {
-  position: relative;
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg-panel-2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.buff-icon img {
-  width: 24px;
-  height: 24px;
-  image-rendering: pixelated;
-  pointer-events: none;
-}
-
-.buff-icon .badge-level {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  padding: 0 3px;
-  font-size: 9px;
-  line-height: 11px;
-  color: var(--text-bright);
-  background: rgba(0, 0, 0, 0.55);
-  border-radius: 3px 0 0 0;
-  pointer-events: none;
-}
-
-.buff-text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.buff-name {
-  font-size: 11px;
-  color: var(--text-bright);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.buff-meta {
-  font-size: 10px;
-  color: var(--text-dim);
-}
-
-.buff-meta.fading { color: #e2b455; }
-
-/* The remaining time percent bar of a row: pinned to the bottom
-   edge, the fill eases toward the next tick so the depletion reads
-   as a continuous run. */
-.buff-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: rgba(0, 0, 0, 0.14);
-  pointer-events: none;
-}
-
-.buff-bar i {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-  opacity: 0.75;
-  transition: width 0.9s linear;
-}
-
-/* A cell or a row that just joined the view spawns with a pop: a
-   quick scale overshoot plus a soft glow ring fading out (the spawn
-   class drops after the animation; the keyed refreshes of the
-   surviving effects never re-trigger it - the icons must not blink
-   on every snapshot). */
-@keyframes buff-spawn-pop {
-  0% { opacity: 0; transform: scale(0.4); }
-  60% { opacity: 1; transform: scale(1.14); }
-  100% { opacity: 1; transform: scale(1); }
-}
-
-@keyframes buff-spawn-glow {
-  0% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.85); }
-  100% { box-shadow: 0 0 6px 2px rgba(255, 255, 255, 0); }
-}
-
-.buff-cell.buff-spawn,
-.buff-item.buff-spawn {
-  animation: buff-spawn-pop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1),
-    buff-spawn-glow 0.6s ease-out;
 }
 
 /* The hover card of a buff (the shared singleton of the page, see

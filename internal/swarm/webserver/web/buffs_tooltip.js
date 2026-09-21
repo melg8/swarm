@@ -4,14 +4,14 @@
 
 // ---- the effects tooltip (the rich hover card of a buff) ----
 //
-// Hovering a buff in either view of the effects panel (the icon grid
-// cell or the detailed list row) shows the floating tooltip card the
-// page keeps as the #buffs-tooltip singleton (the same mechanics the
-// item tooltip of the gear widget uses): the card answers what the
-// effect really is - the name with the level, the numeric effect
-// summary the server skill stats bite with (e.g. Wind Walk 2 answers
-// "+33 Speed"), the generic level description text and the remaining
-// time. The lines the snapshot carries no data for collapse away.
+// Hovering a buff in the effects panel (an icon grid cell) shows the
+// floating tooltip card the page keeps as the #buffs-tooltip
+// singleton (the same mechanics the item tooltip of the gear widget
+// uses): the card answers what the effect really is - the name with
+// the level, the numeric effect summary the server skill stats bite
+// with (e.g. Wind Walk 2 answers "+33 Speed"), the generic level
+// description text and the remaining time. The lines the snapshot
+// carries no data for collapse away.
 //
 // The wiring is delegated on the panel (one mouseover / mousemove /
 // mouseleave trio instead of listeners per keyed node), so the keyed
@@ -64,9 +64,9 @@ function buffsTooltipParts() {
 }
 
 // showBuffsTooltip fills the card for one hovered buff box (a grid
-// cell or a list row) and unhides it near the pointer. The box names
-// its effect through the data-skill-id attribute; an unknown one
-// hides the card instead of guessing.
+// cell) and unhides it near the pointer. The box names its effect
+// through the data-skill-id attribute; an unknown one hides the card
+// instead of guessing.
 function showBuffsTooltip(box, x, y) {
     const el = buffsTooltipElement();
     const parts = buffsTooltipParts();
@@ -127,7 +127,7 @@ function initBuffsTooltip() {
     panel.addEventListener("mouseover", (event) => {
         const target = event && event.target;
         const box = target && typeof target.closest === "function"
-        ? target.closest(".buff-cell, .buff-item") : null;
+        ? target.closest(".buff-cell") : null;
         if (!box) { hideBuffsTooltip(); return; }
         if (box === BuffsTooltip.box) { return; }
         showBuffsTooltip(box, event.clientX, event.clientY);

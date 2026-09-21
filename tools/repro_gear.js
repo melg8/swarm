@@ -2108,10 +2108,11 @@ function main() {
     check(results, "the effects panel hides in the pathfind mode",
         css.includes("body.mode-pathfind .buffs-panel"),
         "the pathfind rule is missing");
-    check(results, "the effects panel still morphs its two views",
-        css.includes(".buffs-panel.view-icons") &&
-        css.includes(".buffs-panel.view-list"),
-        "the view rules are missing");
+    check(results, "the effects panel renders the single icon grid",
+        !css.includes(".buffs-panel.view-icons") &&
+        !css.includes(".buffs-panel.view-list") &&
+        css.includes("grid-template-columns: repeat(10, 34px)"),
+        "the single grid rules are missing");
 
     // The quest items sub tab: the QUEST switch sits right of the
     // INVENTORY title inside the equipment view (the top level QUEST

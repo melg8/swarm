@@ -11,6 +11,51 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: complete): the effects panel strict classic round (2026-09-21, branch feature/improved-behaviour)
+
+Started 2026-09-21 ~11:00 UTC. The owner prompt reversed the earlier
+panel decisions: the vertical mode dies entirely, the panel renders
+as the single strict classic horizontal buff bar. All six asks landed
+in one atomic commit (this entry rides with it):
+
+- The vertical detailed list, the toggle chevron, the dock strip and
+  the `swarm.buffsView` persistence are deleted (markup, CSS, the
+  whole `buffs_flip.js` morph module removed from the page and the
+  load order - `buffs_tooltip.js` then `buffs.js` before `app.js`).
+- The grid owns no scrollbar: the classic 10 x 2 cap clips past the
+  20 visible slots (`max-height: 68px` + `overflow: hidden`), a
+  clipped effect surfaces as soon as a slot frees.
+- The icons answer their native 32px art 1:1 again - the cells grew
+  to 34px border-box (32px icon + the 2px white separator outside
+  the icon box), nothing scales (the owner called the pixelated
+  downscale ugly).
+- No appear or disappear animation: the `buff-spawn` pop/glow
+  keyframes, the spawn class wiring and the frame width/height
+  transitions are gone - a change snaps.
+- The bottom white chrome matches the top: the body pads 2px on the
+  top edge and none on the bottom (the cells' own white separators
+  answer the bottom 2px), the white below the icons reads the same
+  as the white above them.
+- The time strips brightened: 3px tall (was 2) in the dedicated
+  `--buff-strip` tint per theme (#f59e0b light, #ffc061 dark,
+  opacity 1) - the plain accent drowned next to the white
+  separators.
+
+Verification: `tools/repro_buffs.js` rewritten to the new reality
+(47 checks: markup, styles, render, ticker, tooltip, geometry,
+formats), `tools/repro_gear.js` stale two-view check replaced with
+the single grid pin, all seven harnesses green, `go vet`/`go test
+./internal/swarm/webserver/` green, `go build ./...` green. Live
+agent-browser verification on the static preview (the injected
+buffs, both themes): panel width 42/76/110/348 at 1/2/3/10 cells,
+body height 36/70, cells 34, icons pixel-diffed 1:1 against the
+source art, padding bands exactly 2px top and bottom, strips 3px in
+the bright tint, no toggle/dock/list/spawn/transition traces, hover
+chip and tooltip card answer. Geometry note (pre-existing, honest):
+the full 10 column row coexists with the centered status banner only
+from a ~1370px wide map container up; the partial rows to 5 columns
+stay clear at 1280.
+
 ## Active task (status: complete): the guide buff priority round (2026-09-21, branch feature/improved-behaviour)
 
 Started 2026-09-21 ~09:00 UTC, closed ~10:45 UTC. Commits as melg8

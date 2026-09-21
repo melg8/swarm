@@ -760,97 +760,76 @@ regenerates with `tools/generate_skill_trees.sh` (skill stats + class
 trees of the Mobius C1 datapack into `npcdata/skill_trees.go`). The
 widget checks live in `tools/repro_gear.js`.
 
-## The effects panel (buffs.js, buffs_tooltip.js, buffs_flip.js)
+## The effects panel (buffs.js, buffs_tooltip.js)
 
 The floating frame right of the character HUD (left: 272, top: 10 of
 the map wrap) renders the server effect list (`snapshot.buffs`, the
 AbnormalStatusUpdate view: skillId, level, name, icon, the remaining
 seconds `left`, the landed duration `total`, the generic level
-description `desc` and the numeric effect summary `effect`) in two
-view states that share one frame and morph into each other (the frame
-width and the body height transition, the layers cross-fade, the
-chevron springs a 180 degree flip, the visible icons fly from their
-old spots to the new ones):
+description `desc` and the numeric effect summary `effect`) as the
+single horizontal icon grid - the classic buff bar. The vertical
+detailed list, the toggle chevron, the dock strip and the view
+persistence are gone by decision: no view classes, no storage state,
+no control - the grid is all there is.
 
-- the icon grid (the default): one 30px cell per active effect (the
-  same box as the detailed list icon), at most 10 columns wide and 2
-  rows for the classic buff bar (more than 20 active effects scroll
-  inside the grid, the dock keeps the two row height), every cell
-  packs edge to edge and paints its own 2px white strip on the right
-  and the bottom edge (the separators run only between the icons
-  that actually show - a white grid background would leave a white
-  hole under the empty cells of a partially filled row on the dark
-  theme); the frame hugs the filled columns (syncBuffsPanelSize pins
-  the inline width from min(cells, 10), so a partially filled row
-  never reserves dead space over the map), the body pads 2px on the
-  top and the bottom edges and 3px on the sides; the remaining time
-  does NOT
-  overlay the cell by default - a hover chip fades in whose
-  darkening hugs only the digits (width max-content, centered), and
-  a 2px accent sliver pinned to the bottom pixels of the cell (the
-  `buff-strip`) carries the remaining share left over total. The
-  measured geometry: the full 10 column frame spans 335px from its
-  map-relative left 272 (the absolute left is 472 with the 200px
-  sidebar), the centered status banner starts at about 676 on a
-  1280px window - the full row overlaps it there and clears from
-  about 1450px up (the banner paints above the panel, z-index 5 vs
-  4, so the labels stay readable either way); the partial rows up to
-  5 columns stay clear even at 1280.
-- the detailed list: the full effect rows (icon, level badge, name,
-  the human remaining time) with the remaining time percent bar
-  pinned to every row bottom edge (left over total, the fill eases
-  toward the next tick), the tight vertical rhythm and the thin
-  scrollbar - the body height pins EXACTLY to the character HUD
-  stack height (synced on the view change, the window resize and the
-  HUD ResizeObserver, the frame chrome subtracted - never a shorter
-  content measure), so the vertical widget reads as tall as the
-  character widget.
+- one 34px cell per active effect (the 32px native icon art plus the
+  2px white separator the cell paints on its right and bottom
+  edges), at most 10 columns wide and 2 rows for the classic buff
+  bar; more than the 20 visible slots stay clipped with no scrollbar
+  (the strict classic bar owns the cap, a clipped effect surfaces as
+  soon as a slot frees); the icons answer their art 1:1 - nothing
+  scales (the pixelated resample into the smaller box read ugly),
+  the frame hugs the filled columns and rows (syncBuffsPanelSize
+  pins the inline width from min(cells, 10) and the body height from
+  min(rows, 2) - one arithmetic code path for the real DOM and the
+  harness stub alike), the body pads 2px on the top edge, none on
+  the bottom (the cells' own white separators answer the bottom
+  chrome, so the white below the icons reads the same 2px as the
+  white above them) and 3px on the sides;
+- the remaining time does NOT overlay the cell by default - a hover
+  chip appears whose darkening hugs only the digits (width
+  max-content, centered, riding just above the strip), and a 3px
+  bright sliver pinned to the bottom pixels of the cell (the
+  `buff-strip`, the dedicated per theme tint `--buff-strip`:
+  #f59e0b light, #ffc061 dark) carries the remaining share left
+  over total.
 
-Exactly the active effects show in both states (two effects build two
-cells and two rows); the panel hides entirely while no effect runs.
-The left dock is the slim vertical strip stretching with the frame;
-it carries the SINGLE expand chevron (the old view switch button is
-gone - the chevron is the only control, 22px with a 15px triangle)
-pinned to the top, so it never moves between the states and flipping
-it needs no re-aim; the rotation springs with an overshoot ease
-(entering layers cancel the visibility delay - the fade-in paints
-immediately, the hiding layer finishes its fade before it un-hooks).
-The view choice persists in the localStorage (`swarm.buffsView`; the
-panel answers the restored choice on boot). Toggling the view flies
-the visible icons between the layouts (the FLIP morph of
-`buffs_flip.js`: the source boxes are measured first, the view
-switches, the destination boxes are measured, every shared icon
-animates from the inverted delta back to rest; the entries outside
-the pinned body height - the scrolled list rows, the capped grid
-rows - stay still, and a measurement that answers nothing skips the
-flight entirely, so the stub DOM of the harness and hidden frames
-keep the plain cross-fade; the run token guards the cleanup against
-an interrupted older flight).
+The measured geometry: the full 10 column frame spans 348px from its
+map-relative left 272 (the absolute left is 472 with the 200px
+sidebar; 42px at one cell, 76 at two, 178 at five), the centered
+status banner starts at about 676 on a 1280px window - the full row
+overlaps it there and clears from a ~1370px wide map container up
+(a ~1570px window; the banner paints above the panel, z-index 5 vs
+4, so the labels stay readable either way); the partial rows up to
+5 columns stay clear even at 1280.
 
-Hovering a buff in either view opens the floating card (the
-`#buffs-tooltip` singleton of `buffs_tooltip.js`, the mechanics of
-the item tooltip): the name with the level, the remaining time, the
-numeric effect summary (e.g. Wind Walk 2 answers "+33 Speed") and
-the generic level description; the lines the snapshot carries no
-data for collapse away. The wiring is delegated on the panel
-(mouseover / mousemove / mouseleave), the hovered box identifies
-itself through its data-skill-id attribute, every text reaches the
-card as textContent. A buff joining the list spawns with a scale pop
-and a glow ring (the `buff-spawn` keyframes, the class drops after
-the animation; the keyed refreshes never re-trigger it).
+The panel renders strictly: no appear or disappear animation, no
+view morph - a change snaps (no transitions on the frame, no spawn
+keyframes; a buff joining or leaving touches only its own cell).
+The panel hides entirely while no effect runs.
+
+Hovering a cell opens the floating card (the `#buffs-tooltip`
+singleton of `buffs_tooltip.js`, the mechanics of the item tooltip):
+the name with the level, the remaining time, the numeric effect
+summary (e.g. Wind Walk 2 answers "+33 Speed") and the generic
+level description; the lines the snapshot carries no data for
+collapse away. The wiring is delegated on the panel (mouseover /
+mousemove / mouseleave), the hovered cell identifies itself through
+its data-skill-id attribute, every text reaches the card as
+textContent.
 
 The countdowns run locally: every snapshot entry anchors its reading
 (the anchor carries the skill fields plus the at timestamp) and a 1
 Hz ticker counts the elapsed wall clock off it, so the times keep
-running between the server snapshots. The keyed rendering survives
-the module move: the cells and the rows are persistent DOM nodes
-keyed by the skill id, a buff joining or leaving touches only its
-own node (the icons never blink on a refresh), the panel holds the
-previous bot's content through the switch gap like every snapshot
-driven panel. The panel code lives in `web/buffs_tooltip.js`,
-`web/buffs_flip.js` and `web/buffs.js` (loaded in this order before
-`app.js`, which calls the core's `renderBuffs` from the shared render
-path); the harness is `tools/repro_buffs.js` (`task repro:buffs`).
+running between the server snapshots. The cells are persistent DOM
+nodes keyed by the skill id, a buff joining or leaving touches only
+its own node (the icons never blink on a refresh), the panel holds
+the previous bot's content through the switch gap like every
+snapshot driven panel. The panel code lives in `web/buffs_tooltip.js`
+and `web/buffs.js` (loaded in this order before `app.js`, which
+calls the core's `renderBuffs` from the shared render path; the
+former `buffs_flip.js` morph module is deleted); the harness is
+`tools/repro_buffs.js` (`task repro:buffs`).
 
 ## Chat window
 
@@ -1250,12 +1229,15 @@ no bundler, no network dependency; every dynamic text lands through
 - `tools/repro_hud.js` (`task repro:hud`) for the HUD and target panel
   rendering (stub DOM).
 - `tools/repro_buffs.js` (`task repro:buffs`) for the effects panel:
-  the markup (no EFFECTS head, the dock buttons, the layers), the
-  styles (the 10 column grid, the per cell white separators, the
-  scroll, the morph transitions), the render (exactly the active
-  effects, the keyed nodes surviving the refreshes, the percent bars
-  from left over total), the local countdown ticker, the view toggle
-  with the persistence and the height fallbacks (stub DOM).
+  the markup (no EFFECTS head, no toggle button, no dock, no detailed
+  list, no view classes), the styles (the 10 column grid of 34px
+  cells with the native 32px icons, the per cell white separators,
+  the clip without a scrollbar, the 3px bright strip, the top only
+  body padding, no transitions and no spawn keyframes), the render
+  (exactly the active effects, the keyed nodes surviving the
+  refreshes, the strip fills from left over total), the local
+  countdown ticker, the frame geometry (the column and row hugging
+  with the two row cap) and the hover tooltip card (stub DOM).
 - `tools/repro_gear.js` (`task repro:gear`) for the equipment widget
   (paperdoll masks, either-or slot resolution, badges, slot counter,
   the keyed rendering, the pinned footer values, the floating placement
