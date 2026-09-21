@@ -372,12 +372,7 @@ func TestHandleGeodataTileCacheAndMissingRegion(t *testing.T) {
 func TestIconsServeWithoutPack(t *testing.T) {
     // A working directory outside the repository finds no icon pack:
     // the detection walks up from the temp directory and answers empty.
-    previous, err := os.Getwd()
-    require.NoError(t, err)
-    require.NoError(t, os.Chdir(t.TempDir()))
-    t.Cleanup(func() {
-        require.NoError(t, os.Chdir(previous))
-    })
+    t.Chdir(t.TempDir())
     require.Empty(t, detectIconsDir())
 
     server := newServer("127.0.0.1:0", log.New(io.Discard, "", 0))

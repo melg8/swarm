@@ -93,20 +93,12 @@ func TestIconDisabledWithoutPack(t *testing.T) {
 }
 
 // chdir switches the working directory for the duration of the test.
-// A manual os.Chdir instead of testing.T.Chdir: the module builds with
-// the go 1.23 language level where T.Chdir is not available yet, and
-// the test must keep compiling on 1.23 and 1.24 toolchains alike.
+// T.Chdir took over from the manual os.Chdir pair once the module go
+// level moved past 1.24 (the usetesting gate flags the manual form).
 func chdir(t *testing.T, dir string) {
     t.Helper()
 
-    orig, err := os.Getwd()
-    require.NoError(t, err)
-    require.NoError(t, os.Chdir(dir))
-    t.Cleanup(func() {
-        if err := os.Chdir(orig); err != nil {
-            t.Errorf("restore working directory %q: %v", orig, err)
-        }
-    })
+    t.Chdir(dir)
 }
 
 // TestDetectIconsDirWalkUp verifies the candidate walk: the pack is

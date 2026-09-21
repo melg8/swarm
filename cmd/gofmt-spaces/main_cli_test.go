@@ -156,11 +156,7 @@ func TestRunDefaultsToTheWorkingDirectory(t *testing.T) {
     // No path arguments: the walk falls back to ".". A working
     // directory without go files keeps the list empty - the flag
     // parsing and the walk complete without an explicit path.
-    dir := t.TempDir()
-    original, err := os.Getwd()
-    require.NoError(t, err)
-    require.NoError(t, os.Chdir(dir))
-    t.Cleanup(func() { os.Chdir(original) })
+    t.Chdir(t.TempDir())
 
     var out, errOut strings.Builder
     require.NoError(t, run([]string{"-l"}, &out, &errOut))

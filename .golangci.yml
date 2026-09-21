@@ -254,6 +254,18 @@ linters:
           - maintidx
           - noctx
           - prealloc
+      - path: benchmarks/agent-bench/.*\/drill\/go\/
+        linters:
+          # The benchmark drill stages are frozen exercise snapshots
+          # (the sibling .diag files record their past build errors):
+          # the standalone mains print their verdicts by design and
+          # the code stays exactly as the drill left it.
+          - exhaustruct_v5
+          - forbidigo
+          - intrange
+          - nlreturn
+          - unparam
+          - usetesting
     paths:
       - vendor
       - third_party$
