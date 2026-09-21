@@ -11,6 +11,26 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: complete): the cast icon side round - the bow order shot, the quiet npc interact (2026-09-21, branch feature/improved-behaviour)
+
+Started/finished 2026-09-21 ~14:55 UTC (one session). The owner
+prompt assigned three asks, all landed and pushed:
+
+1. The cast icon must not overlap the character name: it hangs
+   beside the character now (side away from the enemy mass, dead
+   band, dashed connector, rotational cast ring inside the marker).
+2. The bow shot must happen right after the attack order: the
+   engage/stall radii pick by the weapon in hand (bow 450/650), the
+   dealt bow shots fly a 500ms projectile.
+3. Selecting a buffer/folk npc must not show combat: a self pawn
+   movement toward a known non attackable npc marks no fight.
+
+Commits: 435abe4 (hunt+state, the radii and the interact walk), then
+the map round (cast icon side + bow projectile + repro_map_render 102
+checks) and this docs entry on top. Verification: state+hunt suites,
+repro_map_render/bot_switch/zone_hover/fight_ui green, lint at the
+single pre-existing finding. Details in development_log Round 126.
+
 ## Active task (status: in progress): the combat polish round - crit floats, melee contact circles, bare buff bar, wrapped status banner, square trash target (2026-09-21, branch feature/improved-behaviour)
 
 Started 2026-09-21 ~13:35 UTC. The owner prompt assigned five web UI

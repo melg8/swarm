@@ -8875,3 +8875,55 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
   appends AND a ring drop, the re-stick at the bottom and the
   collapse toggle; the hunt/state/webserver suites and the full lint
   gate green.
+
+## Round 126: the cast icon beside the character, the immediate bow shot, the quiet npc interact (2026-09-21)
+
+- Report: three owner reports. The cast icon introduced by the
+  combat feedback round sat exactly inside the self name label band
+  (both centered on the marker, the icon vertical span [p.y-23k,
+  p.y-6k] against the label band [p.y-6k-18, p.y-6k+4] - no zoom
+  separates them, only a lateral offset can). The bow shot did not
+  happen right after the attack order. Selecting a buffer or any
+  folk npc lit the combat banner for an interaction.
+
+- Root cause (bow, the class lesson): the manual attack order walked
+  the character to the MELEE engage radius (150 units) before the
+  forced request, whatever the weapon in hand - the Mobius player AI
+  shoots a bow from its weapon range (~500 units), so the walk was
+  pure delay; the autonomous chase stall watchdog read the same way
+  (a healthy bow fight stands at 450-500 units and closes no chase
+  distance, which the watchdog classified as a stalled chase and
+  walked the archer into melee mid fight). The web side compounded
+  the read: the Attack packet (which the server broadcasts
+  immediately at the wind-up start, Creature.doAttack /
+  doAttackHitByBow, hits precomputed) rendered as the identical
+  melee dash, and the damage float waits for the HP drop that lands
+  only after the full bow wind-up. Fix: the engage radius and the
+  stall radius pick by the weapon in hand (bow: 450 / 650), and the
+  dealt bow shots fly a projectile instead of the melee dash.
+
+- Root cause (combat banner): applySelfPawnMovementLocked armed
+  FightingTargetID plus the 10s combat window on EVERY self
+  MoveToPawn, but the Mobius player AI broadcasts the same packet
+  for the INTERACT walk toward a folk npc (the approach to the talk
+  distance) - selecting a buffer armed a phantom fight. Fix: a pawn
+  movement toward a KNOWN non attackable npc updates the target
+  reference but marks no combat; unknown pawns keep the combat
+  default (the npc info can lag the chase packet).
+
+- Landed: the cast icon hangs beside the character on the side away
+  from the enemy mass (mean screen dx of the visible hostiles, a
+  dead band keeps a scattered pack from flipping the icon), a dashed
+  connector ties it to the marker, a rotational cast ring fills the
+  marker circle while the cast runs; the bow projectile (500ms eased
+  arrow, trail, arrival flash); the bow-aware engage/stall radii in
+  the user attack order and the autonomous stall watchdog; the
+  interact walk exception in the self pawn movement.
+
+- Verification: the state and hunt suites green (the bow order
+  shoots from range with no walk, the melee order still walks first,
+  the standing bow fight reads as no stall, the interact walk marks
+  no combat while the mob and unknown chases keep marking it);
+  repro_map_render grown to 102 checks (the lateral cast scenario,
+  the bow shot scenario), the neighbor harnesses green; the lint
+  gate back to the single pre-existing disclosed finding.
