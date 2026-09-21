@@ -162,7 +162,7 @@ function loadMapJs(mapFile) {
     const checkboxes = {
         follow: true, "show-labels": false, "show-dest": true,
         "show-zone": true, "show-targets": true,
-        "show-hunt-zones": true, "show-aggro": true
+        "show-hunt-zones": true, "show-aggro": true, "show-kills": true
     };
     const sandbox = {
         Math, JSON,
@@ -233,6 +233,7 @@ function check(results, name, ok, detail) {
 function runScenario(mapFile) {
     const { MapView, record } = loadMapJs(mapFile);
     MapView.init();
+    MapView.setKillMarks([]);
     MapView.update(buildSnapshot(WORLD.self));
     MapView.draw();
 
@@ -251,6 +252,7 @@ function runScenario(mapFile) {
     if (typeof MapView.resetBot !== "function") {
         return results;
     }
+    MapView.setKillMarks([{ x: 45000, y: 50000, atMs: 0 }]);
     MapView.resetBot();
 
     check(results, "the reset drops the previous snapshot",
@@ -265,6 +267,9 @@ function runScenario(mapFile) {
     check(results, "the reset drops the combat effects",
         MapView.combatAnims.length === 0,
         MapView.combatAnims.length + " effects survived");
+    check(results, "the fleet kill marks survive the reset",
+        MapView.killMarks.length === 1,
+        "the fleet layer must stay across the switches");
 
     // The switch gap: the camera holds the last known position instead
     // of collapsing to the world origin (the follow camera reads this
@@ -287,12 +292,14 @@ function runScenario(mapFile) {
         record.arcs.filter(
             (arc) => Math.abs(arc[2] - spotRadius) < 2).length === 0,
         "a spot circle is still drawn");
-    // The reset map paints no stale unit markers: the fleet kill
-    // skull layer retired (issue #6 - the corpse icon carries the
-    // death read now), so the gap frame may draw no unit fills at
-    // all, only the stroke based static world.
+    // The reset map paints no stale unit markers. The one legitimate
+    // fill source of the gap frame is the surviving fleet kill mark:
+    // it draws as the dead mob face (the gray corpse circle body
+    // fill), the X eyes ride as a stroke - so exactly one fill may
+    // appear.
     check(results, "the reset map paints no stale unit markers",
-        record.fills === 0, record.fills + " fills still drawn");
+        record.fills === 1, record.fills + " fills still drawn - want"
+        + " only the fleet kill mark body");
 
     // The first snapshot of the new bot repaints normally: with follow
     // on the camera centers on the new character, its own spot circle

@@ -55,6 +55,49 @@ repro_hud green, `go build ./...`, `go test
 Status: the pr (#8, "Fixes #6") carries the implementation diff
 only; the issue waits for the merge review.
 
+Round three (2026-09-21 ~20:35 UTC, the review feedback of 20:32 -
+"the kill markers come back for the whole map with the new icon, the
+retire round removed the wrong thing"):
+
+- The fleet kill ring returns to the map with the NEW icon: the
+  marks of /api/fleet/kills (every recent kill of every bot, the
+  layer that survives the bot switches) draw as the dead mob face -
+  the gray corpse circle body (mapColors.dead #80868b) with the two
+  X eyes in the look tick slate (mapColors.tick #39424e), the same
+  proportions the corpse marker uses. No orange anywhere.
+- The layer behavior restores as it was: the five minute melt (8
+  alpha buckets, one body fill + one eye stroke per bucket), the
+  show-kills toolbar toggle, the victim tooltip (name, level, the
+  ticking kill age) that wins over the dead unit tooltip while the
+  corpse sits on its own mark. The bot-switch gap frame keeps
+  painting the ring (repro_bot_switch pins the survive + the one
+  legitimate gap fill).
+- The zone kill centroid skulls stay retired: they were the observed
+  bot's per spot read (they did not survive the bot switches), the
+  fleet ring plus the corpse icon carry the death read now.
+- map.js: the killMarks state and the drawKillMarks / setKillMarks /
+  killMarkAt / showKillTooltip / refreshKillTooltipAge methods are
+  back with the new icon; the paint flow calls the layer in the gap
+  branch and after the hunt zones; the duplicate drawZone call the
+  retire round left in the gap branch is gone. app.js re-fetches the
+  ring with the bot list (404 tolerant); index.html regains the
+  kills checkbox.
+- Harnesses: repro_zone_hover regains the fleet kill marks scenario
+  (12 checks: the body + eyes geometry, the age fade, the TTL drop,
+  the pick, the tooltip flow, the corpse priority, the toggle
+  isolation - run before the corpse object joins the scene, the
+  corpse unit paints the same face by design); repro_bot_switch
+  carries the survive check and the gap fill count (1 body fill, the
+  eyes ride as a stroke).
+
+Verification: repro_zone_hover, repro_bot_switch, repro_map_render,
+repro_fight_ui, repro_hud, repro_buffs, repro_movement, repro_stats,
+repro_gear all exit 0; go build, go vet, go test
+./internal/swarm/webserver/ green.
+
+Status: round three pushed to the pr branch; the issue reports the
+restored layer and waits for the merge review.
+
 ## Active task (status: complete): the cast icon side round - the bow order shot, the quiet npc interact (2026-09-21, branch feature/improved-behaviour)
 
 Started/finished 2026-09-21 ~14:55 UTC (one session). The owner
