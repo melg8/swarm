@@ -140,3 +140,62 @@ func TestFrozenSkipsYieldToTheRecoveryLadder(t *testing.T) {
         "the cursor stayed near the frozen cell instead of running "+
             "to the plan end")
 }
+
+// TestSkipTrackerResetsAtTheTripBoundary pins the episode boundary of
+// the skip tracker: a trip that stormed at a cell must not deny the
+// FIRST skip of a later trip that revisits the same cell - the L2
+// rotations repeat routes and the pocket cells reproduce exact int32
+// coordinates, so a tracker that leaked across the trips would deny
+// the cheap walled waypoint recovery exactly where it worked before.
+func TestSkipTrackerResetsAtTheTripBoundary(t *testing.T) {
+    buildStorm := func() *Loop {
+        bot := newTestBot()
+        moveSelfTo(bot, skipStormX, skipStormY, skipStormZ)
+        game := &fakeGame{}
+        loop := NewLoop(game, bot)
+        nav := &fakeNavigator{
+            found: true,
+            route: skipStormRoute,
+        }
+        nav.validateHook = func(
+            _ pathfind.Vec3, to pathfind.Vec3,
+        ) (pathfind.Vec3, bool) {
+            return to, true
+        }
+        loop.SetNavigator(nav)
+
+        return loop
+    }
+    dest := pathfind.Vec3{
+        X: skipStormRoute[len(skipStormRoute)-1].X,
+        Y: skipStormRoute[len(skipStormRoute)-1].Y,
+        Z: skipStormRoute[len(skipStormRoute)-1].Z,
+    }
+
+    // Trip A: the frozen storm fires its trial skip (the tracker arms
+    // on the frozen cell) and the trip ends the way a storm does.
+    loopA := buildStorm()
+    require.True(t, loopA.startZoneReturnSegment(dest), "trip A starts")
+    loopA.phase = phaseTownReturn
+    now := time.Now()
+    _ = loopA.followWaypoints(skipStormX, skipStormY, skipStormZ, now)
+    now = now.Add(moveStartWindow + time.Second)
+    _ = loopA.followWaypoints(skipStormX, skipStormY, skipStormZ, now)
+    require.True(t, loopA.skipArmed,
+        "trip A's trial skip armed the tracker on the frozen cell")
+    loopA.endTownTrip("walk stuck")
+
+    // Trip B revisits the very cell with a fresh tracker: the first
+    // stuck skip must fire again (the episode boundary cleared the
+    // tracker with the rest of the trip state).
+    loopB := buildStorm()
+    require.True(t, loopB.startZoneReturnSegment(dest), "trip B starts")
+    loopB.phase = phaseTownReturn
+    now = time.Now()
+    _ = loopB.followWaypoints(skipStormX, skipStormY, skipStormZ, now)
+    now = now.Add(moveStartWindow + time.Second)
+    _ = loopB.followWaypoints(skipStormX, skipStormY, skipStormZ, now)
+    require.Greater(t, loopB.wpIndex, 1,
+        "trip B's first frozen skip fired - the tracker reset at the "+
+            "trip boundary")
+}

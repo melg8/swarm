@@ -2363,8 +2363,10 @@ func (l *Loop) clickWaypoint(
             return
         }
         // No clear successor, or the previous skip moved the character
-        // nothing: the stuck escalation owns the segment (the denied
-        // skip must not march the cursor away from a frozen character).
+        // nothing: the denied skip must not march the cursor away from
+        // a frozen character, the click of the threatened waypoint
+        // rides the steered arc, and the stuck window escalates the
+        // segment when the click moves nothing too.
     }
     // The aggro-aware steering: the camps of idle aggressive mobs
     // sitting on the segment bend it sideways (see loop_avoid.go). Every
@@ -2638,8 +2640,18 @@ func (l *Loop) clickForwardJump(
             extendMarchStep {
             continue
         }
+        // The jump rides the same discipline as the waypoint skips
+        // (the 2026-09-21 storm class): a jump that left the character
+        // on this very cell proved the chord bet dead on this
+        // transport, and a farther bet would march the cursor while
+        // the character stands still. The stuck ladder owns the
+        // segment instead.
+        if !l.skipMoveFresh(selfX, selfY) {
+            return false
+        }
         l.wpIndex = next
         l.moveAt = now
+        l.noteSkipStand(selfX, selfY)
         l.logger.Printf("Hunt: the turn click is walled, jumping the "+
             "cursor to the waypoint %d of %d whose line validates",
             next, len(l.waypoints))
@@ -3342,9 +3354,12 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 
 // skipMoveFresh reports whether a waypoint skip may run for this
 // verdict: no skip ran yet, or the character moved since the previous
-// skip. A skip that left the character on the very cell it already
-// held proved the click transport dead on this ground - the successor
-// the skip armed was clicked and the character never walked to it.
+// skip beyond the stood-on-cell tolerance (the server may correct a
+// standing character's position by a unit or two; only real ground
+// counts as a fresh episode). A skip that left the character on the
+// very cell it already held proved the click transport dead on this
+// ground - the successor the skip armed was clicked and the character
+// never walked to it.
 // Repeating the skip cannot help (the farther waypoint rides the same
 // dead transport), it only marches the cursor and the eventual chord
 // walk away from the plan while the standing still character watches
@@ -3357,7 +3372,12 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
 // character on with the successor's click, and only the repeat on an
 // unchanged position names the transport dead.
 func (l *Loop) skipMoveFresh(selfX int32, selfY int32) bool {
-    return !l.skipArmed || selfX != l.skipX || selfY != l.skipY
+    if !l.skipArmed {
+        return true
+    }
+
+    return math.Hypot(float64(selfX-l.skipX),
+        float64(selfY-l.skipY)) >= hopCoincideDist
 }
 
 // noteSkipStand records the cell a waypoint skip leaves the character
@@ -3993,6 +4013,8 @@ func (l *Loop) startReturnSegment() {
     l.phase = phaseTownReturn
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
+    l.skipArmed = false
+    l.skipX, l.skipY = 0, 0
     destX, destY, destZ := l.farmX, l.farmY, l.farmZ
     if zone := l.zone(); zone != nil &&
         (!zone.Contains(destX, destY) || (destX == 0 && destY == 0)) {
@@ -4053,6 +4075,8 @@ func (l *Loop) endTownTrip(reason string) {
     l.cursorEscapes = 0
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
+    l.skipArmed = false
+    l.skipX, l.skipY = 0, 0
     l.moveStartAt = time.Time{}
     l.forceStuck = false
     l.segmentRefusedX, l.segmentRefusedY = 0, 0
@@ -4154,6 +4178,8 @@ func (l *Loop) resetTownTrip() {
     l.cursorEscapes = 0
     l.repathX, l.repathY = 0, 0
     l.frozenRepaths = 0
+    l.skipArmed = false
+    l.skipX, l.skipY = 0, 0
     l.moveStartAt = time.Time{}
     l.forceStuck = false
     l.segmentRefusedX, l.segmentRefusedY = 0, 0

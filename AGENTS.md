@@ -321,7 +321,8 @@ conversation or in a commit message: it lives in the registry below.
   refuses the request. The dump evidence: 49 stuck skips over 3.5
   frozen minutes, the position byte identical (31040 54016 -3415),
   clicks leaving (the dump's walking timer armed), the last
-  ActionFailed hours before the storm, and the unknown packet
+  ActionFailed 55 seconds before the first skip (11:59:40, the walk
+  start, never again through the storm), and the unknown packet
   fingerprints (0x57/53, 0xe7/21, 0x5a/53, 0x8e/21, 0x85/13) that
   mark a build the reference tree does not match. The bot must
   treat "the click validated, went out, and moved nothing" as a

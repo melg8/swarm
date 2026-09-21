@@ -89,20 +89,25 @@ trader Unoren, "town walk stuck, skipping waypoint" fired 49 times
 out, no movement, no ActionFailed, no re-path, no escape through the
 whole 3.5 minutes.
 
-Landed and pushed (commit 160d0e3, rebased over the parallel rounds):
+Landed and pushed (commit 481dfdc after the rebase, plus the review
+hardening commit, rebased over the parallel rounds):
 
 - skipMoveFresh/noteSkipStand on the loop (shared by the stuck skip
-  of stuckTownWalk and the aggro circle skip of clickWaypoint): a
+  of stuckTownWalk, the aggro circle skip of clickWaypoint and the
+  corner turn jump of clickForwardJump; reset at the trip
+  boundaries endTownTrip/resetTownTrip/startReturnSegment; the
+  stood-on-cell tolerance is hopCoincideDist): a
   skip may run only when no skip ran yet or the character moved
   since the previous skip; the first skip of a frozen episode stays
   free, the repeat is denied with its own log line and falls
   through to the re-path ladder (noteRepathCell ->
   abortFrozenTrip -> escalateFrozenSegment), whose cursor key
   escape walks the claims transport along the planned route.
-- The recovery timeline on the dump scene: ~15 s from the first
-  stuck verdict to the escape arming, against the unbounded storm
-  (the trip budget never ran because the skip branch always
-  returned first).
+- The recovery timeline on the dump scene: about 9 s from the
+  first stuck verdict to the escape arming through the move start
+  watchdog (about 23 s through the plain stuck windows), against
+  the unbounded storm (the trip budget never ran because the skip
+  branch always returned first).
 - Repro: hunt/skip_storm_repro_test.go (the dump scene: the frozen
   character, the always-validating open ground oracle, the move
   start watchdog forcing a verdict per dead click). The adapted era
