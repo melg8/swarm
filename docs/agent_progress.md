@@ -11,6 +11,64 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in review): the kite edge cases - the train centroid, the cornered hold, the lane fan (2026-09-21, branch feature/kiting-edge-cases, issue #19)
+
+Started 2026-09-21 ~20:22 UTC. The source is the board issue
+melg8/swarm#19 ("Kiting edge cases: cornered fallback, multi-mob
+trains, retreat path quality"), the third slice of the archer warrior
+support (#13). The branch forks feature/archer-kiting (PR #15, the
+kiting core of #18) at 5df6073 - the edge layer rides the armed step
+the core round landed:
+
+- The train direction (kiteTrainDirection, kite.go): the retreat
+  direction is the centroid away-vector of EVERY chaser - the fight
+  target's own unit vector plus every SelfAttackers member within
+  kiteTrainScanRange (800) on a reachable deck (deckReachableZ, the
+  same gate the trigger uses). The superseded
+  TestKiteDirectionReadsTheNearestChaser (the single-threat
+  direction of the #18 round) became
+  TestKiteDirectionWeighsTheWholeTrain - the centroid bends the
+  retreat off the pure target axis when a member drags it.
+- The encirclement (kiteEncircleShare 0.3): when the summed away
+  vectors cancel (chasers on every side), the train is too wide to
+  outrun - the archer holds ground and shoots through it (the hold
+  log line names the train; the winnable pile up machinery still
+  owns a train that outdamages the standing fight).
+- The cornered hold (kiteHoldGround, the kiteHeldFor/kiteHeldAt
+  fields of loop.go): when no walkable lane exists - the leash, a
+  wall (the navigator LineOfSight), water (OverWater), or every fan
+  candidate failing - the archer stops retreating and KEEPS SHOOTING
+  the bow at melee range (the archetype rule of #21: no weapon
+  switch, no idle stutter - the hold re-probes at the kite pacing,
+  the diagnostic lands once per episode, and the re-request resume
+  of the ordinary engage re-arms the shooting once the stance
+  lapses; the stuck watchdogs never own a running fight).
+- The lane fan (kiteRetreatLane / kiteLaneResolve): the straight
+  away-ray first, then the 45/90 degree candidates each side - the
+  open backward lanes over the blocked corridors, a dead-end lane
+  re-planned at the very next probe (one hop). The away half-plane
+  gate (kiteHalfPlaneSlack) keeps every lane - however deflected -
+  from folding back into the chasing train.
+- The camp deflection (kiteDeflectFromCamps): a lane that would wake
+  an idle aggressive camp deflects onto the tangent ray of its
+  trigger circle - the tangentClearDirection steering of the transit
+  walks (loop_avoid.go), minus the destination exemption (a retreat
+  meets no mob on purpose). The chasers never deflect the lane: they
+  already hold the character as their target.
+
+Tests: kite_edge_test.go carries the eight edge scenarios (the
+centroid bend, the surrounded hold with the pacing pin, the cornered
+hold with the once-per-episode log and the re-request resume, the
+water corner, the dead-end re-plan, the half-plane guard, the camp
+deflection), plus the direction test rewrite in kite_test.go.
+Verification: the kite suite green (19 tests), the full hunt suite
+green (80s), `go build`, `go vet`, `golangci-lint run --new` 0
+issues, gofmt-spaces quiet. Status: pushed to the stacked PR
+(feature/kiting-edge-cases -> main, on top of PR #15); the PR body
+carries the issue marker ("Fixes #19"). The acceptance scenario and
+the live parameter tuning stay with #20; the gear plan (the bow
+buying) stays with #17 on its own branch.
+
 ## Active task (status: in progress): the kiting parameters pinned - the optimal band and the re-engage delay (2026-09-21, branch feature/archer-kiting, issue #18)
 
 Started 2026-09-21 ~20:22 UTC, continuing the kite entry below on the
