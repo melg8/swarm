@@ -316,7 +316,65 @@ the follow-up refactor candidate: the guide stop duplicates the
 teacher approach ring (~60 lines) - extract a shared approachNpc
 helper when the next town flow lands.
 
-## Active task (status: in progress): the effects panel round (2026-09-21, the webui buffs redesign)
+## Active task (status: complete): the effects panel refinement round - the hover answers, the flight morph and the exact height (2026-09-21)
+
+Started and landed: 2026-09-21. Branch: `feature/improved-behaviour`,
+commits as melg8 (the Go round `4776e80` lineage, the web round
+`8eb43e7` lineage after the rebases). The owner report (this round):
+keep only the triangle of the two dock controls, bigger, with an
+animated flip on click; the vertical padding of the buffs down to 2px
+and the icons at the expanded state size so ten across never cross
+the central hunting banner; the remaining time numbers off the cells
+(hover only, the darkening hugging the digits) with small bottom
+strips for the remaining share; the view morph flying the icons from
+the horizontal to the vertical layout instead of the upward settle,
+only the entries really visible in the vertical widget; the vertical
+widget EXACTLY the character widget height; the hover card with the
+name, the level and the real effect values pulled from the server
+code; the spawn animation for a freshly landed buff.
+
+### State (landed, pushed)
+
+- `npcdata`: the hand curated `skillEffects` table (the real per-level
+  values of the deployed Mobius C1 skill stats - the self auras, the
+  Newbie Guide support magic and the Lirein speed debuff 4076, every
+  entry citing its stat table) answered by `SkillEffectOf(id, level)`;
+  the research evidence lives in the worklog of the session.
+- `state`: BuffSnapshot grew `desc` (the generic level description)
+  and `effect` (the numeric summary) through both encoders (the
+  reflection golden test pins the byte identity); `hunt` untouched.
+- web: the dock keeps the single 22px chevron (the view switch button
+  deleted), the 180 degree flip springs on click; the grid packs 30px
+  cells with 2px vertical body padding and the frame hugging the
+  filled columns (min(cells, 10)); the countdown chip shows on hover
+  only with the darkening hugging the digits, the 2px `buff-strip`
+  sliver rides the bottom pixels; the FLIP morph (`buffs_flip.js`)
+  flies the visible icons between the layouts both ways (the run
+  token guards the cleanup); the list body pins EXACTLY the HUD stack
+  height; the hover card (`buffs_tooltip.js`, the `#buffs-tooltip`
+  singleton) answers name, level, time, effect and description
+  through the delegated hover wiring; a joining buff spawns with the
+  scale pop and glow ring keyframes.
+- web: buffs.js split below the 500 line rule into the tooltip and
+  flip modules; `tools/repro_buffs.js` grew to 58 checks (the stub
+  gained getBoundingClientRect / matches / closest / body / rAF).
+- Verified: all six repro harnesses + fight UI green, go build/vet/
+  tests green, `task prepush` green, the live preview driven with
+  agent-browser (the grid, the hover chip and card, the exact height
+  list measured equal 81..330, the flip, the spawn).
+
+### Nuances for the next agent
+
+- The buff icons render blank on the static preview server (no
+  /icons route there); the embedded server serves them - not a
+  defect.
+- The list rows with left=0 keep a zero bar and the amber fading
+  color until the next snapshot drops the effect (the server list is
+  the removal authority).
+- The 32px cell CSS was asserted gone by the harness (`no 32px cell
+  of the old shape is left`) - keep that pin when touching the grid.
+
+## Active task (status: complete): the effects panel round, first pass (2026-09-21, the webui buffs redesign)
 
 Started: 2026-09-21. Branch: `feature/improved-behaviour`, commits as
 melg8. Other agents may push to the same branch - rebase before every
