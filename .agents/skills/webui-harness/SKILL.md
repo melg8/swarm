@@ -80,6 +80,15 @@ not verified.
   order and overlapping units flicker otherwise.
 - Marker palette (`mapColors` in map.js) is theme-independent on
   purpose: it must read over the light map imagery in both themes.
+- **The recording context must model the canvas transform stack**: the
+  float layer (damage, miss, cast fill) translates to its anchor and
+  fills text at the local zero - a `translate: () => {}` stub records
+  every float at (0,0) and the asserts pass for the wrong reason or
+  not at all. `makeRecordingContext` in `tools/repro_map_render.js`
+  folds `save/restore/translate` into an origin applied to the
+  recorded text positions, and records `fillRect`/`strokeRect` into
+  `record.rects` (the cast icon plate asserts read it). Grow the stub
+  the same way for any new transform dependent draw.
 
 ## Adding a snapshot field end to end
 

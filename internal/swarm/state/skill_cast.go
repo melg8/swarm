@@ -52,9 +52,8 @@ type SkillStateView struct {
 // ApplySkillCast records the skill cast broadcast of the played
 // character: the hit time opens the cast window and the reuse delay
 // the cooldown window of the skill. The broadcasts of the other
-// creatures are observed too (they drive nothing yet) but only the
-// self casts open the windows - the cast icon of the map and the
-// skills widget show the character's own casting.
+// creatures open nothing - the cast icon of the map and the skills
+// widget show the played character's own casting.
 func (b *Bot) ApplySkillCast(cast SkillCast) {
     b.mu.Lock()
     defer b.mu.Unlock()

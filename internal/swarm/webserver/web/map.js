@@ -3612,13 +3612,16 @@ const MapView = {
   // windows): the entry with a live cast window becomes the cast
   // icon above the character, the end time lands on the local
   // performance clock so the fill runs smoothly between the
-  // snapshots. A snapshot without a live cast clears the icon.
+  // snapshots. A snapshot without a live cast clears the icon. The
+  // server runs one cast per creature at a time; if two states ever
+  // carried a live cast, the biggest remainder (the newest start)
+  // wins.
   ingestSkillStates(snapshot) {
     const states = snapshot.skillStates || [];
     let live = null;
     for (const state of states) {
       if (state.castLeftMs > 0
-        && (!live || state.skillId < live.skillId)) {
+        && (!live || state.castLeftMs > live.castLeftMs)) {
         live = state;
       }
     }

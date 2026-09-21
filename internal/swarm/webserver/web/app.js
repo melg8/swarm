@@ -460,6 +460,10 @@ function selectBot(botId) {
   // The zone hover of the pointer belongs to the previous bot's
   // registry: clear it before the new stream repaints the map.
   MapView.hoverZone = null;
+  // The countdown anchors belong to the previous bot too: the new
+  // bot's first snapshot rebuilds them, the stale windows would
+  // otherwise dim the shared skill cells for one snapshot.
+  resetSkillLive();
   // The map state of the previous bot (its world objects, its zones,
   // its walk line, its combat effects) must not linger under the new
   // bot's HUD while the event stream reconnects - the blank frame
@@ -2815,6 +2819,18 @@ function applySkillCell(record, skill) {
 // with the restore fill and the remaining seconds covers the cell
 // while the skill is unavailable.
 
+// resetSkillLive drops the countdown anchors and the ticker of the
+// previous bot (the bot switch call): the fresh bot's first snapshot
+// re-anchors everything it owns.
+function resetSkillLive() {
+  SkillLive.anchors.clear();
+  if (SkillLive.timer !== null
+    && typeof window.clearInterval === "function") {
+    window.clearInterval(SkillLive.timer);
+  }
+  SkillLive.timer = null;
+}
+
 // renderSkillStates refreshes the countdown anchors from one
 // snapshot: every state entry re-anchors its skill window at the
 // current wall clock, the skills that left the section (both windows
@@ -2909,7 +2925,10 @@ function updateSkillCellState(record) {
     record.castFill.style.height = "0%";
   }
   const reuseLeft = skillLiveLeft(anchor, "reuseLeftMs");
-  if (reuseLeft > 0 && anchor.reuseTotalMs > 0) {
+  // The cooldown dim waits for the cast: the server opens the reuse
+  // window at the cast start, and the dim over the rising fill would
+  // bury exactly the casting read the cell owes.
+  if (reuseLeft > 0 && castLeft <= 0 && anchor.reuseTotalMs > 0) {
     const restored = 1 - reuseLeft / anchor.reuseTotalMs;
     record.cool.classList.remove("hidden");
     record.coolFill.style.height =
@@ -2917,6 +2936,7 @@ function updateSkillCellState(record) {
     record.coolTime.textContent = skillCoolText(reuseLeft);
   } else {
     record.cool.classList.add("hidden");
+    record.coolFill.style.height = "0%";
   }
 }
 

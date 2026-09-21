@@ -106,8 +106,11 @@ func TestApplySkillCastRecastReplaces(t *testing.T) {
 }
 
 // TestSkillStatesJSONRoundTrip pins the wire encoding of the new
-// section: the hand written snapshot encoder emits the same JSON the
-// struct tags describe.
+// section twice: the struct tags of the reflection encoder and the
+// hand written live encoder (the one the SSE stream actually ships)
+// both must emit exactly the snapshot shape. The remainders ride
+// their own snapshot clock, so the ids and the totals compare exact
+// and the remainders compare as the plausible windows.
 func TestSkillStatesJSONRoundTrip(t *testing.T) {
     bot := NewBot("acc1")
     bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
@@ -117,13 +120,34 @@ func TestSkillStatesJSONRoundTrip(t *testing.T) {
         HitTimeMs: 1500, ReuseDelayMs: 6000,
     })
     snap := bot.Snapshot()
+    require.Len(t, snap.SkillStates, 1)
+
+    for name, data := range map[string][]byte{
+        "reflection": marshalSnapshot(t, snap),
+        "live":       bot.AppendSnapshotJSON(nil),
+    } {
+        var parsed struct {
+            SkillStates []SkillStateView `json:"skillStates"`
+        }
+        require.NoError(t, json.Unmarshal(data, &parsed), name)
+        require.Len(t, parsed.SkillStates, 1, name)
+        state := parsed.SkillStates[0]
+        require.Equal(t, int32(1077), state.SkillID, name)
+        require.Equal(t, int64(1500), state.CastTotalMs, name)
+        require.Equal(t, int64(6000), state.ReuseTotalMs, name)
+        require.Positive(t, state.CastLeftMs, name)
+        require.LessOrEqual(t, state.CastLeftMs, int64(1500), name)
+        require.Positive(t, state.ReuseLeftMs, name)
+        require.LessOrEqual(t, state.ReuseLeftMs, int64(6000), name)
+    }
+}
+
+// marshalSnapshot marshals the snapshot through the reflection
+// encoder.
+func marshalSnapshot(t *testing.T, snap Snapshot) []byte {
+    t.Helper()
     data, err := json.Marshal(snap)
     require.NoError(t, err)
 
-    var parsed struct {
-        SkillStates []SkillStateView `json:"skillStates"`
-    }
-    require.NoError(t, json.Unmarshal(data, &parsed))
-    require.Len(t, parsed.SkillStates, 1)
-    require.Equal(t, snap.SkillStates[0], parsed.SkillStates[0])
+    return data
 }

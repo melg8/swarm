@@ -1643,13 +1643,15 @@ function main() {
     // The cast and cooldown overlays of the learned cells: the
     // snapshot skillStates carry the live windows, the casting cell
     // fills bottom up, the cooling cell dims with the remaining
-    // seconds and the ready cell shows neither.
+    // seconds and the ready cell shows neither. The cooldown dim
+    // waits for the cast (the server opens reuse at the cast start),
+    // so the casting state owns the fill and no dim.
     const stateful = skillsSnapshot();
     stateful.skillStates = [
         { skillId: 3, castLeftMs: 1000, castTotalMs: 2000,
-            reuseLeftMs: 3500, reuseTotalMs: 12000 },
+            reuseLeftMs: 0, reuseTotalMs: 0 },
         { skillId: 16, castLeftMs: 0, castTotalMs: 0,
-            reuseLeftMs: 0, reuseTotalMs: 0 }
+            reuseLeftMs: 3500, reuseTotalMs: 12000 }
     ];
     gear.renderSkills(stateful);
     const cellByTitle = (prefix) => Array.from(skillGrid.children)
@@ -1670,24 +1672,33 @@ function main() {
     const blowCell = cellByTitle("Mortal Blow");
     const castFill = overlayOf(strikeCell, "skill-cast-fill");
     const strikeCool = overlayOf(strikeCell, "skill-cool");
-    const strikeCoolTime = overlayOf(strikeCell, "skill-cool-time");
+    const strikeCoolFill = overlayOf(strikeCell, "skill-cool-fill");
     const blowCool = overlayOf(blowCell, "skill-cool");
+    const blowCoolTime = overlayOf(blowCell, "skill-cool-time");
+    const blowCoolFill = overlayOf(blowCell, "skill-cool-fill");
     const castHeight = castFill
         ? Number.parseInt(castFill.style.height, 10) : -1;
     check(results, "the casting skill cell shows the cast fill",
         Boolean(castFill) && castHeight >= 49 && castHeight <= 62,
         "cast fill height: " + (castFill && castFill.style.height));
-    check(results, "the cooling skill cell dims the icon",
+    check(results, "the casting cell shows no cooldown dim yet",
         Boolean(strikeCool) &&
-        !strikeCool.classList.contains("hidden"),
+        strikeCool.classList.contains("hidden") &&
+        Boolean(strikeCoolFill) &&
+        Number.parseInt(strikeCoolFill.style.height, 10) === 0,
+        "the dim covered the rising cast fill");
+    check(results, "the cooling skill cell dims the icon",
+        Boolean(blowCool) && !blowCool.classList.contains("hidden"),
         "the cooldown overlay stayed hidden on the cooling skill");
     check(results, "the cooldown cell reads the remaining seconds",
-        Boolean(strikeCoolTime) &&
-        strikeCoolTime.textContent === "4s",
-        "cool time: " + (strikeCoolTime && strikeCoolTime.textContent));
-    check(results, "the ready skill cell shows no cooldown",
-        Boolean(blowCool) && blowCool.classList.contains("hidden"),
-        "the ready cell owns a visible cooldown overlay");
+        Boolean(blowCoolTime) && blowCoolTime.textContent === "4s",
+        "cool time: " + (blowCoolTime && blowCoolTime.textContent));
+    check(results, "the cooldown restore fill tracks the recovery",
+        Boolean(blowCoolFill) &&
+        Number.parseInt(blowCoolFill.style.height, 10) >= 69 &&
+        Number.parseInt(blowCoolFill.style.height, 10) <= 72,
+        "restore fill: " +
+        (blowCoolFill && blowCoolFill.style.height));
     check(results, "the cast and cooldown css exists",
         css.includes(".skill-cell .skill-cast-fill") &&
         css.includes(".skill-cell .skill-cool") &&
