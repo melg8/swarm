@@ -258,6 +258,8 @@ func TestDiagnosticsHuntPublication(t *testing.T) {
         RePaths:        1,
         WaypointsLeft:  12,
         TripForMs:      300000,
+        WalkEtaMs:      42000,
+        KillEtaMs:      7000,
     }
     bot.SetHuntDiagnostics(published)
     bot.NoteAction("Hunt: target 1234 does not engage, switching")
@@ -270,6 +272,8 @@ func TestDiagnosticsHuntPublication(t *testing.T) {
     require.Equal(t, 1, hunt.RePaths)
     require.Equal(t, 12, hunt.WaypointsLeft)
     require.Equal(t, int64(300000), hunt.TripForMs)
+    require.Equal(t, int64(42000), hunt.WalkEtaMs)
+    require.Equal(t, int64(7000), hunt.KillEtaMs)
     require.Equal(t, int64(0), hunt.TickAgoMs)
     require.Equal(t, "Hunt: target 1234 does not engage, switching",
         hunt.LastAction)

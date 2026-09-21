@@ -10,9 +10,25 @@ package hunt
 
 import (
     "fmt"
+    "math"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
+)
+
+// The ETA model constants of the hunt diagnostics: the walk ETA
+// divides the remaining plan length by the run speed, the kill ETA
+// divides the observed damage rate into the remaining health.
+const (
+    // walkEtaDefaultSpeed is the fallback run speed of the walk ETA
+    // in world units per second: a character whose speeds the server
+    // never sent still gets an estimate (the plain monster default
+    // of the state package).
+    walkEtaDefaultSpeed = 120.0
+    // killEtaMinElapsed is the fight age below which the damage rate
+    // estimate is noise: one swing either way flips it.
+    killEtaMinElapsed = 2 * time.Second
 )
 
 // logf reports a hunt loop decision on the console logger and the
@@ -63,6 +79,8 @@ func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
         DelevelFromLevel:  0,
         DelevelZoneMedian: 0,
         TickAgoMs:         0,
+        WalkEtaMs:         etaMs(l.walkEtaSeconds()),
+        KillEtaMs:         etaMs(l.killEtaSeconds(now)),
     }
     // The stuck watchdog and the trip clock only run while the loop
     // follows a planned walk: outside those phases the residual
@@ -150,4 +168,121 @@ func (l *Loop) remainingWaypoints() int {
 
         return 0
     }
+}
+
+// walkEtaSeconds estimates the walking time left on the planned
+// walk: the straight line length from the character through the
+// remaining waypoints into the walk destination, divided by the run
+// speed (world units per second). Zero when no walk is running (the
+// phases without a plan, an unknown position, nothing left to walk).
+func (l *Loop) walkEtaSeconds() float64 {
+    selfX, selfY, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return 0
+    }
+    speed := l.tracker.SelfRunSpeed()
+    if speed <= 0 {
+        speed = walkEtaDefaultSpeed
+    }
+    distance := l.walkRemainingDistance(float64(selfX), float64(selfY))
+    if distance <= 0 {
+        return 0
+    }
+
+    return distance / speed
+}
+
+// walkRemainingDistance measures the remaining walk length of the
+// running walk: the character to the first unvisited waypoint, the
+// waypoints chained, the last leg into the walk destination. The
+// phases without a planned walk report zero.
+func (l *Loop) walkRemainingDistance(selfX, selfY float64) float64 {
+    switch l.phase {
+    case phaseTownWalk, phaseTownReturn, phaseDelevel:
+
+        return walkPlanDistance(selfX, selfY, l.waypoints, l.wpIndex,
+            l.segmentDest)
+    case phaseUser:
+        if l.userKind != state.CommandMove {
+            return 0
+        }
+        dest := pathfind.Vec3{
+            X: float64(l.userX),
+            Y: float64(l.userY),
+            Z: float64(l.userZ),
+        }
+
+        return walkPlanDistance(selfX, selfY, l.userWaypoints,
+            l.userWpIndex, dest)
+    default:
+
+        return 0
+    }
+}
+
+// walkPlanDistance sums the straight 2D legs of a walk plan: the
+// character through the remaining waypoints into the destination.
+// An unarmed destination (the zero sentinel the trip resets restore)
+// contributes no leg, so a plan walked to its end measures zero. The
+// cursor clamps into the slice bounds - the transient reset races
+// are a diagnostics input, never a walk decision.
+func walkPlanDistance(
+    selfX, selfY float64, waypoints []pathfind.Vec3, index int,
+    dest pathfind.Vec3,
+) float64 {
+    fromX, fromY := selfX, selfY
+    total := 0.0
+    for _, wp := range waypoints[min(index, len(waypoints)):] {
+        total += math.Hypot(wp.X-fromX, wp.Y-fromY)
+        fromX, fromY = wp.X, wp.Y
+    }
+    if dest.X != 0 || dest.Y != 0 {
+        total += math.Hypot(dest.X-fromX, dest.Y-fromY)
+    }
+
+    return total
+}
+
+// killEtaSeconds estimates the time until the current fight target
+// dies: the damage the fight has done so far over its age is the
+// rate, the remaining health over the rate the estimate. Zero when
+// the fight is not confirmed running (the stamped start keyed by the
+// target), the fight is too fresh for a stable rate (one swing
+// either way flips it below killEtaMinElapsed), the target healed
+// back above its start health or the vitals are unknown.
+func (l *Loop) killEtaSeconds(now time.Time) float64 {
+    if l.target == 0 || l.fightStartFor != l.target ||
+        l.fightStartAt.IsZero() {
+        return 0
+    }
+    elapsed := now.Sub(l.fightStartAt)
+    if elapsed < killEtaMinElapsed {
+        return 0
+    }
+    curHp, maxHp, ok := l.tracker.ObjectVitals(l.target)
+    if !ok || maxHp <= 0 {
+        return 0
+    }
+    damage := maxHp - curHp
+    if damage <= 0 || curHp <= 0 {
+        return 0
+    }
+    rate := damage / elapsed.Seconds()
+    if rate <= 0 {
+        return 0
+    }
+
+    return curHp / rate
+}
+
+// etaMs floors an estimated duration to whole seconds reported as
+// milliseconds: the resolution of the ETA fields (the same flooring
+// the age fields of the state package use). A sub second or negative
+// estimate reports zero.
+func etaMs(seconds float64) int64 {
+    if seconds <= 0 {
+        return 0
+    }
+
+    return state.AgeMs(time.Duration(seconds * float64(time.Second)))
 }

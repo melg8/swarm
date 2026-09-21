@@ -329,6 +329,8 @@ func goldenSnapshot() Snapshot {
                     "not engage, switching",
                 LastActionAgoMs: 3000,
                 TickAgoMs:       0,
+                WalkEtaMs:       42000,
+                KillEtaMs:       7000,
             },
         },
     }

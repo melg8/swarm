@@ -38,6 +38,9 @@ func TestSelfAccessorsTrackTheCharacter(t *testing.T) {
     })
     require.Equal(t, int32(7), bot.SelfLevel())
     require.Equal(t, int32(4242), bot.SelfExp())
+    // The run speed arrives with the UserInfo: the effective speed
+    // of 165 base with the 1.1 multiplier is 181.5.
+    require.InDelta(t, 181.5, bot.SelfRunSpeed(), 0.001)
 
     // The self movement broadcast starts the walk, the placement stops it.
     bot.ApplyMovement(Movement{
@@ -136,11 +139,17 @@ func TestObjectAccessorsServeKnownObjects(t *testing.T) {
 
     // Without vitals the health percent stays unknown.
     require.InDelta(t, -1.0, bot.ObjectHealthPercent(7), 0.0001)
+    _, _, ok = bot.ObjectVitals(7)
+    require.False(t, ok)
     bot.ApplyStatusUpdate(7, []Attribute{
         {ID: AttrCurHP, Value: 25},
         {ID: AttrMaxHP, Value: 50},
     })
     require.InDelta(t, 50.0, bot.ObjectHealthPercent(7), 0.001)
+    curHp, maxHp, ok := bot.ObjectVitals(7)
+    require.True(t, ok)
+    require.InDelta(t, 25.0, curHp, 0.001)
+    require.InDelta(t, 50.0, maxHp, 0.001)
 }
 
 func TestApplyItemInfoTracksGroundItems(t *testing.T) {

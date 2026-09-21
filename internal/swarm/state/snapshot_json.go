@@ -65,7 +65,7 @@ func snapshotJSONSize(s Snapshot) int {
     size += 160 * len(s.HuntingZones)
     size += 320
     size += 320
-    size += 704 + len(s.Diagnostics.Hunt.LastAction)
+    size += 768 + len(s.Diagnostics.Hunt.LastAction)
     for i := range s.Events {
         size += len(s.Events[i].Message)
     }
@@ -1013,6 +1013,10 @@ func appendHuntDiagnosticsJSON(dst []byte, h HuntDiagnostics) []byte {
     dst = strconv.AppendInt(dst, h.LastActionAgoMs, 10)
     dst = append(dst, `,"tickAgoMs":`...)
     dst = strconv.AppendInt(dst, h.TickAgoMs, 10)
+    dst = append(dst, `,"walkEtaMs":`...)
+    dst = strconv.AppendInt(dst, h.WalkEtaMs, 10)
+    dst = append(dst, `,"killEtaMs":`...)
+    dst = strconv.AppendInt(dst, h.KillEtaMs, 10)
 
     return append(dst, '}')
 }

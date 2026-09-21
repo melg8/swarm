@@ -532,7 +532,7 @@ func (b *Bot) snapshotJSONSizeLocked() int {
         len(b.char.Name)
     size += 768 * len(b.inventory.items)
     size += 384 * len(b.world.hot)
-    size += 704 + len(b.huntLastAction)
+    size += 768 + len(b.huntLastAction)
     count := min(b.log.length, snapshotEvents)
     size += 96 * count
     size += 96 * b.chat.length

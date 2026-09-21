@@ -733,6 +733,17 @@ func (b *Bot) SelfPosition() (int32, int32, int32, bool) {
     return b.char.X, b.char.Y, b.char.Z, true
 }
 
+// SelfRunSpeed returns the observed run speed of the played character
+// in world units per second: the walk ETA input of the hunt loop. The
+// zero value before the first UserInfo carried the speeds, the
+// callers fall back to their default.
+func (b *Bot) SelfRunSpeed() float64 {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.char.RunSpeed
+}
+
 // SelfHeading returns the last observed heading of the played
 // character (the client position validation reports it alongside the
 // placement, the server stores it as the client heading).
@@ -1075,6 +1086,25 @@ func (b *Bot) ObjectHealthPercent(objectID int32) float64 {
     pct := cold.CurHP / cold.MaxHP * 100
 
     return math.Min(100, math.Max(0, pct))
+}
+
+// ObjectVitals returns the raw current and maximum HP of an observed
+// object: the kill ETA input of the hunt loop (the damage rate needs
+// the absolute numbers the percentage view loses). ok is false when
+// the object or its maximum is unknown. The server refreshes the
+// vitals of the mob the character attacks, so the values are exact
+// where the hunt loop needs them: the current fight.
+func (b *Bot) ObjectVitals(
+    objectID int32,
+) (curHp float64, maxHp float64, ok bool) {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    _, cold := b.objectLocked(objectID)
+    if cold == nil || cold.MaxHP <= 0 {
+        return 0, 0, false
+    }
+
+    return cold.CurHP, cold.MaxHP, true
 }
 
 // ID returns the session id of the bot.

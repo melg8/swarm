@@ -149,6 +149,19 @@ type HuntDiagnostics struct {
     // loop heartbeat age (a dead or blocked loop goroutine shows a
     // growing value while the session stays online).
     TickAgoMs int64 `json:"tickAgoMs"`
+    // WalkEtaMs is the estimated walking time left on the planned
+    // walk (the straight line length through the remaining waypoints
+    // into the walk destination, divided by the run speed), floored
+    // to whole seconds like the age fields. Zero means no estimate:
+    // the loop is not walking a plan right now.
+    WalkEtaMs int64 `json:"walkEtaMs"`
+    // KillEtaMs is the estimated time until the current fight target
+    // dies (the damage the confirmed fight has done so far over its
+    // age is the rate, the remaining health over the rate the
+    // estimate), floored to whole seconds like the age fields. Zero
+    // means no estimate: no confirmed running fight, a fight too
+    // fresh for a stable rate or unknown target vitals.
+    KillEtaMs int64 `json:"killEtaMs"`
 }
 
 // AgeMs floors a duration to whole seconds reported as milliseconds:

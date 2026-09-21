@@ -157,3 +157,145 @@ func TestLoopRemainingWaypoints(t *testing.T) {
     loop.wpIndex = 1
     require.Equal(t, 6, loop.remainingWaypoints())
 }
+
+// TestLoopDiagnosticsWalkEta pins the walk ETA of the hunt
+// diagnostics: the straight line length through the remaining
+// waypoints into the destination divided by the run speed, the
+// direct segment fallback without waypoints, no estimate outside
+// the walking phases.
+func TestLoopDiagnosticsWalkEta(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetLogger(recordingLogger(bot))
+    // A distinctive run speed: the UserInfo drives the ETA divisor
+    // away from the default 120 and keeps the fixture placement.
+    bot.ApplyUserInfo(state.UserInfo{
+        Name: "unittest1", Level: 7,
+        X: 45000, Y: 50000, Z: -3500,
+        MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
+        RunSpeed: 200, WalkSpeed: 80,
+    })
+
+    now := time.Now()
+    loop.phase = phaseTownReturn
+    loop.waypoints = []pathfind.Vec3{
+        {X: 45600, Y: 50000, Z: -3500},
+        {X: 46000, Y: 50000, Z: -3500},
+    }
+    loop.wpIndex = 0
+    loop.segmentDest = pathfind.Vec3{X: 46200, Y: 50000, Z: -3500}
+
+    // The character stands at 45000 50000 (newTestBot): 600 + 400 +
+    // 200 units left, 1200 at speed 200 is six seconds.
+    report := loop.diagnostics(now)
+    require.Equal(t, int64(6000), report.WalkEtaMs)
+
+    // The walked character carries the cursor with it: standing on
+    // the second waypoint, the plan measures the last leg only (the
+    // straight line restarts at the character, not at the passed
+    // waypoint).
+    loop.wpIndex = 1
+    bot.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 46000, Y: 50000, Z: -3500,
+    })
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(1000), report.WalkEtaMs)
+
+    // A direct segment without waypoints measures the straight line
+    // into the armed destination: 400 units at 200 is two seconds.
+    loop.waypoints = nil
+    loop.wpIndex = 0
+    loop.segmentDest = pathfind.Vec3{X: 45600, Y: 50000, Z: -3500}
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(2000), report.WalkEtaMs)
+
+    // No waypoints and no armed destination: no estimate (the trip
+    // reset state).
+    loop.segmentDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(0), report.WalkEtaMs)
+
+    // The manual walk follows the user plan with the same estimate:
+    // 400 + 200 units left at 200 is three seconds.
+    loop.phase = phaseUser
+    loop.userKind = state.CommandMove
+    loop.userX, loop.userY, loop.userZ = 45800, 50000, -3500
+    loop.userWaypoints = []pathfind.Vec3{
+        {X: 45600, Y: 50000, Z: -3500},
+    }
+    loop.userWpIndex = 0
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(3000), report.WalkEtaMs)
+
+    // A manual command without a walk reports no estimate.
+    loop.userKind = state.CommandAttack
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(0), report.WalkEtaMs)
+
+    // The hunt phases carry no walk plan: the ETA stays out even
+    // with a stale destination armed.
+    loop.phase = phaseEngage
+    loop.segmentDest = pathfind.Vec3{X: 46200, Y: 50000, Z: -3500}
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(0), report.WalkEtaMs)
+}
+
+// TestLoopDiagnosticsKillEta pins the kill ETA of the hunt
+// diagnostics: the damage rate of the confirmed fight applied to the
+// remaining health, no estimate for a fresh fight, a stale fight
+// stamp, a whole target or an unknown one.
+func TestLoopDiagnosticsKillEta(t *testing.T) {
+    bot := newTestBot()
+    spawnMob(bot)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetLogger(recordingLogger(bot))
+    // The gremlin holds 40 of 100 HP: ten seconds of fighting did
+    // the 60 damage, the remaining 40 die at 6 hp per second.
+    bot.ApplyStatusUpdate(7, []state.Attribute{
+        {ID: state.AttrMaxHP, Value: 100},
+        {ID: state.AttrCurHP, Value: 40},
+    })
+
+    now := time.Now()
+    loop.target = 7
+    loop.fightStartFor = 7
+    loop.fightStartAt = now.Add(-10 * time.Second)
+
+    report := loop.diagnostics(now)
+    require.Equal(t, int64(6000), report.KillEtaMs)
+
+    // A fight younger than the rate window is noise: no estimate.
+    loop.fightStartAt = now.Add(-time.Second)
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(0), report.KillEtaMs)
+
+    // A stale stamp of another target: no estimate.
+    loop.fightStartAt = now.Add(-10 * time.Second)
+    loop.fightStartFor = 99
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(0), report.KillEtaMs)
+
+    // No target: no estimate even with a stamped start.
+    loop.fightStartFor = 7
+    loop.target = 0
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(0), report.KillEtaMs)
+
+    // A target at full health shows no damage done: no estimate.
+    loop.target = 7
+    bot.ApplyStatusUpdate(7, []state.Attribute{
+        {ID: state.AttrCurHP, Value: 100},
+    })
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(0), report.KillEtaMs)
+
+    // An unknown target id carries no vitals: no estimate.
+    bot.ApplyStatusUpdate(7, []state.Attribute{
+        {ID: state.AttrCurHP, Value: 40},
+    })
+    loop.target = 424242
+    report = loop.diagnostics(now)
+    require.Equal(t, int64(0), report.KillEtaMs)
+}
