@@ -788,9 +788,7 @@ func (l *Loop) maybeStartTownTrip() {
     }}
     l.buysPlanned = false
     l.buyAt = time.Time{}
-    l.buyRequested = nil
-    l.buyConfirmAt = time.Time{}
-    l.buyRetries = 0
+    l.resetBuyRequest()
     l.segmentRefused = false
     l.refusalVariants = 0
     l.resetReplacementSales()
@@ -4090,9 +4088,7 @@ func (l *Loop) endTownTrip(reason string) {
     l.tripPlan = nil
     l.tripStops = nil
     l.buysPlanned = false
-    l.buyRequested = nil
-    l.buyConfirmAt = time.Time{}
-    l.buyRetries = 0
+    l.resetBuyRequest()
     l.shoppingPlanCache = nil
     l.shoppingPlanAt = time.Time{}
     l.shoppingPlanAdena = 0
@@ -4193,9 +4189,7 @@ func (l *Loop) resetTownTrip() {
     l.tripPlan = nil
     l.tripStops = nil
     l.buysPlanned = false
-    l.buyRequested = nil
-    l.buyConfirmAt = time.Time{}
-    l.buyRetries = 0
+    l.resetBuyRequest()
     l.resetReplacementSales()
     l.resetLearnState()
     l.tripEndedAt = time.Time{}

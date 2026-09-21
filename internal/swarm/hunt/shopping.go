@@ -872,9 +872,7 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
         case l.buysArrived(l.buyRequested):
             l.logf("Hunt: shop: %d purchases confirmed",
                 len(l.buyRequested))
-            l.buyRequested = nil
-            l.buyConfirmAt = time.Time{}
-            l.buyRetries = 0
+            l.resetBuyRequest()
         case now.Sub(l.buyConfirmAt) < buyConfirmWait:
             return false
         default:
@@ -883,9 +881,7 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
                 l.logf("Hunt: shop: %d purchases never "+
                     "arrived after %d requests, skipping them",
                     len(l.buyRequested), l.buyRetries)
-                l.buyRequested = nil
-                l.buyConfirmAt = time.Time{}
-                l.buyRetries = 0
+                l.resetBuyRequest()
             } else {
                 l.logf("Hunt: shop: %d purchases did not "+
                     "arrive, re-requesting (try %d of %d)",
@@ -929,6 +925,19 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
     }
     l.buyAt = now
     l.buyRequested = batch
+    // The arrival baseline of the stackable orders: the owned stack
+    // count at the request moment (a retry re-send keeps the original
+    // baseline - the wait asks whether the count grew since the first
+    // ask, not since the last one).
+    if l.buyBaseline == nil {
+        l.buyBaseline = make(map[int32]int32, len(batch))
+    }
+    for _, purchase := range batch {
+        if _, recorded := l.buyBaseline[purchase.ItemID]; !recorded {
+            l.buyBaseline[purchase.ItemID] =
+                l.carriedStackCount(purchase.ItemID)
+        }
+    }
     l.buyConfirmAt = now
     names := make([]string, 0, len(batch))
     cost := int64(0)
@@ -947,23 +956,82 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
         len(l.buyRequested) == 0
 }
 
-// dropOwnedPurchases filters the stop purchases whose item id the
-// inventory already carries beyond the family copy count (the same
-// signal the arrival confirmation reads): the frozen trip plan
+// isStackPurchase reports whether the order buys a stackable
+// consumable rather than a wearable: the wearable orders carry the
+// family copy semantics (one entry per equipped slot), the stackable
+// ones the count semantics (the server merges the delivery into the
+// carried stack - the entry list never grows, only the count does).
+// The unknown types lean consumable: the planner never plans a gear
+// piece outside the npcdata tables, and the count semantics of an
+// unknown one-off order degrade to the same keep-one behavior.
+func isStackPurchase(itemID int32) bool {
+    switch npcdata.ItemType(itemID) {
+    case "Weapon", "Armor", "Shield":
+        return false
+    default:
+        return true
+    }
+}
+
+// carriedStackCount sums the tracked inventory count of one item id
+// (the partial stacks the loot and the spends leave behind all merge
+// into one count).
+func (l *Loop) carriedStackCount(itemID int32) int32 {
+    var count int32
+    for _, item := range l.tracker.InventoryItems() {
+        if item.ItemID == itemID {
+            count += item.Count
+        }
+    }
+
+    return count
+}
+
+// resetBuyRequest clears the in-flight buy batch with its arrival
+// baseline (the confirmation, the retry budget skip and the trip
+// boundaries all end the wait the same way).
+func (l *Loop) resetBuyRequest() {
+    l.buyRequested = nil
+    l.buyBaseline = nil
+    l.buyConfirmAt = time.Time{}
+    l.buyRetries = 0
+}
+
+// dropOwnedPurchases filters the stop purchases whose item the
+// inventory already carries beyond the plan: the frozen trip plan
 // executes verbatim, but a surplus copy of an item the bot holds is
 // never part of it. A pair family (the rings, the earrings) carries
 // two copies - one worn plus one planned fills both slots - while a
 // single slot family blocks its second copy (the second pair of
-// gloves of the report).
+// gloves of the report). The stackable orders (the arrow restock)
+// are count aware instead: the planner already subtracted the owned
+// count when it sized the batch, so the order only drops when the
+// carried count covers it (a stale top up the trip no longer needs)
+// - a partial stack under the restock floor must never block its own
+// top up.
 func (l *Loop) dropOwnedPurchases(purchases []gear.Purchase) []gear.Purchase {
     items := l.tracker.InventoryItems()
     carried := make(map[int32]int, len(items))
+    stackCount := make(map[int32]int32, len(items))
     for _, item := range items {
         carried[item.ItemID]++
+        stackCount[item.ItemID] += item.Count
     }
     planned := make(map[int32]int, len(purchases))
     kept := purchases[:0]
     for _, purchase := range purchases {
+        if isStackPurchase(purchase.ItemID) {
+            if stackCount[purchase.ItemID] >= purchase.Count {
+                l.logger.Printf("Hunt: shop: the %s stack already "+
+                    "covers the order, skipping the purchase",
+                    npcdata.ItemName(purchase.ItemID))
+
+                continue
+            }
+            kept = append(kept, purchase)
+
+            continue
+        }
         stats, hasStats := npcdata.ItemGearStats(purchase.ItemID)
         copies := 1
         if hasStats {
@@ -983,13 +1051,31 @@ func (l *Loop) dropOwnedPurchases(purchases []gear.Purchase) []gear.Purchase {
 }
 
 // buysArrived reports whether every purchase of the batch shows up in
-// the tracked inventory (the planner never buys an item id the
-// inventory carries at the plan time, so the appearance of the ids is
-// the arrival signal; an equipped purchase still counts - the auto
-// equipment wears it within seconds).
+// the tracked inventory. The wearable orders arrive as a new entry
+// (the planner never buys a wearable item id the inventory carries at
+// the plan time, so the appearance of the id is the arrival signal;
+// an equipped purchase still counts - the auto equipment wears it
+// within seconds). The stackable orders arrive as a count growth: the
+// server merges the delivery into the carried stack, so the count
+// must cover the baseline the batch left behind plus the order - the
+// id presence check would confirm a stack order instantly (the
+// carried stack already holds the id) and mark the purchase done
+// before the server answered.
 func (l *Loop) buysArrived(batch []gear.Purchase) bool {
     items := l.tracker.InventoryItems()
+    stackCount := make(map[int32]int32, len(items))
+    for _, item := range items {
+        stackCount[item.ItemID] += item.Count
+    }
     for _, purchase := range batch {
+        if isStackPurchase(purchase.ItemID) {
+            if stackCount[purchase.ItemID] <
+                l.buyBaseline[purchase.ItemID]+purchase.Count {
+                return false
+            }
+
+            continue
+        }
         found := false
         for _, item := range items {
             if item.ItemID == purchase.ItemID {

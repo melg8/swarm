@@ -1341,6 +1341,55 @@ function main() {
         deepText(shopSummary).includes("left"),
         "row text: " + deepText(shopList.children[0]));
 
+    // The 2026-09-21 owner report: the bot sold the pants to the
+    // trader but never bought the arrows its shop queue kept
+    // displaying - the trip execution dropped the restock order (the
+    // owned 101 arrow stack counted as an inventory entry beyond the
+    // family copy count) while the published plan went on
+    // advertising the line trip after trip. The queue state of the
+    // report: the trip runs (the pants are sold, the adena holds the
+    // proceeds) and the single Wooden Arrow restock entry rides the
+    // plan as the affordable line the user watched.
+    const arrowPlan = {
+        entries: [
+            {
+                itemId: 17, name: "Wooden Arrow", icon: "icon17",
+                merchant: "Herbiel", type: "EtcItem",
+                bodyPartKey: "lhand", weight: 6, price: 998,
+                sellCredit: 0, missing: 0, gain: 0,
+                affordable: true, buying: false
+            }
+        ],
+        adena: 5008,
+        total: 998,
+        trip: true
+    };
+    const arrowSnapshot = gearSnapshot([], 0, 80);
+    arrowSnapshot.shopping = arrowPlan;
+    gear.renderShopping(arrowSnapshot);
+    check(results, "the reported queue state renders the arrow restock line",
+        shopList.children.length === 1 &&
+        deepText(shopList.children[0]).includes("Wooden Arrow") &&
+        deepText(shopList.children[0]).includes("Herbiel") &&
+        deepText(shopList.children[0]).includes("998") &&
+        !shopList.children[0].classList.contains("want"),
+        "row text: " + deepText(shopList.children[0]));
+    check(results, "the reported queue state keeps the trip summary",
+        deepText(shopSummary).includes("left") &&
+        elements.get("shop-have").textContent === "5,008" &&
+        elements.get("shop-buy").textContent === "998",
+        "summary: " + deepText(shopSummary));
+
+    // The buy request goes out (the count aware fix): the entry flips
+    // to the buying chip while the delivery waits for the
+    // confirmation gate.
+    arrowPlan.entries[0].buying = true;
+    gear.renderShopping(arrowSnapshot);
+    check(results, "the in-flight arrow buy carries the buying chip",
+        shopList.children[0].classList.contains("buying") &&
+        deepText(shopList.children[0]).includes("buying"),
+        "row text: " + deepText(shopList.children[0]));
+
     // No plan hides the widget again - the flyout and the tab both.
     gear.renderShopping(gearSnapshot([], 0, 80));
     check(results, "no plan hides the flyout and the edge tab",

@@ -806,11 +806,17 @@ type Loop struct {
     // distributes into, the request pacing of the buys, the in-flight
     // buy batch awaiting its inventory confirmation and the cached
     // plan of the shopping trigger.
-    tripPlan          []gear.Purchase
-    tripStops         []tripStop
-    buysPlanned       bool
-    buyAt             time.Time
-    buyRequested      []gear.Purchase
+    tripPlan     []gear.Purchase
+    tripStops    []tripStop
+    buysPlanned  bool
+    buyAt        time.Time
+    buyRequested []gear.Purchase
+    // buyBaseline holds the owned stack count of every item id of the
+    // in-flight batch at the moment the request went out: the
+    // stackable orders arrive as a count growth (the server merges
+    // the delivery into the carried stack), so the arrival gate
+    // compares the live count against the baseline plus the order.
+    buyBaseline       map[int32]int32
     buyConfirmAt      time.Time
     buyRetries        int
     shoppingPlanAt    time.Time
