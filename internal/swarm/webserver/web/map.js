@@ -69,7 +69,7 @@ const MapView = {
   cursorWorld: null,
 
   // The fleet wide kill marks of /api/fleet/kills (every recent kill
-  // of every bot): drawn as the crosses of the whole deployment so
+  // of every bot): drawn as the skulls of the whole deployment so
   // they survive the bot switches of the view (the per zone kill
   // centroid of the observed bot alone does not).
   killMarks: [],
@@ -1592,7 +1592,7 @@ const MapView = {
 
   // drawHuntingZone paints the hunting grounds of the deployment
   // (the registry the hunt loop switches through): every spot draws
-  // as a dashed circle with its anchor dot and kill cross, the
+  // as a dashed circle with its anchor dot and kill skull, the
   // legacy squares as dashed rectangles - the active ground in
   // bright amber with the thicker stroke, the future ones in a
   // clearly readable soft blue with a light fill (the demonstration
@@ -1687,7 +1687,7 @@ const MapView = {
   // ---- the hunt layer raster and the live emphasis ----
   //
   // The registry splits by what changes its pixels: the shapes (the
-  // circles, the squares, the anchor dots, the kill crosses) go into
+  // circles, the squares, the anchor dots, the kill skulls) go into
   // the world anchored offscreen cache below and every frame
   // composites them with one drawImage, while the emphasis (the
   // hovered or listed zone - its thicker stroke, its brighter fill
@@ -2087,8 +2087,8 @@ const MapView = {
     const demotedRects = [];
     const futureDots = [];
     const activeDots = [];
-    const futureCrosses = [];
-    const activeCrosses = [];
+    const futureSkulls = [];
+    const activeSkulls = [];
     const futureHeat = new Map();
     const activeHeat = new Map();
     for (const zone of zones) {
@@ -2102,11 +2102,11 @@ const MapView = {
         const active = zone.active;
         (active ? activeSpots : futureSpots).push([c.x, c.y, r]);
         (active ? activeDots : futureDots).push([c.x, c.y]);
-        // The kill centroid cross (where the kills actually happen).
+        // The kill centroid skull (where the kills actually happen).
         if (zone.killX || zone.killY) {
           const k = this.worldToScreen(zone.killX, zone.killY);
           if (k.x > -6 && k.y > -6 && k.x < vw + 6 && k.y < vh + 6) {
-            (active ? activeCrosses : futureCrosses).push([k.x, k.y]);
+            (active ? activeSkulls : futureSkulls).push([k.x, k.y]);
           }
         }
         // The death heat fill: the warmer the ground, the redder. The
@@ -2240,21 +2240,26 @@ const MapView = {
       ctx.stroke();
     }
     ctx.setLineDash([]);
-    // The kill centroid crosses of the spots with known kill points.
-    for (const [list, alpha] of [[futureCrosses, 0.75],
-      [activeCrosses, 0.95]]) {
+    // The kill centroid skulls of the spots with known kill points:
+    // the same two pass fill the fleet ring uses (the body in the
+    // marker orange, the face in the dark contrast), just larger -
+    // the centroid marks the ground, not a single corpse.
+    for (const [list, alpha] of [[futureSkulls, 0.75],
+      [activeSkulls, 0.95]]) {
       if (list.length === 0) { continue; }
       ctx.globalAlpha = alpha;
-      ctx.strokeStyle = killMarkColor;
-      ctx.lineWidth = 2;
+      ctx.fillStyle = killMarkColor;
       ctx.beginPath();
       for (const k of list) {
-        ctx.moveTo(k[0] - 5, k[1] - 5);
-        ctx.lineTo(k[0] + 5, k[1] + 5);
-        ctx.moveTo(k[0] + 5, k[1] - 5);
-        ctx.lineTo(k[0] - 5, k[1] + 5);
+        traceKillSkull(ctx, k[0], k[1], 5, false);
       }
-      ctx.stroke();
+      ctx.fill();
+      ctx.fillStyle = killMarkDetailColor;
+      ctx.beginPath();
+      for (const k of list) {
+        traceKillSkull(ctx, k[0], k[1], 5, true);
+      }
+      ctx.fill();
     }
     // The anchor dots of the spots.
     if (futureDots.length > 0) {
@@ -2432,14 +2437,14 @@ const MapView = {
     ctx.restore();
   },
 
-  // drawKillMarks paints the fleet wide kill crosses: every recent
+  // drawKillMarks paints the fleet wide kill skulls: every recent
   // kill of every bot (the /api/fleet/kills ring) draws as a small
-  // orange cross that melts away with its age. The layer survives
+  // orange skull that melts away with its age. The layer survives
   // the bot switches of the view - the marks live in the map, not in
   // the snapshot of the observed bot. The fade quantizes into
-  // buckets: every cross of one bucket shares a single stroke call,
-  // so a full ring of kills costs a handful of strokes instead of
-  // one state round trip per cross (a bucket step of the alpha is
+  // buckets: every skull of one bucket shares a single fill call per
+  // pass, so a full ring of kills costs a handful of fills instead
+  // of one state round trip per skull (a bucket step of the alpha is
   // invisible on a five minute melt).
   drawKillMarks(ctx, rect) {
     if (!this.layerChecked("show-kills")) { return; }
@@ -2455,35 +2460,38 @@ const MapView = {
         continue;
       }
       // The fresh kills read full strength, the old ones melt toward
-      // a quarter opacity before the ring drops them.
+      // a quarter opacity and shrink before the ring drops them.
       const bucket = Math.min(killFadeBuckets - 1,
         Math.floor(age / killMarkTTLms * killFadeBuckets));
       (buckets[bucket] = buckets[bucket] || []).push(p);
     }
     ctx.save();
-    ctx.lineWidth = 1.5;
-    ctx.lineCap = "round";
-    ctx.strokeStyle = killMarkColor;
     for (let bucket = 0; bucket < buckets.length; bucket++) {
       const marks = buckets[bucket];
       if (!marks) { continue; }
       const fade = bucket / killFadeBuckets;
       ctx.globalAlpha = 0.95 - 0.7 * fade;
       const size = 4 - 1.5 * fade;
+      // The body pass: the head and jaw silhouette in the orange.
+      ctx.fillStyle = killMarkColor;
       ctx.beginPath();
       for (const p of marks) {
-        ctx.moveTo(p.x - size, p.y - size);
-        ctx.lineTo(p.x + size, p.y + size);
-        ctx.moveTo(p.x + size, p.y - size);
-        ctx.lineTo(p.x - size, p.y + size);
+        traceKillSkull(ctx, p.x, p.y, size, false);
       }
-      ctx.stroke();
+      ctx.fill();
+      // The face pass: the eyes and mouth slots in the dark contrast.
+      ctx.fillStyle = killMarkDetailColor;
+      ctx.beginPath();
+      for (const p of marks) {
+        traceKillSkull(ctx, p.x, p.y, size, true);
+      }
+      ctx.fill();
     }
     ctx.restore();
   },
 
   // setKillMarks ingests the fleet kill ring of /api/fleet/kills (the
-  // web app polls it with the bot list). The crosses draw on the next
+  // web app polls it with the bot list). The skulls draw on the next
   // frame - the poll period paces the fade steps well enough.
   setKillMarks(marks) {
     this.killMarks = Array.isArray(marks) ? marks : [];
@@ -3910,14 +3918,15 @@ const tilesCommitMs = 250;
 const bgDevicePixels = 4096 * 2560;
 
 // huntDevicePixels caps the hunt layer cache raster: the layer holds
-// thin vector strokes (the dashed circles, the crosses), so its
+// thin vector strokes (the dashed circles, the kill skulls), so its
 // budget is leaner than the imagery cache - a stepped down raster
 // of a 1.5px dash upscales cleanly and keeps the second offscreen
 // canvas in the low tens of megabytes even on a 4K class viewport.
 const huntDevicePixels = 4096 * 1440;
 
-// killFadeBuckets is the quantization of the kill cross fade: every
-// cross of one bucket shares one stroke call (see drawKillMarks).
+// killFadeBuckets is the quantization of the kill skull fade: every
+// skull of one bucket shares one fill call per pass (see
+// drawKillMarks).
 const killFadeBuckets = 8;
 
 // socialWindowMs is how long the social animation marker stays visible
@@ -3943,12 +3952,18 @@ const zoneFutureFill = "rgba(91, 155, 213, 0.07)";
 // its neighbors at a glance.
 const zoneHoverFill = "rgba(91, 155, 213, 0.22)";
 
-// killMarkColor is the stroke of the fleet kill crosses (the same
-// orange the per spot kill centroid cross uses, so every kill marker
+// killMarkColor is the fill of the fleet kill skulls (the same
+// orange the per spot kill centroid skull uses, so every kill marker
 // on the map reads as one family).
 const killMarkColor = "#e37400";
 
-// killMarkTTLms bounds the life of a fleet kill cross: the fresh kill
+// killMarkDetailColor is the fixed dark contrast of the skull face
+// (the eye dots and the mouth slots): a dark brown that stays
+// readable over the orange fill on the light map imagery, theme
+// independent like the rest of the kill marker palette.
+const killMarkDetailColor = "#40230a";
+
+// killMarkTTLms bounds the life of a fleet kill skull: the fresh kill
 // reads full strength and melts away before the server ring drops
 // it (the hunt loop keeps five minutes of kills per bot).
 const killMarkTTLms = 5 * 60 * 1000;
@@ -4127,6 +4142,43 @@ function drawDiamond(ctx, x, y, size, color) {
   ctx.fillStyle = color;
   ctx.fillRect(-size, -size, size * 2, size * 2);
   ctx.restore();
+}
+
+// traceKillSkull traces one stylized skull onto the current canvas
+// path, centered on (x, y) with the half size r. The body pass (face
+// false) adds the cranium circle and the jaw circle, the face pass
+// (face true) adds the two eye dots and the two mouth slots - the
+// caller fills the passes with killMarkColor and killMarkDetailColor
+// in two batched fill calls. Traced from primitives, never a font
+// glyph, so the face stays crisp at every device pixel ratio and
+// still reads as a skull at the ~8px melt of the oldest fade bucket.
+function traceKillSkull(ctx, x, y, r, face) {
+  if (!face) {
+    // The cranium: a wide circle over a smaller jaw circle - the
+    // silhouette alone reads skull from a distance.
+    ctx.moveTo(x + r * 0.75, y - r * 0.15);
+    ctx.arc(x, y - r * 0.15, r * 0.75, 0, Math.PI * 2);
+    ctx.moveTo(x + r * 0.45, y + r * 0.45);
+    ctx.arc(x, y + r * 0.45, r * 0.45, 0, Math.PI * 2);
+
+    return;
+  }
+  // The eye dots sit inside the cranium, above the jaw line.
+  ctx.moveTo(x - r * 0.13, y - r * 0.3);
+  ctx.arc(x - r * 0.33, y - r * 0.3, r * 0.22, 0, Math.PI * 2);
+  ctx.moveTo(x + r * 0.53, y - r * 0.3);
+  ctx.arc(x + r * 0.33, y - r * 0.3, r * 0.22, 0, Math.PI * 2);
+  // The mouth slots: the two dark teeth gaps of the jaw slab.
+  ctx.moveTo(x - r * 0.3, y + r * 0.15);
+  ctx.lineTo(x - r * 0.1, y + r * 0.15);
+  ctx.lineTo(x - r * 0.1, y + r * 0.55);
+  ctx.lineTo(x - r * 0.3, y + r * 0.55);
+  ctx.closePath();
+  ctx.moveTo(x + r * 0.1, y + r * 0.15);
+  ctx.lineTo(x + r * 0.3, y + r * 0.15);
+  ctx.lineTo(x + r * 0.3, y + r * 0.55);
+  ctx.lineTo(x + r * 0.1, y + r * 0.55);
+  ctx.closePath();
 }
 
 function cardinalOf(heading) {

@@ -85,6 +85,10 @@ function makeElement() {
         set innerHTML(value) {
             this._innerHTML = value;
             this.children.length = 0;
+            // A real browser clamps the scrollTop of the emptied
+            // element to 0 once the content collapses: emulate it so
+            // the scroll restore checks stay honest.
+            this.scrollTop = 0;
         },
         addEventListener: () => {},
         scrollTop: 0,
@@ -315,6 +319,22 @@ function main() {
         check(results, "the fight detail carries the target name",
             fight === "fighting Keltir for 4s, eta ~9s",
             "got " + JSON.stringify(fight));
+        const fightLevel = hud.engageFightDetail(
+            { objects: [{ objectId: 300, kind: "npc", name: "Keltir",
+                level: 4, dead: false }] },
+            { targetId: 300 },
+            { targetId: 300, targetForMs: 4000, killEtaMs: 9000 });
+        check(results, "the fight detail carries the mob level",
+            fightLevel === "fighting Keltir lvl 4 for 4s, eta ~9s",
+            "got " + JSON.stringify(fightLevel));
+        const fightNoLevel = hud.engageFightDetail(
+            { objects: [{ objectId: 300, kind: "npc", name: "Keltir",
+                level: 0, dead: false }] },
+            { targetId: 300 },
+            { targetId: 300, targetForMs: 4000, killEtaMs: 9000 });
+        check(results, "a levelless mob never shows a level",
+            fightNoLevel === "fighting Keltir for 4s, eta ~9s",
+            "got " + JSON.stringify(fightNoLevel));
         const fightUnnamed = hud.engageFightDetail(
             { objects: [] },
             { targetId: 301 },
@@ -451,11 +471,22 @@ function main() {
 
         // Auto scroll follows the newest line only while stuck: the
         // default state scrolls to the bottom, a scrolled up user keeps
-        // the chosen view, reaching the bottom resumes the follow.
-        const scrollList = { scrollTop: 0, clientHeight: 300,
-            scrollHeight: 500,
-            children: [], innerHTML: "",
-            append(child) { this.children.push(child); } };
+        // the chosen view (the rebuild collapses the content and a real
+        // browser clamps the scrollTop of the emptied list to 0 - the
+        // render must capture and restore the offset), reaching the
+        // bottom resumes the follow.
+        const scrollList = {
+            scrollTop: 0, clientHeight: 300, scrollHeight: 500,
+            children: [],
+            append(child) { this.children.push(child); },
+            // The honest emulation of the browser clear: the innerHTML
+            // assignment drops the children and clamps scrollTop to 0.
+            set innerHTML(value) {
+                this.children.length = 0;
+                this.scrollTop = 0;
+            },
+            get innerHTML() { return ""; }
+        };
         hud.ChatWindow.stick = true;
         hud.renderChat.call(null, { chat: [
             { time: "2026-09-06T10:00:00Z", kind: "system", text: "l1" }
@@ -472,11 +503,27 @@ function main() {
         hud.ChatWindow.stick = false;
         scrollList.scrollTop = 120;
         hud.renderChat({ chat: [
+            { time: "2026-09-06T10:00:00Z", kind: "system", text: "l1" },
             { time: "2026-09-06T10:00:01Z", kind: "system", text: "l2" }
         ] });
-        check(results, "scrolled up chat keeps the chosen view",
+        check(results,
+            "scrolled up chat keeps the offset on a re-render",
             scrollList.scrollTop === 120,
             "scrollTop " + scrollList.scrollTop);
+        check(results, "scrolled up chat keeps the rendered lines",
+            scrollList.children.length === 2,
+            "got " + scrollList.children.length + " lines");
+        // The lines may also shrink (a tab filter or a snapshot drop):
+        // the restore clamps to the maximum offset of the new content.
+        scrollList.scrollHeight = 350;
+        scrollList.scrollTop = 120;
+        hud.renderChat({ chat: [
+            { time: "2026-09-06T10:00:02Z", kind: "system", text: "l3" }
+        ] });
+        check(results, "a smaller content clamps the restored offset",
+            scrollList.scrollTop === 50,
+            "scrollTop " + scrollList.scrollTop + " (want 50)");
+        scrollList.scrollHeight = 500;
         check(results, "chatAtBottom detects the bottom",
             hud.chatAtBottom({ scrollTop: 196, clientHeight: 300,
                 scrollHeight: 500 })

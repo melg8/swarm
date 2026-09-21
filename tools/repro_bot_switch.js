@@ -156,11 +156,13 @@ function loadMapJs(mapFile) {
     };
     const elements = new Map();
     // The layer checkboxes the map reads: the world layers on (the
-    // zones and the units are the subject of this harness).
+    // zones and the units are the subject of this harness). The kill
+    // ring rides too - it paints in the switch gap on purpose (the
+    // fleet layer survives the reset), checked by default in the UI.
     const checkboxes = {
         follow: true, "show-labels": false, "show-dest": true,
         "show-zone": true, "show-targets": true,
-        "show-hunt-zones": true, "show-aggro": true
+        "show-hunt-zones": true, "show-aggro": true, "show-kills": true
     };
     const sandbox = {
         Math, JSON,
@@ -290,8 +292,13 @@ function runScenario(mapFile) {
         record.arcs.filter(
             (arc) => Math.abs(arc[2] - spotRadius) < 2).length === 0,
         "a spot circle is still drawn");
+    // The reset map paints no stale unit markers. The one legitimate
+    // fill source of the gap frame is the surviving fleet kill mark:
+    // it draws as a two pass skull (the orange body fill and the dark
+    // face detail fill), so exactly those two fills may appear.
     check(results, "the reset map paints no stale unit markers",
-        record.fills === 0, record.fills + " unit fills still drawn");
+        record.fills === 2, record.fills + " fills still drawn - want"
+        + " only the two fleet kill skull passes");
 
     // The first snapshot of the new bot repaints normally: with follow
     // on the camera centers on the new character, its own spot circle

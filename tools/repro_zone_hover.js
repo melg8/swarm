@@ -14,9 +14,9 @@ SPDX-License-Identifier: MIT
 // - zone list focus: focusZone pins the camera on the ground, scales
 //   it to fit and lights the zone label; blurZone restores the camera
 //   the user had (the follow flag, the pan anchor, the zoom);
-// - fleet kill crosses: setKillMarks draws the crosses of every bot
-//   (the layer lives in the map, not the observed bot's snapshot),
-//   the old marks melt away, the checkbox hides the layer;
+// - fleet kill skulls: setKillMarks draws the path traced skull of
+//   every bot (the layer lives in the map, not the observed bot's
+//   snapshot), the old marks melt away, the checkbox hides the layer;
 // - social links: two npcs of the same clan inside their clan help
 //   range connect with the solid teal line, a pair that only
 //   approaches the range with the dashed amber warning line, npcs of
@@ -107,7 +107,21 @@ function makeRecordingContext(record) {
             }
             current = null;
         },
-        fill: () => { current = null; },
+        // The fill pass records land in record.fills (the skull
+        // marker of the kill layer draws as two fill passes: the
+        // orange body and the dark face), so the scenario can assert
+        // the filled geometry, style and alpha at fill time.
+        fill: () => {
+            if (current) {
+                record.fills.push({
+                    segments: current.segments.slice(),
+                    arcs: current.arcs.slice(),
+                    style: record.fillStyle,
+                    alpha: record.alpha
+                });
+            }
+            current = null;
+        },
         fillRect: () => {},
         drawImage: () => {},
         fillText: (text, x, y) => {
@@ -163,7 +177,7 @@ function makeElementStub(checked) {
 // clan mask parsing of the social layer needs it.
 function loadMapJs(mapFile) {
     const record = {
-        strokes: [], texts: [], style: "", fillStyle: "",
+        strokes: [], fills: [], texts: [], style: "", fillStyle: "",
         width: 1, alpha: 1, dash: []
     };
     const listeners = { canvas: {}, window: {} };
@@ -477,51 +491,112 @@ async function runScenarioHuntCells(mapFile) {
     return results;
 }
 
-// Scenario 2: the fleet kill crosses. The marks live in the map layer
-// independent of the observed bot's snapshot.
+// Scenario 2: the fleet kill skulls. The marks live in the map layer
+// independent of the observed bot's snapshot and draw as small path
+// traced skulls in two fill passes (the orange body, the dark face) -
+// never as a stroke cross and never as a font glyph.
 function runScenarioKillMarks(mapFile) {
     const { MapView, record, elements } = loadMapJs(mapFile);
     MapView.init();
-    MapView.update(buildSnapshot());
+    const snap = buildSnapshot();
+    // The kill centroid of the active spot rides the registry: the
+    // spot layer draws its own (larger) skull at the kill point.
+    snap.huntingZones[0].killX = 44500;
+    snap.huntingZones[0].killY = 49500;
+    MapView.update(snap);
 
     const results = [];
     const fresh = worldToScreen(45100, 50100);
     const old = worldToScreen(45300, 50300);
     const stale = worldToScreen(47000, 52000);
+    const centroid = worldToScreen(44500, 49500);
 
     MapView.setKillMarks([
         { botId: "a", x: 45100, y: 50100, atMs: 0 },
         { botId: "b", x: 45300, y: 50300, atMs: -240000 },
         { botId: "a", x: 47000, y: 52000, atMs: -400000 }
     ]);
-    const crossAt = (p) => record.strokes.filter((stroke) =>
-        stroke.style === "#e37400" && stroke.segments.length === 2
-        && Math.hypot(stroke.segments[0][0] - (p.x - 4),
-            stroke.segments[0][1] - (p.y - 4)) < 3
-        && Math.hypot(stroke.segments[1][0] - (p.x + 4),
-            stroke.segments[1][1] - (p.y - 4)) < 3);
 
-    check(results, "fresh kill draws its cross",
-        crossAt(fresh).length > 0,
-        "no cross at " + JSON.stringify(fresh));
-    check(results, "aged kill draws a smaller cross",
-        crossAt(old).length > 0,
-        "no aged cross at " + JSON.stringify(old));
+    // The skull passes land as fills: the body pass fills the head
+    // and jaw circles in the marker orange, the face pass fills the
+    // eye dots and the mouth slots in the dark contrast color.
+    const skullFills = (p, style) => record.fills.filter((fill) =>
+        fill.style === style
+        && fill.arcs.some(([ax, ay]) =>
+            Math.hypot(ax - p.x, ay - p.y) < 4));
+    const headRadiusOf = (fill, p) => Math.max(...fill.arcs
+        .filter(([ax, ay]) => Math.hypot(ax - p.x, ay - p.y) < 4)
+        .map(([, , ar]) => ar));
+
+    record.fills.length = 0;
+    record.strokes.length = 0;
+    record.texts.length = 0;
+    MapView.draw();
+
+    const freshBody = skullFills(fresh, "#e37400");
+    const freshFace = skullFills(fresh, "#40230a");
+    const oldBody = skullFills(old, "#e37400");
+    check(results, "fresh kill draws its skull body and face",
+        freshBody.length > 0 && freshFace.length > 0,
+        "body fills " + freshBody.length + ", face fills "
+            + freshFace.length);
+    check(results, "aged kill draws a smaller and fainter skull",
+        oldBody.length > 0 && freshBody.length > 0
+        && headRadiusOf(oldBody[0], old)
+            < headRadiusOf(freshBody[0], fresh)
+        && oldBody[0].alpha < freshBody[0].alpha,
+        "aged head radius "
+            + (oldBody.length > 0
+                ? headRadiusOf(oldBody[0], old).toFixed(2) : "-")
+            + " vs fresh "
+            + (freshBody.length > 0
+                ? headRadiusOf(freshBody[0], fresh).toFixed(2) : "-"));
+    check(results, "the two segment cross stroke is gone",
+        record.strokes.every((stroke) => stroke.style !== "#e37400"
+            || stroke.dash.length > 0
+            || stroke.segments.length !== 2),
+        "a solid two segment orange stroke still draws");
+    check(results, "no skull rides a font glyph",
+        !record.texts.some(
+            (t) => (t.text || "").indexOf("\u2620") >= 0),
+        "the skull glyph was fillTexted");
     check(results, "marks past the TTL never draw",
-        crossAt(stale).length === 0,
-        "stale cross drawn at " + JSON.stringify(stale));
+        skullFills(stale, "#e37400").length === 0
+        && skullFills(stale, "#40230a").length === 0,
+        "a stale skull drew at " + JSON.stringify(stale));
+    check(results, "the spot kill centroid draws its skull",
+        skullFills(centroid, "#e37400").length > 0
+        && skullFills(centroid, "#40230a").length > 0,
+        "no skull at the centroid " + JSON.stringify(centroid));
 
-    // The layer toggle hides everything.
+    // The layer toggle hides the fleet ring: the fleet skull fills and
+    // the old solid cross strokes drop while the dashed social
+    // warnings (they share the orange) keep drawing - the dash based
+    // distinction of the two orange layers stays intact. The spot
+    // centroid skull belongs to the hunt zone layer and stays.
     elements.get("show-kills").checked = false;
+    record.fills.length = 0;
     record.strokes.length = 0;
     MapView.draw();
-    // The dashed social warnings share the orange: only the solid
-    // two-segment crosses count as kill marks.
-    const hidden = record.strokes.filter((stroke) =>
+    const hiddenSkulls = [fresh, old, stale].flatMap((p) =>
+        record.fills.filter((fill) =>
+            (fill.style === "#e37400" || fill.style === "#40230a")
+            && fill.arcs.some(([ax, ay]) =>
+                Math.hypot(ax - p.x, ay - p.y) < 4))).length;
+    const hiddenCrosses = record.strokes.filter((stroke) =>
         stroke.style === "#e37400" && stroke.dash.length === 0
         && stroke.segments.length === 2).length;
-    check(results, "kills checkbox hides the crosses",
-        hidden === 0, hidden + " crosses still drawn");
+    const centroidStays = skullFills(centroid, "#e37400").length > 0;
+    const dashedWarn = record.strokes.filter((stroke) =>
+        stroke.style === "#e37400" && stroke.dash.length === 2).length;
+    check(results, "kills checkbox hides the fleet skulls",
+        hiddenSkulls === 0 && hiddenCrosses === 0,
+        hiddenSkulls + " skull fills, " + hiddenCrosses
+            + " cross strokes still drawn");
+    check(results, "the hunt zone skull ignores the kills toggle",
+        centroidStays, "the centroid skull vanished with the toggle");
+    check(results, "the shared orange social layer still draws",
+        dashedWarn > 0, "no dashed warning drew - the check went blind");
 
     return results;
 }
@@ -685,7 +760,7 @@ async function main() {
 
     const scenarios = [
         ["hunt cell layer", await runScenarioHuntCells(mapFile)],
-        ["fleet kill crosses", runScenarioKillMarks(mapFile)],
+        ["fleet kill skulls", runScenarioKillMarks(mapFile)],
         ["social links", runScenarioSocialLinks(mapFile)],
         ["tile ancestor fallback", runScenarioTileFallback(mapFile)],
         ["spot hover", runScenarioSpotHover(mapFile)]

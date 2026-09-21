@@ -622,8 +622,9 @@ function offlineDetailFor(snap) {
 
 // engageFightDetail describes a running fight: the target name - the
 // same name the target panel resolves from the snapshot objects, the
-// raw object id never shows - and its engagement age when the
-// diagnostics arrived.
+// raw object id never shows - the mob level of the npc targets (the
+// owner reads the fight grade off the banner) and its engagement age
+// when the diagnostics arrived.
 function engageFightDetail(snap, c, hunt) {
   const target = c.targetId
     ? (snap.objects || []).find(
@@ -632,6 +633,9 @@ function engageFightDetail(snap, c, hunt) {
   let head = "fighting " + (target && target.name
     ? target.name
     : "a target");
+  if (target && target.kind === "npc" && target.level > 0) {
+    head += " lvl " + target.level;
+  }
   if (hunt && hunt.targetId && hunt.targetForMs > 0) {
     head += " for " + formatAgeMs(hunt.targetForMs);
   }
@@ -3616,6 +3620,11 @@ function sendChatInput() {
 function renderChat(snap) {
   const list = document.getElementById("chat-list");
   const lines = (snap && snap.chat) || [];
+  // The rebuild collapses the content first and a real browser clamps
+  // the scrollTop of the emptied list to 0, so the reading offset of
+  // a scrolled up user must be captured before the clear and restored
+  // after the new rows are in.
+  const prevTop = list.scrollTop;
   list.innerHTML = "";
   for (const line of lines) {
     if (!chatTabAccepts(line.kind)) { continue; }
@@ -3639,6 +3648,11 @@ function renderChat(snap) {
   }
   if (ChatWindow.stick) {
     list.scrollTop = list.scrollHeight;
+  } else {
+    // Restore the reading offset, clamped to the content that is
+    // actually there now (a filtered tab may hold fewer lines).
+    list.scrollTop = Math.min(prevTop,
+      list.scrollHeight - list.clientHeight);
   }
 }
 

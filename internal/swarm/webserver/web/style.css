@@ -1047,8 +1047,18 @@ body.mode-pathfind .bot-status { display: none; }
   flex-direction: column;
 }
 
-/* The filter tabs of the chat window (the skill filter tab idiom). */
-.chat-head { display: flex; gap: 2px; margin-bottom: 4px; flex-shrink: 0; }
+/* The filter tabs of the chat window (the skill filter tab idiom).
+   The head pins a whole pixel height so the list below inherits a
+   predictable leftover; align-items centers the tabs inside it. */
+.chat-head {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  align-items: center;
+  box-sizing: border-box;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
 
 .chat-tab {
   background: transparent;
@@ -1069,7 +1079,12 @@ body.mode-pathfind .bot-status { display: none; }
   background: var(--bg-panel-2);
 }
 
-/* The list is the scroll container: the auto scroll logic scrolls it. */
+/* The list is the scroll container: the auto scroll logic scrolls it.
+   The whole box arithmetic stays in whole rows of the 18px line
+   pitch: the content box is 190 - 2 * 1 (borders) - 2 * 6 (padding)
+   = 176px, minus the pinned head (18px + 4px margin) and the pinned
+   input row (24px + 4px margin) the leftover is 176 - 22 - 28 = 126px
+   = 18 * 7 exactly - seven whole chat rows, no cut-off line on top. */
 .chat-list {
   flex: 1;
   min-height: 0;
@@ -1112,10 +1127,15 @@ body.mode-pathfind .bot-status { display: none; }
 .chat-line.chat-announcement .chat-msg { color: var(--warn); }
 
 /* The input row: channel select, whisper target (whisper only), the
-   message input and the send button. */
+   message input and the send button. The row pins a whole pixel
+   height (the controls center inside it) so the list leftover above
+   stays an exact multiple of the 18px row pitch. */
 .chat-input-row {
   display: flex;
   gap: 4px;
+  height: 24px;
+  align-items: center;
+  box-sizing: border-box;
   margin-top: 4px;
   flex-shrink: 0;
 }
