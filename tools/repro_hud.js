@@ -35,6 +35,8 @@ const vm = require("node:vm");
 
 const DEFAULT_APP_JS = path.join(__dirname, "..", "internal", "swarm",
     "webserver", "web", "app.js");
+const DEFAULT_STYLE_CSS = path.join(__dirname, "..", "internal", "swarm",
+    "webserver", "web", "style.css");
 
 // makeElement returns a DOM element stub recording the last written
 // textContent, style and class toggles.
@@ -296,11 +298,10 @@ function main() {
         check(results, "the detail builders expose the eta suffix", false,
             "walkDetail/engageFightDetail missing from app.js");
     } else {
-        const walk = hud.walkDetail("heading back to the hunting zone",
+        const walk = hud.walkDetail("",
             { waypointsLeft: 3, tripForMs: 0, walkEtaMs: 45300 });
         check(results, "the walk detail carries the walk eta",
-            walk === "heading back to the hunting zone, 3 waypoints left"
-            + ", eta ~45s",
+            walk === "3 waypoints left, eta ~45s",
             "got " + JSON.stringify(walk));
         const walkNoEta = hud.walkDetail("heading back",
             { waypointsLeft: 0, tripForMs: 0, walkEtaMs: 0 });
@@ -308,11 +309,19 @@ function main() {
             walkNoEta === "heading back",
             "got " + JSON.stringify(walkNoEta));
         const fight = hud.engageFightDetail(
+            { objects: [{ objectId: 300, name: "Keltir", dead: false }] },
             { targetId: 300 },
             { targetId: 300, targetForMs: 4000, killEtaMs: 9000 });
-        check(results, "the fight detail carries the kill eta",
-            fight === "fighting #300 for 4s, eta ~9s in the zone",
+        check(results, "the fight detail carries the target name",
+            fight === "fighting Keltir for 4s, eta ~9s",
             "got " + JSON.stringify(fight));
+        const fightUnnamed = hud.engageFightDetail(
+            { objects: [] },
+            { targetId: 301 },
+            null);
+        check(results, "an unknown target never shows the raw id",
+            fightUnnamed === "fighting a target",
+            "got " + JSON.stringify(fightUnnamed));
     }
 
     // The experience bar renders from expPercent.
@@ -426,6 +435,19 @@ function main() {
         check(results, "empty chat clears the window",
             chatList.children.length === 0,
             "got " + chatList.children.length + " lines");
+
+        // The vertical rhythm of the chat lines is a whole pixel line
+        // height pinned on .chat-line: a unitless ratio (the old 1.6
+        // at 11px = 17.6px) rounds per row at paint time and the
+        // distance between the lines drifts apart on some rows. The
+        // rule lives in the real style.css, so the check reads it.
+        const chatCss = fs.readFileSync(DEFAULT_STYLE_CSS, "utf8");
+        const chatLineRule = chatCss.match(/\.chat-line\s*\{[^}]*\}/);
+        check(results, "chat lines pin a whole pixel line height",
+            Boolean(chatLineRule) && /line-height:\s*\d+px/
+                .test(chatLineRule[0]),
+            "rule: " + (chatLineRule ? chatLineRule[0]
+                : ".chat-line missing"));
 
         // Auto scroll follows the newest line only while stuck: the
         // default state scrolls to the bottom, a scrolled up user keeps

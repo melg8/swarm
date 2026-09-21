@@ -258,6 +258,9 @@ function loadAppJs(appFile) {
         " ? resetSkillQueue : undefined," +
         " setGearMode: typeof setGearMode === 'function'" +
         " ? setGearMode : undefined," +
+        " setInvTab: typeof setInvTab === 'function'" +
+        " ? setInvTab : undefined," +
+        " InvTab: typeof InvTab !== 'undefined' ? InvTab : undefined," +
         " setSkillFilter: typeof setSkillFilter === 'function'" +
         " ? setSkillFilter : undefined," +
         " GearMode: typeof GearMode !== 'undefined' ? GearMode" +
@@ -2061,14 +2064,17 @@ function main() {
         css.includes(".buffs-panel.view-list"),
         "the view rules are missing");
 
-    // The quest items tab: the third mode button shows only the type2
-    // quest family items in its own keyed grid, the tab badge carries
-    // the count, the empty note covers the empty state, and the bag
-    // keeps its own cells (one element cannot sit in two grids).
+    // The quest items sub tab: the QUEST switch sits right of the
+    // INVENTORY title inside the equipment view (the top level QUEST
+    // widget mode is retired), it swaps the bag grid and the keyed
+    // quest grid in place, the tab badge carries the count, the empty
+    // note covers the empty state, and the bag keeps its own cells
+    // (one element cannot sit in two grids).
     if (typeof gear.renderQuest !== "function"
-        || typeof gear.isQuestItem !== "function") {
+        || typeof gear.isQuestItem !== "function"
+        || typeof gear.setInvTab !== "function") {
         check(results, "the quest tab renders the quest items", false,
-            "renderQuest/isQuestItem missing from app.js");
+            "renderQuest/isQuestItem/setInvTab missing from app.js");
     } else {
         check(results, "the quest family filter follows the type2 id",
             gear.isQuestItem({ type2: 3 })
@@ -2076,13 +2082,17 @@ function main() {
             && !gear.isQuestItem(null),
             "the filter is not the type2 === 3 pin");
 
-        sandbox.document.getElementById("quest-view");
+        sandbox.document.getElementById("inv-grid");
         sandbox.document.getElementById("quest-grid");
-        sandbox.document.getElementById("gear-mode-quest-badge");
+        sandbox.document.getElementById("inv-tab-items");
+        sandbox.document.getElementById("inv-tab-quest");
+        sandbox.document.getElementById("inv-tab-quest-badge");
         sandbox.document.getElementById("quest-empty");
-        const questView = elements.get("quest-view");
+        const invGrid = elements.get("inv-grid");
         const questGrid = elements.get("quest-grid");
-        const questBadge = elements.get("gear-mode-quest-badge");
+        const itemsTab = elements.get("inv-tab-items");
+        const questTab = elements.get("inv-tab-quest");
+        const questBadge = elements.get("inv-tab-quest-badge");
         const questEmpty = elements.get("quest-empty");
         const questInv = [
             item(1, 0, false),
@@ -2100,9 +2110,27 @@ function main() {
             questBadge.textContent === "2" &&
             !questBadge.classList.contains("hidden"),
             "badge: " + questBadge.textContent);
+        check(results, "the bag tab shows the bag grid by default",
+            itemsTab.classList.contains("active") &&
+            !invGrid.classList.contains("hidden") &&
+            questGrid.classList.contains("hidden"),
+            "the default sub tab is not the bag grid");
+
+        // The sub tab switch: the QUEST tab right of INVENTORY swaps
+        // the two grids in place, the widget keeps its height.
+        gear.setInvTab("quest");
+        check(results, "the quest sub tab swaps the grids",
+            questTab.classList.contains("active") &&
+            invGrid.classList.contains("hidden") &&
+            !questGrid.classList.contains("hidden"),
+            "the sub tab did not swap the grids");
         check(results, "the quest empty note hides with items",
             questEmpty.classList.contains("hidden"),
             "the empty note showed with items present");
+        check(results, "the sub tab persists in localStorage",
+            sandbox.window.localStorage.getItem("swarm.invTab")
+            === "quest",
+            "the sub tab was not stored");
 
         gear.renderQuest(gearSnapshot([item(1, 0, false)], 1));
         check(results, "the quest grid drops the consumed quest items",
@@ -2116,30 +2144,34 @@ function main() {
             !questEmpty.classList.contains("hidden"),
             "the empty note stayed hidden");
 
-        // The mode switch: the quest overlay replaces the gear
-        // content and the markup pins the third tab.
-        gear.setGearMode("quest");
-        const questMain = elements.get("gear-main");
-        check(results, "the quest mode shows the quest overlay",
-            questMain.classList.contains("mode-quest") &&
-            !questView.classList.contains("hidden") &&
-            !questMain.classList.contains("mode-skills"),
-            "the mode switch did not toggle the quest overlay");
-        check(results, "the quest tab markup carries the badge span",
-            html.includes('id="gear-mode-quest"') &&
-            html.includes('id="gear-mode-quest-badge"') &&
-            html.includes('id="quest-grid"'),
-            "the quest tab markup is incomplete");
-        check(results, "the quest overlay css follows the overlay contract",
-            css.includes(".gear-main.mode-quest #gear-view") &&
-            /\.quest-view\s*\{[^}]*z-index:\s*4/.test(css) &&
-            css.includes(".quest-view.hidden { display: none; }"),
-            "the quest overlay css drifted");
-        gear.setGearMode("gear");
-        check(results, "leaving the quest mode restores the gear view",
-            !questMain.classList.contains("mode-quest") &&
-            questView.classList.contains("hidden"),
-            "the gear view stayed hidden");
+        gear.setInvTab("items");
+        check(results, "the bag sub tab restores the inventory grid",
+            itemsTab.classList.contains("active") &&
+            !invGrid.classList.contains("hidden") &&
+            questGrid.classList.contains("hidden") &&
+            questEmpty.classList.contains("hidden"),
+            "the sub tab did not restore the bag grid");
+
+        // The markup: the quest switch lives in the inventory title
+        // row of the gear view, the retired top level widget mode
+        // button and its overlay view are gone.
+        check(results, "the quest switch markup sits in the inventory row",
+            html.includes('id="inv-tab-items"') &&
+            html.includes('id="inv-tab-quest"') &&
+            html.includes('id="inv-tab-quest-badge"') &&
+            html.includes('id="quest-grid"') &&
+            html.indexOf("inv-tabs") < html.indexOf("inv-count"),
+            "the quest switch markup is incomplete");
+        check(results, "the retired quest widget mode is gone",
+            !html.includes('id="gear-mode-quest"') &&
+            !html.includes('id="quest-view"'),
+            "the retired quest widget mode markup is still there");
+        check(results, "the quest switch css keeps the grids as siblings",
+            css.includes(".inv-tabs { display: flex;") &&
+            css.includes(".inv-grid.hidden { display: none; }") &&
+            css.includes(".quest-empty {") &&
+            !css.includes(".quest-view"),
+            "the quest switch css drifted");
     }
 
     let failed = 0;
