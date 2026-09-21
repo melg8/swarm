@@ -11,6 +11,31 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in progress): the coverage reporting repaired, the packet error paths walked (2026-09-21, branch feature/coverage-reporting, issue #9)
+
+Started 2026-09-21 ~20:46 UTC on the board issue melg8/swarm#9
+("Improve test coverage"). The full-tree audit ran first, the round
+then took the two pieces that carry the issue's reporting and core
+logic asks:
+
+- `tools/coverage_delta.sh` was broken (the python summary parser
+  syntax-errored on `rowsatch...` - a dropped `[m` in
+  `rows[match...]`), so the `test:cover` gate never completed and
+  the committed baseline drifted. Repaired, the fresh baseline
+  committed to `runs/coverage-latest.txt`.
+- The packet builders' error branches were structurally dead
+  (bytes.Buffer writes never fail): the Writer gained the test-only
+  failure injection (`FailWrites` / `FailWritesAfter`), and the
+  walking tests step every builder's whole write sequence - the
+  injected error must surface at every arm position. to_game_server
+  65.3 -> 97.9, to_auth_server 78.1 -> 98.6, the packet package at
+  100%.
+- The audit table, the three real coverage drifts the fresh baseline
+  surfaced (acceptance, npcdata, connection - predating this round)
+  and the remaining #9 candidates (cmd/swarm wiring, the
+  live-stack-bound packages, the probe tools) are recorded in the
+  issue comment and the Round 129 entry of the development log.
+
 ## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
 
 Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7);

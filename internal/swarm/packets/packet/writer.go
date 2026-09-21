@@ -14,6 +14,17 @@ import (
 
 type Writer struct {
     *bytes.Buffer
+    // writeErr is the sticky failure the tests arm (FailWrites or
+    // FailWritesAfter): every write method returns it once the budget
+    // runs out. A memory buffer write never fails on its own, so the
+    // guarded error returns of the packet builders are unreachable in
+    // production - the armed writer is the exercise those branches
+    // get (see the builder error path tests of the packet packages).
+    writeErr error
+    // writeBudget counts the writes that still pass before the armed
+    // failure fires (FailWritesAfter): the counted form lets the
+    // builder tests walk a whole write sequence branch by branch.
+    writeBudget int
 }
 
 func NewWriter() *Writer {
@@ -24,7 +35,47 @@ func NewWriterTo(data []byte) *Writer {
     return &Writer{Buffer: bytes.NewBuffer(data)}
 }
 
+// FailWrites arms the sticky write failure: every write method of
+// this writer returns err from the next call on, without touching
+// the buffer. The packet builders guard every write with an error
+// return - a contract the wire layer could enforce one day - and the
+// failure injection is how the tests reach those branches. Pass a
+// fresh writer (or never arm one) for the ordinary error free
+// behavior.
+func (b *Writer) FailWrites(err error) {
+    b.writeErr = err
+    b.writeBudget = 0
+}
+
+// FailWritesAfter arms the counted write failure: the first n write
+// calls succeed, every later call returns err. A sticky arm from the
+// first write would exercise only the FIRST error branch of a
+// builder - the counted form walks the whole write sequence branch
+// by branch (the builder error tests step n through 0, 1, 2, ...).
+func (b *Writer) FailWritesAfter(n int, err error) {
+    b.writeErr = err
+    b.writeBudget = n
+}
+
+// writeGate hands back the armed failure once the budget is spent
+// (nil keeps the write going and consumes one budget unit).
+func (b *Writer) writeGate() error {
+    if b.writeErr == nil {
+        return nil
+    }
+    if b.writeBudget > 0 {
+        b.writeBudget--
+
+        return nil
+    }
+
+    return b.writeErr
+}
+
 func (b *Writer) WriteInt64(value int64) error {
+    if err := b.writeGate(); err != nil {
+        return err
+    }
     buf := (*[8]byte)(unsafe.Pointer(&value))
     _, err := b.Write(buf[:])
 
@@ -32,6 +83,9 @@ func (b *Writer) WriteInt64(value int64) error {
 }
 
 func (b *Writer) WriteInt32(value int32) error {
+    if err := b.writeGate(); err != nil {
+        return err
+    }
     buf := (*[4]byte)(unsafe.Pointer(&value))
     _, err := b.Write(buf[:])
 
@@ -39,6 +93,9 @@ func (b *Writer) WriteInt32(value int32) error {
 }
 
 func (b *Writer) WriteInt16(value int16) error {
+    if err := b.writeGate(); err != nil {
+        return err
+    }
     buf := (*[2]byte)(unsafe.Pointer(&value))
     _, err := b.Write(buf[:])
 
@@ -46,11 +103,18 @@ func (b *Writer) WriteInt16(value int16) error {
 }
 
 func (b *Writer) WriteInt8(value int8) error {
+    if err := b.writeGate(); err != nil {
+        return err
+    }
+
     return b.WriteByte(byte(value))
 }
 
 // WriteFloat64 writes a little endian float64 value.
 func (b *Writer) WriteFloat64(value float64) error {
+    if err := b.writeGate(); err != nil {
+        return err
+    }
     var buf [8]byte
     binary.LittleEndian.PutUint64(buf[:], math.Float64bits(value))
     _, err := b.Write(buf[:])
@@ -59,6 +123,9 @@ func (b *Writer) WriteFloat64(value float64) error {
 }
 
 func (b *Writer) WriteBytes(bytes []byte) error {
+    if err := b.writeGate(); err != nil {
+        return err
+    }
     _, err := b.Write(bytes)
 
     return err
@@ -82,6 +149,9 @@ func (b *Writer) WriteBytes(bytes []byte) error {
 // previous byte(r) truncation that silently corrupted non Latin-1
 // names.
 func (b *Writer) WriteStringAsUtf16(value string) error {
+    if err := b.writeGate(); err != nil {
+        return err
+    }
     // Fast path: ASCII only. Scan once to confirm, then write pairs
     // directly without allocating a scratch slice. The Grow hint
     // keeps the buffer from reallocating mid-write on repeated calls.
