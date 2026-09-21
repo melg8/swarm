@@ -63,6 +63,13 @@ type Purchase struct {
     MerchantTemplateID int32
     // Count is the stack count of the order (1 for gear).
     Count int32
+    // OwnedStack is the stack count the planner sized the order
+    // against (the stackable orders): the executor staleness rule
+    // drops the order only when the live count already covers the
+    // plan target OwnedStack+Count (a budget capped partial restock
+    // stays a real order - the carried stack is below the target, not
+    // above it).
+    OwnedStack int32
     // Price is the buy price of the order with the shop tax.
     Price int64
     // Reason is the human readable log line.
@@ -821,6 +828,7 @@ func walkedPurchase(
         ListID:             best.listID,
         MerchantTemplateID: best.merchant,
         Count:              1,
+        OwnedStack:         0,
         Price:              best.price,
         Reason:             "buying " + best.describe(gain),
         SellFirst:          sellFirst,

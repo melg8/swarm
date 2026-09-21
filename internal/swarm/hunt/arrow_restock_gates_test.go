@@ -48,8 +48,9 @@ func arrowReproAdenaStack() state.InventoryItem {
 
 // TestDropOwnedPurchasesKeepsTheStackTopUp pins the count aware drop
 // rule of the stackable orders: the partial stack under the restock
-// floor keeps its top up, the covered order drops, the wearable
-// family rule stays intact.
+// floor keeps its top up, the budget capped partial order stays real
+// (the carried stack sits below the plan target, not above it), the
+// loot satisfied target drops.
 func TestDropOwnedPurchasesKeepsTheStackTopUp(t *testing.T) {
     loop, logBuf := newGateLoop(t, []state.InventoryItem{
         {
@@ -67,31 +68,47 @@ func TestDropOwnedPurchasesKeepsTheStackTopUp(t *testing.T) {
     kept := loop.dropOwnedPurchases([]gear.Purchase{
         {
             ItemID: arrowReproWoodenArrowID, ListID: 3015000,
-            MerchantTemplateID: 7150, Count: 499, Price: 998,
-            Affordable: true,
+            MerchantTemplateID: 7150, Count: 499, OwnedStack: 101,
+            Price: 998, Affordable: true,
         },
     })
     require.Len(t, kept, 1,
         "the 101 arrow stack must not block its 499 arrow top up")
     require.Empty(t, logBuf.String(), "the kept order logs nothing")
 
+    // The budget capped partial restock: the planner sized the order
+    // against the owned 101 (the target 131), the carried stack is
+    // below it - a real order, not a stale one.
     kept = loop.dropOwnedPurchases([]gear.Purchase{
         {
             ItemID: arrowReproWoodenArrowID, ListID: 3015000,
-            MerchantTemplateID: 7150, Count: 499, Price: 998,
-            Affordable: true,
-        },
-        {
-            ItemID: arrowReproWoodenArrowID, ListID: 3015000,
-            MerchantTemplateID: 7150, Count: 100, Price: 200,
-            Affordable: true,
+            MerchantTemplateID: 7150, Count: 30, OwnedStack: 101,
+            Price: 60, Affordable: true,
         },
     })
     require.Len(t, kept, 1,
-        "the stale order the carried stack covers drops, the top up stays")
-    require.Equal(t, int32(499), kept[0].Count,
-        "the surviving order is the uncovered top up")
-    require.Contains(t, logBuf.String(),
+        "the budget capped partial order stays real below the target")
+
+    // The loot satisfied the plan target while the trip walked: the
+    // stale order drops.
+    staleLoop, staleBuf := newGateLoop(t, []state.InventoryItem{
+        {
+            ObjectID: arrowReproArrowsObjectID,
+            ItemID:   arrowReproWoodenArrowID,
+            Count:    650,
+        },
+        arrowReproAdenaStack(),
+    })
+    kept = staleLoop.dropOwnedPurchases([]gear.Purchase{
+        {
+            ItemID: arrowReproWoodenArrowID, ListID: 3015000,
+            MerchantTemplateID: 7150, Count: 499, OwnedStack: 101,
+            Price: 998, Affordable: true,
+        },
+    })
+    require.Empty(t, kept,
+        "the order the loot already satisfied drops")
+    require.Contains(t, staleBuf.String(),
         "the Wooden Arrow stack already covers the order, "+
             "skipping the purchase")
 }
@@ -170,25 +187,48 @@ func TestBuysArrivedWaitsForTheStackGrowth(t *testing.T) {
         "the grown stack confirms the delivery")
 }
 
-// TestBuysArrivedKeepsTheIdPresenceRule pins the wearable arrival
-// signal: the appearance of the id is the arrival, the absence holds
-// the gate for the retry budget.
-func TestBuysArrivedKeepsTheIdPresenceRule(t *testing.T) {
+// TestBuysArrivedKeepsTheEntryUnitsRule pins the wearable arrival
+// signal: the order confirms only when the ENTRY count grew past the
+// baseline the batch left behind - the pair floor's second half rides
+// a carried id, the id presence check would confirm it before the
+// server answered.
+func TestBuysArrivedKeepsTheEntryUnitsRule(t *testing.T) {
     loop, _, bot, _ := newTripLoop()
     bot.ApplyItemList([]state.InventoryItem{
+        {ObjectID: 105, ItemID: 113, Count: 1, Equipped: true},
         arrowReproAdenaStack(),
     })
+    // The pair floor's second half: the same item id the ear already
+    // wears, one more entry must appear before the gate confirms.
     batch := []gear.Purchase{{
+        ItemID: 113, ListID: 3014900, MerchantTemplateID: 7149,
+        Count: 1, Price: 890, Affordable: true,
+    }}
+    loop.buyRequested = batch
+    loop.buyBaseline = map[int32]int32{113: 1}
+
+    require.False(t, loop.buysArrived(batch),
+        "the worn pair half holds the gate without the delivery")
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 211, ItemID: 113, Count: 1, Change: 1},
+    })
+    require.True(t, loop.buysArrived(batch),
+        "the delivered second half confirms the batch")
+
+    // A fresh wearable id: the zero baseline asks for the entry.
+    fresh := []gear.Purchase{{
         ItemID: 29, ListID: 3014800, MerchantTemplateID: 7148,
         Count: 1, Price: 5715, SellFirst: []int32{200},
         Affordable: true,
     }}
+    loop.buyRequested = fresh
+    loop.buyBaseline = map[int32]int32{}
 
-    require.False(t, loop.buysArrived(batch),
+    require.False(t, loop.buysArrived(fresh),
         "the absent wearable holds the gate")
     bot.ApplyInventoryUpdate([]state.InventoryItem{
         {ObjectID: 210, ItemID: 29, Count: 1, Change: 1},
     })
-    require.True(t, loop.buysArrived(batch),
+    require.True(t, loop.buysArrived(fresh),
         "the appeared wearable confirms the delivery")
 }

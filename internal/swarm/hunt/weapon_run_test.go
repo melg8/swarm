@@ -185,6 +185,17 @@ func TestWeaponRunCooldownIsShort(t *testing.T) {
     bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 999, ItemID: 57, Count: 14814, Type2: 4, Change: 1},
     })
+    // The full support magic of the guide is active: the guide run
+    // shares the short cooldown window and would hijack the ordinary
+    // cooldown this test pins (the level 11 fighter sits inside the
+    // guide band, the buffless fixture armed the run).
+    buffs := make([]state.BuffEntry, 0, len(expectedGuideBuffs(11, false)))
+    for _, skillID := range expectedGuideBuffs(11, false) {
+        buffs = append(buffs, state.BuffEntry{
+            SkillID: skillID, Level: 1, Time: 1200,
+        })
+    }
+    bot.SetBuffs(buffs)
     // Bare-handed: the short cooldown applies.
     loop.tripEndedAt = time.Now().Add(-weaponRunCooldown +
         2*time.Second)

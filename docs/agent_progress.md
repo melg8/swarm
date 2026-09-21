@@ -2760,14 +2760,20 @@ count does (verified in the C1 RequestBuyItem sources).
 - Tests: `hunt/arrow_restock_repro_test.go` (the reported trip end
   to end, red before), `hunt/arrow_restock_gates_test.go` (the four
   gate quadrants), the `tools/repro_gear.js` queue-state scenario.
+- Review round (fresh-context critic): 3 majors landed - the pair
+  family arrival phantom fixed with the entry-unit baseline gate,
+  the budget capped partial restock fixed with
+  `Purchase.OwnedStack` (the staleness rule compares against the
+  plan target), the weapon-run cooldown fixture arming the guide run
+  fixed with the expected buff set (the flake ledger row added).
 - Docs: the frozen trip plan rule in shopping_strategy.md now names
-  the kind aware split; development_log Round 121 carries the RCA.
+  the kind aware split; development_log Round 121 carries the RCA
+  and the review outcome.
 
 ### Verification and known state
 
-- The full hunt suite green (74 s), build + vet green, the round's
-  files lint clean, the harness OK. The hunt suite baseline diffed
-  clean (no new failures).
+- The full hunt suite green (74 s, after the review fixes), build +
+  vet green, the round's files lint clean, the harness OK.
 - Known pre-existing (NOT this round): golangci-lint cyclop on
   `clickWaypoint` (hunt/town.go, 16 over the max 15) - landed with
   the parallel skip-tracker rounds (8487365/0dc22da), disclosed

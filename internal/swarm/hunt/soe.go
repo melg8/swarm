@@ -208,6 +208,7 @@ func (l *Loop) soePurchaseLine() (gear.Purchase, bool) {
         ListID:             listID,
         MerchantTemplateID: merchantID,
         Count:              1,
+        OwnedStack:         0,
         Price:              l.soePrice(),
         Reason:             "keep one Scroll of Escape",
         SellFirst:          nil,

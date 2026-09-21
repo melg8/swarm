@@ -8570,11 +8570,28 @@ Result: 22 red -> 0 red, the whole hunt suite green (73.7 s).
   affordable arrow line the user watched, the trip summary, the
   in-flight buying chip).
 
-- Verification: the full hunt suite green (74 s), go build, go vet,
-  `golangci-lint` clean on the round's files (one pre-existing cyclop
-  finding on `clickWaypoint` - hunt/town.go 16 over the max 15 -
-  landed with the parallel skip-tracker rounds and is disclosed in
-  the progress file), the harness green (OK).
+- Review round (the fresh-context critic, FIX-FIRST verdict, 3
+  majors all landed): the pair family arrival phantom (the jewel
+  floor's second half rides a carried id, the id presence check
+  confirmed the batch before the server answered) - the wearable
+  orders now read ENTRY units against the request baseline; the
+  budget capped partial restock (owned 101, a 30 arrow order)
+  dropped as stale every trip - the planner pins the stack context
+  into `Purchase.OwnedStack` and the staleness rule compares against
+  the plan target OwnedStack+Count; the false "suite green" claim -
+  the level 11 buffless weapon-run fixture sat inside the guide band
+  and armed the guide run's short cooldown window (the fixture
+  state, not the clock - the flake ledger row added), the fixture
+  arms the expected buff set now; the sixth teardown site
+  (`advanceTripStop`) joined `resetBuyRequest`; the Mobius stack
+  merge claim cites the C1 `RequestBuyItem` -> `Inventory.addItem`
+  chain read at the source tree.
+- Verification: the full hunt suite green (74 s, after the review
+  fixes), go build, go vet, `golangci-lint` clean on the round's
+  files (one pre-existing cyclop finding on `clickWaypoint` -
+  hunt/town.go 16 over the max 15 - landed with the parallel
+  skip-tracker rounds and is disclosed in the progress file), the
+  harness green (OK).
 
 - Follow ups: the trip freeze could snapshot the owned stack counts
   and let the executor compare against the freeze instead of the

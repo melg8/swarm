@@ -327,6 +327,7 @@ func (w *planWalk) planArrowRestock() {
         ListID:             listID,
         MerchantTemplateID: merchant,
         Count:              count,
+        OwnedStack:         owned,
         Price:              price,
         Reason:             "restocking the quiver with arrows",
         Affordable:         w.affordable,
