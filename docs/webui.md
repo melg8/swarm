@@ -447,8 +447,17 @@ grow by the 2 s window, so the payload stays small.
   combat/rest chips share the line under it, HP/MP/EXP bars, then a two
   column grid: level/race, x/exp, y/sp, z/slots, weight/adena with the
   weight as a bare percentage) and directly below it the target panel
-  of the currently selected object (name, level chip, HP bar, MP row
-  that reads no data for npcs - the C1 server never sends their MP).
+  of the currently selected object (name, level chip, kill ETA chip,
+  HP bar, MP row that reads no data for npcs - the C1 server never
+  sends their MP). The kill ETA chip (`#target-eta`, accent colored)
+  shows the `diagnostics.hunt.killEtaMs` estimate rounded to whole
+  seconds (~12s) while a confirmed fight runs at least 2 seconds: the
+  rate is the damage dealt over the elapsed fight, the estimate is
+  the remaining health over the rate. Without an estimate (no fight,
+  too fresh, no HP data) the chip hides. The status banner appends
+  the walk ETA (`walkEtaMs` - the remaining plan length over the run
+  speed) to the walk phase details and the kill ETA to the fight
+  detail (`eta ~Ns`, `web/app.js etaSuffix`).
   The target panel exists only while there is a target: a killed,
   removed or missing target hides it completely. Long target names live
   in their own panel and cannot break the layout. The experience bar is
@@ -674,13 +683,14 @@ grow by the 2 s window, so the payload stays small.
 
 ## Skills view and the skill learning queue
 
-The equipment widget is a two view widget that behaves like real tabs
-- switching the mode fully replaces the visible content. The EQUIPMENT
-/ SKILLS mode tabs replaced the static title row. The gear content
-stays in the flow and keeps sizing the panel, the skills view is an
-absolutely positioned overlay of exactly that area: the hidden view
-turns invisible (`visibility` swap, never `display none` - the panel
-must not change its dimensions) AND the overlay carries `z-index: 4`
+The equipment widget is a three view widget that behaves like real
+tabs - switching the mode fully replaces the visible content. The
+EQUIPMENT / SKILLS / QUEST mode tabs replaced the static title row.
+The gear content stays in the flow and keeps sizing the panel, the
+skills view is an absolutely positioned overlay of exactly that area:
+the hidden view turns invisible (`visibility` swap, never `display
+none` - the panel must not change its dimensions) AND the overlay
+carries `z-index: 4`
 so it paints above every gear child - the paperdoll icon, glyph and
 badge cells stack at z-index 1..3 and would otherwise bleed through a
 z-index auto sibling (the mode class lands on `#gear-main`, which
@@ -688,7 +698,15 @@ must carry that id in the markup). The skills view carries the ACTIVE
 / PASSIVE filter tabs, the learned skill grid and the pinned sp/next
 foot (the SP wallet and the head of the learning queue, anchored at
 the panel bottom like the adena/weight footer); the mode and the
-filter persist in localStorage. The learned grid is a small fixed
+filter persist in localStorage. The QUEST tab is the third overlay
+(`#quest-view`): the keyed grid (`QuestCells`, its own registry - one
+element cannot sit in the bag grid and the quest grid at once) shows
+only the type2 quest family items of the inventory (`isQuestItem`,
+type2 === 3 of the Mobius item packets), the tab badge carries their
+the count, the empty note covers the empty state; the bag keeps
+showing
+the quest items too (the trash and the drop flows work from it).
+The learned grid is a small fixed
 grid - the same six 36px column metric as the bag and the same four
 visible rows (153px) - one keyed cell per skill with the icon and the
 green level badge (the icons never re-decode, `SkillCells` of
@@ -785,19 +803,36 @@ lives in `web/buffs.js` (loaded before `app.js`, which calls its
 
 ## Chat window
 
-The bottom left corner of the map shows the parsed system messages and
-the social animations (`snapshot.chat`, a rolling 64 line ring fed by
-ApplySystemMessage/ApplySocialAction). The auto scroll follows the
-newest line only while the view is at the bottom (`chatAtBottom`, 4 px
-tolerance): scrolling up detaches the follow to read the history,
-scrolling back to the bottom resumes it. The list itself is the scroll
-container (the box clips, the list scrolls). SystemMessage texts
-resolve through the generated `npcdata/system_messages.go` dictionary
-(id -> client text with $sN placeholders, substituted positionally with
-the packet parameters; item and npc name parameters resolve through
-the item and npc dictionaries). Regenerate with `task
-generate:system-messages` (tools/generate_system_messages.sh) after
-Mobius updates.
+The bottom left corner of the map shows the world chat lines, the
+parsed system messages and the social animations (`snapshot.chat`, a
+rolling 64 line ring fed by ApplySystemMessage/ApplySocialAction and
+ApplySay). The auto scroll follows the newest line only while the view
+is at the bottom (`chatAtBottom`, 4 px tolerance): scrolling up
+detaches the follow to read the history, scrolling back to the bottom
+resumes it. The list itself is the scroll container (the box clips,
+the list scrolls). SystemMessage texts resolve through the generated
+`npcdata/system_messages.go` dictionary (id -> client text with $sN
+placeholders, substituted positionally with the packet parameters;
+item and npc name parameters resolve through the item and npc
+dictionaries). Regenerate with `task generate:system-messages`
+(tools/generate_system_messages.sh) after Mobius updates.
+
+The three tabs split the stream: ALL shows everything, CHAT keeps the
+world chat kinds of the CreatureSay packet (say, shout, whisper,
+party, clan, trade, announcement - the channel to kind mapping lives
+in `state.ChatEvent`), SYSTEM keeps the bot system messages and the
+social lines. A world chat line renders the sender as its own column
+(`ChatEvent.from`) and colors by channel (shout/whisper/trade stand
+out). The input row below the list sends a chat message through the
+bot: the channel select (all, shout, trade, party, clan, whisper),
+the whisper recipient input (whisper only), the 105 character bound
+of Say2 and the empty text refusal are validated on both the client
+and the server side; the message rides the say command
+(POST /api/bots/{id}/commands, one shot like useItem) into
+GameClient.Say, and the own CreatureSay echo lands back in the
+window. The CreatureSay system variant (int charId + messageId
+instead of the two strings) and the NpcSay packet are not parsed -
+they are not chat lines of this window.
 
 ## Map toolbar
 

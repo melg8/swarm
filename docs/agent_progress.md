@@ -11,7 +11,82 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in progress): the webui chat round, the quest tab and the ETA round (2026-09-21)
+
+Started: 2026-09-21 ~07:57 UTC. Branch: `feature/improved-behaviour`,
+commits as melg8. Other agents push to the same branch - rebase before
+every push. The owner report: webui chat messages in the bottom left
+window (split system and chat, write to chat from the UI), a quest
+items tab in the inventory, and ETA calculations for the walk to the
+farm spot and for killing a mob.
+
+### Goal
+
+The chat window shows the world chat (CreatureSay) next to the bot
+system messages behind tabs and sends a chat message through the bot;
+the inventory grows a quest items tab; the hunt diagnostics publish a
+walk ETA and a kill ETA the webui banner and the target panel render.
+
+### Progress
+
+- Landed c714ac6: the chat backend. CreatureSay (0x5D) parser and
+  Say (0x38) packet (both verified against the Mobius C1 Java:
+  Say2.readImpl is [text utf16z][type i32][target utf16z whisper
+  only], CreatureSay.writeImpl is [objId i32][channel i32]
+  [senderName utf16z][text utf16z]; CREATURE_SAY is 0x5D in C1, NOT
+  0x4A). state.Bot.ApplySay maps the ChatType client id to the chat
+  kind (say/shout/whisper/party/clan/trade/announcement);
+  ChatEvent gained From (both snapshot encoders emit "from", golden
+  tests updated). GameClient.Say + GameAPI.Say + the one shot
+  CommandSay (text/target/channel ride the command request, validated
+  against the Say2.runImpl refusals: empty text, 105 characters,
+  unknown channel, whisper without target). The agent-bench drill go
+  files got per-stage build tags (drill1/2/3): the one package of
+  three mains had broken `go build ./...` and the lint typecheck.
+- Landed 81887cb: the chat window UI. ALL / CHAT / SYSTEM tabs in the
+  bottom left box, the sender as its own column, the channel colors,
+  the input row (channel select, whisper target input, 105 char
+  bound, enter or button) posting the say command. repro_hud.js
+  covers the tabs, the sender column and the posts.
+- Landed eea22af: the quest items tab. Third gear mode tab QUEST with
+  its own keyed cell registry (one element cannot sit in the bag grid
+  and the quest grid at once), type2 === 3 filter, count badge, empty
+  note; the bag keeps the quest items (trash/drop flows). repro_gear.js
+  pins the filter, the badge, the mode switch, the overlay css.
+- Landed 1e08f67 + b0b836c: the ETA backend (the eta-work worktree
+  round, ff merged). HuntDiagnostics gained walkEtaMs/killEtaMs
+  (0 = not available, floored to whole seconds like the AgeMs
+  fields). Walk ETA = remaining plan length (self -> remaining
+  waypoints -> segmentDest, 2D legs) / run speed (fallback 120);
+  kill ETA = curHp / ((maxHp - curHp) / elapsed) once the confirmed
+  fight ran >= 2s. Both snapshot encoders and the size estimates
+  updated, byte-identical pin held. b0b836c dropped the duplicate
+  SelfRunSpeed the parallel travel economy round landed in buffs.go.
+- Landed 7398988: the ETA UI. The walk phases append "eta ~Ns" to the
+  banner detail, the fight detail appends the kill eta, the target
+  panel carries the accent chip (~Ns, hidden without an estimate).
+  repro_hud.js pins the chip, the rounding, both detail builders.
+
+### Next / open
+
+- PRE-EXISTING hunt test failures from the parallel scroll/guide
+  round (005d6ee, 006f8cd, 2203086 landed between 81887cb and
+  eea22af) - NOT from this round, verified failing at eea22af:
+  TestLearnTripTriggersOnTheSkillBudget ("the teach stop follows the
+  sell stop of the trip"), TestEngageRepositionsBlindTarget ("the
+  blind recovery must arm") and the learn/engage group around them
+  (~10 failures). Whoever resumes: run
+  `go test ./internal/swarm/hunt/ -count=1` first, fix the scroll
+  economy / guide behavior or the stale tests before new work.
+- The NpcSay (0x02) packet is not parsed: mob chatter stays out of
+  the chat window (deliberate v1 scope).
+- The CreatureSay system variant (int charId + int messageId instead
+  of the two strings) is not a chat line and is not parsed.
+- Say flood protection: the Mobius build carries no SAY flood
+  protector entry, one command per UI send is the pacing.
+
 ## Active task (status: complete): the travel behaviour round (2026-09-21, branch feature/improved-behaviour)
+
 
 The owner prompt of 2026-09-21 assigned three behaviour features.
 All three landed and pushed on `feature/improved-behaviour` (commits
