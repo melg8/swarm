@@ -136,7 +136,12 @@ colors from the same variables).
   order and overlapping units would flicker otherwise. A sitting
   character draws the breathing zZ marker above its dot. Unit markers
   draw the look direction tick only outside the circle; inside the
-  radius the marker is a solid fill.
+  radius the marker is a solid fill. Overlapping markers never shrink
+  and never merge: the contact pass slides the overlapping pair apart
+  at its full radii until the circles touch face to face, and a pair
+  that meets too tight (closer than the packet jitter) separates along
+  the shared look line - each unit backs away from what it looks at -
+  so the slide direction can never mismatch the direction ticks.
 - Map target links: the map renders the selection of every visible
   player, not only the own one. The own target is a red dashed line
   with a ring; the targets of other players are violet dashed lines

@@ -915,7 +915,9 @@ function runScenarioMeleeContact(mapFile) {
 // units at the exact same world spot (a respawn under a standing
 // character) have no connecting axis to slide along - the fallback
 // separates them horizontally, both circles at their full radii and
-// the pair still touching face to face.
+// the pair still touching face to face. Units without heading data
+// (heading 0) keep this horizontal split; the facing pair gets the
+// look direction axis in runScenarioFacingContact below.
 function runScenarioStackedContact(mapFile) {
     const { MapView, record } = loadMapJs(mapFile);
     MapView.init();
@@ -955,6 +957,147 @@ function runScenarioStackedContact(mapFile) {
                 - (6 + 5)) < 1
             && Math.abs(selfBodies[0].arcs[0][1] - CANVAS_H / 2) < 2
             && Math.abs(mobBodies[0].arcs[0][1] - CANVAS_H / 2) < 2,
+        "centers: " + (selfBodies[0] && mobBodies[0]
+            && selfBodies[0].arcs[0][0] + "," + selfBodies[0].arcs[0][1]
+            + " vs " + mobBodies[0].arcs[0][0] + ","
+            + mobBodies[0].arcs[0][1]));
+
+    return results;
+}
+
+// runScenarioFacingContact covers the review round of the contact
+// slide (issue #7): a bot and a mob that meet too tight have no
+// connecting axis to slide along - the stacked fallback used to split
+// the pair west/east regardless of the look direction, so a
+// north-south pair read side by side while both ticks kept pointing
+// north-south (the reported icon drift). The slide axis now comes
+// from the look direction: the character that looks south backs
+// north, the mob that looks north backs south, the pair separates
+// along the shared facing line at full radii and never drifts
+// sideways.
+function runScenarioFacingContact(mapFile) {
+    const { MapView, record } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    const mob = snap.objects.find(
+        (o) => o.objectId === WORLD.playerTargetMob.objectId);
+    // The tight meet: the mob at the exact spot of the character (the
+    // attacker walked into the target), the character looking south
+    // at it (heading 16384 draws the tick straight down), the mob
+    // looking north back (heading 49152 draws the tick straight up).
+    mob.x = WORLD.self.x;
+    mob.y = WORLD.self.y;
+    snap.character.heading = 16384;
+    mob.heading = 49152;
+    MapView.update(snap);
+    MapView.draw();
+
+    const results = [];
+    const slide = (6 + 5 + 0.5) / 2;
+    const self = { x: CANVAS_W / 2, y: CANVAS_H / 2 - slide };
+    const mobSide = { x: CANVAS_W / 2, y: CANVAS_H / 2 + slide };
+    const bodyAt = (center, style) => record.fills.filter((fill) =>
+        fill.arcs.length === 1
+        && Math.hypot(fill.arcs[0][0] - center.x, fill.arcs[0][1]
+            - center.y) < 2
+        && (style ? fill.style === style : true));
+
+    const selfBodies = bodyAt(self, MARK.self);
+    const mobBodies = bodyAt(mobSide, MARK.passive);
+    check(results, "the facing self circle backs north at full radius",
+        selfBodies.length > 0
+            && Math.abs(selfBodies[0].arcs[0][2] - 6) < 0.5,
+        "self radius: " + (selfBodies[0] && selfBodies[0].arcs[0][2]));
+    check(results, "the facing mob circle backs south at full radius",
+        mobBodies.length > 0
+            && Math.abs(mobBodies[0].arcs[0][2] - 5) < 0.5,
+        "mob radius: " + (mobBodies[0] && mobBodies[0].arcs[0][2]));
+    check(results, "the tight pair separates along the facing line",
+        selfBodies.length > 0 && mobBodies.length > 0
+            && Math.abs(Math.hypot(
+                mobBodies[0].arcs[0][0] - selfBodies[0].arcs[0][0],
+                mobBodies[0].arcs[0][1] - selfBodies[0].arcs[0][1])
+                - (6 + 5)) < 1,
+        "center distance: " + (selfBodies[0] && mobBodies[0]
+            && Math.hypot(mobBodies[0].arcs[0][0]
+                - selfBodies[0].arcs[0][0],
+                mobBodies[0].arcs[0][1] - selfBodies[0].arcs[0][1])));
+    check(results, "no sideways drift of the facing pair",
+        selfBodies.length > 0 && mobBodies.length > 0
+            && Math.abs(selfBodies[0].arcs[0][0] - CANVAS_W / 2) < 1.5
+            && Math.abs(mobBodies[0].arcs[0][0] - CANVAS_W / 2) < 1.5
+            && selfBodies[0].arcs[0][1] < CANVAS_H / 2 - 4
+            && mobBodies[0].arcs[0][1] > CANVAS_H / 2 + 4,
+        "centers: " + (selfBodies[0] && mobBodies[0]
+            && selfBodies[0].arcs[0][0] + "," + selfBodies[0].arcs[0][1]
+            + " vs " + mobBodies[0].arcs[0][0] + ","
+            + mobBodies[0].arcs[0][1]));
+
+    return results;
+}
+
+// runScenarioFacingNearContact covers the tight meet that still
+// keeps a sliver of residual offset (3 world units = 0.36px on the
+// harness canvas - the packet jitter zone): the connecting axis of
+// such a pair is noise, and when the residual sits perpendicular to
+// the facing line the old code split the pair sideways (the exact
+// field report: a north-south pair reading west-east). The axis
+// blend keeps the slide on the facing line instead - the pair
+// separates north-south at full radii with no sideways drift.
+function runScenarioFacingNearContact(mapFile) {
+    const { MapView, record } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    const mob = snap.objects.find(
+        (o) => o.objectId === WORLD.playerTargetMob.objectId);
+    // The near meet: the mob a sub pixel east of the character (the
+    // residual jitter of a real approach), the facing pair
+    // north-south as in the field report - the character looks
+    // south, the mob looks north.
+    mob.x = WORLD.self.x + 3;
+    mob.y = WORLD.self.y;
+    snap.character.heading = 16384;
+    mob.heading = 49152;
+    MapView.update(snap);
+    MapView.draw();
+
+    const results = [];
+    const slide = (6 + 5 + 0.5 - 3 * WORLD.scale) / 2;
+    const self = { x: CANVAS_W / 2, y: CANVAS_H / 2 - slide };
+    const mobSide = {
+        x: CANVAS_W / 2 + 3 * WORLD.scale, y: CANVAS_H / 2 + slide };
+    const bodyAt = (center, style) => record.fills.filter((fill) =>
+        fill.arcs.length === 1
+        && Math.hypot(fill.arcs[0][0] - center.x, fill.arcs[0][1]
+            - center.y) < 2
+        && (style ? fill.style === style : true));
+
+    const selfBodies = bodyAt(self, MARK.self);
+    const mobBodies = bodyAt(mobSide, MARK.passive);
+    check(results, "the near meet self circle keeps its full radius",
+        selfBodies.length > 0
+            && Math.abs(selfBodies[0].arcs[0][2] - 6) < 0.5,
+        "self radius: " + (selfBodies[0] && selfBodies[0].arcs[0][2]));
+    check(results, "the near meet mob circle keeps its full radius",
+        mobBodies.length > 0
+            && Math.abs(mobBodies[0].arcs[0][2] - 5) < 0.5,
+        "mob radius: " + (mobBodies[0] && mobBodies[0].arcs[0][2]));
+    check(results, "the near meet separates along the facing line",
+        selfBodies.length > 0 && mobBodies.length > 0
+            && Math.abs(Math.hypot(
+                mobBodies[0].arcs[0][0] - selfBodies[0].arcs[0][0],
+                mobBodies[0].arcs[0][1] - selfBodies[0].arcs[0][1])
+                - (6 + 5)) < 1,
+        "center distance: " + (selfBodies[0] && mobBodies[0]
+            && Math.hypot(mobBodies[0].arcs[0][0]
+                - selfBodies[0].arcs[0][0],
+                mobBodies[0].arcs[0][1] - selfBodies[0].arcs[0][1])));
+    check(results, "no sideways drift of the near meet pair",
+        selfBodies.length > 0 && mobBodies.length > 0
+            && Math.abs(selfBodies[0].arcs[0][0] - CANVAS_W / 2) < 1.5
+            && Math.abs(mobBodies[0].arcs[0][0] - CANVAS_W / 2) < 1.5
+            && selfBodies[0].arcs[0][1] < CANVAS_H / 2 - 4
+            && mobBodies[0].arcs[0][1] > CANVAS_H / 2 + 4,
         "centers: " + (selfBodies[0] && mobBodies[0]
             && selfBodies[0].arcs[0][0] + "," + selfBodies[0].arcs[0][1]
             + " vs " + mobBodies[0].arcs[0][0] + ","
@@ -1899,6 +2042,8 @@ function main() {
         ["combat floats", runScenarioCombatFloats(mapFile)],
         ["melee contact", runScenarioMeleeContact(mapFile)],
         ["stacked contact", runScenarioStackedContact(mapFile)],
+        ["facing contact", runScenarioFacingContact(mapFile)],
+        ["facing near contact", runScenarioFacingNearContact(mapFile)],
         ["cast icon", runScenarioCastIcon(mapFile)],
         ["bow shot", runScenarioBowShot(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
