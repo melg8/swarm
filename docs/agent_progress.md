@@ -3031,3 +3031,45 @@ position) and renders once on expand, the round entry renumbered to
 a fixture guard - liveSnapshotBot fires no critical hit, so a
 regression dropping Crit again would pass the suites; add a crit
 attack plus an HP drop to the fixture.
+
+## Active task (status: in progress): the overhit finishing blow and the melee self heal recovery (2026-09-21, branch feature/improved-behaviour)
+
+Started 2026-09-21 ~14:50 UTC. New owner prompt (the 2h session clock
+reset with it). Two combat behavior features:
+
+1. **The overhit finishing blow.** The verified server mechanic
+   (Mobius C1 sources, research round below): a skill whose stats
+   carry `<overHit>true</overHit>` (21 skills; for the deployment
+   classes Power Strike id 3 and Power Shot id 56) arms the overhit
+   flag on its target when the cast resolves
+   (`Creature.callSkill` L6043); the flag is consumed by the FIRST
+   damage event after it - if that damage kills the attackable, the
+   killer gains `exp * min(overkillDamage / mobMaxHp, 0.25)` bonus
+   (`Attackable.calculateOverhitExp` L1480, the +25 percent cap),
+   any non lethal hit clears the flag (`AttackableStatus.reduceHp`
+   L40-71). The bot plan: `maybeCastCombatSkill` holds an
+   overhit-capable strike while the target stands above
+   `overhitFinishPercent` (40 percent - the low level band lands
+   inside the window after one swing, the skill nearly always kills
+   from there and the overkill reaches the cap) and fires it as the
+   finishing blow once the target drops into the window. Static
+   overhit skill set lands in `npcdata` (verified id list).
+2. **The melee self heal recovery.** A character that knows a
+   self heal skill (verified SELF target instant heals of C1:
+   Divine Heal 45, Elemental Heal 58, Self Heal 1216 - the mystic
+   starting classes auto learn 1216, the server may grant any of
+   them) casts it instead of sitting down while the mana pays the
+   cost, the local reuse window is clear and no blow is landing
+   (`SelfUnderAttack` gate). The server refuses the casts of a
+   sitting character (`Player.useMagic`, "YOU_CANNOT_MOVE_WHILE_
+   SITTING"), so a sitting character stands up first; the sit
+   request waits out the cast flight (`sitDown` refuses "Cannot
+   sit while casting"). The post relogin settle needs no change:
+   it ends on a clear ground and hands the recovery to the rest
+   flow, and a heal cast would burn the spawn protection it holds.
+
+Status: the research round is done (two Explore agents: the Mobius
+overhit flow with line references, the hunt code map with the
+insertion points). Implementation next: npcdata skill sets, the
+combat_skills.go hold gate, the recovery heal in loop_actions.go,
+tests beside combat_skills_test.go, docs/hunting.md sections.
