@@ -2644,3 +2644,44 @@ go build, go vet, golangci-lint run on the touched packages 0 issues,
 gofmt-spaces clean, go test ./... 28 packages ok zero failures. The
 live acceptance run of the delevel scenario stays for the next
 session with the stack up.
+## Active task (status: complete): the arrow restock count awareness round (2026-09-21, branch feature/improved-behaviour)
+
+Started 2026-09-21 ~10:37 UTC, closed ~12:05 UTC. One owner report
+landed as melg8 (581b9ae the fix, the docs commit right after),
+rebased over the parallel webui review push and pushed. The report:
+the bot sold the pants to the trader but never bought the arrows its
+shop queue kept displaying.
+
+### Root cause (verified at the source, Round 121 in development_log.md)
+
+The trip execution filtered purchases by the inventory ENTRY count;
+stackables work on COUNTS. `dropOwnedPurchases` counted the 101
+arrow stack as one entry beyond the family copy count and dropped
+the 499 arrow restock order before any request (the planner is count
+aware: 101 < 150 floor -> top up to 600 - hence the queue showing
+the arrows forever). The latent twin: `buysArrived` confirmed stack
+orders by the id presence, but the Mobius inventory merges the
+delivery into the carried stack - the entry never grows, only the
+count does (verified in the C1 RequestBuyItem sources).
+
+### Landed
+
+- `isStackPurchase` (the npcdata item type discriminator) + the
+  count aware `dropOwnedPurchases` + the baseline based
+  `buysArrived` (`Loop.buyBaseline`) + `resetBuyRequest` (the five
+  inline teardowns centralized).
+- Tests: `hunt/arrow_restock_repro_test.go` (the reported trip end
+  to end, red before), `hunt/arrow_restock_gates_test.go` (the four
+  gate quadrants), the `tools/repro_gear.js` queue-state scenario.
+- Docs: the frozen trip plan rule in shopping_strategy.md now names
+  the kind aware split; development_log Round 121 carries the RCA.
+
+### Verification and known state
+
+- The full hunt suite green (74 s), build + vet green, the round's
+  files lint clean, the harness OK. The hunt suite baseline diffed
+  clean (no new failures).
+- Known pre-existing (NOT this round): golangci-lint cyclop on
+  `clickWaypoint` (hunt/town.go, 16 over the max 15) - landed with
+  the parallel skip-tracker rounds (8487365/0dc22da), disclosed
+  here, the corridor branch extraction is the follow up.

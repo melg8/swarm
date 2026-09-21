@@ -8501,3 +8501,86 @@ Result: 22 red -> 0 red, the whole hunt suite green (73.7 s).
   anticipation (the removal push of the server starts the refill -
   anticipating the last minute of the 1200 s buffs would tighten
   the buff uptime further).
+
+## Round 121: the stack orders buy past the owned stack - the count aware trip execution (2026-09-21)
+
+- Report: the bot carried a pair of pants for sale (the worn Leather
+  Pants of a planned Hard Leather Pants replacement) and 101 Wooden
+  Arrows, reached the trader, sold the pants - and never bought the
+  arrows its shop queue kept displaying. The sell succeeded, the buy
+  never went out, the queue advertised the arrows trip after trip.
+
+- Root cause: the trip execution filtered purchases by the inventory
+  ENTRY count while the stackable world works on COUNTS. The arrow
+  restock planner is count aware (`planArrowRestock`: 101 under the
+  150 floor plans a 499 arrow top up to the 600 target), but
+  `dropOwnedPurchases` counted the inventory entries of the item id
+  (the 101 arrow stack is ONE entry), compared them against the
+  family copy count (arrows ride lhand, not a pair family: 1) and
+  dropped the order as a "surplus copy" before any request went out -
+  the smoking gun log line "Wooden Arrow already in the inventory,
+  skipping the purchase" sits right after the stop planning line in
+  the flow reproduction. The latent twin sat in `buysArrived`: its
+  arrival signal was the id APPEARANCE in the inventory, and the
+  server merges a stack delivery into the carried stack (verified in
+  the Mobius C1 `RequestBuyItem` -> `Inventory.addItem` chain) - the
+  entry list never grows, so the gate would have confirmed a stack
+  order instantly and marked the purchase done before the server
+  answered. The stale invariant behind it ("the planner never buys an
+  item id the inventory carries at the plan time") died when the
+  count aware restock planner arrived: a partial stack CARRIES the id
+  and still needs the order.
+
+- Fix (the whole class, both gates):
+  - `isStackPurchase` splits the order kinds by the npcdata item type:
+    the wearable orders (Weapon, Armor, Shield) keep the family copy
+    semantics, the stackable ones the count semantics (the unknown
+    types lean consumable - the planner never plans a gear piece
+    outside the npcdata tables);
+  - `dropOwnedPurchases` drops a stack order only when the carried
+    COUNT covers it (a stale top up the trip no longer needs) - a
+    partial stack under the restock floor never blocks its own top
+    up; the log line names the coverage rule;
+  - `buysArrived` waits for the count growth: the batch records the
+    owned stack count as the arrival baseline at the request moment
+    (`Loop.buyBaseline`, a retry re-send keeps the original baseline -
+    the wait asks whether the count grew since the FIRST ask), the
+    confirmation needs the live count to cover the baseline plus the
+    order; a lost baseline (a fresh process after a restart mid trip)
+    degrades to the order coverage check, never to the instant
+    confirmation;
+  - `resetBuyRequest` centralizes the in-flight batch teardown (the
+    confirmation, the retry budget skip and the trip boundaries) and
+    clears the baseline with it - the five former inline resets could
+    not forget a field that did not exist yet.
+
+- Tests: `hunt/arrow_restock_repro_test.go` walks the reported trip
+  end to end (the sell stop at Herbiel - the nearest merchant IS the
+  arrows merchant, the first stop group merges into the sell stop,
+  exactly the reported "sold to the trader, bought nothing from him"
+  shape - sells the junk and the replaced pants, buys the 499 arrows
+  at the same trader, the delivery confirms through the count growth,
+  the armor stop and the trip end run untouched); red before the fix
+  at the drop gate, green after. `hunt/arrow_restock_gates_test.go`
+  pins the four quadrant rules (the stack top up survives, the stale
+  order drops, the pair family fills both slots, the worn piece
+  blocks its copy; the arrival gate waits for the growth, the lost
+  baseline degrades to coverage, the wearable id presence signal
+  stays). `tools/repro_gear.js` renders the reported queue state (the
+  affordable arrow line the user watched, the trip summary, the
+  in-flight buying chip).
+
+- Verification: the full hunt suite green (74 s), go build, go vet,
+  `golangci-lint` clean on the round's files (one pre-existing cyclop
+  finding on `clickWaypoint` - hunt/town.go 16 over the max 15 -
+  landed with the parallel skip-tracker rounds and is disclosed in
+  the progress file), the harness green (OK).
+
+- Follow ups: the trip freeze could snapshot the owned stack counts
+  and let the executor compare against the freeze instead of the
+  order count (the stale-top-up rule would tighten from "covers the
+  order" to "reached the target"); the wanted tail of the queue
+  still shows lines the frozen trip will never buy (the save up view
+  by design, but a trip-scoped tail view would read cleaner); the
+  pre-existing `clickWaypoint` complexity finding wants the corridor
+  branch extraction.

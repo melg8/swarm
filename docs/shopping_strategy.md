@@ -129,7 +129,20 @@ Supporting rules that survived the rework unchanged:
   inventory already carries (beyond the family copy count) drops out
   of the stop before any request goes out (`dropOwnedPurchases`) -
   a second pair of gloves is never part of the plan, while the
-  second ring half of the basic set still buys.
+  second ring half of the basic set still buys. The guard is
+  kind aware (the 2026-09-21 arrows report): the wearable orders
+  (Weapon, Armor, Shield) use the family copy semantics above, the
+  stackable orders use COUNT semantics - the planner already
+  subtracted the owned count when it sized the batch, so a partial
+  stack under the restock floor never blocks its own top up (the 101
+  arrow stack of the report counted as one entry and dropped the 499
+  arrow order) and only a stale top up the carried count already
+  covers drops. The arrival gate follows the same split
+  (`buysArrived`): the wearable orders confirm by the id appearance,
+  the stackable orders by the count growth past the baseline the
+  batch recorded at the request moment (the Mobius inventory merges
+  the delivery into the carried stack - the entry list never grows,
+  only the count does).
 - **The top-tier slot guard**: within the weapon and shield picks the
   guard records the best viable gain per paperdoll slot and drops
   every candidate aspired above that record, whatever its value per
