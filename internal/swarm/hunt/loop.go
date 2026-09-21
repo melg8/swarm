@@ -452,6 +452,21 @@ type Loop struct {
     // the full stuckTimeout for each one. resetTownTrip and
     // startWalkSegment clear it.
     stuckFast bool
+    // skipX/skipY/skipArmed record the cell the last waypoint skip of
+    // the frozen episode left the character on (the stuck skip of
+    // stuckTownWalk and the aggro circle skip of clickWaypoint both
+    // run through skipMoveFresh): a repeat skip on the same cell is
+    // denied, because a skip that moved the character nothing proved
+    // the click transport dead on this ground - repeating it only
+    // marches the cursor (and the eventual chord walk) away from the
+    // plan while the character stands still (the 2026-09-21 town walk
+    // report: 49 stuck skips advanced the cursor 15 -> 63 of 87, the
+    // aim 18,000 units out, through 3.5 frozen minutes without a unit
+    // of movement or a single re-path) and starves the recovery ladder
+    // that owns the dead click transport.
+    skipArmed bool
+    skipX     int32
+    skipY     int32
     // moveStartAt/X/Y are the move start watchdog of the walker (see
     // noteMoveStart): the deadline arms when a walk click goes out,
     // a position change or the server movement broadcast clears it
@@ -972,6 +987,9 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         stuckWP:            0,
         stuckBest:          0,
         stuckFast:          false,
+        skipArmed:          false,
+        skipX:              0,
+        skipY:              0,
         tripAbortRun:       0,
         rePaths:            0,
         extendArmed:        false,

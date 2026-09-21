@@ -85,13 +85,14 @@ func TestThreatenedVerdictReadsTheWaypointNotTheClick(t *testing.T) {
         "wp 10 of the dump is 358 units from the camp")
 }
 
-// TestThreatenedSkipStopsAtTheFirstClearWaypoint pins the follower
-// behavior end to end on the dump scene: the cursor skips the three
-// waypoints the camp circle genuinely holds and STOPS on the first
-// clear one - the walk continues along the plan (the steering arcs the
-// clicks around the camp), the far waypoints stay ahead of the cursor
-// and the published plan never marks them passed while the character
-// stands still.
+// TestThreatenedSkipStopsAtTheFirstClearWaypoint pins the skip chain
+// bound of the report: the chain may advance the cursor only while
+// the character moves (the movement paced chain), never a second
+// skip from the very cell the first one left the character on - the
+// 2026-09-21 storm rule. The old code chained the skips while the
+// character stood still (the 2026-09-20 report: cursors 9 through 23
+// in three seconds, the whole middle marked passed) and walked the
+// rest cross-country.
 func TestThreatenedSkipStopsAtTheFirstClearWaypoint(t *testing.T) {
     bot := avoidSceneBot()
     // The dump camp beside the route the plan shares with the report.
@@ -120,26 +121,28 @@ func TestThreatenedSkipStopsAtTheFirstClearWaypoint(t *testing.T) {
         loop.walkTownWaypoints()
     }
 
-    // The cursor rests on wp 11 (the index 3): the first waypoint
-    // outside the camp circle. The old code chained the skips onto
-    // the far waypoints (the cursor ended on the LAST waypoint of
-    // the plan, the whole middle marked passed) and walked the rest
-    // cross-country.
-    require.Equal(t, 3, loop.wpIndex,
-        "the skip chain stops on the first waypoint outside the circle")
+    // The cursor rests on wp 9 (the index 1): the first frozen skip
+    // fired (the cheap walled waypoint recovery keeps its trial) and
+    // the second one was DENIED - the character never moved since,
+    // so the chain may not advance the cursor farther while the
+    // steered click of the denied skip's target owns the walk. The
+    // storm's runaway (the cursor ending on the LAST waypoint of the
+    // plan, the whole middle marked passed) stays impossible.
+    require.Equal(t, 1, loop.wpIndex,
+        "the skip chain stops after the trial skip on the frozen cell")
     require.Len(t, game.walks, 1,
-        "exactly the clear waypoint's click goes out")
+        "exactly the denied skip's steered click goes out")
     walk := game.walks[0]
     clearance := math.Hypot(float64(walk[0]-37920), float64(walk[1]-44989))
     require.GreaterOrEqual(t, clearance, 600.0,
         "the issued click steers clear of the camp circle")
 
-    // The published plan reads honestly: the cursor names wp 11, the
-    // far waypoints 12 and 13 stay ahead of it - nothing marked
-    // passed that the character never reached.
+    // The published plan reads honestly: the cursor names wp 9, the
+    // far waypoints stay ahead of it - nothing marked passed that the
+    // character never reached.
     loop.publishWalkPlan()
     snap := bot.Snapshot()
-    require.Equal(t, 3, snap.WalkIndex,
+    require.Equal(t, 1, snap.WalkIndex,
         "the published plan keeps the far waypoints ahead of the cursor")
     require.Len(t, snap.WalkPath, 6)
 }

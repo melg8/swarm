@@ -246,9 +246,12 @@ func TestWalkStuckBudgetBoundsMovingRepaths(t *testing.T) {
 
 // TestWalkStuckFastTimeoutArmsAfterSkip pins the fast timeout: after the
 // first skip, the stuck timer uses the shorter stuckFastTimeout so the
-// walker cycles through the remaining waypoints quickly. The round 53
-// dump showed the bot waiting 15 s per waypoint while the server refused
-// every click - the fast timeout cuts that to 4 s after the first stuck.
+// recovery answers quickly. The round 53 dump showed the bot waiting
+// 15 s per waypoint while the server refused every click - the fast
+// timeout cuts that to 4 s after the first stuck. The detection that
+// the fast window then fires may not REPEAT the skip (the character
+// never moved since - the 2026-09-21 storm rule): the recovery ladder
+// (the re-path) owns the segment instead, and the cursor stays bound.
 func TestWalkStuckFastTimeoutArmsAfterSkip(t *testing.T) {
     loop, _, bot, nav := newTripLoop()
     nav.found = true
@@ -269,14 +272,20 @@ func TestWalkStuckFastTimeoutArmsAfterSkip(t *testing.T) {
     require.True(t, loop.stuckFast, "the fast timeout must arm after the first skip")
 
     // A stuck that is past the fast timeout but NOT past the full
-    // timeout must still fire the skip.
+    // timeout must still fire the recovery - but the skip that moved
+    // the character nothing may not repeat: the re-path ladder owns
+    // the frozen segment and the cursor may not march past the first
+    // skip's aim.
     selfX, selfY, _, _ := bot.SelfPosition()
     loop.stuckAt = time.Now().Add(-stuckFastTimeout - time.Second)
     loop.stuckX = selfX
     loop.stuckY = selfY
     loop.tick()
-    require.Equal(t, 3, loop.wpIndex,
-        "the fast timeout must fire the second skip before the full timeout")
+    require.Equal(t, 1, loop.rePaths,
+        "the fast window fired the detection into the re-path ladder, "+
+            "the frozen skip may not repeat")
+    require.LessOrEqual(t, loop.wpIndex, 2,
+        "the cursor stayed bound below the second frozen skip")
 }
 
 // TestWalkStuckSkipNeedsAClearLine pins the skip gate of the 06:19

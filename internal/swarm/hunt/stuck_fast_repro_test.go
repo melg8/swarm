@@ -225,7 +225,9 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
 
     // Advance past the full stuckTimeout: the first stuck detection
     // finds wp2 as a clear successor (nextClearWaypoint jumps the
-    // cursor) - the WAYPOINT SKIP branch fires.
+    // cursor) - the WAYPOINT SKIP branch fires. The first skip of the
+    // frozen episode stays free (the walled waypoint case keeps its
+    // cheap recovery).
     now = now.Add(stuckTimeout + time.Second)
     loop.moveAt = time.Time{}
     _ = loop.followWaypoints(
@@ -235,13 +237,20 @@ func TestStuckSkipWaypointStillArmsFastWindow(t *testing.T) {
     require.True(t, loop.stuckFast,
         "the waypoint skip arm sets the fast stuck window (unchanged)")
 
-    // The fast window fires the next detection in 4s, not 15s.
+    // The fast window fires the next detection in 4s, not 15s. The
+    // character never moved since the skip, so the detection may not
+    // REPEAT the skip (the 2026-09-21 storm rule): the recovery ladder
+    // (the re-path) owns the segment and the cursor stays bound below
+    // the first skip's successor.
     now = now.Add(stuckFastTimeout + time.Second)
     loop.moveAt = time.Time{}
     _ = loop.followWaypoints(
         reproFastStuckX, reproFastStuckY, selfZ, now)
-    require.Equal(t, 2, loop.wpIndex,
-        "the fast window fired the next detection")
+    require.Equal(t, 1, loop.rePaths,
+        "the fast window fired the detection into the re-path ladder, "+
+            "the frozen skip may not repeat")
+    require.LessOrEqual(t, loop.wpIndex, 1,
+        "the cursor did not march past the first frozen skip")
 }
 
 // TestStuckRepathRebaselinesStuckWindow pins the second half of the

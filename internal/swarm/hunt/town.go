@@ -2306,16 +2306,20 @@ func (l *Loop) clickWaypoint(
     wpXI, wpYI := int32(math.Round(wp.X)), int32(math.Round(wp.Y))
     if l.segmentTargetThreatened(wpXI, wpYI,
         int32(l.segmentDest.X), int32(l.segmentDest.Y)) {
-        if next := l.nextClearWaypoint(selfX, selfY, selfZ); next > l.wpIndex {
+        if next := l.nextClearWaypoint(selfX, selfY, selfZ); next > l.wpIndex &&
+            l.skipMoveFresh(selfX, selfY) {
             l.wpIndex = next
             l.moveAt = time.Time{}
+            l.noteSkipStand(selfX, selfY)
             l.logger.Printf("Hunt: the waypoint sits inside an aggro "+
                 "circle, skipping ahead (cursor %d of %d)",
                 l.wpIndex, len(l.waypoints))
 
             return
         }
-        // No clear successor: the stuck escalation owns the segment.
+        // No clear successor, or the previous skip moved the character
+        // nothing: the stuck escalation owns the segment (the denied
+        // skip must not march the cursor away from a frozen character).
     }
     // The aggro-aware steering: the camps of idle aggressive mobs
     // sitting on the segment bend it sideways (see loop_avoid.go). Every
@@ -3212,9 +3216,10 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
         }
     }
     next := l.nextClearWaypoint(selfX, selfY, l.stuckSelfZ())
-    if next > l.wpIndex {
+    if next > l.wpIndex && l.skipMoveFresh(selfX, selfY) {
         l.wpIndex = next
         l.moveAt = time.Time{}
+        l.noteSkipStand(selfX, selfY)
         l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
         l.stuckWP = l.wpIndex
         l.stuckBest = l.stuckWaypointDistance(selfX, selfY)
@@ -3223,6 +3228,16 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
             "(cursor %d of %d)", l.wpIndex, len(l.waypoints))
 
         return false
+    }
+    if next > l.wpIndex {
+        // The clear successor exists but the previous skip left the
+        // character on this very cell: the skips proved the click
+        // transport dead on this ground, and every farther skip only
+        // inflates the aim while the character stands still (the
+        // 2026-09-21 storm). The re-path ladder owns the segment now.
+        l.logf("Hunt: town walk stuck, the last skip moved the "+
+            "character nowhere (cursor %d of %d)", l.wpIndex,
+            len(l.waypoints))
     }
     if l.noteRepathCell(selfX, selfY) {
         // The previous re-path started from this very cell and
@@ -3278,6 +3293,35 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
     l.stuckFast = true
 
     return false
+}
+
+// skipMoveFresh reports whether a waypoint skip may run for this
+// verdict: no skip ran yet, or the character moved since the previous
+// skip. A skip that left the character on the very cell it already
+// held proved the click transport dead on this ground - the successor
+// the skip armed was clicked and the character never walked to it.
+// Repeating the skip cannot help (the farther waypoint rides the same
+// dead transport), it only marches the cursor and the eventual chord
+// walk away from the plan while the standing still character watches
+// the waypoints get farther (the 2026-09-21 town walk report: 49
+// stuck skips advanced the cursor 15 -> 63 of 87 through 3.5 frozen
+// minutes), and it starves the recovery ladder that owns the dead
+// transport - the re-path budget, the frozen trip abort and the
+// cursor key escape all sit behind the skip branch. The first skip of
+// a frozen episode stays free: the walled waypoint case walks the
+// character on with the successor's click, and only the repeat on an
+// unchanged position names the transport dead.
+func (l *Loop) skipMoveFresh(selfX int32, selfY int32) bool {
+    return !l.skipArmed || selfX != l.skipX || selfY != l.skipY
+}
+
+// noteSkipStand records the cell a waypoint skip leaves the character
+// on: the next skipMoveFresh denies the skip that finds the character
+// still standing there (see skipMoveFresh for the dead transport
+// verdict and the recovery ladder it hands the walk to).
+func (l *Loop) noteSkipStand(selfX int32, selfY int32) {
+    l.skipArmed = true
+    l.skipX, l.skipY = selfX, selfY
 }
 
 // noteRepathCell records the cell a stuck re-path plans from and
