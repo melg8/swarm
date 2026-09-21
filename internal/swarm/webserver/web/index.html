@@ -450,7 +450,27 @@ SPDX-License-Identifier: MIT
           </div>
 
           <div id="chat-box" class="chat-box">
+            <div class="chat-head" role="tablist" aria-label="chat window filter">
+              <button id="chat-tab-all" class="chat-tab active" role="tab" aria-selected="true">ALL</button>
+              <button id="chat-tab-chat" class="chat-tab" role="tab" aria-selected="false">CHAT</button>
+              <button id="chat-tab-system" class="chat-tab" role="tab" aria-selected="false">SYSTEM</button>
+            </div>
             <div id="chat-list" class="chat-list"></div>
+            <div class="chat-input-row">
+              <select id="chat-channel" class="chat-channel" title="the chat channel of the message">
+                <option value="0" selected>all</option>
+                <option value="1">shout</option>
+                <option value="8">trade</option>
+                <option value="3">party</option>
+                <option value="4">clan</option>
+                <option value="2">whisper</option>
+              </select>
+              <input id="chat-whisper" type="text" class="chat-whisper hidden" maxlength="24"
+                placeholder="to" title="the whisper recipient name">
+              <input id="chat-input" type="text" class="chat-input" maxlength="105"
+                placeholder="write to the chat" title="the message the bot sends (105 characters max)">
+              <button id="chat-send" class="chat-send" title="send through the bot">send</button>
+            </div>
           </div>
         </div>
       </section>

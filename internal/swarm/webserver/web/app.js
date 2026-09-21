@@ -3356,10 +3356,29 @@ initViewMenu();
 initShopPanel();
 initGearMode();
 
-// Chat window state: auto scroll follows the newest line while the
-// user stays at the bottom; scrolling up reads the history, scrolling
-// back to the bottom resumes the follow.
-const ChatWindow = { stick: true };
+// Chat window state: the active filter tab, and auto scroll follows
+// the newest line while the user stays at the bottom; scrolling up
+// reads the history, scrolling back to the bottom resumes the follow.
+const ChatWindow = { stick: true, tab: "all" };
+
+// Chat line kind families: the world chat lines (the CreatureSay
+// packets) split from the bot system messages in the tabs.
+const CHAT_LINE_KINDS = [
+  "say", "shout", "whisper", "party", "clan", "trade", "announcement"
+];
+const SYSTEM_LINE_KINDS = ["system", "social"];
+
+// chatTabAccepts reports whether a line passes the active tab filter.
+function chatTabAccepts(kind) {
+  if (ChatWindow.tab === "chat") {
+    return CHAT_LINE_KINDS.indexOf(kind) !== -1;
+  }
+  if (ChatWindow.tab === "system") {
+    return SYSTEM_LINE_KINDS.indexOf(kind) !== -1;
+  }
+
+  return true;
+}
 
 // chatAtBottom reports whether the scroll position of the chat list is
 // within a few pixels of the newest line.
@@ -3367,31 +3386,88 @@ function chatAtBottom(list) {
   return list.scrollTop + list.clientHeight >= list.scrollHeight - 4;
 }
 
-// initChat attaches the scroll tracking of the chat window.
+// setChatTab switches the chat filter tab and re-renders.
+function setChatTab(tab) {
+  ChatWindow.tab = tab;
+  for (const name of ["all", "chat", "system"]) {
+    const button = document.getElementById("chat-tab-" + name);
+    const active = name === tab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+  }
+  renderChat(App.snapshot);
+}
+
+// initChat attaches the scroll tracking, the filter tabs and the chat
+// input of the chat window.
 function initChat() {
   const list = document.getElementById("chat-list");
   list.addEventListener("scroll", () => {
     ChatWindow.stick = chatAtBottom(list);
   });
+  for (const name of ["all", "chat", "system"]) {
+    document.getElementById("chat-tab-" + name)
+      .addEventListener("click", () => setChatTab(name));
+  }
+
+  const input = document.getElementById("chat-input");
+  const send = () => sendChatInput();
+  document.getElementById("chat-send").addEventListener("click", send);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      send();
+    }
+  });
+  document.getElementById("chat-channel").addEventListener("change", () => {
+    const whisper = document.getElementById("chat-channel").value === "2";
+    document.getElementById("chat-whisper").classList
+      .toggle("hidden", !whisper);
+  });
 }
 
-// Chat window rendering: the parsed system messages and the social
-// animations of the creatures around the bot, oldest at the top. The
-// view scrolls to the newest line only while the follow is stuck.
+// sendChatInput posts the typed message as a say command: the hunt
+// loop forwards it to the game session and the own CreatureSay echo
+// lands back in this window.
+function sendChatInput() {
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text || !App.activeBotId) { return; }
+  const channel = parseInt(
+    document.getElementById("chat-channel").value, 10);
+  const command = { kind: "say", text: text, channel: channel };
+  if (channel === 2) {
+    command.target = document.getElementById("chat-whisper").value.trim();
+  }
+  postCommand(command);
+  input.value = "";
+}
+
+// Chat window rendering: the world chat lines, the parsed system
+// messages and the social animations of the creatures around the bot,
+// oldest at the top, filtered by the active tab. The view scrolls to
+// the newest line only while the follow is stuck.
 function renderChat(snap) {
   const list = document.getElementById("chat-list");
-  const lines = snap.chat || [];
+  const lines = (snap && snap.chat) || [];
   list.innerHTML = "";
   for (const line of lines) {
+    if (!chatTabAccepts(line.kind)) { continue; }
     const row = document.createElement("div");
     row.className = "chat-line chat-" + line.kind;
     const time = document.createElement("span");
     time.className = "chat-time";
     time.textContent = new Date(line.time).toTimeString().slice(0, 8);
+    row.append(time);
+    if (line.from) {
+      const from = document.createElement("span");
+      from.className = "chat-from";
+      from.textContent = line.from + ":";
+      row.append(from);
+    }
     const msg = document.createElement("span");
     msg.className = "chat-msg";
     msg.textContent = line.text;
-    row.append(time, msg);
+    row.append(msg);
     list.append(row);
   }
   if (ChatWindow.stick) {

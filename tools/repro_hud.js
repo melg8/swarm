@@ -115,6 +115,14 @@ function loadAppJs(appFile) {
             getItem: () => null, setItem: () => {}
         } },
         document,
+        // The chat input and the other command posters ride fetch:
+        // record the posts so the harness can assert the body.
+        fetch: (url, options) => {
+            sandbox.__posts.push({ url, options });
+
+            return { catch: () => {} };
+        },
+        __posts: [],
         // app.js renderZones calls MapView.blurZone() (map.js owns the
         // real one) when it rebuilds the zone list: a no-op stub keeps
         // the harness free of the map bundle.
@@ -144,6 +152,12 @@ function loadAppJs(appFile) {
         " ? chatAtBottom : undefined," +
         " ChatWindow: typeof ChatWindow === 'undefined'" +
         " ? undefined : ChatWindow," +
+        " chatTabAccepts: typeof chatTabAccepts === 'function'" +
+        " ? chatTabAccepts : undefined," +
+        " setChatTab: typeof setChatTab === 'function'" +
+        " ? setChatTab : undefined," +
+        " sendChatInput: typeof sendChatInput === 'function'" +
+        " ? sendChatInput : undefined," +
         " renderHUD: typeof renderHUD === 'function'" +
         " ? renderHUD : undefined," +
         " renderBotStatus: typeof renderBotStatus === 'function'" +
@@ -394,6 +408,119 @@ function main() {
                 scrollHeight: 500 }),
             "bottom detection broken");
         elements.set("chat-list", chatList);
+
+        // The ALL / CHAT / SYSTEM tabs split the world chat lines
+        // (the CreatureSay packets) from the bot system messages: the
+        // chat tab keeps only the chat kinds, the system tab only the
+        // system and social ones, the all tab everything. The world
+        // chat lines carry the sender as its own column.
+        if (typeof hud.chatTabAccepts !== "function"
+            || typeof hud.setChatTab !== "function") {
+            check(results, "chat window exposes the tab filter", false,
+                "chatTabAccepts/setChatTab missing from app.js");
+        } else {
+            hud.ChatWindow.stick = false;
+            hud.setChatTab("all");
+            const world = [
+                { time: "2026-09-06T10:00:00Z", kind: "say",
+                    from: "Melg", text: "hello" },
+                { time: "2026-09-06T10:00:01Z", kind: "system",
+                    text: "You picked up 25 adena." }
+            ];
+            hud.renderChat({ chat: world });
+            const allList = elements.get("chat-list");
+            check(results, "all tab renders every line",
+                allList.children.length === 2,
+                "got " + allList.children.length + " lines");
+            check(results, "world chat line renders the sender column",
+                allList.children[0].children.length === 3
+                && allList.children[0].children[1].textContent
+                    === "Melg:",
+                "got " + JSON.stringify(
+                    allList.children[0].children.map(
+                        (c) => c.textContent)));
+
+            hud.setChatTab("chat");
+            hud.renderChat({ chat: world });
+            const chatOnly = elements.get("chat-list");
+            check(results, "chat tab keeps only the chat kinds",
+                chatOnly.children.length === 1
+                && chatOnly.children[0].className === "chat-line chat-say",
+                "got " + chatOnly.children.length + " lines: "
+                + JSON.stringify(chatOnly.children.map(
+                    (c) => c.className)));
+
+            hud.setChatTab("system");
+            hud.renderChat({ chat: world });
+            const sysOnly = elements.get("chat-list");
+            check(results, "system tab keeps only the system kinds",
+                sysOnly.children.length === 1
+                && sysOnly.children[0].className
+                    === "chat-line chat-system",
+                "got " + sysOnly.children.length + " lines");
+            check(results, "system line renders without a sender",
+                sysOnly.children[0].children.length === 2,
+                "got " + sysOnly.children[0].children.length
+                + " columns");
+            hud.setChatTab("all");
+        }
+
+        // The chat input posts a say command for the active bot: the
+        // text rides the body, the whisper channel adds the target and
+        // the input clears after the send.
+        if (typeof hud.sendChatInput !== "function") {
+            check(results, "chat input posts a say command", false,
+                "sendChatInput missing from app.js");
+        } else {
+            sandbox.__posts.length = 0;
+            vm.runInContext("App.activeBotId = 'acc1'", sandbox);
+            sandbox.document.getElementById("chat-input");
+            sandbox.document.getElementById("chat-channel");
+            sandbox.document.getElementById("chat-whisper");
+            const chatInput = elements.get("chat-input");
+            const channelInput = elements.get("chat-channel");
+            const whisperInput = elements.get("chat-whisper");
+            channelInput.value = "0";
+            whisperInput.value = "";
+            chatInput.value = "  hello there  ";
+            hud.sendChatInput();
+            const posted = sandbox.__posts.length === 1
+                ? JSON.parse(sandbox.__posts[0].options.body) : null;
+            check(results, "chat input posts to the command endpoint",
+                sandbox.__posts.length === 1
+                && sandbox.__posts[0].url
+                    === "/api/bots/acc1/commands",
+                "got " + JSON.stringify(sandbox.__posts));
+            check(results, "chat input trims and posts the text",
+                posted !== null && posted.kind === "say"
+                && posted.text === "hello there"
+                && posted.channel === 0,
+                "got " + JSON.stringify(posted));
+            check(results, "chat input clears after the send",
+                chatInput.value === "",
+                "got " + JSON.stringify(chatInput.value));
+
+            channelInput.value = "2";
+            chatInput.value = "psst";
+            whisperInput.value = "Melg";
+            hud.sendChatInput();
+            const whisper = sandbox.__posts.length === 2
+                ? JSON.parse(sandbox.__posts[1].options.body) : null;
+            check(results, "whisper send carries the recipient",
+                whisper !== null && whisper.channel === 2
+                && whisper.target === "Melg",
+                "got " + JSON.stringify(whisper));
+
+            chatInput.value = "   ";
+            const before = sandbox.__posts.length;
+            hud.sendChatInput();
+            check(results, "empty chat input posts nothing",
+                sandbox.__posts.length === before
+                && chatInput.value === "   ",
+                "posts grew by "
+                + (sandbox.__posts.length - before));
+            chatInput.value = "";
+        }
     }
 
     // The bot status banner maps the hunt loop phase to a human

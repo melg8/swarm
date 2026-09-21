@@ -1137,15 +1137,17 @@ body.mode-pathfind .bot-status { display: none; }
    killed, removed or missing target hides it completely. */
 .hud-target .hud-name-row { margin-bottom: 8px; }
 
-/* Chat window in the bottom left corner of the map: the parsed system
-   messages (loot, status) and the social animations of the creatures
-   around the bot. */
+/* Chat window in the bottom left corner of the map: the world chat
+   lines of the creatures around the bot (the CreatureSay packets), the
+   parsed system messages (loot, status) and the social animations,
+   split by the ALL / CHAT / SYSTEM tabs, with an input row that sends
+   a chat message through the bot. */
 .chat-box {
   position: absolute;
   left: 12px;
   bottom: 10px;
   width: 416px;
-  height: 150px;
+  height: 190px;
   background: var(--bg-panel);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1155,11 +1157,36 @@ body.mode-pathfind .bot-status { display: none; }
   font-family: var(--mono);
   font-size: 11px;
   line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The filter tabs of the chat window (the skill filter tab idiom). */
+.chat-head { display: flex; gap: 2px; margin-bottom: 4px; flex-shrink: 0; }
+
+.chat-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 1px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+}
+
+.chat-tab:hover { color: var(--text); background: var(--bg-panel-2); }
+
+.chat-tab.active {
+  color: var(--accent);
+  background: var(--bg-panel-2);
 }
 
 /* The list is the scroll container: the auto scroll logic scrolls it. */
 .chat-list {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -1167,9 +1194,91 @@ body.mode-pathfind .bot-status { display: none; }
 
 .chat-time { color: var(--text-dim); flex-shrink: 0; }
 
+.chat-from { color: var(--text-bright); flex-shrink: 0; }
+
 .chat-msg { color: var(--text); word-break: break-word; }
 
 .chat-line.chat-social .chat-msg { color: var(--violet); }
+
+/* World chat lines: the channel colors mirror the client conventions,
+   the whisper and the trade stand out from the plain say. */
+.chat-line.chat-say .chat-from { color: var(--text-bright); }
+
+.chat-line.chat-shout .chat-from,
+.chat-line.chat-shout .chat-msg { color: var(--warn); }
+
+.chat-line.chat-whisper .chat-from,
+.chat-line.chat-whisper .chat-msg { color: var(--violet); }
+
+.chat-line.chat-trade .chat-from,
+.chat-line.chat-trade .chat-msg { color: var(--accent); }
+
+.chat-line.chat-announcement .chat-msg { color: var(--warn); }
+
+/* The input row: channel select, whisper target (whisper only), the
+   message input and the send button. */
+.chat-input-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.chat-channel {
+  width: 74px;
+  flex-shrink: 0;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 4px;
+}
+
+.chat-whisper {
+  width: 90px;
+  flex-shrink: 0;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 6px;
+}
+
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 2px 6px;
+}
+
+.chat-input:focus,
+.chat-whisper:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.chat-send {
+  flex-shrink: 0;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+
+.chat-send:hover { color: var(--accent); border-color: var(--accent); }
 
 .kv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; }
 
