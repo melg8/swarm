@@ -1188,7 +1188,11 @@ body.mode-pathfind .bot-status { display: none; }
   padding: 2px 4px;
 }
 
-.chat-whisper {
+/* The whisper recipient input: scoped to the input element - the
+   bare .chat-whisper class also matches the chat rows of the whisper
+   kind (chat-line chat-whisper) and squeezed them to the 90px input
+   width, rendering every message letter on its own line. */
+input.chat-whisper {
   width: 90px;
   flex-shrink: 0;
   background: var(--bg-panel-2);
@@ -1213,7 +1217,7 @@ body.mode-pathfind .bot-status { display: none; }
 }
 
 .chat-input:focus,
-.chat-whisper:focus {
+input.chat-whisper:focus {
   outline: none;
   border-color: var(--accent);
 }

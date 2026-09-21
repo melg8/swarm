@@ -489,6 +489,16 @@ function main() {
             && /text-overflow:\s*ellipsis/.test(chatFromRule[0]),
             "rule: " + (chatFromRule ? chatFromRule[0]
                 : ".chat-from missing"));
+        // The whisper recipient input styles are scoped to the input
+        // element: the bare .chat-whisper selector also matched the
+        // whisper chat rows (chat-line chat-whisper) and squeezed
+        // them to the 90px input width - every message letter landed
+        // on its own line.
+        check(results,
+            "the whisper input rule never matches the chat rows",
+            /input\.chat-whisper\s*\{/.test(chatCss)
+            && !/(^|[,\s])\.chat-whisper\s*\{/.test(chatCss),
+            "bare .chat-whisper rule still present");
 
         // The shout orange-brown and the trade pink ride theme
         // variables (both themes tint them), and the announcement
