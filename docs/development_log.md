@@ -8818,3 +8818,60 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
   victim wrong (cosmetic, documented); the skill crits (no Attack
   packet) label nothing - the same boundary the damage numbers
   already have.
+
+## Round 123: the skull tooltips, the anchored chat scroll and the whisper selector collision (2026-09-21)
+
+- Report: seven owner reports. The skulls wanted 2.5x size and a
+  hover tooltip with the victim (name, level, age). The previous
+  round's chat scroll fix was rejected: the read segment still moved
+  (the 64 line ring drops rows above the reading position and a raw
+  pixel offset drifts with them). The chat wanted a collapse into a
+  square corner button. The brand header wanted only the swarm logo.
+  Whisper messages rendered every letter on its own line. Shout
+  wanted orange-brown and trade pink.
+
+- Root cause (whisper, the class lesson): the chat rows carry the
+  channel KIND as a class (`chat-line chat-whisper`) and the whisper
+  recipient INPUT carried the SAME class with its own `width: 90px`
+  rule - every whisper row rendered 90px wide, the message span
+  collapsed to a zero width box and the text stacked one letter per
+  line. The class lesson: a class name is a GLOBAL namespace in CSS -
+  a kind marker on many elements and an element-specific styling
+  class must never share a name; scope the element rule
+  (`input.chat-whisper`) and pin the collision with a static harness
+  check. The measurement workflow that found it: the repo preview
+  server (tools/webui_preview_server.js) plus a headless browser
+  measuring the real computed boxes - the vm harnesses cannot see
+  layout, only a real browser can (the background server dies with
+  the tool call, so the whole probe runs inside ONE call).
+
+- Root cause (scroll): anchoring the pixel offset anchors the
+  CONTENT only while the content set is stable - the ring rotates
+  and the rows above the reading position disappear, shifting every
+  offset. The fix anchors the topmost visible ROW by its identity
+  (time+kind+from+text, the tracker clock is unique per line) and
+  restores its exact viewport slot: the read segment never moves,
+  the scrollbar thumb drifts up gradually with the new lines, the
+  follow re-arms when the user reaches the bottom again.
+
+- Landed: the kill victim name and level ride killRecord ->
+  KillMarkView -> /api/fleet/kills (the npc dictionary resolves the
+  vanished corpse); the skulls draw at 2.5x (r 10 fleet, 12.5
+  centroid) with the hover tooltip (killMarkAt pick radius 13, unit
+  tooltips keep priority, the age read refreshes while the cursor
+  rests); the anchored chat scroll (the list positions relative so
+  the row offsetTop is list relative); the chat collapse into the
+  corner restore button (persisted, the special modes hide it); the
+  brand-sub removal; the scoped whisper input rule plus the message
+  span flex sizing (flex 1 1 0, min-width 0) and the 40% sender
+  ellipsis; the shout/trade themed chat color variables and the
+  previously undefined --warn declared.
+
+- Verification: the six Node harnesses green (the zone hover
+  scenario covers the pick and the tooltip content, the hud scenario
+  the anchor restore through the ring drop and the scoped selector);
+  a real browser pass measured the whisper rows (394px row, 4 whole
+  lines - was 0px/109 lines), the frozen read segment through five
+  appends AND a ring drop, the re-stick at the bottom and the
+  collapse toggle; the hunt/state/webserver suites and the full lint
+  gate green.

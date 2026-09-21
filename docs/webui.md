@@ -193,7 +193,13 @@ colors from the same variables).
 - Fleet kill skulls: every recent kill of every bot draws as a small
   path traced orange skull (the head and jaw silhouette in the
   marker orange, the eye dots and mouth slots in the dark contrast
-  `killMarkDetailColor`) that melts away over five minutes. No font
+  `killMarkDetailColor`) that melts away over five minutes. The
+  fresh skull reads at 2.5x of the old cross size (r 10, the spot
+  centroid 12.5 - a bit smaller than the mob dots); hovering a skull
+  shows the victim tooltip (the name with the level and the kill
+  age, `killMarkAt` picks within 13 px where no unit tooltip
+  claims the cursor, the victim data rides `KillMarkView.Name` and
+  `.Level` captured at the kill). No font
   glyph - the canvas path keeps the marker palette theme independent
   and renders identically in every environment. The marks come from
   `/api/fleet/kills` (the hunt loop publishes its kill ring to the bot
@@ -903,12 +909,15 @@ rolling 64 line ring fed by ApplySystemMessage/ApplySocialAction and
 ApplySay). The auto scroll follows the newest line only while the view
 is at the bottom (`chatAtBottom`, 4 px tolerance): scrolling up
 detaches the follow to read the history, scrolling back to the bottom
-resumes it. The full re-render of `renderChat` keeps that reading
-position: the offset is captured before `innerHTML` clears the list
-(a real browser clamps the scrollTop of the emptied container to 0)
-and restored clamped to the new content after the rows are back -
-the scrolled up user keeps the chosen messages across the 300 ms
-snapshot re-renders. The list itself is the scroll container (the box
+resumes it. While detached the render anchors the topmost visible row
+by its identity (time+kind+from+text): the row keeps its exact
+viewport slot across the 300 ms re-renders, so nothing the user reads
+moves even when the 64 line ring drops rows above the anchor (a raw
+pixel offset would drift with them) while the scrollbar thumb drifts
+up gradually as the new lines grow the content below the frozen
+segment. The collapsed chat folds into a square restore button of
+the same corner (`#chat-restore`, the choice persists through
+localStorage behind sandbox guards). The list itself is the scroll container (the box
 clips, the list scrolls). SystemMessage texts resolve through the
 generated `npcdata/system_messages.go` dictionary (id -> client text
 with $sN placeholders, substituted positionally with the packet
@@ -918,7 +927,13 @@ its level as the second wire int and renders "Name lvl N"). A
 parameter the packet does not carry renders as nothing (the server
 `sendMessage` texts ride the generic `$s1 $s2` template with the
 whole sentence as the one parameter - a rendered tail used to show
-up as a stray "?"). Regenerate with `task generate:system-messages`
+up as a stray "?"). The message span owns the remaining row width
+(`flex: 1 1 0; min-width: 0`) and the sender ellipsizes at 40%:
+a squeezed row used to collapse the message to its one character
+min-content width (every letter on its own line - the bare
+`.chat-whisper` input selector also matched the whisper rows and
+squeezed them to the 90px input width; the input styles are scoped
+to `input.chat-whisper` now). Regenerate with `task generate:system-messages`
 (tools/generate_system_messages.sh) after Mobius updates.
 
 The three tabs split the stream: ALL shows everything, CHAT keeps the
@@ -926,8 +941,9 @@ world chat kinds of the CreatureSay packet (say, shout, whisper,
 party, clan, trade, announcement - the channel to kind mapping lives
 in `state.ChatEvent`), SYSTEM keeps the bot system messages and the
 social lines. A world chat line renders the sender as its own column
-(`ChatEvent.from`) and colors by channel (shout/whisper/trade stand
-out). Every row pins the same whole pixel line height (18px on
+(`ChatEvent.from`) and colors by channel (the shout reads the
+orange-brown `--chat-shout`, the trade the pink `--chat-trade`, the
+whisper the violet - the themed variables of both palettes). Every row pins the same whole pixel line height (18px on
 `.chat-line`): a unitless ratio (the earlier 1.6 at 11px = 17.6px)
 rounds per row at paint time and the vertical distance between the
 lines drifted apart on some rows - taller glyph fallback boxes (emoji,

@@ -2981,3 +2981,19 @@ the acceptance botlog renderer resolves the skill name parameters
 through the dictionary now (the same class fix as the chat window),
 the stale cross comments follow the skull rename, the round report
 count is consistent.
+## Active task (status: complete): the web UI feedback round - the skull tooltips, the anchored scroll, the collapsible chat (2026-09-21, branch feature/improved-behaviour)
+
+Started 2026-09-21 ~13:20 UTC, closed ~14:40 UTC. Seven owner reports
+landed as melg8 (8ea1771 the anchored scroll, 0e3ceae the skull size
+and the victim tooltip, 6a96d7c the collapse and the channel colors,
+b143f09 the whisper root cause), rebased over the parallel pushes.
+The highlights: the kill marks carry the victim name and level now
+(the kill record captures them at the kill, the npc dictionary
+resolves a vanished corpse) and the skull hover shows the victim and
+the age; the chat scroll anchors the reading row by identity (the
+ring drops no longer move the read segment); the chat collapses into
+the corner button; the whisper one-letter-per-line root cause was a
+CSS class collision (the bare .chat-whisper input selector matched
+the whisper kind rows, squeezing them to 90px) - found with the
+preview server plus a headless browser measuring the real boxes.
+Docs: webui.md, development_log.md Round 123.
