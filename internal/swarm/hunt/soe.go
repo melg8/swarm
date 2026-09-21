@@ -197,13 +197,11 @@ func (l *Loop) maybeEscapeWithSOE(merchant townNpc) {
 // the line lands only when the bag holds none (the dropOwnedPurchases
 // filter would drop a carried line anyway).
 func (l *Loop) soePurchaseLine() (gear.Purchase, bool) {
+    var zero gear.Purchase
     if l.soeCount() > 0 {
-        return gear.Purchase{}, false
+        return zero, false
     }
-    listID, merchantID, ok := soeMerchantOf(l.zoneRegion)
-    if !ok {
-        return gear.Purchase{}, false
-    }
+    listID, merchantID := soeMerchantOf(l.zoneRegion)
 
     return gear.Purchase{
         ItemID:             soeItemID,
@@ -212,7 +210,11 @@ func (l *Loop) soePurchaseLine() (gear.Purchase, bool) {
         Count:              1,
         Price:              l.soePrice(),
         Reason:             "keep one Scroll of Escape",
+        SellFirst:          nil,
+        SellCredit:         0,
+        Gain:               0,
         Affordable:         true,
+        Missing:            0,
     }, true
 }
 
@@ -220,12 +222,12 @@ func (l *Loop) soePurchaseLine() (gear.Purchase, bool) {
 // sells the scroll (the elven Herbiel list 3015000 and the Dion Lara
 // list 3006300 carry the item 736; the generated buylists are the
 // authority).
-func soeMerchantOf(region string) (int32, int32, bool) {
+func soeMerchantOf(region string) (int32, int32) {
     switch region {
     case regionDion:
-        return 3006300, 7063, true
+        return 3006300, 7063
     default:
-        return 3015000, 7150, true
+        return 3015000, 7150
     }
 }
 

@@ -707,12 +707,11 @@ func TestTripStuckWalkRepaths(t *testing.T) {
 func TestTripStartsThroughTheMidFightTarget(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     spawnMob(bot)
-
-    // The mob is picked as the target while the inventory is still
-    // light.
-    loop.tick()
-    require.Equal(t, int32(7), loop.target)
-    require.False(t, loop.tripActive())
+    // The keep one scroll line of the shopping queue justifies the
+    // trip on the very first tick (460 adena over the trip minimum),
+    // so the held fight arms manually before the trigger.
+    loop.target = 7
+    bot.ApplySelfTarget(7)
 
     // The bag crosses the trip threshold mid-fight: the trip starts
     // and the held fight drops (the clear click rides only when the
