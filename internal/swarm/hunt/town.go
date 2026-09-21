@@ -757,6 +757,7 @@ func (l *Loop) maybeStartTownTrip() {
         sell:     true,
         buys:     nil,
         teach:    false,
+        guide:    false,
     }}
     l.buysPlanned = false
     l.buyAt = time.Time{}
@@ -3473,6 +3474,19 @@ func (l *Loop) tickTownSell() {
 
         return
     }
+    if l.guideStop() {
+        // The Newbie Guide stop: approach the guide and receive the
+        // support magic through the dialog (see guide_buffs.go). The
+        // stop carries no buys and never sells; a guide that never
+        // showed up or a refusal (the cooldown arms) skips the stop
+        // - the trip continues either way.
+        if !l.handleGuideStop(now) {
+            return
+        }
+        l.advanceTripStop()
+
+        return
+    }
     if l.sellableStop() {
         if l.junkRemaining() {
             if !l.handleMerchant(now, l.merchantTemplates()) {
@@ -3508,6 +3522,11 @@ func (l *Loop) tickTownSell() {
             // abort on the teacher segment never strands a
             // bare-handed character.
             l.planLearnStops()
+            // The Newbie Guide support magic closes the trip behind
+            // the lessons (see guide_buffs.go): the stop plans once,
+            // the refusal cooldown of a refused character keeps the
+            // later trips away.
+            l.planGuideStop()
         }
     }
     if l.stopBuysPending() {

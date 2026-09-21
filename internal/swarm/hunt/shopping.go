@@ -96,14 +96,16 @@ const (
 
 // tripStop is one merchant visit of a town trip: the merchant to
 // walk to, the purchases to buy there (grouped by their list ids),
-// whether the junk selling happens at this stop and whether this is
+// whether the junk selling happens at this stop, whether this is
 // the skill teacher stop that learns the queued lessons (see
-// learning.go).
+// learning.go) or the Newbie Guide stop that receives the support
+// magic (see guide_buffs.go).
 type tripStop struct {
     merchant townNpc
     buys     []gear.Purchase
     sell     bool
     teach    bool
+    guide    bool
 }
 
 // townShopCatalog is the static gear catalog of the elven village town
@@ -782,6 +784,7 @@ func (l *Loop) planShoppingStops() {
             buys:     stop.buys,
             sell:     false,
             teach:    false,
+            guide:    false,
         })
     }
 }
@@ -1005,6 +1008,7 @@ func (l *Loop) advanceTripStop() {
     l.buyConfirmAt = time.Time{}
     l.buyRetries = 0
     l.resetLearnState()
+    l.resetGuideState()
     // A fresh stop starts with a fresh escape budget: the frozen
     // aborts of the previous segment spent its attempts, the next
     // segment deserves its own cursor key escape before the trip
@@ -1025,7 +1029,8 @@ func (l *Loop) advanceTripStop() {
     stop := l.tripStops[0]
     l.logf("Hunt: shop: walking to %s", stop.merchant.Name)
     var planFailed bool
-    if stop.teach {
+    switch {
+    case stop.teach:
         // The teacher stop walks right up to the class master: the
         // npc search radius plans the walk to the master's own point -
         // the closest walkable surface of it (the hall row beside the
@@ -1037,7 +1042,14 @@ func (l *Loop) advanceTripStop() {
         // plan ends at the closest reachable point in front of it.
         planFailed = !l.startWalkNpcSegment(
             townNpcPosition(stop.merchant))
-    } else {
+    case stop.guide:
+        // The guide stop walks the same npc segment as the teacher:
+        // the spawn sits in the open village square and the plan
+        // ends on the closest walkable surface of it (the approach
+        // ring of handleGuideStop closes the last stretch).
+        planFailed = !l.startWalkNpcSegment(
+            townNpcPosition(stop.merchant))
+    default:
         // The merchant stop walks the exact mesh search first (the
         // same authority the manual walk plans with): the approach
         // ring catches the first deck polygon inside its radius and

@@ -127,6 +127,12 @@ func (l *Loop) maybeSelfBuff(now time.Time) bool {
         if l.tracker.SelfHasBuff(skill.SkillID) {
             continue
         }
+        // The collision guard: a fresh guide support magic buff in
+        // the same abnormal slot outlasts the own aura by far, the
+        // cast would replace the stronger effect (see guide_buffs.go).
+        if l.selfBuffSuperseded(skill.SkillID) {
+            continue
+        }
         if float64(cast.MPCostOf(skill.Level)) >
             l.tracker.SelfCurMP() {
             continue

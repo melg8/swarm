@@ -828,6 +828,16 @@ type Loop struct {
     learnRetries     int
     learnAt          time.Time
     learnRevision    uint64
+    // The Newbie Guide support magic state (see guide_buffs.go): the
+    // found guide npc with its pick pacing, the dialog anchor and
+    // the close approach window, plus the refusal cooldown the stop
+    // arms when the expected buffs never land (the cooldown outlives
+    // the trip - the gate of the server stays refused for a while).
+    guideID        int32
+    guidePick      time.Time
+    guideAt        time.Time
+    guideWalkUntil time.Time
+    guideRefusedAt time.Time
     // The combat casting state (see combat_skills.go): the pacing
     // timestamps of the strike and spell requests and of the self
     // buff casts, plus the locally tracked reuse windows of the
@@ -1005,6 +1015,11 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         learnRetries:       0,
         learnAt:            time.Time{},
         learnRevision:      0,
+        guideID:            0,
+        guidePick:          time.Time{},
+        guideAt:            time.Time{},
+        guideWalkUntil:     time.Time{},
+        guideRefusedAt:     time.Time{},
         castAt:             time.Time{},
         buffAt:             time.Time{},
         skillReuse:         make(map[int32]time.Time),

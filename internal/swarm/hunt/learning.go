@@ -267,6 +267,7 @@ func (l *Loop) planLearnStops() {
                     buys:     books,
                     sell:     false,
                     teach:    false,
+                    guide:    false,
                 })
                 l.logger.Printf("Hunt: learn: buying %d spellbooks from %s",
                     len(books), merchant.Name)
@@ -281,6 +282,7 @@ func (l *Loop) planLearnStops() {
         buys:     nil,
         sell:     false,
         teach:    true,
+        guide:    false,
     })
     l.logger.Printf("Hunt: learn: walking to the teacher %s for %d"+
         " lessons worth %d sp", teacher.Name, len(lessons),
