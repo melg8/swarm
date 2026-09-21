@@ -539,9 +539,11 @@ function renderSnapshot() {
 // takes precedence when the loop has not published a phase yet - a
 // manual only session never sets the phase, so its banner stays on
 // the status text. The label is the headline of the bot status
-// banner; the detail adds the next step (e.g. "selling junk at the
-// trader", "walking back to the farm spot") so the user sees at a
-// glance what every bot is doing right now.
+// banner; the detail adds the next step (e.g. "heading to the
+// trader") so the user sees at a glance what every bot is doing
+// right now. The detail stays straight to the point: the measured
+// progress (the waypoints, the trip age, the eta) and the goal,
+// nothing else.
 function phaseLabel(snap) {
   const status = snap.status;
   if (status === "offline") {
@@ -559,22 +561,24 @@ function phaseLabel(snap) {
   case "engage":
     if (c.inCombat) {
       return { kind: "combat", text: "hunting",
-        detail: engageFightDetail(c, hunt) };
+        detail: engageFightDetail(snap, c, hunt) };
     }
     return { kind: "hunt", text: "hunting",
       detail: engageSearchDetail(hunt) };
   case "loot":
     return { kind: "loot", text: "looting",
-      detail: "picking up the drops of the last kill" };
+      detail: "looting the last kill" };
   case "townWalk":
     return { kind: "town", text: "walking to town",
-      detail: walkDetail("heading to the trader to sell junk", hunt) };
+      detail: walkDetail("heading to the trader", hunt) };
   case "townSell":
     return { kind: "town", text: "selling",
       detail: sellDetail(hunt) };
   case "townReturn":
+    // The text already says where the bot walks; the detail carries
+    // only the measured progress of the trip.
     return { kind: "return", text: "walking to farm spot",
-      detail: walkDetail("heading back to the hunting zone", hunt) };
+      detail: walkDetail("", hunt) };
   case "delevel": {
     // The deleveling message: the target level and the trigger
     // evidence (the start level against the median mob level of the
@@ -598,7 +602,7 @@ function phaseLabel(snap) {
     return userPhaseLabel(snap);
   case "idle":
     return { kind: "idle", text: "idle",
-      detail: "waiting for a manual command" };
+      detail: "waiting for a command" };
   default:
     return { kind: "online", text: status || "online", detail: "" };
   }
@@ -616,17 +620,26 @@ function offlineDetailFor(snap) {
   return "session ended";
 }
 
-// engageFightDetail describes a running fight: the target id and its
-// engagement age when the diagnostics arrived.
-function engageFightDetail(c, hunt) {
-  const target = c.targetId ? ("#" + c.targetId) : "a target";
-  let detail = "fighting " + target;
+// engageFightDetail describes a running fight: the target name - the
+// same name the target panel resolves from the snapshot objects, the
+// raw object id never shows - and its engagement age when the
+// diagnostics arrived.
+function engageFightDetail(snap, c, hunt) {
+  const target = c.targetId
+    ? (snap.objects || []).find(
+      (obj) => obj.objectId === c.targetId && !obj.dead)
+    : null;
+  let head = "fighting " + (target && target.name
+    ? target.name
+    : "a target");
   if (hunt && hunt.targetId) {
-    detail += " for " + formatAgeMs(hunt.targetForMs);
+    head += " for " + formatAgeMs(hunt.targetForMs);
   }
-  detail += etaSuffix(hunt ? hunt.killEtaMs : 0);
+  const parts = [head];
+  const eta = etaText(hunt ? hunt.killEtaMs : 0);
+  if (eta) { parts.push(eta); }
 
-  return detail + " in the zone";
+  return parts.join(", ");
 }
 
 // engageSearchDetail describes the target search: the patience age
@@ -646,42 +659,46 @@ function engageSearchDetail(hunt) {
   return detail;
 }
 
-// etaSuffix renders an ETA value (milliseconds, 0 = not available) as
-// the "eta ~Ns" detail suffix, rounded to whole seconds - the
-// estimate is a plan over a noisy walk or fight, not a countdown.
-function etaSuffix(etaMs) {
+// etaText renders an ETA value (milliseconds, 0 = not available) as
+// the "eta ~Ns" part, rounded to whole seconds - the estimate is a
+// plan over a noisy walk or fight, not a countdown. The caller joins
+// the detail parts with the comma separators.
+function etaText(etaMs) {
   if (!etaMs || etaMs <= 0) { return ""; }
 
-  return ", eta ~" + Math.max(1, Math.round(etaMs / 1000)) + "s";
+  return "eta ~" + Math.max(1, Math.round(etaMs / 1000)) + "s";
 }
 
-// walkDetail describes a planned walk: the remaining waypoints, the
-// trip age when the diagnostics arrived and the walk ETA (the
-// remaining plan length over the run speed).
+// walkDetail describes a planned walk: the destination phrase of the
+// phase (empty when the phase text already says where the bot walks),
+// the remaining waypoints, the trip age when the diagnostics arrived
+// and the walk ETA (the remaining plan length over the run speed).
 function walkDetail(fallback, hunt) {
   if (!hunt) {
     return fallback;
   }
-  let detail = fallback;
+  const parts = [];
+  if (fallback) { parts.push(fallback); }
   if (hunt.waypointsLeft > 0) {
-    detail += ", " + hunt.waypointsLeft + " waypoints left";
+    parts.push(hunt.waypointsLeft + " waypoints left");
   }
   if (hunt.tripForMs > 0) {
-    detail += " (" + formatAgeMs(hunt.tripForMs) + " trip)";
+    parts.push(formatAgeMs(hunt.tripForMs) + " trip");
   }
-  detail += etaSuffix(hunt.walkEtaMs);
+  const eta = etaText(hunt.walkEtaMs);
+  if (eta) { parts.push(eta); }
 
-  return detail;
+  return parts.join(", ");
 }
 
 // sellDetail describes the sell stop: the buy retries of the
 // shopping plan when they accumulated.
 function sellDetail(hunt) {
   if (hunt && hunt.buyRetries > 0) {
-    return "selling the inventory, buy retry " + hunt.buyRetries;
+    return "selling at the trader, buy retry " + hunt.buyRetries;
   }
 
-  return "selling the inventory at the trader";
+  return "selling at the trader";
 }
 
 // userPhaseLabel describes the manual command the loop is executing:
@@ -695,14 +712,13 @@ function userPhaseLabel(snap) {
   const c = snap.character || {};
   if (c.inCombat) {
     return { kind: "combat", text: "manual · attacking",
-      detail: "fighting the manually selected target" };
+      detail: engageFightDetail(snap, c, null) };
   }
   if (c.moving) {
     return { kind: "user", text: "manual · moving",
       detail: "walking to the clicked destination" };
   }
-  return { kind: "user", text: "manual",
-    detail: "executing a manual command" };
+  return { kind: "user", text: "manual", detail: "" };
 }
 
 // renderBotStatus updates the floating activity banner of the bot
@@ -1670,18 +1686,20 @@ function isQuestItem(item) {
   return Boolean(item) && item.type2 === 3;
 }
 
-// renderQuest refreshes the quest tab of the equipment widget: the
+// renderQuest refreshes the quest grid of the equipment widget: the
 // keyed grid shows only the type2 quest items of the inventory, the
-// tab badge carries their count. The bag keeps showing them too (the
-// trash and the drop flows work from it), the tab answers the
+// sub tab badge carries their count. The bag keeps showing them too
+// (the trash and the drop flows work from it), the tab answers the
 // "what does my character carry for the running quests" question at
-// one glance.
+// one glance. The visibility of the grid itself belongs to
+// applyInvTab, this function only fills the cells and the counts.
 function renderQuest(snap) {
   const grid = document.getElementById("quest-grid");
-  const badge = document.getElementById("gear-mode-quest-badge");
   if (!grid) { return; }
 
   const questItems = (snap.inventory || []).filter(isQuestItem);
+  InvTab.questCount = questItems.length;
+  const badge = document.getElementById("inv-tab-quest-badge");
   if (badge) {
     badge.textContent = String(questItems.length);
     badge.classList.toggle("hidden", questItems.length === 0);
@@ -1716,14 +1734,7 @@ function renderQuest(snap) {
     }
   }
 
-  const count = document.getElementById("quest-count");
-  if (count) {
-    count.textContent = String(questItems.length);
-  }
-  const empty = document.getElementById("quest-empty");
-  if (empty) {
-    empty.classList.toggle("hidden", questItems.length !== 0);
-  }
+  applyInvTab();
 }
 
 // ---- weight gauge coloring ----
@@ -2310,11 +2321,21 @@ function showShoppingTooltip(entry, item) {
 // planned lesson.
 
 // GearMode holds the widget mode and the learned list filter, both
-// persisted in localStorage like the zone panel collapse.
+// persisted in localStorage like the zone panel collapse. The quest
+// items are not a widget mode: they are a sub tab of the equipment
+// view (the inventory title row), owned by InvTab below.
 const GearMode = {
   mode: "gear",
   filter: "active",
   gridSignature: ""
+};
+
+// InvTab holds the inventory sub tab of the equipment view (the bag
+// items or the quest items grid) and the quest item count of the last
+// snapshot, persisted in localStorage the same way.
+const InvTab = {
+  tab: "items",
+  questCount: 0
 };
 
 // SkillCells is the keyed cell registry of the learned skill grid:
@@ -2333,13 +2354,13 @@ const SkillCells = {
 // generated skill dictionary (0 attack power, 1 defense, 2 other).
 const SKILL_CATEGORY_LABELS = ["attack power", "defense", "other"];
 
-// initGearMode wires the mode tabs of the equipment widget and the
-// ACTIVE / PASSIVE filter of the learned list, restoring both from
-// localStorage.
+// initGearMode wires the mode tabs of the equipment widget, the
+// INVENTORY / QUEST switch of the inventory area and the ACTIVE /
+// PASSIVE filter of the learned list, restoring all from localStorage
+// (the retired "quest" widget mode migrates to the quest sub tab).
 function initGearMode() {
   const equipBtn = document.getElementById("gear-mode-equip");
   const skillsBtn = document.getElementById("gear-mode-skills");
-  const questBtn = document.getElementById("gear-mode-quest");
   if (equipBtn && skillsBtn) {
     equipBtn.addEventListener("click", () => {
       setGearMode("gear");
@@ -2348,9 +2369,14 @@ function initGearMode() {
       setGearMode("skills");
     });
   }
-  if (questBtn) {
-    questBtn.addEventListener("click", () => {
-      setGearMode("quest");
+  const itemsTab = document.getElementById("inv-tab-items");
+  const questTab = document.getElementById("inv-tab-quest");
+  if (itemsTab && questTab) {
+    itemsTab.addEventListener("click", () => {
+      setInvTab("items");
+    });
+    questTab.addEventListener("click", () => {
+      setInvTab("quest");
     });
   }
   const activeBtn = document.getElementById("skill-tab-active");
@@ -2365,9 +2391,16 @@ function initGearMode() {
   }
   try {
     const storedMode = window.localStorage.getItem("swarm.gearMode");
-    if (storedMode === "skills" || storedMode === "quest") {
+    if (storedMode === "skills") {
       GearMode.mode = storedMode;
+    } else if (storedMode === "quest") {
+      // The pre 2026-09-21 builds kept the quest items as a widget
+      // mode: migrate the stored value to the sub tab and drop it.
+      InvTab.tab = "quest";
+      window.localStorage.removeItem("swarm.gearMode");
     }
+    const storedTab = window.localStorage.getItem("swarm.invTab");
+    if (storedTab === "quest") { InvTab.tab = "quest"; }
     const storedFilter = window.localStorage.getItem("swarm.skillFilter");
     if (storedFilter === "passive") { GearMode.filter = "passive"; }
   } catch (err) { /* storage unavailable - defaults stay */ }
@@ -2403,6 +2436,44 @@ function setSkillFilter(filter) {
   renderSkillsNow();
 }
 
+// setInvTab switches the INVENTORY / QUEST sub tab of the inventory
+// area and persists it.
+function setInvTab(tab) {
+  if (InvTab.tab === tab) { return; }
+  InvTab.tab = tab;
+  try {
+    window.localStorage.setItem("swarm.invTab", tab);
+  } catch (err) { /* storage unavailable - skip */ }
+  applyInvTab();
+}
+
+// applyInvTab syncs the INVENTORY / QUEST switch and the grid
+// visibility with the InvTab state: one of the two grids is always
+// visible so the widget keeps its height, and the empty note shows
+// only while the quest tab is active with no quest items.
+function applyInvTab() {
+  const itemsTab = document.getElementById("inv-tab-items");
+  const questTab = document.getElementById("inv-tab-quest");
+  const invGrid = document.getElementById("inv-grid");
+  const questGrid = document.getElementById("quest-grid");
+  const quest = InvTab.tab === "quest";
+  if (itemsTab) {
+    itemsTab.classList.toggle("active", !quest);
+    itemsTab.setAttribute("aria-selected", quest ? "false" : "true");
+  }
+  if (questTab) {
+    questTab.classList.toggle("active", quest);
+    questTab.setAttribute("aria-selected", quest ? "true" : "false");
+  }
+  if (invGrid) { invGrid.classList.toggle("hidden", quest); }
+  if (questGrid) { questGrid.classList.toggle("hidden", !quest); }
+  const empty = document.getElementById("quest-empty");
+  if (empty) {
+    empty.classList.toggle("hidden",
+      !(quest && InvTab.questCount === 0));
+  }
+}
+
 // renderSkillsNow is the synchronous entry point of the skills grid
 // for tab-switch events: it invalidates the grid signature cache (so
 // the filter change is picked up even when the snapshot data did not
@@ -2427,12 +2498,9 @@ function applyGearMode() {
   const main = document.getElementById("gear-main");
   const equipBtn = document.getElementById("gear-mode-equip");
   const skillsBtn = document.getElementById("gear-mode-skills");
-  const questBtn = document.getElementById("gear-mode-quest");
   const skillsView = document.getElementById("skills-view");
-  const questView = document.getElementById("quest-view");
   if (main) {
     main.classList.toggle("mode-skills", GearMode.mode === "skills");
-    main.classList.toggle("mode-quest", GearMode.mode === "quest");
   }
   if (equipBtn) {
     equipBtn.classList.toggle("active", GearMode.mode === "gear");
@@ -2444,17 +2512,10 @@ function applyGearMode() {
     skillsBtn.setAttribute("aria-selected",
       GearMode.mode === "skills" ? "true" : "false");
   }
-  if (questBtn) {
-    questBtn.classList.toggle("active", GearMode.mode === "quest");
-    questBtn.setAttribute("aria-selected",
-      GearMode.mode === "quest" ? "true" : "false");
-  }
   if (skillsView) {
     skillsView.classList.toggle("hidden", GearMode.mode !== "skills");
   }
-  if (questView) {
-    questView.classList.toggle("hidden", GearMode.mode !== "quest");
-  }
+  applyInvTab();
   const activeBtn = document.getElementById("skill-tab-active");
   const passiveBtn = document.getElementById("skill-tab-passive");
   if (activeBtn) {

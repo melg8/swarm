@@ -1218,7 +1218,17 @@ body.mode-pathfind .bot-status { display: none; }
   overflow-y: auto;
 }
 
-.chat-line { display: flex; gap: 8px; }
+/* Every row pins the same whole pixel line height: a unitless ratio
+   (the old 1.6 at 11px = 17.6px) rounds per row at paint time and
+   the vertical distance between the lines drifts apart on some
+   rows - the taller glyph fallback boxes (emoji, arrows) widen the
+   line box the same way. 18px keeps the rhythm identical everywhere,
+   wrapped message lines included. */
+.chat-line {
+  display: flex;
+  gap: 8px;
+  line-height: 18px;
+}
 
 .chat-time { color: var(--text-dim); flex-shrink: 0; }
 
@@ -1583,6 +1593,12 @@ body.mode-pathfind .gear-panel { display: none; }
   justify-content: space-between;
 }
 
+/* The INVENTORY / QUEST switch of the equipment view: the same tab
+   idiom as the skill filter. The quest grid is a sibling of the bag
+   grid (one of the two is always visible), not a widget mode of its
+   own - the switch sits right of the INVENTORY title it belongs to. */
+.inv-tabs { display: flex; gap: 4px; }
+
 .inv-count { color: var(--text-dim); letter-spacing: 0; }
 
 /* ---- queue flyout widgets (the shop plan and the skill lessons) ----
@@ -1898,11 +1914,10 @@ body.mode-pathfind .gear-panel { display: none; }
 
 /* In skills mode the gear content only hides visually: display none
    would collapse the flow and shrink the panel - the forbidden size
-   change. */
+   change. The quest grid is no overlay: it is a sibling of the bag
+   grid inside the gear view, so the mode class hides the gear view
+   alone. */
 .gear-main.mode-skills #gear-view { visibility: hidden; }
-
-.gear-main.mode-quest #gear-view,
-.gear-main.mode-skills #quest-view { visibility: hidden; }
 
 /* The overlay paints above every gear child: the paperdoll icons,
    glyphs and badges carry positive z-index values (1..3) that would
@@ -1918,29 +1933,11 @@ body.mode-pathfind .gear-panel { display: none; }
   z-index: 4;
 }
 
-/* The quest tab overlay: the same overlay contract as the skills
-   view, the grid reuses the bag cell metrics. */
-.quest-view {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-panel);
-  overflow: hidden;
-  z-index: 4;
-}
-
-.quest-note {
-  color: var(--text-dim);
-  font-size: 10px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.quest-grid { flex: 1; min-height: 0; }
-
-.quest-view .skill-empty {
+/* The empty note of the quest tab: absolutely positioned so the
+   widget keeps its height when it shows (the nearest positioned
+   ancestor is gear-main), it pins to the widget bottom like the old
+   overlay hint did. */
+.quest-empty {
   position: absolute;
   inset: auto 0 0 0;
   text-align: center;
@@ -1948,9 +1945,9 @@ body.mode-pathfind .gear-panel { display: none; }
   padding: 8px 0;
 }
 
-.skills-view.hidden { display: none; }
+.quest-empty.hidden { display: none; }
 
-.quest-view.hidden { display: none; }
+.skills-view.hidden { display: none; }
 
 /* The ACTIVE / PASSIVE filter row of the learned list, the same
    chrome height as the INVENTORY title row it replaces. */
@@ -2253,6 +2250,10 @@ body.mode-pathfind .gear-panel { display: none; }
 .inv-grid::-webkit-scrollbar {
   width: 6px;
 }
+
+/* The tab swap of the inventory area: the hidden grid leaves the
+   flow so the panel height never changes between the tabs. */
+.inv-grid.hidden { display: none; }
 
 .inv-grid::-webkit-scrollbar-thumb {
   background: var(--border);

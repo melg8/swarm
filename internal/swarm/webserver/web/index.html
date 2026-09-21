@@ -313,13 +313,6 @@ SPDX-License-Identifier: MIT
                 <span id="gear-mode-skill-badge"
                   class="gear-mode-badge hidden"></span>
               </button>
-              <button id="gear-mode-quest" class="gear-mode-btn"
-                type="button" role="tab" aria-selected="false"
-                title="the quest items of the inventory">
-                QUEST
-                <span id="gear-mode-quest-badge"
-                  class="gear-mode-badge hidden"></span>
-              </button>
             </div>
             <div id="gear-main" class="gear-main">
               <div id="gear-view" class="gear-view">
@@ -328,10 +321,28 @@ SPDX-License-Identifier: MIT
                   <div id="gear-jewel" class="gear-jewel"></div>
                 </div>
                 <div class="sidebar-title inv-title">
-                  INVENTORY
+                  <div class="inv-tabs" role="tablist"
+                    aria-label="inventory mode">
+                    <button id="inv-tab-items"
+                      class="skill-filter-btn active" type="button"
+                      role="tab" aria-selected="true"
+                      title="the bag items of the inventory">
+                      INVENTORY
+                    </button>
+                    <button id="inv-tab-quest" class="skill-filter-btn"
+                      type="button" role="tab" aria-selected="false"
+                      title="the quest items of the inventory">
+                      QUEST
+                      <span id="inv-tab-quest-badge"
+                        class="gear-mode-badge hidden"></span>
+                    </button>
+                  </div>
                   <span id="inv-count" class="inv-count">0/80</span>
                 </div>
                 <div id="inv-grid" class="inv-grid"></div>
+                <div id="quest-grid" class="inv-grid hidden"></div>
+                <div id="quest-empty" class="quest-empty hidden">no quest
+                  items yet</div>
                 <div class="gear-foot">
                   <div class="gear-foot-cols">
                     <div class="gear-row adena-row">
@@ -377,18 +388,6 @@ SPDX-License-Identifier: MIT
                     <b id="skill-next" class="skill-next-val">—</b>
                   </div>
                 </div>
-              </div>
-              <div id="quest-view" class="quest-view hidden"
-                title="the quest items of the inventory">
-                <div class="skill-filter" role="tablist"
-                  aria-label="quest item header">
-                  <span class="skill-count" id="quest-count">0</span>
-                  <span class="quest-note">quest items carry the
-                    progress of the running quests</span>
-                </div>
-                <div id="quest-grid" class="inv-grid quest-grid"></div>
-                <div id="quest-empty" class="skill-empty hidden">no quest
-                  items yet</div>
               </div>
             </div>
             <button id="shop-tab" class="shop-tab hidden" type="button"
