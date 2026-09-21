@@ -11,30 +11,30 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task (status: in progress): the guide buff priority round (2026-09-21, branch feature/improved-behaviour)
+## Active task (status: complete): the guide buff priority round (2026-09-21, branch feature/improved-behaviour)
 
-Started 2026-09-21 ~09:00 UTC, session ends by ~11:00 UTC (the owner
-1h45m mark ~10:45 UTC). Commits as melg8, rebase before every push.
-The owner prompt assigned two behaviour features:
+Started 2026-09-21 ~09:00 UTC, closed ~10:45 UTC. Commits as melg8
+(0dc22da the guide run, 60810e9 the keep-one trigger fix), rebased
+over the parallel webui and skip-storm rounds and pushed. The owner
+prompt assigned two behaviour features, both landed:
 
-- After death the bot must approach the Newbie Guide and take the
-  support magic BEFORE walking back to the farm spot (today it just
-  returns to the ground unbuffed - the death wiped every buff).
-- The bots must PRIORITIZE the buffs: when the expected support magic
-  is missing or expired, the bot starts the buff refill trip instead
-  of farming without the buffs.
+- After death the bot approaches the Newbie Guide and takes the
+  support magic BEFORE walking back to the farm spot.
+- The bots prioritize the buffs: missing or expired support magic
+  starts the buff refill trip instead of farming without the buffs.
 
-### Design (verified against the code, landed)
+### Design (verified against the code, landed in 0dc22da)
 
 - The trip start gained the guide run trigger (`guideRunWanted`,
-  guide_buffs.go): the region carries a guide AND `guideWanted` holds
-  (the 8-24 band, no refusal cooldown, an eligible buff missing). It
-  joins the justification disjunction of `maybeStartTownTrip` and the
-  out-of-zone exception beside `weaponRun`: the village revive of a
-  death lands next to the guide, the trip machinery takes the buffs
-  first and the return segment walks the farm spot second. No new
-  phase machinery - the ordinary sell stop leads (the junk sells),
-  `planGuideStop` appends the guide stop behind the learning stops.
+  guide_buffs.go): the region carries a guide AND `guideWanted`
+  holds (the 8-24 band, no refusal cooldown, an eligible buff
+  missing). It joins the justification disjunction of
+  `maybeStartTownTrip` and the out-of-zone exception beside
+  `weaponRun`: the village revive of a death lands next to the
+  guide, the trip machinery takes the buffs first and the return
+  segment walks the farm spot second. No new phase machinery - the
+  ordinary sell stop leads (the junk sells), `planGuideStop`
+  appends the guide stop behind the learning stops.
 - The farm spot survives the death (`resetTownTrip` keeps it), so
   the guide run skips `rememberFarmSpot` when it starts outside the
   zone - the precise return target stays instead of the zone center
@@ -48,31 +48,35 @@ The owner prompt assigned two behaviour features:
   `tripStartReason` (the trigger list growth pushed maintidx over
   the limit; the extraction keeps the nolint debt flat, gocognit
   dropped out of the directive).
-- Tests: `guide_trip_test.go` (6 tests): the village death recovery
-  (trip starts, farm spot preserved, reason names the buffs), the
-  in-zone expiry trigger, the negatives (full buffs / above band),
-  the refusal fallback to the plain zone return, the region guard,
-  the junk-less sell stop riding the guide stop. Test gotcha
-  recorded: `setGuideLevel` zeroes the tracker position (the
-  UserInfo coordinate block) - the tests snap the position AFTER
-  the level seeding.
+- Tests: `guide_trip_test.go` (6 tests). Test gotcha recorded:
+  `setGuideLevel` zeroes the tracker position (the UserInfo
+  coordinate block) - the tests snap the position AFTER the level
+  seeding.
 
-### State
+### The red tree debt (the class fix, landed in 60810e9)
 
-- Landed (this commit): guide_buffs.go (guideForRegion,
-  guideRunWanted, the planGuideStop region guard), town.go (the
-  trigger disjunct, the zone gate exception, the conditional
-  rememberFarmSpot, tripStartReason), guide_trip_test.go.
-- Verified: go build, the focused guide+trip tests, the full hunt
-  suite vs the clean tree (IDENTICAL failure sets - zero new
-  regressions), golangci-lint 0 issues on hunt.
-- KNOWN RED (pre-existing on the branch, 22 hunt tests): the SOE
-  keep-one line of the previous round inserts a pending buy into
-  every trip (TestTripFullFlow, TestShoppingTrip*, the plan freeze
-  tests) and the learning trips stopped triggering (TestLearnTrip*,
-  TestTeacher*), plus the blind engage cluster (TestEngageBlind*).
-  Diagnosed as the top priority of the NEXT step in this session,
-  budget permitting; otherwise the next session starts there.
+The merged branch failed 22 hunt tests from the parallel rounds'
+unverified merge: the SOE keep-one line of commit 2203086 made
+`shoppingWanted()` true for every SOE-less bot (460 adena hardcoded
+affordable over the 100 adena trip minimum) - it hijacked the blind
+engage fixtures, inserted a pending scroll buy into every trip flow
+test and broke both trigger-threshold tests. Root cause analysis
+and the fix live in `docs/development_log.md` (Round 114):
+`shoppingWanted` skips the scroll line (a scroll-only plan never
+starts a trip, the stock rides the natural cadence), the flow
+fixtures own their scroll. Result: 22 red -> 0 red, the whole hunt
+suite green, task prepush green, `lint --new` 0 issues.
+
+- Docs updated: docs/hunting.md (the Newbie Guide buff run block of
+  the town trips section), docs/development_log.md (Round 114).
+- Follow ups for the next session: the scroll round reserves no
+  wallet share for the scroll before the gear plan (the gear
+  affordability computes against the full wallet); the guide run
+  has no expiry anticipation (the server's removal push starts the
+  refill - anticipating the last minute of the 1200 s buffs would
+  tighten the buff uptime); the full-lint findings of the parallel
+  rounds (clickWaypoint cyclop 16, handleServerPacket cyclop 16,
+  church_entry exhaustruct) belong to their owning rounds.
 
 ## Active task (status: complete): the frozen skip storm round (2026-09-21, branch feature/improved-behaviour)
 

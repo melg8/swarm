@@ -581,6 +581,31 @@ The short form:
   sets follow the region (`merchantsForRegion`): the elven default
   and the Dion set for the 20-25 band, the same set the region shop
   catalog builds from.
+- **The Newbie Guide buff run** (the 2026-09-21 guide priority
+  round): the support magic of the village guide (template 7599, the
+  8-24 level band, the two dialog links - see `hunt/guide_buffs.go`)
+  is a trip reason of its own (`guideRunWanted`: the region carries a
+  guide AND `guideWanted` - the level band, no refusal cooldown, an
+  eligible buff missing). The run joins the weapon run as the second
+  trip start that may fire OUTSIDE the hunting zone: the village
+  revive of a death wipes every buff and lands next to the guide, so
+  the recovered character takes the support magic first and the trip
+  return segment walks the preserved farm spot second (`resetTownTrip`
+  keeps `farmX/Y/Z`; the guide run skips the out-of-zone
+  `rememberFarmSpot` zone-center overwrite). In zone, the expired
+  support magic starts the refill trip at the next between-fights
+  window - the bot never keeps farming unbuffed while the guide is
+  reachable. The trip machinery is shared: the ordinary sell stop
+  leads (the junk sells), the guide stop plans behind the learning
+  stops (`planGuideStop`), the refusal cooldown of a refused gate
+  keeps the later trips away for 10 minutes. The keep-one scroll
+  line of the shopping plan stays out of the trip justification
+  total (`shoppingWanted` skips the scroll): a scroll-only plan
+  never clears the trip minimum, the stock rides the natural trip
+  cadence and restores itself on the same trip that spends it.
+  Regions without a mapped guide (Dion today) neither start the run
+  nor plan the stop (`guideForRegion`) - a wrong guide would walk
+  the Dion trips to the elven village across the whole map.
 - **One town visit buys everything** (the 2026-09-12 acceptance
   round): the gear stops distribute first (`planShoppingStops`), the
   learn stops close the trip behind them (`planLearnStops` at the

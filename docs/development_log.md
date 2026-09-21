@@ -8415,3 +8415,89 @@ recovery ladder only answers what the one oracle cannot see.
   rung that always succeeds is not a recovery - it is a gate
   starving every rung behind it; a skip must pay for itself with
   ground before it may fire again.
+
+## Round 114: the guide buff run and the red tree debt (2026-09-21)
+
+Scope: the owner prompt assigned the death-recovery buff visit and
+the buff priority; the session found the whole hunt suite red (22
+tests) from the parallel rounds' unverified merge and fixed that
+class too.
+
+### Problem 1: the bot returns to the farm spot unbuffed after death
+
+Statement: the death wipes every effect (the server side), the
+village revive lands next to the Newbie Guide, and the previous
+round's guide stop only rode the shopping trips - the recovered
+character walked home without the support magic and kept farming
+without it.
+
+Root cause: the trip justification gate (`maybeStartTownTrip`) had
+no buff trigger and the zone gate refused every trip start outside
+the hunting square except the weapon run. The guide stop planned
+only from the sell stop's stop distribution (`planGuideStop` behind
+the learning stops), so a trip was the only way in.
+
+Fix: `guideRunWanted` (region carries a guide AND `guideWanted`)
+joined the justification disjunction and the out-of-zone exception
+beside the weapon run. The farm spot survives the death
+(`resetTownTrip` keeps it), so the guide run skips the out-of-zone
+`rememberFarmSpot` overwrite - the return segment walks the precise
+ground, not the zone center. Region guard `guideForRegion`: the
+Dion region maps no guide, so neither the run nor the stop plans
+there (the pre-existing latent trap of the guide stop walking Dion
+trips to the elven village closes with it).
+
+### Problem 2: the bots farm without the buffs
+
+Statement: the support magic lapses mid farm and nothing happened -
+the bot only took buffs when some other trigger walked it to town.
+
+Root cause: same gate, the missing-buff verdict existed
+(`guideWanted`) but nothing consumed it as a trip start reason.
+
+Fix: the same `guideRunWanted` trigger; the expired support magic
+starts the refill trip at the next between-fights window (the
+`fightBusy` hold keeps mid-fight starts away, the owner's priority
+is "no farming unbuffed", not "abandon the current fight").
+
+### Problem 3 (the class fix): 22 red hunt tests on the shared branch
+
+Statement: the merged tree failed 22 hunt tests across the shopping
+flow (TestTripFullFlow, TestShoppingTrip*), the learning trips
+(TestLearnTrip*, TestTeacher*) and the blind engage cluster
+(TestEngageBlind*) - the previous rounds verified focused suites
+only (the progress note flagged the full verify as pending).
+
+Root cause: ONE line - the SOE keep-one purchase line of the scroll
+round (commit 2203086) led every shopping queue with a hardcoded
+`Affordable: true` 460 adena line. Every SOE-less bot (every fresh
+test fixture) thus had `shoppingWanted() == true` (460 over the 100
+adena trip minimum): the trip start hijacked the blind engage
+fixtures ("the town trip owns the way"), the pending scroll buy
+inserted itself into every sell stop flow the trip tests walk, and
+the trigger-threshold tests failed both ways
+(TestShoppingTriggerSkipsSmallPlans - 50 adena "plans" a 460 trip).
+
+Fix: the keep-one scroll stays out of the trip justification total
+(`shoppingWanted` skips the `soeItemID` line - the safety stock
+rides the natural trip cadence and restores itself on the same trip
+that spends it; a scroll-only plan never clears the trip minimum).
+The trip flow fixtures own their scroll (`addSOE(bot, 1)` in the
+tests that walk the stop flow, the guide stop neutralized with the
+expected buff set where the guide stop would divert the flow).
+Result: 22 red -> 0 red, the whole hunt suite green (73.7 s).
+
+- Verification: go build, the full hunt suite green, task prepush
+  green, `lint --new` 0 issues, the guide run covered by
+  guide_trip_test.go (6 tests: the village death recovery with the
+  preserved farm spot, the in-zone expiry trigger, the negatives,
+  the refusal fallback to the zone return, the region guard, the
+  junk-less sell stop riding the guide stop).
+- Follow ups: the scroll round reserves no wallet share for the
+  scroll before the gear plan (the gear affordability computes
+  against the full wallet, the scroll buy can strand the plan's
+  tail - the buy retries skip it, nothing deadlocks, but the
+  planning could be exact); the guide trip trigger has no expiry
+  anticipation (the removal push of the server starts the refill -
+  anticipating the last minute of the 1200 s buffs would tighten
+  the buff uptime further).
