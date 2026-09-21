@@ -65,27 +65,37 @@ type botPlan struct {
     Account string
 }
 
-// botTypeFighter is the default (and today the only) bot type: the
-// elven melee fighter of the current hunt loop. The empty type of a
-// bot spec reads as this constant, so {"count": 3} means three
-// fighters.
+// botTypeFighter is the melee bot type: the elven fighter of the
+// current hunt loop. The empty type of a bot spec reads as this
+// constant, so {"count": 3} means three fighters.
 const botTypeFighter = "fighter"
 
+// botTypeArcher is the ranged bot type: the archetype of the ranged
+// weapon preference with kiting (see the archetype issue linked from
+// #13). The launch side accepts it today; the hunt side behaviors
+// land with their own slices (the bow-aware radii and the lure
+// profiles of the current loop already serve a bow-equipped bot).
+const botTypeArcher = "archer"
+
 // implementedBotTypes lists the bot types the fleet can launch today.
-// The fighter is the melee hunt bot of the current hunt loop; the
-// archer with its kiting behavior is issue #13 and joins this registry
-// (and the docs) when it lands. A config naming anything else fails
-// validation with this list in the message, so a config written for a
-// newer swarm refuses loudly instead of silently degrading.
+// The fighter is the melee hunt bot; the archer is the ranged
+// archetype whose kiting behavior lands in its own slices (the first
+// round rides PR #15). A config naming anything else fails validation
+// with this list in the message, so a config written for a newer
+// swarm refuses loudly instead of silently degrading.
 var implementedBotTypes = map[string]bool{
     botTypeFighter: true,
+    botTypeArcher:  true,
 }
 
 // defaultLaunchConfig is the built-in default of the -config file:
-// exactly the flag defaults of parseFlags with a single fighter. The
-// shipped configs/swarm.json mirrors it, and a launch without -config
-// runs the same values - the file, the fallback and the flags agree
-// by construction (the tests pin the three-way equality).
+// the flag defaults for the shared parameters with the default swarm
+// composition of three melee warriors and three archers (the owner
+// picked the six bot default; the account ladder walks the
+// composition, so the fleet runs test1..test3 as fighters and
+// test4..test6 as archers). The shipped configs/swarm.json mirrors
+// it, and a launch without -config keeps the plain single fighter of
+// the flag form (the tests pin the file/default equality).
 func defaultLaunchConfig() launchConfig {
     return launchConfig{
         Login:      defaultLoginAddress,
@@ -101,7 +111,10 @@ func defaultLaunchConfig() launchConfig {
         ProxyGame:  strings.Join(proxy.DefaultGameAddresses(), ","),
         ProxyLog:   defaultProxyLogPath,
         SessionDir: "logs",
-        Bots:       []botSpec{{Type: botTypeFighter, Count: 1}},
+        Bots: []botSpec{
+            {Type: botTypeFighter, Count: 3},
+            {Type: botTypeArcher, Count: 3},
+        },
     }
 }
 

@@ -7,9 +7,13 @@ its swarm by editing a JSON file instead of maintaining a CLI flag
 line (owner issue #12).
 
 The shipped default lives at `configs/swarm.json` and mirrors the
-plain flag defaults exactly, so running the file and running without
-any config launch the same swarm (the equality is pinned by
-`cmd/swarm/launch_config_test.go`).
+built-in default exactly: the shared parameters at their flag
+defaults with the default swarm composition of **three melee
+warriors and three archers** (the owner picked the six bot default;
+the account ladder walks the composition, so the fleet runs test1..
+test3 as fighters and test4..test6 as archers). A launch without
+`-config` keeps the plain single fighter of the flag form. The file /
+default equality is pinned by `cmd/swarm/launch_config_test.go`.
 
 ## Running with a config
 
@@ -56,7 +60,8 @@ mode they select.
     "proxyLog": "proxy.log",
     "sessionDir": "logs",
     "bots": [
-        { "type": "fighter", "count": 3 }
+        { "type": "fighter", "count": 3 },
+        { "type": "archer", "count": 3 }
     ]
 }
 ```
@@ -95,7 +100,7 @@ The implemented bot types today:
 | Type | Behavior |
 | --- | --- |
 | `fighter` | the elven melee fighter of the current hunt loop |
-| `archer` | reserved: the ranged kiting bot of issue #13, joins the registry when it lands |
+| `archer` | the ranged archetype: the ranged weapon preference with kiting and bow shots even at melee range (the hunt side behavior lands in its own slices, the first round rides PR #15; the launch side accepts the type today) |
 
 A config naming an unimplemented type fails validation with the list
 of implemented types in the error, so a config written for a newer
@@ -104,8 +109,8 @@ swarm refuses loudly instead of silently degrading.
 A composition of exactly one bot runs the single bot path (no fleet
 supervisor, no shared web sidebar); anything larger runs the fleet
 mode exactly like `-bots N` does. The startup log reads the
-composition back: `Starting swarm fleet of 3 bots (2 fighter, 1
-archer)`.
+composition back: `Starting swarm fleet of 6 bots (3 fighter,
+3 archer)`.
 
 ## Where the code lives
 
