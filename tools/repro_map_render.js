@@ -836,17 +836,20 @@ function runScenarioBowShot(mapFile) {
     return results;
 }
 
-// runScenarioMeleeContact covers the contact shrink: a mob standing
+// runScenarioMeleeContact covers the contact slide: a mob standing
 // at the melee collision distance overlaps the self circle at the
-// harness scale - the pair shrinks so the circles touch face to face
-// (two bodies visible, not one merged blob), while a far mob keeps
-// its full marker radius.
+// harness scale - the pair keeps its full marker radii and slides
+// apart along the connecting axis so the circles touch face to face
+// (two full size bodies, not one merged blob), while a far mob keeps
+// its full radius at its untouched spot.
 function runScenarioMeleeContact(mapFile) {
     const { MapView, record } = loadMapJs(mapFile);
     MapView.init();
     const snap = buildSnapshot(0, false);
     // The melee mob: 30 world units east of the character - 3.6px on
-    // the harness canvas, well inside the 6+6 marker radii sum.
+    // the harness canvas, well inside the 6+5 marker radii sum. The
+    // contact pass pushes the pair to 6+5+0.5 apart, so each side
+    // slides (11.5 - 3.6) / 2 = 3.95px along the axis.
     const melee = snap.objects.find(
         (o) => o.objectId === WORLD.playerTargetMob.objectId);
     melee.x = WORLD.self.x + 30;
@@ -855,41 +858,107 @@ function runScenarioMeleeContact(mapFile) {
     MapView.draw();
 
     const results = [];
-    const self = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
-    const meleeScreen = worldToScreen(melee.x, melee.y);
+    const slide = (6 + 5 + 0.5 - 30 * WORLD.scale) / 2;
+    const self = { x: CANVAS_W / 2 - slide, y: CANVAS_H / 2 };
+    const meleeScreen = {
+        x: CANVAS_W / 2 + 30 * WORLD.scale + slide, y: CANVAS_H / 2 };
     const bodyAt = (center, style) => record.fills.filter((fill) =>
         fill.arcs.length === 1
         && Math.hypot(fill.arcs[0][0] - center.x, fill.arcs[0][1]
             - center.y) < 2
         && (style ? fill.style === style : true));
 
-    // The melee pair: both bodies shrink below the base 6 radius and
-    // their radii no longer cover the distance (touching, not one
-    // blob). The factor: (3.6 / 12) * 0.95 = 0.285 -> 1.71px each.
+    // The melee pair: both bodies keep their full marker radii (the
+    // self 6, the passive mob 5 - nothing shrinks on the contact).
     const selfBodies = bodyAt(self, MARK.self);
     const meleeBodies = bodyAt(meleeScreen, MARK.passive);
-    check(results, "the melee self circle shrinks to the contact",
-        selfBodies.length > 0 && selfBodies[0].arcs[0][2] < 4,
+    check(results, "the melee self circle keeps its full radius",
+        selfBodies.length > 0
+            && Math.abs(selfBodies[0].arcs[0][2] - 6) < 0.5,
         "self radius: " + (selfBodies[0] && selfBodies[0].arcs[0][2]));
-    check(results, "the melee mob circle shrinks to the contact",
-        meleeBodies.length > 0 && meleeBodies[0].arcs[0][2] < 4,
+    check(results, "the melee mob circle keeps its full radius",
+        meleeBodies.length > 0
+            && Math.abs(meleeBodies[0].arcs[0][2] - 5) < 0.5,
         "mob radius: " + (meleeBodies[0] && meleeBodies[0].arcs[0][2]));
-    check(results, "the shrunken circles still read as bodies",
+    check(results, "the full size circles touch face to face",
         selfBodies.length > 0 && meleeBodies.length > 0
-        && selfBodies[0].arcs[0][2] > 0.5
-        && meleeBodies[0].arcs[0][2] > 0.5,
-        "radii: " + (selfBodies[0] && selfBodies[0].arcs[0][2]) + " / "
-        + (meleeBodies[0] && meleeBodies[0].arcs[0][2]));
+            && Math.abs(Math.hypot(
+                meleeBodies[0].arcs[0][0] - selfBodies[0].arcs[0][0],
+                meleeBodies[0].arcs[0][1] - selfBodies[0].arcs[0][1])
+                - (6 + 5)) < 1,
+        "center distance: " + (selfBodies[0] && meleeBodies[0]
+            && Math.hypot(meleeBodies[0].arcs[0][0]
+                - selfBodies[0].arcs[0][0], meleeBodies[0].arcs[0][1]
+                - selfBodies[0].arcs[0][1])));
+    check(results, "the slide stays anchored near the true spots",
+        selfBodies.length > 0
+            && Math.abs(selfBodies[0].arcs[0][0] - CANVAS_W / 2) < 6
+            && Math.abs(selfBodies[0].arcs[0][1] - CANVAS_H / 2) < 2,
+        "self center: " + (selfBodies[0]
+            && selfBodies[0].arcs[0][0] + ", " + selfBodies[0].arcs[0][1]));
 
-    // The far mob keeps its full radius (nothing overlaps it; it is
-    // out of combat, so the passive radius 5 applies).
+    // The far mob keeps its full radius at its true spot (nothing
+    // overlaps it; it is out of combat, so the passive radius 5
+    // applies).
     const farScreen = worldToScreen(WORLD.ownTargetMob.x,
         WORLD.ownTargetMob.y);
     const farBodies = bodyAt(farScreen, MARK.passive);
     check(results, "the far mob keeps its full marker radius",
         farBodies.length > 0
-        && Math.abs(farBodies[0].arcs[0][2] - 5) < 0.75,
+            && Math.abs(farBodies[0].arcs[0][2] - 5) < 0.75,
         "far radius: " + (farBodies[0] && farBodies[0].arcs[0][2]));
+
+    return results;
+}
+
+// runScenarioStackedContact covers the degenerate contact pair: two
+// units at the exact same world spot (a respawn under a standing
+// character) have no connecting axis to slide along - the fallback
+// separates them horizontally, both circles at their full radii and
+// the pair still touching face to face.
+function runScenarioStackedContact(mapFile) {
+    const { MapView, record } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    const mob = snap.objects.find(
+        (o) => o.objectId === WORLD.playerTargetMob.objectId);
+    mob.x = WORLD.self.x;
+    mob.y = WORLD.self.y;
+    MapView.update(snap);
+    MapView.draw();
+
+    const results = [];
+    const slide = (6 + 5 + 0.5) / 2;
+    const self = { x: CANVAS_W / 2 - slide, y: CANVAS_H / 2 };
+    const mobSide = { x: CANVAS_W / 2 + slide, y: CANVAS_H / 2 };
+    const bodyAt = (center, style) => record.fills.filter((fill) =>
+        fill.arcs.length === 1
+        && Math.hypot(fill.arcs[0][0] - center.x, fill.arcs[0][1]
+            - center.y) < 2
+        && (style ? fill.style === style : true));
+
+    const selfBodies = bodyAt(self, MARK.self);
+    const mobBodies = bodyAt(mobSide, MARK.passive);
+    check(results, "the stacked self circle slides west at full radius",
+        selfBodies.length > 0
+            && Math.abs(selfBodies[0].arcs[0][2] - 6) < 0.5,
+        "self radius: " + (selfBodies[0] && selfBodies[0].arcs[0][2]));
+    check(results, "the stacked mob circle slides east at full radius",
+        mobBodies.length > 0
+            && Math.abs(mobBodies[0].arcs[0][2] - 5) < 0.5,
+        "mob radius: " + (mobBodies[0] && mobBodies[0].arcs[0][2]));
+    check(results, "the stacked pair separates on the fallback axis",
+        selfBodies.length > 0 && mobBodies.length > 0
+            && Math.abs(Math.hypot(
+                mobBodies[0].arcs[0][0] - selfBodies[0].arcs[0][0],
+                mobBodies[0].arcs[0][1] - selfBodies[0].arcs[0][1])
+                - (6 + 5)) < 1
+            && Math.abs(selfBodies[0].arcs[0][1] - CANVAS_H / 2) < 2
+            && Math.abs(mobBodies[0].arcs[0][1] - CANVAS_H / 2) < 2,
+        "centers: " + (selfBodies[0] && mobBodies[0]
+            && selfBodies[0].arcs[0][0] + "," + selfBodies[0].arcs[0][1]
+            + " vs " + mobBodies[0].arcs[0][0] + ","
+            + mobBodies[0].arcs[0][1]));
 
     return results;
 }
@@ -1829,6 +1898,7 @@ function main() {
         ["stable draw order", runScenarioStableOrder(mapFile)],
         ["combat floats", runScenarioCombatFloats(mapFile)],
         ["melee contact", runScenarioMeleeContact(mapFile)],
+        ["stacked contact", runScenarioStackedContact(mapFile)],
         ["cast icon", runScenarioCastIcon(mapFile)],
         ["bow shot", runScenarioBowShot(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
