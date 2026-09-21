@@ -176,13 +176,13 @@ function makeRecordingContext(record) {
         fillText: (text, x, y) => {
             record.texts.push({
                 text, x: x + origin.x, y: y + origin.y,
-                style: record.fillStyle
+                style: record.fillStyle, font: record.font
             });
         },
         strokeText: (text, x, y) => {
             record.texts.push({
                 text, x: x + origin.x, y: y + origin.y,
-                style: record.strokeStyle
+                style: record.strokeStyle, font: record.font
             });
         },
         measureText: (text) => ({ width: (text || "").length * 6 }),
@@ -201,8 +201,8 @@ function makeRecordingContext(record) {
         set globalAlpha(v) {},
         get lineCap() { return "butt"; },
         set lineCap(v) {},
-        get font() { return ""; },
-        set font(v) {},
+        get font() { return record.font; },
+        set font(v) { record.font = v; },
         get textAlign() { return "left"; },
         set textAlign(v) {}
     };
@@ -225,8 +225,8 @@ function makeElementStub(checked) {
 // together with the stroke record.
 function loadMapJs(mapFile) {
     const record = {
-        strokes: [], fills: [], texts: [], blits: [], rects: [], style: "",
-        fillStyle: "", width: 1, dash: []
+        strokes: [], fills: [], texts: [], blits: [], rects: [],
+        style: "", fillStyle: "", width: 1, dash: [], font: ""
     };
     const listeners = { canvas: {}, window: {} };
     const listen = (registry) => (type, fn) => {
@@ -445,7 +445,10 @@ function runScenarioCombatFloats(mapFile) {
         { seq: 4, kind: "damage", attackerId: mob.objectId,
             targetId: selfId, amount: 17, atMs: 0,
             x: WORLD.self.x, y: WORLD.self.y,
-            targetX: 0, targetY: 0 }
+            targetX: 0, targetY: 0 },
+        { seq: 5, kind: "damage", attackerId: selfId,
+            targetId: mob.objectId, amount: 84, atMs: 0, crit: true,
+            x: mob.x, y: mob.y, targetX: 0, targetY: 0 }
     ];
     // The first update (without the events) arms the sequence
     // cursor, the fresh events of the second snapshot spawn the
@@ -502,6 +505,32 @@ function runScenarioCombatFloats(mapFile) {
     check(results, "the taken damage floats to the left of the bot",
         taken.length > 0 && taken.every((t) => t.x < self.x - 5),
         "-17 x=" + taken.map((t) => t.x) + " anchor x=" + self.x);
+
+    // The critical float carries the italic "Crit!" tail after the
+    // (bigger) number - the miss float styling. The combined run is
+    // centered: with the stub measure ("-84" = 18px, " Crit!" =
+    // 36px) the number starts 27px left of the anchor and the tail
+    // follows 18px after the number. The seq 5 jitter is the same
+    // deterministic formula the spawn applies.
+    const critJitter = ((5 * 37) % 17 - 8) * 1.6;
+    const critAnchor = mobScreen.x + 15 + critJitter;
+    const critNum = nearX(floats("-84"), critAnchor - 27);
+    const critTail = nearX(floats(" Crit!"), critAnchor - 9);
+    check(results, "the critical damage reads the Crit! tail",
+        critNum.length > 0 && critTail.length > 0
+        && critTail.every((t) => t.x > critNum[0].x),
+        "num x=" + critNum.map((t) => t.x) + " tail x="
+        + critTail.map((t) => t.x));
+    const fontPx = (entry) => {
+        const at = String(entry.font || "").match(/(\d+(\.\d+)?)px/);
+
+        return at ? Number(at[1]) : 0;
+    };
+    check(results, "the critical number reads bigger than the plain one",
+        critNum.length > 0 && dealt.length > 0
+        && fontPx(critNum[0]) > fontPx(dealt[0]),
+        "crit font: " + fontPx(critNum[0] || {}) + " plain font: "
+        + fontPx(dealt[0] || {}));
 
     // The miss float clears out after its life (800ms), the damage
     // number (950ms) still paints at 900ms.
@@ -585,6 +614,64 @@ function runScenarioCastIcon(mapFile) {
     check(results, "the expired cast paints no plate",
         plateAfter.length === 0,
         "plate rects survived: " + plateAfter.length);
+
+    return results;
+}
+
+// runScenarioMeleeContact covers the contact shrink: a mob standing
+// at the melee collision distance overlaps the self circle at the
+// harness scale - the pair shrinks so the circles touch face to face
+// (two bodies visible, not one merged blob), while a far mob keeps
+// its full marker radius.
+function runScenarioMeleeContact(mapFile) {
+    const { MapView, record } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    // The melee mob: 30 world units east of the character - 3.6px on
+    // the harness canvas, well inside the 6+6 marker radii sum.
+    const melee = snap.objects.find(
+        (o) => o.objectId === WORLD.playerTargetMob.objectId);
+    melee.x = WORLD.self.x + 30;
+    melee.y = WORLD.self.y;
+    MapView.update(snap);
+    MapView.draw();
+
+    const results = [];
+    const self = { x: CANVAS_W / 2, y: CANVAS_H / 2 };
+    const meleeScreen = worldToScreen(melee.x, melee.y);
+    const bodyAt = (center, style) => record.fills.filter((fill) =>
+        fill.arcs.length === 1
+        && Math.hypot(fill.arcs[0][0] - center.x, fill.arcs[0][1]
+            - center.y) < 2
+        && (style ? fill.style === style : true));
+
+    // The melee pair: both bodies shrink below the base 6 radius and
+    // their radii no longer cover the distance (touching, not one
+    // blob). The factor: (3.6 / 12) * 0.95 = 0.285 -> 1.71px each.
+    const selfBodies = bodyAt(self, MARK.self);
+    const meleeBodies = bodyAt(meleeScreen, MARK.passive);
+    check(results, "the melee self circle shrinks to the contact",
+        selfBodies.length > 0 && selfBodies[0].arcs[0][2] < 4,
+        "self radius: " + (selfBodies[0] && selfBodies[0].arcs[0][2]));
+    check(results, "the melee mob circle shrinks to the contact",
+        meleeBodies.length > 0 && meleeBodies[0].arcs[0][2] < 4,
+        "mob radius: " + (meleeBodies[0] && meleeBodies[0].arcs[0][2]));
+    check(results, "the shrunken circles still read as bodies",
+        selfBodies.length > 0 && meleeBodies.length > 0
+        && selfBodies[0].arcs[0][2] > 0.5
+        && meleeBodies[0].arcs[0][2] > 0.5,
+        "radii: " + (selfBodies[0] && selfBodies[0].arcs[0][2]) + " / "
+        + (meleeBodies[0] && meleeBodies[0].arcs[0][2]));
+
+    // The far mob keeps its full radius (nothing overlaps it; it is
+    // out of combat, so the passive radius 5 applies).
+    const farScreen = worldToScreen(WORLD.ownTargetMob.x,
+        WORLD.ownTargetMob.y);
+    const farBodies = bodyAt(farScreen, MARK.passive);
+    check(results, "the far mob keeps its full marker radius",
+        farBodies.length > 0
+        && Math.abs(farBodies[0].arcs[0][2] - 5) < 0.75,
+        "far radius: " + (farBodies[0] && farBodies[0].arcs[0][2]));
 
     return results;
 }
@@ -1523,6 +1610,7 @@ function main() {
         ["social animation marker", runScenarioSocialMarker(mapFile)],
         ["stable draw order", runScenarioStableOrder(mapFile)],
         ["combat floats", runScenarioCombatFloats(mapFile)],
+        ["melee contact", runScenarioMeleeContact(mapFile)],
         ["cast icon", runScenarioCastIcon(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],

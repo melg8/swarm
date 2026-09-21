@@ -241,6 +241,12 @@ const MapView = {
   selfCast: null,
   skillIconCache: null,
 
+  // The per frame contact shrink factors of the unit circles (key ->
+  // factor, see computeContactFactors): the melee combatants touch
+  // face to face instead of merging into one blob. Null until the
+  // first draw pass computes it.
+  contactFactors: null,
+
   // The server world region grid: every region is 2048 units and every
   // object within the 3x3 region block around the player is loaded (see
   // World.broadcastPacket of the Mobius server).
@@ -1266,6 +1272,7 @@ const MapView = {
     this.drawTargetLinks(ctx);
     this.drawAggroRanges(ctx, rect);
     this.drawSocialLinks(ctx, rect);
+    this.computeContactFactors();
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
     this.drawSelfCast(ctx);
@@ -2700,6 +2707,60 @@ const MapView = {
     ctx.restore();
   },
 
+  // computeContactFactors builds the per frame shrink factors of the
+  // unit circles: in melee the combatants stand at the collision
+  // distance, and at the zoomed out scales the screen distance drops
+  // below the sum of the marker radii - the circles merge into one
+  // blob. Every overlapping pair shrinks proportionally so the
+  // circles touch face to face with a hair of separation instead
+  // (the factor floor keeps sub pixel dots from vanishing). Dead
+  // units, ground items and the decorations stay out of it; a unit
+  // overlapping several partners takes the smallest factor.
+  computeContactFactors() {
+    const k = this.unitScale || 1;
+    const units = [];
+    const selfRt = this.runtime.get("self");
+    const c = this.lastSnap.character;
+    if (c && c.x) {
+      const p = this.worldToScreen(
+        selfRt ? selfRt.drawX : c.x, selfRt ? selfRt.drawY : c.y);
+      units.push({ key: "self", x: p.x, y: p.y,
+        r: selfMarkerUnits * k });
+    }
+    for (const obj of this.sortedObjects) {
+      if (obj.kind === "item" || obj.dead) { continue; }
+      const rt = this.runtime.get(obj.objectId);
+      const p = this.worldToScreen(
+        rt ? rt.drawX : obj.x, rt ? rt.drawY : obj.y);
+      units.push({ key: obj.objectId, x: p.x, y: p.y,
+        r: radiusOf(obj, threatOf(obj)) * k });
+    }
+    this.contactFactors = new Map();
+    for (let i = 0; i < units.length; i++) {
+      for (let j = i + 1; j < units.length; j++) {
+        const a = units[i];
+        const b = units[j];
+        const want = a.r + b.r;
+        const dist = Math.hypot(b.x - a.x, b.y - a.y);
+        if (dist >= want) { continue; }
+        const factor = Math.max(0.25, dist / want) * 0.95;
+        this.contactFactors.set(a.key,
+          Math.min(this.contactFactors.get(a.key) ?? 1, factor));
+        this.contactFactors.set(b.key,
+          Math.min(this.contactFactors.get(b.key) ?? 1, factor));
+      }
+    }
+  },
+
+  // contactRadiusOf scales one unit marker radius by its contact
+  // shrink factor (1 when the unit overlaps nobody).
+  contactRadiusOf(key, baseRadius) {
+    const factor = this.contactFactors
+      ? this.contactFactors.get(key) : undefined;
+
+    return baseRadius * (factor === undefined ? 1 : factor);
+  },
+
   drawObjects(ctx, rect) {
     const showLabels = document.getElementById("show-labels").checked;
     const showDest = document.getElementById("show-dest").checked;
@@ -2744,7 +2805,8 @@ const MapView = {
       if (obj.kind === "item") {
         drawDiamond(ctx, p.x, p.y, 4, this.mapColors.item);
       } else {
-        labelRadius = radiusOf(obj, threat) * this.unitScale;
+        labelRadius = this.contactRadiusOf(obj.objectId,
+          radiusOf(obj, threat) * this.unitScale);
         drawUnitTick(ctx, p.x, p.y, rt.drawHeading,
           labelRadius, this.mapColors[threat], this.mapColors.tick, {
             dead: obj.dead,
@@ -2993,7 +3055,8 @@ const MapView = {
 
     // The self marker: the mob parity circle, the accent ring and
     // the look tick.
-    const selfRadius = selfMarkerUnits * this.unitScale;
+    const selfRadius = this.contactRadiusOf("self",
+      selfMarkerUnits * this.unitScale);
     drawUnitTick(ctx, p.x, p.y, heading, selfRadius,
       this.mapColors.self, this.mapColors.tick, {
         self: true, pulse: performance.now(), scale: this.unitScale
@@ -3602,6 +3665,7 @@ const MapView = {
     this.combatAnims.push({
       kind: "damage", at: performance.now(), seq: ev.seq,
       objectId: ev.targetId, amount: ev.amount,
+      crit: Boolean(ev.crit),
       world: { x: ev.x, y: ev.y }, onSelf: ev.targetId === selfId,
       jitter
     });
@@ -3871,16 +3935,20 @@ const MapView = {
   // away. The hits the character takes read red and fly out to the
   // LEFT of the fight, the damage the character deals amber and to
   // the RIGHT - the direction split of the owner brief; a short
-  // flash ring under the number marks the hurt unit itself.
+  // flash ring under the number marks the hurt unit itself. The
+  // critical blows read a slightly bigger number plus the italic
+  // "Crit!" tail styled like the miss float.
   drawDamageEffect(ctx, anim, t) {
     const pos = this.effectScreenPos(anim.objectId, anim.world);
     const k = this.unitScale || 1;
     const rise = easeOutQuad(t) * 30 * k;
     const alpha = t < 0.75 ? 1 : 1 - (t - 0.75) / 0.25;
     const scale = t < 0.14 ? easeOutBack(t / 0.14) : 1;
+    const crit = Boolean(anim.crit);
     const color = anim.onSelf ? damageSelfColor : damageMobColor;
-    const size = Math.max(10, Math.min(17,
-      (anim.onSelf ? 12 : 11) + Math.sqrt(anim.amount) * 0.7)) * k;
+    const size = (Math.max(10, Math.min(17,
+      (anim.onSelf ? 12 : 11) + Math.sqrt(anim.amount) * 0.7))
+      + (crit ? 3 : 0)) * k;
     const x = pos.x + anim.jitter * k
       + (anim.onSelf ? -1 : 1) * floatSideOffset * k;
     const y = pos.y - 8 * k - rise;
@@ -3893,18 +3961,39 @@ const MapView = {
     ctx.arc(pos.x, pos.y, (5 + 13 * t) * k, 0, Math.PI * 2);
     ctx.stroke();
     // The number itself, scaled by the pop and with the same dark
-    // halo the map labels use.
+    // halo the map labels use; a critical hit carries the italic
+    // "Crit!" tail after it (the miss float styling).
     ctx.translate(x, y);
     ctx.scale(scale, scale);
-    ctx.font = "700 " + size.toFixed(1) + "px " + this.sansStack;
-    ctx.textAlign = "center";
     ctx.lineWidth = 3;
     ctx.strokeStyle = "rgba(15, 18, 22, 0.75)";
     ctx.globalAlpha = alpha;
     const text = "-" + Math.round(anim.amount);
-    ctx.strokeText(text, 0, 0);
-    ctx.fillStyle = color;
-    ctx.fillText(text, 0, 0);
+    if (crit) {
+      const tail = " Crit!";
+      ctx.font = "700 " + size.toFixed(1) + "px " + this.sansStack;
+      const numWidth = ctx.measureText(text).width;
+      ctx.font = "600 italic " + size.toFixed(1) + "px "
+        + this.sansStack;
+      const tailWidth = ctx.measureText(tail).width;
+      const startX = -(numWidth + tailWidth) / 2;
+      ctx.textAlign = "left";
+      ctx.font = "700 " + size.toFixed(1) + "px " + this.sansStack;
+      ctx.strokeText(text, startX, 0);
+      ctx.fillStyle = color;
+      ctx.fillText(text, startX, 0);
+      ctx.font = "600 italic " + size.toFixed(1) + "px "
+        + this.sansStack;
+      ctx.strokeText(tail, startX + numWidth, 0);
+      ctx.fillStyle = color;
+      ctx.fillText(tail, startX + numWidth, 0);
+    } else {
+      ctx.font = "700 " + size.toFixed(1) + "px " + this.sansStack;
+      ctx.textAlign = "center";
+      ctx.strokeText(text, 0, 0);
+      ctx.fillStyle = color;
+      ctx.fillText(text, 0, 0);
+    }
     ctx.restore();
   },
 

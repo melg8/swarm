@@ -856,6 +856,8 @@ func appendCombatEventViewJSON(dst []byte, view CombatEventView) []byte {
     dst = strconv.AppendInt(dst, int64(view.TargetID), 10)
     dst = append(dst, `,"amount":`...)
     dst = appendJSONFloat(dst, view.Amount)
+    dst = append(dst, `,"crit":`...)
+    dst = strconv.AppendBool(dst, view.Crit)
     dst = append(dst, `,"atMs":`...)
     dst = strconv.AppendInt(dst, view.AtMs, 10)
     dst = append(dst, `,"x":`...)
