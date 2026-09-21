@@ -53,7 +53,7 @@ function buffsCaptureRects(view) {
     for (const [id, entry] of store) {
         const box = boxOf(entry);
         if (!box || typeof box.getBoundingClientRect !== "function") {
-            continue;
+        continue;
         }
         const rect = box.getBoundingClientRect();
         if (!(rect.width > 0) || !(rect.height > 0)) { continue; }
@@ -61,9 +61,9 @@ function buffsCaptureRects(view) {
         // height (the grid rows cap, the list scrolls); the source
         // answers with the same test against its own height.
         if (bodyRect && finalHeight > 0 &&
-            (rect.top > bodyRect.top + finalHeight ||
-                rect.bottom < bodyRect.top)) {
-            continue;
+        (rect.top > bodyRect.top + finalHeight ||
+            rect.bottom < bodyRect.top)) {
+        continue;
         }
         rects.set(id, rect);
     }
@@ -94,7 +94,7 @@ function buffsPlayFly(box, from, to, token) {
     const settle = () => {
         if (BuffsPanel.flipRun !== token) { return; }
         box.style.transition = "transform " + buffsFlipMs +
-            "ms cubic-bezier(0.33, 1, 0.5, 1)";
+        "ms cubic-bezier(0.33, 1, 0.5, 1)";
         box.style.transform = "";
     };
     window.requestAnimationFrame(() => window.requestAnimationFrame(

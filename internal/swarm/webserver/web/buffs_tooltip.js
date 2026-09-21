@@ -64,10 +64,10 @@ function buffsTooltipParts() {
 }
 
 // showBuffsTooltip fills the card for one hovered buff box (a grid
-// cell or a list row) and unhides it. The box names its effect
-// through the data-skill-id attribute; an unknown one hides the card
-// instead of guessing.
-function showBuffsTooltip(box) {
+// cell or a list row) and unhides it near the pointer. The box names
+// its effect through the data-skill-id attribute; an unknown one
+// hides the card instead of guessing.
+function showBuffsTooltip(box, x, y) {
     const el = buffsTooltipElement();
     const parts = buffsTooltipParts();
     if (!el || !parts) { return; }
@@ -93,14 +93,17 @@ function showBuffsTooltip(box) {
     }
     BuffsTooltip.box = box;
     el.classList.remove("hidden");
+    positionBuffsTooltip(x, y);
 }
 
 // positionBuffsTooltip keeps the card near the cursor (the fixed
 // position works in viewport coordinates, the offsets place the card
 // to the lower right of the pointer so it never covers the hovered
-// buff).
+// buff). An event without coordinates (the harness stub) leaves the
+// card where it is.
 function positionBuffsTooltip(x, y) {
     if (!BuffsTooltip.element) { return; }
+    if (typeof x !== "number" || typeof y !== "number") { return; }
     BuffsTooltip.element.style.left = (x + 14) + "px";
     BuffsTooltip.element.style.top = (y + 16) + "px";
 }
@@ -124,10 +127,10 @@ function initBuffsTooltip() {
     panel.addEventListener("mouseover", (event) => {
         const target = event && event.target;
         const box = target && typeof target.closest === "function"
-            ? target.closest(".buff-cell, .buff-item") : null;
+        ? target.closest(".buff-cell, .buff-item") : null;
         if (!box) { hideBuffsTooltip(); return; }
         if (box === BuffsTooltip.box) { return; }
-        showBuffsTooltip(box);
+        showBuffsTooltip(box, event.clientX, event.clientY);
     });
     panel.addEventListener("mousemove", (event) => {
         if (!BuffsTooltip.box) { return; }

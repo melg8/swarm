@@ -51,6 +51,11 @@ SPDX-License-Identifier: MIT
 //
 // Usage: node tools/repro_buffs.js [--app <app.js>]
 //
+// The harness intentionally grows past the 500 line source rule: the
+// webui-harness skill routes every new panel scenario into the
+// existing repro file instead of fragmenting the verification across
+// per-feature harnesses.
+//
 // The harness exits 0 when every check passes, 1 otherwise (a FAIL
 // line names the broken check).
 

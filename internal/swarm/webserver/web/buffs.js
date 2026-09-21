@@ -217,7 +217,7 @@ function buffLeftText(left) {
 
 // buffLeftShort formats the remaining seconds for the overlay strip
 // of a grid cell: the same reading as buffLeftText compressed to the
-// couple of characters a 32px cell fits (45s, 12m, 1h30), a dash for
+// couple of characters a 30px cell fits (45s, 12m, 1h30), a dash for
 // the never timed out ones.
 function buffLeftShort(left) {
   if (left >= 86400) { return "\u2014"; }

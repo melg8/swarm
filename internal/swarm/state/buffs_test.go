@@ -215,3 +215,33 @@ func paperdollWithRHand(objectID int32) [PaperdollSlots]int32 {
 
     return slots
 }
+
+func TestSetBuffsCarriesTheTooltipAnswers(t *testing.T) {
+    bot := NewBot("unittest1")
+    bot.SetBuffs([]BuffEntry{
+        {SkillID: 1204, Level: 2, Time: 1200}, // Wind Walk 2
+        {SkillID: 4099, Level: 1, Time: 60},   // has a desc, no effect
+    })
+
+    snap := bot.Snapshot()
+    require.Len(t, snap.Buffs, 2)
+    // The snapshot sorts by skill id: 1204 before 4099.
+    windWalk := snap.Buffs[0]
+    require.Equal(t, int32(1204), windWalk.SkillID)
+    require.Equal(t, "Wind Walk", windWalk.Name)
+    require.Equal(t, "Temporarily increases Speed. Effect 2.", windWalk.Desc)
+    require.Equal(t, "+33 Speed", windWalk.Effect)
+    unknown := snap.Buffs[1]
+    require.Equal(t, int32(4099), unknown.SkillID)
+    require.Equal(t, "NPC Berserk", unknown.Name)
+    require.NotEmpty(t, unknown.Desc)
+    require.Empty(t, unknown.Effect)
+
+    // The live byte encoder answers the same lines: the fields ride
+    // both encode paths, not only the reflection one.
+    payload := string(bot.AppendSnapshotJSON(nil))
+    require.Contains(t, payload,
+        `"desc":"Temporarily increases Speed. Effect 2."`)
+    require.Contains(t, payload, `"effect":"+33 Speed"`)
+    require.Contains(t, payload, `"effect":""`)
+}

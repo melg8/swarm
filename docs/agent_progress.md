@@ -361,7 +361,7 @@ code; the spawn animation for a freshly landed buff.
   through the delegated hover wiring; a joining buff spawns with the
   scale pop and glow ring keyframes.
 - web: buffs.js split below the 500 line rule into the tooltip and
-  flip modules; `tools/repro_buffs.js` grew to 58 checks (the stub
+  flip modules; `tools/repro_buffs.js` grew to 56 checks (the stub
   gained getBoundingClientRect / matches / closest / body / rAF).
 - Verified: all six repro harnesses + fight UI green, go build/vet/
   tests green, `task prepush` green, the live preview driven with

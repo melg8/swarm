@@ -782,13 +782,20 @@ old spots to the new ones):
   hole under the empty cells of a partially filled row on the dark
   theme); the frame hugs the filled columns (syncBuffsPanelSize pins
   the inline width from min(cells, 10), so a partially filled row
-  never reserves dead space and ten across keep the frame clear of
-  the central status banner), the body pads 2px on the top and the
-  bottom edges and 3px on the sides; the remaining time does NOT
+  never reserves dead space over the map), the body pads 2px on the
+  top and the bottom edges and 3px on the sides; the remaining time
+  does NOT
   overlay the cell by default - a hover chip fades in whose
   darkening hugs only the digits (width max-content, centered), and
   a 2px accent sliver pinned to the bottom pixels of the cell (the
-  `buff-strip`) carries the remaining share left over total;
+  `buff-strip`) carries the remaining share left over total. The
+  measured geometry: the full 10 column frame spans 335px from its
+  map-relative left 272 (the absolute left is 472 with the 200px
+  sidebar), the centered status banner starts at about 676 on a
+  1280px window - the full row overlaps it there and clears from
+  about 1450px up (the banner paints above the panel, z-index 5 vs
+  4, so the labels stay readable either way); the partial rows up to
+  5 columns stay clear even at 1280.
 - the detailed list: the full effect rows (icon, level badge, name,
   the human remaining time) with the remaining time percent bar
   pinned to every row bottom edge (left over total, the fill eases
