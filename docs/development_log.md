@@ -8345,3 +8345,73 @@ freeze that never was, and every recovery layer armed on the false
 signal poisons the next honest question (the ban sealed the plaza
 the server was happily walking). One oracle end to end, and the
 recovery ladder only answers what the one oracle cannot see.
+
+## Round 107: the frozen skips yield to the ladder - the skip that moves nothing may not repeat (2026-09-21)
+
+- date, scope: 2026-09-21, the town walk stuck skip ladder
+  (`internal/swarm/hunt/town.go` stuckTownWalk + the aggro circle
+  skip of clickWaypoint, the skip tracker fields of
+  `internal/swarm/hunt/loop.go`).
+- Problem statement: the owner report with the state dump (build
+  a483578, bot test3, phase townWalk) - "the bot skips waypoints,
+  stands still, and the waypoints get farther and farther from it".
+  The dump: the character froze at 31040 54016 -3415 on the 87
+  waypoint walk to the trader Unoren from 12:00:19 to the 12:03:57
+  dump moment, "Hunt: town walk stuck, skipping waypoint" fired 49
+  times (cursor 15 -> 63), one per fast stuck window (~4 s), the
+  aim ended 18,000 units out, and the dump's own counters name the
+  silence: last action failed 11:59:40 (the walk start, once), no
+  refusal lines, no re-path lines, no escape lines through the
+  whole storm.
+- Root cause: the skip branch of stuckTownWalk returns BEFORE the
+  re-path ladder whenever nextClearWaypoint finds a clear successor,
+  and over open ground it always does - every far waypoint's
+  maxMoveDistance clipped line validates, so every stuck verdict
+  skipped one more waypoint while the deployed server accepted each
+  subsequent click without moving the character and without an
+  ActionFailed answer (a click transport the local oracle cannot
+  see through). The skip that moves nothing is not a recovery:
+  repeating it marches the cursor away and starves every rung that
+  owns the dead transport - the re-path budget, the frozen trip
+  abort and the cursor key escape all sat behind the early return
+  for 3.5 minutes. The same shape lived in the aggro circle skip of
+  clickWaypoint (the 2026-09-20 report: cursors 9 through 23 in
+  three seconds).
+- The fix: a skip tracker on the loop (skipArmed/skipX/skipY) shared
+  by both skip call sites through skipMoveFresh - a skip may run
+  only when no skip ran yet or the character moved since the
+  previous skip; the first skip of a frozen episode stays free (the
+  walled waypoint case walks the character on with the successor's
+  click), the repeat is denied with its own honest log line and
+  falls through to noteRepathCell -> replanTownWalkSegment ->
+  abortFrozenTrip -> escalateFrozenSegment, whose cursor key escape
+  walks the character along the planned route with the claims
+  transport - the only movement a dead click transport cannot
+  block. The movement paced chain also keeps the working transport
+  honest: each skip must produce ground before the next one arms.
+- The reproductions: hunt/skip_storm_repro_test.go replays the dump
+  (the frozen character, the always-validating open ground oracle,
+  the move start watchdog forcing a verdict per dead click) and
+  pins the whole contract - the first skip fires, the second is
+  denied, the re-path runs, the second identical re-path escalates
+  and the cursor key escape arms with the cursor still bound near
+  the frozen cell. The adapted era tests: TestWalkStuckFastTimeout-
+  ArmsAfterSkip and TestStuckSkipWaypointStillArmsFastWindow keep
+  their fast window contracts (the detection still fires on the 4 s
+  window) and assert the ladder rung instead of the second skip;
+  TestThreatenedSkipStopsAtTheFirstClearWaypoint pins the movement
+  paced chain (one trial skip, the steered click of the denied
+  skip's target, the published plan keeps the far waypoints ahead).
+- Verification: go build, go vet, task prepush green (golangci-lint
+  0 issues, whitespace clean), the hunt suite diffed against the
+  pre-existing baseline of the parallel rounds (22 failures before
+  and after - zero new), the storm reproduction red before the fix
+  and green after.
+- Follow ups: the deployment whose server silently swallows
+  accepted move requests stays unnamed - the dump's unknown packet
+  fingerprints and the refusal-free silence are the evidence, the
+  escape ladder is the bot's answer, and the hypothesis lives in
+  the AGENTS.md registry (H-006). The eye of the round: a recovery
+  rung that always succeeds is not a recovery - it is a gate
+  starving every rung behind it; a skip must pay for itself with
+  ground before it may fire again.

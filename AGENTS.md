@@ -312,6 +312,35 @@ conversation or in a commit message: it lives in the registry below.
   mechanism above) plus the owner live observation; see
   docs/hunting.md (the spawn protection section).
 
+### H-006: the deployment that swallows accepted move requests
+
+- Assumption: the owner's live deployment (the 2026-09-21 town walk
+  dump, build a483578, bot test3) answers some MoveToLocation
+  requests with silence - no movement broadcast, no ActionFailed -
+  while the reference Mobius master either moves the character or
+  refuses the request. The dump evidence: 49 stuck skips over 3.5
+  frozen minutes, the position byte identical (31040 54016 -3415),
+  clicks leaving (the dump's walking timer armed), the last
+  ActionFailed hours before the storm, and the unknown packet
+  fingerprints (0x57/53, 0xe7/21, 0x5a/53, 0x8e/21, 0x85/13) that
+  mark a build the reference tree does not match. The bot must
+  treat "the click validated, went out, and moved nothing" as a
+  state of its own: the move start watchdog names it, and the
+  recovery must not answer it with more of the same transport.
+- Relied on by: the frozen skip rule of the town walk follower
+  (skipMoveFresh, internal/swarm/hunt/town.go) - a skip that moved
+  the character nothing may not repeat, the re-path ladder and the
+  cursor key escape own the dead click transport instead.
+- Verify: reproduce on the deployed stack - place a character on
+  the dump cell, click a waypoint the local oracle validates, and
+  record the server answers (the game server log with a
+  MOVEDBG-style diagnostics line is the allowed evidence form).
+  If the reference stack moves the character, the silence is a
+  deployment build difference; pin the build the owner runs and
+  the packet that differs.
+- Status: open (the bot-side recovery shipped in 160d0e3; the
+  server side stays unobserved).
+
 ## Mandatory first step of every task: deploy and verify the environment
 
 Any task in this repository - a bug fix, a feature, a refactor, a test

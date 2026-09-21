@@ -11,6 +11,48 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: complete): the frozen skip storm round (2026-09-21, branch feature/improved-behaviour)
+
+The owner report (the state dump, build a483578, bot test3, phase
+townWalk): the bot skips waypoints, stands still, and the waypoints
+get farther and farther from it. The dump pinned the storm - the
+character frozen at 31040 54016 -3415 on the 87 waypoint walk to the
+trader Unoren, "town walk stuck, skipping waypoint" fired 49 times
+(cursor 15 -> 63, one per fast stuck window), the aim 18,000 units
+out, no movement, no ActionFailed, no re-path, no escape through the
+whole 3.5 minutes.
+
+Landed and pushed (commit 160d0e3, rebased over the parallel rounds):
+
+- skipMoveFresh/noteSkipStand on the loop (shared by the stuck skip
+  of stuckTownWalk and the aggro circle skip of clickWaypoint): a
+  skip may run only when no skip ran yet or the character moved
+  since the previous skip; the first skip of a frozen episode stays
+  free, the repeat is denied with its own log line and falls
+  through to the re-path ladder (noteRepathCell ->
+  abortFrozenTrip -> escalateFrozenSegment), whose cursor key
+  escape walks the claims transport along the planned route.
+- The recovery timeline on the dump scene: ~15 s from the first
+  stuck verdict to the escape arming, against the unbounded storm
+  (the trip budget never ran because the skip branch always
+  returned first).
+- Repro: hunt/skip_storm_repro_test.go (the dump scene: the frozen
+  character, the always-validating open ground oracle, the move
+  start watchdog forcing a verdict per dead click). The adapted era
+  tests: walk_stuck_skip_test.go, stuck_fast_repro_test.go,
+  threatened_mass_skip_repro_test.go keep their fast window and
+  anti-runaway contracts on the new movement paced chain.
+- Docs: development_log.md round 107; AGENTS.md hypothesis H-006
+  (the deployment that swallows accepted move requests - open, the
+  bot-side recovery shipped, the server side unobserved).
+
+Verified: go build, go vet, task prepush green (golangci-lint 0
+issues, whitespace clean), the hunt suite diffed against the
+pre-existing baseline of the parallel rounds (22 failures before
+and after - zero new). NOT yet done: the live E2E against the
+deployed stack on the merged tree (the parallel rounds own the
+same debt), and the H-006 server side observation.
+
 ## Active task (status: in progress): the webui chat round, the quest tab and the ETA round (2026-09-21)
 
 Started: 2026-09-21 ~07:57 UTC. Branch: `feature/improved-behaviour`,
