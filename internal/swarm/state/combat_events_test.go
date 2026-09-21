@@ -349,3 +349,37 @@ func TestCritHintLabelsSelfDamage(t *testing.T) {
     require.True(t, events[1].Crit,
         "the damage the character takes from the critical swing labels crit")
 }
+
+// TestCritHintCountsAwaitedDrops pins the count-consume core of the
+// hint: a dual weapon critting twice on one victim labels exactly
+// the next two HP drops of that victim - the third (a plain
+// follow-up) stays plain.
+func TestCritHintCountsAwaitedDrops(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    spawnNpcInfo(bot, 7, 1000001, 45300)
+    bot.ApplyStatusUpdate(7, []Attribute{
+        {ID: AttrMaxHP, Value: 100},
+        {ID: AttrCurHP, Value: 100},
+    })
+
+    bot.ApplyAttack(Attack{
+        AttackerID: 100, X: 45000, Y: 50000, Z: -3500,
+        TargetX: 45300, TargetY: 50000, TargetZ: -3500,
+        TargetIDs:   [AttackTargets]int32{7, 7},
+        HitFlags:    [AttackTargets]int8{attackHitCritFlag, attackHitCritFlag},
+        CritFlags:   [AttackTargets]bool{true, true},
+        TargetCount: 2,
+    })
+    labels := []bool{}
+    for _, hp := range []int32{80, 60, 50} {
+        bot.ApplyStatusUpdate(7, []Attribute{{ID: AttrCurHP, Value: hp}})
+        events := bot.Snapshot().CombatEvents
+        last := events[len(events)-1]
+        require.Equal(t, CombatEventDamage, last.Kind)
+        labels = append(labels, last.Crit)
+    }
+
+    require.Equal(t, []bool{true, true, false}, labels,
+        "two awaited crit drops consume exactly, the follow-up stays plain")
+}

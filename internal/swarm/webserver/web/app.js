@@ -744,7 +744,12 @@ function renderBotStatus(snap) {
   const text = document.getElementById("bot-status-text");
   if (text) { text.textContent = label.text; }
   const detail = document.getElementById("bot-status-detail");
-  if (detail) { detail.textContent = label.detail || ""; }
+  if (detail) {
+    detail.textContent = label.detail || "";
+    // The empty detail must not leave its flex gap behind: the span
+    // drops out of the pill while there is nothing to say.
+    detail.classList.toggle("hidden", !label.detail);
+  }
 }
 
 // ---- dump state button ----

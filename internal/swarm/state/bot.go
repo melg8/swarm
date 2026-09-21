@@ -2075,6 +2075,10 @@ func (b *Bot) noteCritHintLocked(a Attack, now time.Time) {
 // window is live and an awaited drop count remains (each labeled
 // drop consumes one - a plain follow-up hit of the same victim stays
 // plain). The caller must hold the write lock.
+// Known trade-off of the one slot: a MIXED broadcast (a plain hit
+// followed by a crit on the same victim) lets the plain hit's drop
+// consume the label first - the two floats swap their labels, which
+// is cosmetic only.
 func (b *Bot) critHintLocked(victimID int32, now time.Time) bool {
     if b.critVictim != victimID || b.critVictimAt.IsZero() ||
         b.critVictimHits <= 0 {

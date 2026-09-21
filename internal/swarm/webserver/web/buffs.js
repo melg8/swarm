@@ -7,12 +7,11 @@
 // The panel renders the active effects of the server
 // AbnormalStatusUpdate list as the single horizontal icon grid - the
 // classic buff bar (the vertical detailed list is gone by decision):
-// one cell per active effect, at most 10 columns by 2 rows, every
-// cell packs edge to edge with the thin separator strips on its
-// right and bottom edges (theme tinted, the white chrome of the
-// light theme and the panel chrome of the dark one) and carries the
-// icon at its native 32px size - nothing scales - plus the level
-// badge, the remaining time chip on hover
+// one bare 32px icon per active effect, at most 10 columns by 2
+// rows, only a 2px separator SPACE between the neighbours (the
+// framing - panel background, border, shadow, padding and the
+// painted separator strips - is gone by decision) - nothing scales -
+// plus the level badge, the remaining time chip on hover
 // and the mini time strip pinned to its bottom pixels.
 //
 // The panel renders strictly and classically: no view switch, no

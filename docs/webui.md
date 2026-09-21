@@ -857,22 +857,15 @@ the 2px separator SPACE between neighbours stays.
   both themes (the near black light theme text colors sank into the
   plate).
 
-The measured geometry: the full 10 column frame spans 348px from its
+The measured geometry: the full 10 column bar spans 338px from its
 map-relative left 272 (the absolute left is 472 with the 200px
-sidebar; 42px at one cell, 76 at two, 178 at five), the centered
-status banner starts at about 676 on a 1280px window - the full row
-overlaps it there and clears from a ~1370px wide map container up
-(a ~1570px window; the banner paints above the panel, z-index 5 vs
-4, so the labels stay readable either way); the partial rows up to
-5 columns stay clear even at 1280.
-
-The panel renders strictly: no appear or disappear animation, no
-view morph - a change snaps (no transitions on the frame, no spawn
-keyframes; a buff joining or leaving touches only its own cell).
-The panel hides entirely while no effect runs. The separator chrome
-is theme tinted now (--buff-separator: white light, the dark panel
-itself dark), so the bands below and between the buffs darken with
-the panel in the dark theme instead of staying white.
+sidebar; 32px at one cell, 66 at two, 168 at five). The centered
+status banner anchors its center at max(50%, 800px): on the wide
+maps it stays centered, below the 1600px map width it shifts right
+just enough for its left edge to hug the bar's right edge (610 + the
+190px half pill), so the full row and the banner never collide (the
+banner paints above the bar, z-index 5 vs 4, but the geometry keeps
+them apart anyway).
 
 Hovering a cell opens the floating card (the `#buffs-tooltip`
 singleton of `buffs_tooltip.js`, the mechanics of the item tooltip):

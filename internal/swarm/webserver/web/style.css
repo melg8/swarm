@@ -638,7 +638,6 @@ body.mode-pathfind .buffs-panel { display: none; }
 .bot-status {
   position: absolute;
   top: 10px;
-  left: 50%;
   transform: translateX(-50%);
   z-index: 5;
   display: flex;
@@ -652,7 +651,12 @@ body.mode-pathfind .buffs-panel { display: none; }
   pointer-events: none;
   /* The width cap keeps the banner clear of the full effects bar:
      the long activity lines (the deleveling report et al) wrap onto
-     up to three lines instead of growing the pill sideways. */
+     up to three lines instead of growing the pill sideways. The
+     center anchor yields right of the bar on the narrow maps: the
+     bar ends at 610px (left 272 + 338), and a 380px pill needs its
+     center at 610 + 190 to clear it - below the 1600px map width
+     the pill slides right just enough to hug the bar edge. */
+  left: max(50%, 800px);
   max-width: min(380px, 60%);
   font-size: 12px;
   overflow: hidden;

@@ -57,7 +57,7 @@ Design (verified against the code and the Mobius C1 sources):
 
 Status: complete. Three commits pushed to
 origin/feature/improved-behaviour:
-- The crit hint backend (59dcb97): the Attack packet HITFLAG_CRIT
+- The crit hint backend (6db8e20): the Attack packet HITFLAG_CRIT
   (0x20) rides state.Attack.CritFlags; the tracker correlates the
   victim of the landed critical blows (500ms window, an awaited drop
   count per crit hit - a dual weapon crits twice) and the next HP

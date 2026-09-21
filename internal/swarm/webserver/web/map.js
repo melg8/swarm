@@ -1273,10 +1273,10 @@ const MapView = {
     }
     this.drawHuntingZone(ctx, rect);
     this.drawKillMarks(ctx, rect);
+    this.computeContactFactors();
     this.drawTargetLinks(ctx);
     this.drawAggroRanges(ctx, rect);
     this.drawSocialLinks(ctx, rect);
-    this.computeContactFactors();
     this.drawObjects(ctx, rect);
     this.drawSelf(ctx);
     this.drawSelfCast(ctx);
@@ -2741,7 +2741,11 @@ const MapView = {
       units.push({ key: obj.objectId, x: p.x, y: p.y,
         r: radiusOf(obj, threatOf(obj)) * k });
     }
-    this.contactFactors = new Map();
+    if (this.contactFactors) {
+      this.contactFactors.clear();
+    } else {
+      this.contactFactors = new Map();
+    }
     for (let i = 0; i < units.length; i++) {
       for (let j = i + 1; j < units.length; j++) {
         const a = units[i];
@@ -3010,8 +3014,9 @@ const MapView = {
     ctx.restore();
 
     const radius = (self
-      ? selfMarkerUnits
-      : radiusOf(target, threatOf(target))) * this.unitScale + 5;
+      ? this.contactRadiusOf("self", selfMarkerUnits * this.unitScale)
+      : this.contactRadiusOf(target.objectId,
+        radiusOf(target, threatOf(target)))) * this.unitScale + 5;
     ctx.save();
     ctx.strokeStyle = this.mapColors.player;
     ctx.globalAlpha = 0.75;
