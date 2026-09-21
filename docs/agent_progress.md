@@ -127,6 +127,36 @@ and the facing near contact scenarios - both fail on the pre-fix
 map.js, pinning the reported drift), the change is web only, the
 branch pushed for the PR review.
 
+Round 2 (2026-09-21 ~20:20 UTC, the kiting core slice issue #18):
+
+- The main merge (3bca8f1): the docs/agent_progress.md conflict
+  resolved by the file protocol - the finished full-size contact
+  markers entry of the merged main (issue #7, Done on the board)
+  moved to docs/agent_progress_archive.md, the kite entry stays the
+  active task.
+- The task 1 gap of the slice issue closed: the retreat trigger now
+  reads the train members too - kiteThreat picks the closest of the
+  fight target and the projected NearestAttacker scan (the mobs
+  whose server target is the character), so a second mob that
+  chased its way into the fight arms the step even while the fight
+  target holds its distance. The steering stays the single
+  away-vector of the armed threat: the centroid weighing, the
+  aggro-aware deflection and the too-wide-train hold belong to the
+  edge case slice (#19). The deck guard of the pick applies: a mob
+  past the deckReachableZ gap is no melee threat.
+- The log line names the armed hostile and the fight target
+  separately ("hostile 8 closed to 200 units of the fight on 7").
+- Two new tests: TestKiteTrainMemberArmsTheRetreat (the member at
+  200 units arms the step away from IT while the target holds 440)
+  and TestKiteSkipsADeckGapTrainMember (the deck gap member stays
+  quiet). Ten kite tests total, the full hunt suite green (77s),
+  go build, go vet, gofmt-spaces and golangci-lint run --new clean.
+
+Status: round 2 pushed (the merge plus the train member commit) on
+feature/archer-kiting, PR #15 carries the slice issue marker (#18).
+The follow-ups stand: the live acceptance round (#20), the
+arrow-aware timing, the centroid steering round of #19.
+
 ## Active task (status: complete): the cast icon side round - the bow order shot, the quiet npc interact (2026-09-21, branch feature/improved-behaviour)
 
 Started/finished 2026-09-21 ~14:55 UTC (one session). The owner

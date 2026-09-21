@@ -27,9 +27,14 @@ package hunt
 //     skipped - the leash outranks the kite, the archer stands and
 //     shoots (the panic machinery of the loop still owns a fight that
 //     turns unwinnable);
-//   - multiple mobs chasing: the step direction reads the current
-//     target alone; the pile up answer (the attacker count gate, the
-//     panic run) already owns the too-many-attackers case;
+//   - multiple mobs chasing: the trigger reads every chaser (the
+//     fight target and the train members that target the character -
+//     the closest one arms the step), but the step direction stays
+//     the single away-vector of the armed threat; the centroid
+//     steering of a wide train, the aggro-aware deflection and the
+//     hold-ground-vs-too-wide-train answer belong to the edge case
+//     slice (#19), the too-many-attackers pile up stays with the
+//     attacker count gate and the panic run;
 //   - pathfinding while retreating: the step goes through WalkTo,
 //     so the walk follower drives it over the mesh routes - the
 //     retreat never runs into a wall the geodata knows about;
@@ -86,16 +91,51 @@ const (
     kiteStreakLimit = 8
 )
 
-// kiteFromTarget steps a bow fighting character away from its own
-// target when the mob closed inside the retreat radius: the archer
-// buys back the weapon range instead of tanking the melee. The step
-// respects the zone leash (a cornered archer stands and shoots), the
-// movement window contract of the fight steps (the forced attack
-// re-requests wait out the walk), and the streak limit (an
-// unwinnable distance race falls back to the ordinary fight). A
-// fresh target resets the streak. Reports whether the tick issued
-// the step (the caller skips the rest of the fighting branch then -
-// the walk owns the movement).
+// kiteThreat locates the hostile that arms the kite step: the fight
+// target or the nearest train member - a living mob that already
+// chases the character (its server target is the character, the
+// projected NearestAttacker scan reads it, see scans.go) - whichever
+// sits closer. A mob on a deck the walk cannot reach (the z gap past
+// deckReachableZ, the same test the pick uses) is no melee threat.
+// Returns the threat position, its identity for the logs and its
+// ground distance to the character.
+func (l *Loop) kiteThreat(
+    selfX, selfY, selfZ int32,
+) (x, y float64, id int32, dist float64, ok bool) {
+    if tx, ty, _, tok := l.tracker.ObjectPosition(l.target); tok {
+        dx := float64(selfX) - float64(tx)
+        dy := float64(selfY) - float64(ty)
+        x, y, id, dist, ok =
+            float64(tx), float64(ty), l.target, math.Hypot(dx, dy), true
+    }
+    if attacker, aok := l.tracker.NearestAttacker(); aok &&
+        attacker.ObjectID != l.target {
+        if attacker.Z == 0 ||
+            math.Abs(float64(attacker.Z-selfZ)) <= deckReachableZ {
+            dx := float64(selfX) - float64(attacker.X)
+            dy := float64(selfY) - float64(attacker.Y)
+            adist := math.Hypot(dx, dy)
+            if !ok || adist < dist {
+                x, y, id, dist, ok =
+                    float64(attacker.X), float64(attacker.Y),
+                    attacker.ObjectID, adist, true
+            }
+        }
+    }
+
+    return x, y, id, dist, ok
+}
+
+// kiteFromTarget steps a bow fighting character away from the
+// hostile that armed the step (the target or a train member, see
+// kiteThreat): the archer buys back the weapon range instead of
+// tanking the melee. The step respects the zone leash (a cornered
+// archer stands and shoots), the movement window contract of the
+// fight steps (the forced attack re-requests wait out the walk), and
+// the streak limit (an unwinnable distance race falls back to the
+// ordinary fight). A fresh target resets the streak. Reports whether
+// the tick issued the step (the caller skips the rest of the
+// fighting branch then - the walk owns the movement).
 func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !l.bowEquipped() || l.target == 0 {
         return false
@@ -118,17 +158,16 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
         // The distance race is unwinnable: stop the shuffle, fight.
         return false
     }
-    x, y, _, ok := l.tracker.ObjectPosition(l.target)
     selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
-    if !ok || !selfOK {
+    if !selfOK {
         return false
     }
-    dx := float64(selfX) - float64(x)
-    dy := float64(selfY) - float64(y)
-    dist := math.Hypot(dx, dy)
-    if dist >= kiteRetreatRadius || dist < 1 {
+    threatX, threatY, threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
+    if !ok || dist >= kiteRetreatRadius || dist < 1 {
         return false
     }
+    dx := float64(selfX) - threatX
+    dy := float64(selfY) - threatY
     stepX := int32(float64(selfX) + dx/dist*kiteStep)
     stepY := int32(float64(selfY) + dy/dist*kiteStep)
     if zone := l.zone(); zone != nil && !zone.Contains(stepX, stepY) {
@@ -143,9 +182,10 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     // holds its forced attack re-requests until the walk finished
     // (see the combatAvoidUntil gate of the engage branch).
     l.combatAvoidUntil = now.Add(kiteStepWindow)
-    l.logger.Printf("Hunt: target %d closed to %d units, "+
-        "kiting clear (step %d of %d)",
-        l.target, int(math.Round(dist)), l.kiteStreak, kiteStreakLimit)
+    l.logger.Printf("Hunt: hostile %d closed to %d units of the "+
+        "fight on %d, kiting clear (step %d of %d)",
+        threatID, int(math.Round(dist)), l.target,
+        l.kiteStreak, kiteStreakLimit)
     if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
         l.logger.Printf("Hunt: kite walk failed: %v", err)
     }
