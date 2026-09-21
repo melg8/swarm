@@ -540,6 +540,11 @@ func runBot( //nolint:funlen // linear session script
     // web UI (map clicks, equipment drags) so the interface stays
     // interactive in both launch modes.
     loop := hunt.NewLoop(game, tracker)
+    // Every session start IS a relogin into the same world spot: the
+    // spawn protection settle holds the character there while it
+    // regenerates and opens the first fight deliberately (see
+    // hunt/settle.go and the verified H-005 server facts).
+    loop.EnableSpawnSettle()
     // The hunt decisions mirror into the tracker event log: the web UI
     // log tab and the state dump button then carry the reasoning of
     // the loop (zone switches, escapes, stuck re-paths) next to the
