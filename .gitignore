@@ -32,6 +32,7 @@ go.work.sum
 # The persistent session journals of the bot runs (the session dump
 # artifacts, see docs/session_journal.md)
 logs/
+proxy.log
 
 # The offline navmesh tile build output (cmd/navmesh-build, derived
 # from the tracked geodata pack - 1.9 GB for the full 165 regions,
