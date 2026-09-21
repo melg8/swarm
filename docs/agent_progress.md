@@ -36,23 +36,51 @@ into a pack.
 
 ### Progress
 
-- Landed: the three dependency bumps (go mod tidy raised the go
-  directive 1.23.2 -> 1.26.0, required by the new x/crypto and
+- Commit dce2a28: the three dependency bumps (go mod tidy raised the
+  go directive 1.23.2 -> 1.26.0, required by the new x/crypto and
   x/text), the five non-constant format string vet findings the
   version bump surfaced (delevel.go, town.go, acceptance/manager.go),
-  and the whitespace normalization of the benchmark drill files the
-  2fda7ff commit left tab formatted. NOTE for the next agent: the
-  `go build ./...` of the whole tree fails on the PRE-EXISTING
-  benchmark drill package (g1/g2/g3.go redeclare the same symbols in
-  one package, 2fda7ff) - unrelated to this round, the drill files
-  look like deliberate per-stage artifacts, left untouched.
-- Verified facts this round (see docs/hunting.md and the H-005
-  entry): Mobius C1 spawn protection is REAL and ENABLED in the
-  deployed stack (PlayerSpawnProtection = 600 s in Player.ini, armed
-  by EnterWorld, cleared ONLY by MoveToLocation / AttackRequest /
-  Action / UseItem / RequestMagicSkillUse; the sit toggle is not in
-  the list, so a sitting character keeps the protection and
-  regenerates).
+  the whitespace normalization of the benchmark drill files and the
+  agent progress entry.
+- Commit 98d7cad: the pre-existing broken benchmark drill package
+  (g1/g2/g3.go redeclared the same symbols in one package, 2fda7ff)
+  split into g1/, g2/, g3/ subdirs - `go build ./...` and the lint
+  typecheck are green tree wide again; the frozen drill snapshots
+  got a documented .golangci.yml exclusion; the os.Chdir test pairs
+  took t.Chdir (the usetesting gate at the go 1.26 language level).
+- Commit 300e936 + 880fa39: the approach aggro answer (a mob that
+  aggros during the walk to a peaceful pick is answered at once; a
+  selected target that already holds the character stays), the
+  winnable pile up tank (pileUpWinnable gates the panic run: health
+  above the re-engage line, attackers inside the level ceiling, at
+  most three; the hurt pile up still runs), the fight potion in the
+  running fight, state.Bot.SelfAttackers/ObjectTargetsSelf.
+- Commit 2192bb1: the spawn protection settle (hunt/settle.go, the
+  verified H-005 facts) - the fresh session holds the spot, sits and
+  regenerates, then opens with the first strike (the bow owner
+  through the lure machinery). Commit 8c4a823: the review hardening
+  (the empty knownlist and unknown position hold instead of burning
+  the one shot, the pending sit confirm wait, the strike level and
+  mana gates, the panic gate stands down while the settle holds, the
+  potion threshold above the re-engage line and served in loot too).
+- Verified facts this round (H-005, docs/hunting.md): Mobius C1
+  spawn protection is REAL and ENABLED in the deployed stack
+  (PlayerSpawnProtection = 600 s in Player.ini, armed by EnterWorld,
+  cleared ONLY by MoveToLocation / AttackRequest / Action / UseItem /
+  RequestMagicSkillUse; the sit toggle is not in the list, so a
+  sitting character keeps the protection and regenerates).
+- Verification at HEAD 8c4a823: go build ./... OK, go vet OK,
+  golangci-lint 0 issues tree wide, hunt suite 73 s + state + web +
+  gofmt-spaces suites green, go mod verify/tidy clean. The live e2e
+  (tools/mobius_e2e.sh) did not run this session (the sandbox lost
+  the JDK between the stack start and the e2e call - the stack was
+  up, the e2e bootstrap refused; next session: rerun before the live
+  acceptance).
+- Not done this round (the next candidates): the bow kiting against
+  slower mobs (the circle kite with shots - the owner recipe item
+  that needs a movement-during-fight design), spiritshot consumption,
+  the settle for the town trip starts (a full bag right after the
+  relogin still walks into the packs).
 
 ## Active task (other branch, 2026-09-20): the farm readiness frame round (2026-09-20)
 

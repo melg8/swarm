@@ -35,6 +35,11 @@ the documentation map below) and is read on demand, not upfront.
   work so every atomic commit lands well before the mark.
 - A new owner prompt **resets the timer**: the 2 hour life and the
   1h45m stop mark count again from the fresh prompt.
+- No single process, script or test run may exceed **6 minutes**
+  (owner instruction 2026-09-21, hard cap on top of the 10 minute
+  sandbox reaper): budget the verification loops accordingly and
+  split anything longer (per-package test runs instead of the whole
+  tree in one call).
 - Stamp the session start into `/home/z/my-project/.session_start_ts`
   (a unix timestamp, one line) at the session start; read it back
   (`cat /home/z/my-project/.session_start_ts`) and compare with
@@ -107,7 +112,8 @@ server is load-bearing for the task.
 ## Tech stack at a glance (read this first)
 
 - **Language**: Go (deployed by `tools/swarm_fast_deploy.sh`).
-  `go.mod` pins `go 1.23.2` and the `toolchain go1.26.8` line - every
+  `go.mod` pins `go 1.26.0` (raised by the 2026-09-21 dependency
+  bump) and the `toolchain go1.26.8` line - every
   `go` invocation inside the module switches to the go1.26.8
   toolchain, so the formatting and the gates agree on every host (the
   deb go1.24 GOROOT included). There is **no Rust, no Node, no C** in
@@ -282,6 +288,29 @@ conversation or in a commit message: it lives in the registry below.
   entries), record the initial status broadcast, request the open
   and walk through, noting whether the server blocks the move.
 - Status: open.
+
+### H-005: the spawn protection window of a fresh login
+
+- Assumption: every EnterWorld arms the Mobius C1 spawn protection
+  (PlayerSpawnProtection, 600 s in the deployed Player.ini): the
+  Attackable.getHating gate strips the aggro of a protected player
+  every AI tick, so aggressive mobs stand next to a stationary
+  fresh login without attacking. The protection clears ONLY on one
+  of five action packets - MoveToLocation, AttackRequest, Action,
+  UseItem, RequestMagicSkillUse - the sit toggle of
+  RequestActionUse is NOT in the list.
+- Relied on by: the post relogin settle of the hunt loop
+  (internal/swarm/hunt/settle.go): the sit-regeneration under the
+  protection and the deliberate first strike that ends it.
+- Verify: read Player.setSpawnProtection/onActionRequest,
+  EnterWorld (the arming), Attackable.getHating (the aggro strip),
+  AttackableAI.isAggressiveTowards (no movement or sitting check in
+  the aggro itself) and Player.ini (the window); the owner observed
+  the live behavior on the deployed stack (mobs 1 m away ignore the
+  stationary fresh character until it moves).
+- Status: verified 2026-09-21 by the Mobius source read (the
+  mechanism above) plus the owner live observation; see
+  docs/hunting.md (the spawn protection section).
 
 ## Mandatory first step of every task: deploy and verify the environment
 

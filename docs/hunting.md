@@ -179,6 +179,55 @@ would have paid for.
   farm spot of the previous square (the returns aim at the new center
   until a fresh spot is remembered inside it).
 
+## The spawn protection settle and the pile up policy (2026-09-21)
+
+The verified server facts (H-005 in AGENTS.md, the Mobius sources):
+every EnterWorld arms the spawn protection - PlayerSpawnProtection,
+600 s in the deployed Player.ini. Attackable.getHating strips the
+aggro of a protected player on every one second AI tick, so
+aggressive mobs stand around a stationary fresh login without
+attacking. The protection clears on the FIRST of these client
+packets: MoveToLocation, AttackRequest, Action, UseItem,
+RequestMagicSkillUse. The sit toggle (RequestActionUse) is not in
+the list - a sitting character keeps the protection and regenerates.
+
+The settle (hunt/settle.go, opt in via EnableSpawnSettle, the
+supervisor enables it on every session): while the session is fresh
+(the settleWindow cap), no blow has landed and the loaded ground
+holds an aggressive mob within its own on-sight circle, the
+character holds the spot and sits down to regenerate until the stand
+threshold (90 percent). An empty knownlist (the enter world burst
+has not arrived) or an unknown position holds without deciding - the
+one shot settle is never burned on the packet gap. A landed blow
+ends the settle at once: the protection strips hate, it never
+absorbs damage.
+
+The recovered character opens with the first strike instead of
+walking: the nearest aggressive mob inside the firstStrikeRange (the
+700 unit Power Shot cast range) is attacked FROM THE SPOT - the bow
+owner arms the ranged tool through the lure machinery (the
+lureArm/lureShoot phases run the ranged fight and swap the melee
+weapon back when the mob closes to lureArriveRange), everyone else
+answers in melee at the chosen spot with a full bar. The strike
+keeps the engage discipline (the level ceiling, the mystic mana
+gate); without an aggressive mob in range the ordinary pick flow
+resumes. Breaking the protection exposes the character to every
+aggressive mob on sight within the same second - that is the point:
+the pack arrives at a chosen spot, full health, into a ranged opener.
+
+The pile up policy answers the reported two mob softlock: a pack of
+at most pileUpFightMaxAttackers (3) attackers inside the engage
+level ceiling with the health above the re-engage threshold is
+TANKED (pileUpWinnable in loop_safety.go) - the tick gate skips the
+panic run, the aggro answer fights the nearest attacker, the fight
+potion (fightPotionHealthPercent = 70, above the re-engage line so
+the flee gates never pre-empt it; the loot phase serves it too)
+keeps the bar under the swings. The kill that thins the pack to one
+attacker hands the answer back to the ordinary flow; the health
+drop re-arms the panic run mid fight. The unwinnable pile up keeps
+the old run, relogin and regenerate cycle - which now lands into
+the settle instead of an immediate walk back into the pack.
+
 ## Blind engage recovery (walk around the obstacle, then switch)
 
 A small obstacle (a column) between the character and its target locks
