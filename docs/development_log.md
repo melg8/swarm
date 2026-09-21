@@ -8940,3 +8940,44 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
   review: the bow attribution approximates when two weapons ride
   the paperdoll (no weapon id in the event), the connector stroke
   degrades at the smallest zooms.
+
+## Round 127: the full size contact markers - the melee pair slides apart instead of shrinking (2026-09-21)
+
+- Report: the owner issue #7 (the kanban board) - the bot and the
+  npc icons must not reduce their size when they get close to each
+  other; a bot fighting at the melee collision distance must read
+  as two FULL SIZE circles touching face to face, not two deflated
+  ones.
+
+- Root cause: Round 124 solved the merged melee blob by shrinking
+  every overlapping pair (factor = dist/(r1+r2), floored at 0.25,
+  x0.95 for the hair) - the circles touched, but both lost size,
+  which reads as the units deflating as the fight closes. Tangency
+  at constant size has exactly one geometric solution: separate the
+  centers. Fix: the contact pass computes per frame screen-space
+  OFFSETS instead of radii factors - every overlapping pair pushes
+  apart along the axis that connects the two centers (a 50/50
+  split, two Gauss-Seidel rounds over the deterministic snapshot
+  order, a 0.5px contact hair, the per unit drift capped at 2x its
+  radius so a dense crowd stays anchored), and every
+  marker-anchored visual reads the position through one new
+  resolver (unitScreenPos: the body, the tick, the name band, the
+  target rings, the combat floats and swings, the cast plate, the
+  social links, the hover hit test), so the whole unit slides
+  together. The world-anchored layers (the aggro range circles,
+  the kill marks, the walk plans) keep the true positions on
+  purpose - they are world facts, not unit plates. Stacked pairs
+  (a respawn under a standing character) separate on a fixed
+  horizontal fallback axis.
+
+- Landed: map.js (computeContactOffsets + unitScreenPos replace
+  computeContactFactors + contactRadiusOf; the cast ring and the
+  player target ring ride the plain full radii - the player ring
+  also loses a unitScale double multiply the old call site
+  carried); repro_map_render.js (the melee contact scenario
+  re-pinned to the full radii plus the slide geometry, the new
+  stacked contact scenario).
+
+- Verification: all nine web UI harnesses green (repro_map_render
+  grown to 106 checks), go test ./internal/swarm/webserver/ green;
+  no Go source touched, the change is web only.

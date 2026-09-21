@@ -11,6 +11,41 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
+
+Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7).
+The owner ask: "Bot and npcs should not reduce their icon size even
+if they get close to each other. When bot fights and it is too
+close to enemy both icons should just touch facing each other, but
+should not change size."
+
+Design (verified against the Round 124 contact pass):
+
+- The shrink is replaced by a slide: the contact pass computes per
+  frame screen-space OFFSETS (computeContactOffsets) instead of
+  radii factors - every overlapping pair keeps both radii and
+  pushes apart along the axis that connects the two centers, so
+  the circles touch face to face with a 0.5px hair (contactGap).
+- Two Gauss-Seidel rounds over the deterministic snapshot order
+  (self first, then the sorted objects) so the offsets never
+  flicker; a cheap axis-aligned early-out guards the pair loop;
+  the per unit drift is capped at 2x its radius so a dense crowd
+  stays anchored near its true spot.
+- One new resolver (unitScreenPos) feeds every marker-anchored
+  visual - the circle body, the look tick, the name band, the
+  target rings, the combat floats and swings, the cast plate, the
+  social links, the hover hit test - so the whole unit slides
+  together. The world-anchored layers (the aggro range circles,
+  the kill marks, the walk plans) keep the true positions: they
+  are world facts, not unit plates.
+- Stacked pairs (a respawn under a standing character) separate on
+  a fixed horizontal fallback axis.
+
+Status: implementation complete, all nine web UI harnesses green
+(repro_map_render re-pinned to 106 checks with the new stacked
+contact scenario), go test ./internal/swarm/webserver/ green, the
+branch pushed and the PR open for the issue.
+
 ## Active task (status: complete): the cast icon side round - the bow order shot, the quiet npc interact (2026-09-21, branch feature/improved-behaviour)
 
 Started/finished 2026-09-21 ~14:55 UTC (one session). The owner

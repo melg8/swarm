@@ -251,11 +251,12 @@ const MapView = {
   // default keeps it on the right when no hostiles are visible.
   castIconSide: 1,
 
-  // The per frame contact shrink factors of the unit circles (key ->
-  // factor, see computeContactFactors): the melee combatants touch
-  // face to face instead of merging into one blob. Null until the
-  // first draw pass computes it.
-  contactFactors: null,
+  // The per frame contact offsets of the unit markers (key ->
+  // {x, y}, see computeContactOffsets): the melee combatants keep
+  // their full circle size and slide apart so they touch face to face
+  // instead of merging into one blob. Null until the first draw pass
+  // computes it.
+  contactOffsets: null,
 
   // The server world region grid: every region is 2048 units and every
   // object within the 3x3 region block around the player is loaded (see
@@ -1280,7 +1281,7 @@ const MapView = {
     }
     this.drawHuntingZone(ctx, rect);
     this.drawKillMarks(ctx, rect);
-    this.computeContactFactors();
+    this.computeContactOffsets();
     this.drawTargetLinks(ctx);
     this.drawAggroRanges(ctx, rect);
     this.drawSocialLinks(ctx, rect);
@@ -2552,8 +2553,9 @@ const MapView = {
       // The screen position is computed once per unit: the pair loop
       // below used to transform the same position again for every
       // candidate pair - a dense pack multiplied the transform cost
-      // by its square.
-      const p = this.worldToScreen(x, y);
+      // by its square. The position rides the contact offset of the
+      // frame, so the pack links follow the slid markers.
+      const p = this.unitScreenPos(obj.objectId, x, y);
       units.push({
         x: x, y: y, sx: p.x, sy: p.y,
         low: mask.low, all: mask.all,
@@ -2720,16 +2722,18 @@ const MapView = {
     ctx.restore();
   },
 
-  // computeContactFactors builds the per frame shrink factors of the
-  // unit circles: in melee the combatants stand at the collision
+  // computeContactOffsets builds the per frame contact offsets of
+  // the unit markers: in melee the combatants stand at the collision
   // distance, and at the zoomed out scales the screen distance drops
-  // below the sum of the marker radii - the circles merge into one
-  // blob. Every overlapping pair shrinks proportionally so the
-  // circles touch face to face with a hair of separation instead
-  // (the factor floor keeps sub pixel dots from vanishing). Dead
-  // units, ground items and the decorations stay out of it; a unit
-  // overlapping several partners takes the smallest factor.
-  computeContactFactors() {
+  // below the sum of the marker radii - the full size circles would
+  // merge into one blob. Every overlapping pair keeps its radii and
+  // slides apart along the axis that connects the two centers, so
+  // the circles touch face to face with a hair of separation instead
+  // (the offset cap keeps a dense crowd from carrying one unit far
+  // from its true place). Dead units, ground items and the
+  // decorations stay out of it; a unit overlapping several partners
+  // accumulates the pushes of every pair.
+  computeContactOffsets() {
     const k = this.unitScale || 1;
     const units = [];
     const selfRt = this.runtime.get("self");
@@ -2737,7 +2741,7 @@ const MapView = {
     if (c && c.x) {
       const p = this.worldToScreen(
         selfRt ? selfRt.drawX : c.x, selfRt ? selfRt.drawY : c.y);
-      units.push({ key: "self", x: p.x, y: p.y,
+      units.push({ key: "self", ox: p.x, oy: p.y, x: p.x, y: p.y,
         r: selfMarkerUnits * k });
     }
     for (const obj of this.sortedObjects) {
@@ -2745,37 +2749,74 @@ const MapView = {
       const rt = this.runtime.get(obj.objectId);
       const p = this.worldToScreen(
         rt ? rt.drawX : obj.x, rt ? rt.drawY : obj.y);
-      units.push({ key: obj.objectId, x: p.x, y: p.y,
+      units.push({ key: obj.objectId, ox: p.x, oy: p.y, x: p.x, y: p.y,
         r: radiusOf(obj, threatOf(obj)) * k });
     }
-    if (this.contactFactors) {
-      this.contactFactors.clear();
-    } else {
-      this.contactFactors = new Map();
+    // The separation pass: pairwise pushes over the working
+    // positions, where a later pair sees the pairs before it
+    // resolved (a chain of touching units settles in one round, the
+    // second catches the rare leftovers). The pairs run in the
+    // deterministic snapshot order (the self first, then the sorted
+    // objects), so the offsets never flicker frame to frame.
+    for (let round = 0; round < 2; round++) {
+      for (let i = 0; i < units.length; i++) {
+        for (let j = i + 1; j < units.length; j++) {
+          const a = units[i];
+          const b = units[j];
+          const want = a.r + b.r + contactGap;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          if (dx > want || dx < -want || dy > want || dy < -want) {
+            continue;
+          }
+          const dist = Math.hypot(dx, dy);
+          if (dist >= want) { continue; }
+          const push = (want - dist) / 2;
+          let ux = 1;
+          let uy = 0;
+          if (dist > 0.001) { ux = dx / dist; uy = dy / dist; }
+          a.x -= ux * push;
+          a.y -= uy * push;
+          b.x += ux * push;
+          b.y += uy * push;
+        }
+      }
     }
-    for (let i = 0; i < units.length; i++) {
-      for (let j = i + 1; j < units.length; j++) {
-        const a = units[i];
-        const b = units[j];
-        const want = a.r + b.r;
-        const dist = Math.hypot(b.x - a.x, b.y - a.y);
-        if (dist >= want) { continue; }
-        const factor = Math.max(0.25, dist / want) * 0.95;
-        this.contactFactors.set(a.key,
-          Math.min(this.contactFactors.get(a.key) ?? 1, factor));
-        this.contactFactors.set(b.key,
-          Math.min(this.contactFactors.get(b.key) ?? 1, factor));
+    if (this.contactOffsets) {
+      this.contactOffsets.clear();
+    } else {
+      this.contactOffsets = new Map();
+    }
+    for (const u of units) {
+      let dx = u.x - u.ox;
+      let dy = u.y - u.oy;
+      const drift = Math.hypot(dx, dy);
+      const cap = 2 * u.r;
+      if (drift > cap) {
+        dx = dx / drift * cap;
+        dy = dy / drift * cap;
+      }
+      if (dx !== 0 || dy !== 0) {
+        this.contactOffsets.set(u.key, { x: dx, y: dy });
       }
     }
   },
 
-  // contactRadiusOf scales one unit marker radius by its contact
-  // shrink factor (1 when the unit overlaps nobody).
-  contactRadiusOf(key, baseRadius) {
-    const factor = this.contactFactors
-      ? this.contactFactors.get(key) : undefined;
+  // unitScreenPos resolves the screen position of one unit marker:
+  // the interpolated runtime position (the snapshot coordinates as
+  // the fallback) plus the contact offset of the frame. Every
+  // marker-anchored visual reads through here - the circle body, the
+  // look tick, the name band, the target rings, the combat floats,
+  // the cast plate and the hover hit test - so the full size contact
+  // slide moves the whole unit together.
+  unitScreenPos(key, wx, wy) {
+    const rt = this.runtime.get(key);
+    const p = this.worldToScreen(rt ? rt.drawX : wx, rt ? rt.drawY : wy);
+    const off = this.contactOffsets
+      ? this.contactOffsets.get(key) : undefined;
+    if (off) { p.x += off.x; p.y += off.y; }
 
-    return baseRadius * (factor === undefined ? 1 : factor);
+    return p;
   },
 
   drawObjects(ctx, rect) {
@@ -2797,7 +2838,7 @@ const MapView = {
       const rt = this.runtime.get(obj.objectId) || {
         drawX: obj.x, drawY: obj.y, drawHeading: obj.heading
       };
-      const p = this.worldToScreen(rt.drawX, rt.drawY);
+      const p = this.unitScreenPos(obj.objectId, rt.drawX, rt.drawY);
       if (p.x < -30 || p.y < -30
         || p.x > rect.width + 30 || p.y > rect.height + 30) {
         continue;
@@ -2822,8 +2863,7 @@ const MapView = {
       if (obj.kind === "item") {
         drawDiamond(ctx, p.x, p.y, 4, this.mapColors.item);
       } else {
-        labelRadius = this.contactRadiusOf(obj.objectId,
-          radiusOf(obj, threat) * this.unitScale);
+        labelRadius = radiusOf(obj, threat) * this.unitScale;
         drawUnitTick(ctx, p.x, p.y, rt.drawHeading,
           labelRadius, this.mapColors[threat], this.mapColors.tick, {
             dead: obj.dead,
@@ -3020,10 +3060,8 @@ const MapView = {
     ctx.setLineDash([]);
     ctx.restore();
 
-    const radius = (self
-      ? this.contactRadiusOf("self", selfMarkerUnits * this.unitScale)
-      : this.contactRadiusOf(target.objectId,
-        radiusOf(target, threatOf(target)))) * this.unitScale + 5;
+    const radius = (self ? selfMarkerUnits
+      : radiusOf(target, threatOf(target))) * this.unitScale + 5;
     ctx.save();
     ctx.strokeStyle = this.mapColors.player;
     ctx.globalAlpha = 0.75;
@@ -3050,8 +3088,7 @@ const MapView = {
     if (!c || !c.x) { return; }
     const rt = this.runtime.get("self");
     const heading = rt ? rt.drawHeading : c.heading;
-    const p = this.worldToScreen(
-      rt ? rt.drawX : c.x, rt ? rt.drawY : c.y);
+    const p = this.unitScreenPos("self", c.x, c.y);
 
     // The server side walk of the character gets the same dashed
     // destination line as every other moving object (the paths
@@ -3072,9 +3109,10 @@ const MapView = {
     }
 
     // The self marker: the mob parity circle, the accent ring and
-    // the look tick.
-    const selfRadius = this.contactRadiusOf("self",
-      selfMarkerUnits * this.unitScale);
+    // the look tick. The radius stays the full unit scale whatever
+    // the contacts - the marker slides (unitScreenPos above), it
+    // never shrinks.
+    const selfRadius = selfMarkerUnits * this.unitScale;
     drawUnitTick(ctx, p.x, p.y, heading, selfRadius,
       this.mapColors.self, this.mapColors.tick, {
         self: true, pulse: performance.now(), scale: this.unitScale
@@ -3371,9 +3409,7 @@ const MapView = {
     let best = null;
     let bestDist = 14;
     for (const obj of this.lastSnap.objects || []) {
-      const rt = this.runtime.get(obj.objectId);
-      const p = this.worldToScreen(
-        rt ? rt.drawX : obj.x, rt ? rt.drawY : obj.y);
+      const p = this.unitScreenPos(obj.objectId, obj.x, obj.y);
       const dist = Math.hypot(p.x - mx, p.y - my);
       if (dist < bestDist) {
         bestDist = dist;
@@ -3893,10 +3929,10 @@ const MapView = {
     for (const obj of this.sortedObjects) {
       if (!obj.attackable || obj.dead) { continue; }
       // The interpolated position source of drawObjects: the moving
-      // hostiles weigh with their drawn spot, not their snapshot one.
-      const rt = this.runtime.get(obj.objectId);
-      const s = this.worldToScreen(
-        rt ? rt.drawX : obj.x, rt ? rt.drawY : obj.y);
+      // hostiles weigh with their drawn spot, not their snapshot one
+      // (the contact offset included - the icon dodges the enemy as
+      // it reads on the map).
+      const s = this.unitScreenPos(obj.objectId, obj.x, obj.y);
       const dx = s.x - p.x;
       const d2 = dx * dx + (s.y - p.y) * (s.y - p.y);
       if (d2 < nearestD2) {
@@ -3947,7 +3983,7 @@ const MapView = {
     // of both lanes (taken flies left, dealt flies right) at every
     // zoom; the name band above stays clear the same way. The inner
     // edge lands selfRadius + 5k from the center, clearing the pulse
-    // ring while the marker is not contact-shrunk.
+    // ring around the full size marker.
     const dodgeY = 10 * k;
     const x = pos.x + side * (selfRadius + 5 * k + size / 2) - size / 2;
     const y = pos.y + dodgeY - size / 2;
@@ -4002,10 +4038,8 @@ const MapView = {
     // The cast ring inside the marker circle: the faint track plus
     // the bright progress arc sweeping clockwise from the top - the
     // circle fills rotationally while the cast runs. The radius
-    // follows the drawn marker, whose contact shrink the raw
-    // selfMarkerUnits math would ignore.
-    const ringR = Math.max(2 * k, this.contactRadiusOf("self",
-      selfMarkerUnits * k) - 2 * k);
+    // rides the drawn marker radius less the ring inset.
+    const ringR = Math.max(2 * k, selfMarkerUnits * k - 2 * k);
     ctx.strokeStyle = "#7cc4ff";
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
@@ -4297,16 +4331,15 @@ const MapView = {
   // effectScreenPos resolves the screen position of an animation
   // anchor: the interpolated runtime position while the unit is
   // still on the map (the self character included), the captured
-  // event placement once it despawned.
+  // event placement once it despawned. The contact offset applies
+  // while the unit lives, so the floats and the swings stay glued to
+  // the slid marker; a despawned anchor keeps its captured spot.
   effectScreenPos(id, fallbackWorld) {
     const selfId = this.lastSnap.character
       && this.lastSnap.character.objectId;
-    const rt = this.runtime.get(id === selfId ? "self" : id);
-    if (rt) {
-      return this.worldToScreen(rt.drawX, rt.drawY);
-    }
 
-    return this.worldToScreen(fallbackWorld.x, fallbackWorld.y);
+    return this.unitScreenPos(id === selfId ? "self" : id,
+      fallbackWorld.x, fallbackWorld.y);
   },
 
   // ---- transforms ----
@@ -4550,6 +4583,11 @@ const missColor = "#dfe6ee";
 // combatant among the others (mob combat parity), no bigger-self
 // emphasis.
 const selfMarkerUnits = 6;
+
+// contactGap is the hair of separation the contact pass leaves
+// between two touching circles: exactly tangent rims fuse under the
+// canvas anti aliasing, the half pixel seam keeps the pair readable.
+const contactGap = 0.5;
 
 // easeOutQuad eases t out: fast at the start, settled at the end.
 function easeOutQuad(t) {
