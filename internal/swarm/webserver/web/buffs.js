@@ -11,21 +11,26 @@
 //   10 columns by 2 rows for the classic buff bar (a longer list
 //   scrolls inside the grid), every cell packs edge to edge with the
 //   thin white separator strips on its right and bottom edges and
-//   carries the icon with the level badge and the short remaining
-//   time overlaid at its bottom edge;
+//   carries the icon with the level badge, the remaining time chip
+//   on hover and the mini time strip pinned to its bottom pixels;
 // - the detailed list: the full effect rows (icon, level, name, the
 //   remaining time) with the remaining time percent bar under every
 //   row, the tighter vertical rhythm and the scrollbar - the panel
-//   never grows taller than the character HUD stack.
+//   body fills EXACTLY the height of the character HUD stack (never
+//   shorter), so the pair reads as one block.
 //
 // Both views show exactly the active effects (two effects render two
 // cells and two rows). The dock is the slim vertical strip on the
-// left edge of the frame: it carries the expand chevron and the view
-// switch icon, both buttons toggle between the two states and
-// neither ever moves (the chevron stays pinned to the top left
-// corner in both states, so collapsing and expanding again needs no
-// re-aim). The view choice persists in the localStorage
+// left edge of the frame: it carries the single expand chevron (the
+// only control - the old view switch is gone) pinned to the top, so
+// it never moves between the states and flipping it needs no
+// re-aim; the chevron rotates 180 degrees with a springy ease on
+// every click. The view choice persists in the localStorage
 // (swarm.buffsView). The panel hides entirely while no effect runs.
+//
+// Toggling the view flies the visible icons from their old spots to
+// the new ones (the FLIP morph of buffs_flip.js) and hovering a buff
+// in either view opens the rich tooltip card (buffs_tooltip.js).
 //
 // The rows and the cells are persistent DOM nodes keyed by the skill
 // id - the icon builds once per effect, the later refreshes only
@@ -35,53 +40,56 @@
 
 // The panel geometry constants: the grid packs buffCellSize px
 // cells at most buffGridColumns per row and at most two rows (the
-// classic buff bar; the white separator strips ride inside the cell
-// borders and the longer lists scroll inside the grid), the body
-// adds buffBodyPadding px of panel colored frame around the content.
-// The panel frame width per view state lives in the CSS next to
-// these numbers.
+// classic buff bar; the cell matches the icon box of the detailed
+// list, and ten of them keep the frame clear of the central status
+// banner), the body adds buffBodyPaddingY px of panel colored frame
+// on the top and the bottom edges (the horizontal one lives in the
+// CSS next to the frame widths).
 const buffGridColumns = 10;
 const buffGridRows = 2;
-const buffCellSize = 32;
-const buffBodyPadding = 3;
-// The detailed list row pitch (the row box plus its tight padding)
-// for the height fallback when the DOM does not answer measurements.
-const buffListRowPitch = 36;
+const buffCellSize = 30;
+const buffBodyPaddingY = 2;
+// The horizontal chrome the frame width rides with: the chevron dock
+// strip (the 22px button, its 2px paddings and the 1px border) plus
+// the side body padding (2 x 3px) and the frame borders (2 x 1px).
+const buffDockWidth = 27;
+const buffPanelSide = 8;
 // The detailed list falls back to this height cap when the HUD stack
 // does not answer a measurement (the harness stub DOM).
 const buffListFallbackCap = 320;
-// The frame chrome of the panel: the body padding on both edges plus
-// the panel borders - the parts the pinned body height rides with.
-const buffFrameChrome = buffBodyPadding * 2 + 2;
+// The frame chrome of the panel: the body padding on the vertical
+// edges plus the panel borders - the parts the pinned body height
+// rides with.
+const buffFrameChrome = buffBodyPaddingY * 2 + 2;
 
 // The effects panel state: the keyed cells of the icon grid, the
 // keyed rows of the detailed list, the countdown anchors of the last
-// snapshot (the server sent left seconds at the at timestamp) and the
-// view choice (icons or list).
+// snapshot (the server sent left seconds at the at timestamp), the
+// view choice (icons or list) and the flip run token of the view
+// morph.
 const BuffsPanel = {
   cells: new Map(),
   rows: new Map(),
   anchors: new Map(),
-  view: "icons"
+  view: "icons",
+  flipRun: 0
 };
 
-// initBuffsPanel wires the dock buttons (both toggle the view
-// state), restores the stored view choice, tracks the HUD stack size
-// (the detailed list never outgrows it) and starts the one second
-// countdown ticker that keeps the remaining times honest between the
-// server snapshots.
+// initBuffsPanel wires the dock chevron (the single view toggle),
+// restores the stored view choice, tracks the HUD stack size (the
+// detailed list fills exactly its height), starts the one second
+// countdown ticker that keeps the remaining times honest between
+// the server snapshots and wires the hover tooltip card.
 function initBuffsPanel() {
   const panel = document.getElementById("buffs-panel");
   if (!panel || panel.dataset.buffsInit) { return; }
   panel.dataset.buffsInit = "1";
   BuffsPanel.view = buffsStoredView() === "list" ? "list" : "icons";
-  const flip = () => {
-    setBuffsView(BuffsPanel.view === "icons" ? "list" : "icons");
-  };
   const toggle = document.getElementById("buffs-toggle");
-  const viewBtn = document.getElementById("buffs-view-btn");
-  if (toggle) { toggle.addEventListener("click", flip); }
-  if (viewBtn) { viewBtn.addEventListener("click", flip); }
+  if (toggle) { toggle.addEventListener("click", () => {
+    setBuffsView(BuffsPanel.view === "icons" ? "list" : "icons");
+  }); }
+  initBuffsTooltip();
   const stack = document.querySelector(".hud-stack");
   if (typeof ResizeObserver === "function" && stack &&
     typeof stack.addEventListener === "function") {
@@ -104,38 +112,34 @@ function buffsStoredView() {
 }
 
 // setBuffsView switches the panel between the icon grid and the
-// detailed list (the CSS transition morphs the frame both ways) and
-// persists the choice (best effort, see buffsStoredView).
+// detailed list (the FLIP morph of buffs_flip.js flies the visible
+// icons across while the CSS morphs the frame) and persists the
+// choice (best effort, see buffsStoredView).
 function setBuffsView(view) {
   if (view !== "icons" && view !== "list") { return; }
+  const previous = BuffsPanel.view;
   BuffsPanel.view = view;
   try {
     window.localStorage.setItem("swarm.buffsView", view);
   } catch (_e) {
     // The choice lives for the session only then.
   }
-  applyBuffsPanelState();
+  flipBuffsView(previous, applyBuffsPanelState);
 }
 
 // applyBuffsPanelState syncs the panel DOM with the view choice: the
 // view classes drive the frame width and the layer cross-fade in the
-// CSS, the button titles name the action each click performs.
+// CSS, the chevron title names the action the click performs.
 function applyBuffsPanelState() {
   const panel = document.getElementById("buffs-panel");
   if (!panel) { return; }
   panel.classList.toggle("view-icons", BuffsPanel.view === "icons");
   panel.classList.toggle("view-list", BuffsPanel.view === "list");
   const toggle = document.getElementById("buffs-toggle");
-  const viewBtn = document.getElementById("buffs-view-btn");
   if (toggle) {
     toggle.title = BuffsPanel.view === "icons"
       ? "expand the detailed effect list"
       : "collapse the effect list back to the icons";
-  }
-  if (viewBtn) {
-    viewBtn.title = BuffsPanel.view === "icons"
-      ? "switch to the detailed effect list"
-      : "switch back to the icon grid";
   }
   syncBuffsPanelSize();
 }
@@ -149,20 +153,29 @@ function buffsHudHeight() {
   return stack && stack.offsetHeight > 0 ? stack.offsetHeight : 0;
 }
 
-// syncBuffsPanelSize pins the panel body height to the content of
-// the active view: the grid height (one row of cells or two, the
-// dock follows the same height) or the detailed list content capped
-// at the HUD stack height. The explicit heights are what the CSS
-// height transition animates between the states. The count
+// syncBuffsPanelSize pins the panel shape to the view: the grid
+// height (one row of cells or two) with the frame hugging the filled
+// columns (a partially filled row never reserves dead space over the
+// map, so the frame stays clear of the central status banner for
+// every count up to the full 10 column row), or the EXACT height of
+// the character HUD stack for the list (the body always fills it,
+// never a shorter content measure - the vertical widget reads as
+// tall as the character widget). The explicit heights and widths are
+// what the CSS transitions animate between the states. The count
 // arithmetic covers the stub DOM of the harness where the elements
 // answer no measurements.
 function syncBuffsPanelSize() {
   const body = document.getElementById("buffs-panel-body");
-  if (!body) { return; }
+  const panel = document.getElementById("buffs-panel");
+  if (!body || !panel) { return; }
   let height = 0;
   if (BuffsPanel.view === "icons") {
     const grid = document.getElementById("buffs-grid");
     height = grid ? grid.offsetHeight : 0;
+    const cols = Math.min(buffGridColumns,
+      Math.max(1, BuffsPanel.cells.size));
+    panel.style.width =
+      (cols * buffCellSize + buffDockWidth + buffPanelSide) + "px";
     if (!height) {
       // The grid CSS caps the shape at the classic two rows (a
       // longer list scrolls inside it), the arithmetic mirrors the
@@ -172,20 +185,16 @@ function syncBuffsPanelSize() {
       height = rows * buffCellSize;
     }
   } else {
-    const list = document.getElementById("buffs-list");
-    height = list ? list.scrollHeight : 0;
+    // The list keeps its CSS reading width.
+    panel.style.width = "";
     // The HUD ceiling counts the whole frame in: the body padding
     // and the panel borders ride on top of the pinned height, so
-    // the chrome comes off the cap (the expanded panel never
-    // outgrows the character widget).
-    const cap = Math.max(0,
+    // the chrome comes off the cap - the expanded panel matches
+    // the character widget height exactly.
+    height = Math.max(0,
       (buffsHudHeight() || buffListFallbackCap) - buffFrameChrome);
-    if (height > cap) { height = cap; }
-    if (!height) {
-      height = Math.min(BuffsPanel.rows.size * buffListRowPitch, cap);
-    }
   }
-  body.style.height = (height + buffBodyPadding * 2) + "px";
+  body.style.height = (height + buffBodyPaddingY * 2) + "px";
 }
 
 // buffLeftText formats the remaining seconds of an effect: the short
@@ -249,9 +258,10 @@ function buffLiveLeft(anchor) {
 }
 
 // makeBuffCell creates one keyed grid cell: the icon box with its
-// level badge and the countdown overlay strip. The icon image itself
-// waits for the first snapshot entry (a missing icon leaves the
-// plain box).
+// level badge, the remaining time chip (shown on hover only) and
+// the mini time strip pinned to the bottom pixels. The icon image
+// itself waits for the first snapshot entry (a missing icon leaves
+// the plain box).
 function makeBuffCell() {
   const item = document.createElement("div");
   item.className = "buff-cell";
@@ -261,16 +271,19 @@ function makeBuffCell() {
   level.className = "badge-level";
   const left = document.createElement("span");
   left.className = "buff-left";
-  item.append(img, level, left);
+  const strip = document.createElement("i");
+  strip.className = "buff-strip";
+  item.append(img, level, left, strip);
 
-  return { item, img, level, left };
+  return { item, img, level, left, strip };
 }
 
 // applyBuffCell refreshes one keyed grid cell to the anchored
 // snapshot entry (the anchor carries the skill fields and the at
 // moment of the reading): the icon source builds once (a failing
-// load removes the image and leaves the plain box), the level badge
-// and the countdown rewrite on every snapshot and every local tick.
+// load removes the image and leaves the plain box), the level badge,
+// the hover countdown and the mini time strip (the remaining share
+// of the duration) rewrite on every snapshot and every local tick.
 function applyBuffCell(cell, buff) {
   if (!cell.img.src && buff.icon) {
     cell.img.src = "/icons/" + buff.icon + ".png";
@@ -280,9 +293,9 @@ function applyBuffCell(cell, buff) {
   cell.level.textContent = String(buff.level);
   cell.left.textContent = buffLeftShort(left);
   cell.left.classList.toggle("fading", left > 0 && left < 60);
-  const name = buff.name || ("effect #" + buff.skillId);
-  cell.item.title = name + " level " + buff.level + " \u00b7 " +
-    buffLeftText(left) + " left";
+  cell.strip.style.width = buff.total > 0
+    ? Math.min(100, Math.max(0, left / buff.total * 100)) + "%"
+    : "0%";
 }
 
 // makeBuffRow creates one keyed effect row of the detailed list: the
@@ -336,16 +349,16 @@ function applyBuffRow(row, buff) {
   row.fill.style.width = buff.total > 0
     ? Math.min(100, Math.max(0, left / buff.total * 100)) + "%"
     : "0%";
-  row.item.title = (buff.name || ("effect #" + buff.skillId)) +
-    " level " + buff.level + " \u00b7 " + buffLeftText(left) + " left";
 }
 
 // syncBuffsKeyed diffs one keyed view (the grid cells or the list
 // rows) against the snapshot list: the effects that left the server
 // list drop their nodes, the effects that joined build fresh ones
-// (with the brief enter animation), the surviving ones refresh in
-// place and every node ends in the snapshot order (appending an
+// (with the spawn animation), the surviving ones refresh in place
+// and every node ends in the snapshot order (appending an
 // existing node moves it, the icons never re-decode for a reorder).
+// Every node carries its skill id in the data-skill-id attribute -
+// the hover tooltip card resolves the anchor through it.
 function syncBuffsKeyed(container, buffs, store, make, apply) {
   const seen = new Set();
   for (const buff of buffs) { seen.add(buff.skillId); }
@@ -362,10 +375,11 @@ function syncBuffsKeyed(container, buffs, store, make, apply) {
     if (fresh) {
       entry = make();
       store.set(buff.skillId, entry);
-      entry.item.classList.add("buff-enter");
-      window.setTimeout(((node) => () => node.classList.remove("buff-enter"))(
-        entry.item), 260);
+      entry.item.classList.add("buff-spawn");
+      window.setTimeout(((node) => () => node.classList.remove(
+        "buff-spawn"))(entry.item), 700);
     }
+    entry.item.setAttribute("data-skill-id", String(buff.skillId));
     const anchor = buffAnchorOf(buff.skillId, buff);
     apply(entry, anchor);
     container.append(entry.item);
