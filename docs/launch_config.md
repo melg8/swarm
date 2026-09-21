@@ -100,7 +100,7 @@ The implemented bot types today:
 | Type | Behavior |
 | --- | --- |
 | `fighter` | the elven melee fighter of the current hunt loop |
-| `archer` | the ranged archetype: the ranged weapon preference with kiting and bow shots even at melee range (the hunt side behavior lands in its own slices, the first round rides PR #15; the launch side accepts the type today) |
+| `archer` | the ranged archetype: the ranged weapon preference with kiting and bow shots even at melee range. The bow gear plan is live (the weapon milestone buys the bow, the quiver restocks behind it, the arrows arm onto the left hand); the kiting lands in its own slices (#18-#20 of #13) |
 
 A config naming an unimplemented type fails validation with the list
 of implemented types in the error, so a config written for a newer

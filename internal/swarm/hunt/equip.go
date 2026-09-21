@@ -9,6 +9,7 @@ import (
 
     "github.com/melg8/swarm/internal/swarm/gear"
     "github.com/melg8/swarm/internal/swarm/npcdata"
+    "github.com/melg8/swarm/internal/swarm/state"
 )
 
 // Auto equipment of the hunt loop: the burst planner of the gear
@@ -122,23 +123,28 @@ func (l *Loop) plannedEquipKeeps() map[int32]bool {
     return manager.keepsCache
 }
 
-// addLureToolKeeps adds the ranged luring tool of the melee profiles
-// to the keep set: the bow scores zero under the profile (the
-// profile's weapon ladder ranks the close combat damage), so the gear
-// simulation never places it on the paperdoll and the plain keep set
-// never holds it - the junk flows would sell the bought luring bow at
-// the very next vendor visit (the owner report: the bot reaches the
-// vendor and sells the bow it owns although it plans no more
-// expensive bow) and the overflow cleanup would destroy it for bag
-// space. The lure flow equips the bow from the bag on demand (see
-// lure.go), so the strongest owned bow and the arrow stacks must
-// survive every junk decision. A second, weaker bow stays plain junk
-// (the duplicate gear rank of the sell order owns it), the mystic
-// profiles never lure - their inventory bows are junk.
+// addLureToolKeeps adds the ranged tooling of the bow shooting
+// profiles to the keep set: for the melee lurer the bow scores zero
+// under the profile (the profile's weapon ladder ranks the close
+// combat damage), so the gear simulation never places it on the
+// paperdoll and the plain keep set never holds it - the junk flows
+// would sell the bought luring bow at the very next vendor visit
+// (the owner report: the bot reaches the vendor and sells the bow it
+// owns although it plans no more expensive bow) and the overflow
+// cleanup would destroy it for bag space. The lure flow equips the
+// bow from the bag on demand (see lure.go), so the strongest owned
+// bow and the arrow stacks must survive every junk decision. For the
+// archer the bow itself is planner managed (WeaponScore ranks it),
+// but the ARROWS still score zero under every profile - the quiver
+// of the primary weapon must survive the junk decisions the same
+// way (the keep is redundant for the bow and harmless). A second,
+// weaker bow stays plain junk (the duplicate gear rank of the sell
+// order owns it), the mystic profiles never shoot - their inventory
+// bows are junk.
 func (l *Loop) addLureToolKeeps(
     profile gear.Profile, keeps map[int32]bool,
 ) {
-    if !gear.BowLurer(profile) {
+    if !gear.QuiverCarrier(profile) {
         return
     }
     bestBowPower := int32(0)
@@ -174,6 +180,60 @@ func (l *Loop) equipment() gear.Equipment {
     return gear.NewEquipment(
         l.tracker.InventoryItems(),
         l.tracker.PaperdollSlotObjectIDs())
+}
+
+// maybeArmQuiver equips the arrow stack of the archer onto the
+// paperdoll: the bow in the right hand shoots only with a quiver in
+// the left, but the ammo scores zero under every profile (a
+// consumable, not gear), so the equip planner never places it - the
+// arming is the loop's own step, the same contract the lure arm
+// phase follows for the melee pull (see lure.go). One use item
+// request per arming, gated on the same in flight write set as the
+// auto equips; a worn left hand item (the quiver itself - the
+// profile never plans a shield) means the arming already holds. The
+// stack runs dry server side, the left hand empties, and the next
+// tick re-arms from the biggest bag stack of the restock.
+func (l *Loop) maybeArmQuiver() {
+    manager := l.equip
+    if manager == nil || l.game == nil {
+        return
+    }
+    if !gear.IsArcher(manager.profile) {
+        return
+    }
+    paperdoll := l.tracker.PaperdollSlotObjectIDs()
+    if paperdoll[state.PaperdollLHand] != 0 {
+        // The quiver (the only left hand item the archer profile
+        // lets stay) is worn already.
+        return
+    }
+    if paperdoll[state.PaperdollRHand] == 0 {
+        return
+    }
+    kind, ok := l.tracker.SelfWeaponKind()
+    if !ok || kind != weaponTypeBow {
+        return
+    }
+    _, arrowID, hasTool := l.bowAndArrow()
+    if !hasTool {
+        return
+    }
+    if len(l.userDeferred) > 0 || l.replacementSellingActive() {
+        // The manual mode or the replacement sale owns the inventory
+        // flows right now; the arming rides the next tick.
+        return
+    }
+    if !l.inventoryItemAllowed(arrowID, []gear.Slot{gear.SlotLHand}) {
+        return
+    }
+    l.markInventoryAction(arrowID)
+    if err := l.game.UseItem(arrowID); err != nil {
+        l.logf("Hunt: quiver equip failed: %v", err)
+
+        return
+    }
+    l.logf("Hunt: gear: arming the quiver, the bow shoots with " +
+        "the arrows worn")
 }
 
 // maybeEquipGear executes the auto equipment burst: every

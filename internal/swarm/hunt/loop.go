@@ -1576,6 +1576,11 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
     // caster gear from its very first equip decision.
     l.maybePickGearProfile()
     l.maybeEquipGear()
+    // The archer quiver follows the auto equipment: the bow the
+    // planner placed shoots only with the arrows worn, and the ammo
+    // is invisible to the planner (it scores zero - a consumable, not
+    // gear), so the arming is the loop's own step right behind it.
+    l.maybeArmQuiver()
     // The replaced starter kit follows the equips: the unsellable,
     // undroppable Squire's pieces leave the bag through the destroy
     // request as soon as their replacement is worn.

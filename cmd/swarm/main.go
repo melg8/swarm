@@ -24,6 +24,7 @@ import (
 
     "github.com/melg8/swarm/internal/swarm/acceptance"
     "github.com/melg8/swarm/internal/swarm/connection"
+    "github.com/melg8/swarm/internal/swarm/gear"
     "github.com/melg8/swarm/internal/swarm/hunt"
     "github.com/melg8/swarm/internal/swarm/huntaudit"
     "github.com/melg8/swarm/internal/swarm/memwatch"
@@ -578,6 +579,17 @@ func runBot( //nolint:funlen // linear session script
     // web UI (map clicks, equipment drags) so the interface stays
     // interactive in both launch modes.
     loop := hunt.NewLoop(game, tracker)
+    // The launch bot type seeds the gear profile: an archer typed slot
+    // scores the ranged gear (the bow as the weapon milestone, the
+    // quiver as the ammo, issue #17) from its very first equip
+    // decision. The fighter and every mode run without a type keep
+    // the melee fighter default of the loop, and the class based pick
+    // of the loop may still override a caster class later (the
+    // physical class wins over the label - a mystic cannot shoot the
+    // bow the label pretends).
+    if cfg.botType == botTypeArcher {
+        loop.SetGearProfile(gear.Archer{})
+    }
     // Every session start IS a relogin into the same world spot: the
     // spawn protection settle holds the character there while it
     // regenerates and opens the first fight deliberately (see
