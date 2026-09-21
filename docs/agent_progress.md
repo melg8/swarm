@@ -11,6 +11,67 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
+## Active task (status: in review): the archer kite step - the bow user steps clear of a closed target (2026-09-21, branch feature/archer-kiting, issue #13)
+
+Started 2026-09-21 ~19:35 UTC. The source is the project board issue
+melg8/swarm#13 ("Add support for archer warriors with kiting behavior
+against mobs"): an archer that fights a mob from the bow range never
+wants the mob in its face - the Mobius server AI stands the archer
+still while the auto attack shoots, so a melee mob that closes simply
+swings away at a target it could outrange.
+
+Design (the first implementation round of the issue):
+
+- `internal/swarm/hunt/kite.go`: the kite step - while a bow fight
+  runs, a target that closed inside kiteRetreatRadius (250, the mob
+  is a second from melee) steps the character kiteStep (400) units
+  straight away from it through WalkTo (the retreat follows the mesh
+  routes, never runs into a known wall). The step reuses the fighting
+  movement window (combatAvoidUntil): the forced attack re-requests
+  hold while the retreat walks (a request would interrupt the walk
+  server-side), and once the window closes the engage re-requests the
+  attack - the distance after the step lands back inside the bow
+  engage radius (450), so the re-request shoots from range instead of
+  starting a server chase that walks the distance right back in.
+- The step paces itself (kiteStepPeriod 3s: 2s walk, 1s shoot at the
+  fastest cycle), respects the zone leash (a cornered archer stands
+  and shoots - the leash outranks the kite), and carries a streak
+  limit (kiteStreakLimit 8 per target): a chaser at least as fast as
+  the character never falls behind, and past the limit the archer
+  fights it out instead of shuffling forever (the losing fight and
+  panic machinery still own the death risk). A fresh target resets
+  the streak.
+- The hook sits in the running fight branch of engage() ahead of the
+  impending-add scan: the closing target is the concrete damage, the
+  add scan runs the next tick when the target holds its distance.
+- The behavior arms itself on the weapon in hand (bowEquipped): no
+  config, no class check - whatever bot holds a bow (the planned
+  archer type of the config launch round, issue #12) kites its
+  fights.
+- The edge cases the issue names, handled or bounded: cornered (the
+  leash skip above), multiple mobs chasing (the step reads the target
+  alone; the attacker count gate and the panic run already own the
+  pile up), pathfinding while retreating (WalkTo routes over the
+  mesh), attack animation/travel time (the window pauses re-requests,
+  the already flying shots land; nothing more is modeled - honest
+  limit, recorded in kite.go).
+- The kiting parameters (the trigger radius, the step length, the
+  window, the period, the streak limit) are the tunable block at the
+  top of kite.go, each with its rationale comment.
+
+Verification: 8 new tests in kite_test.go pin the step geometry, the
+quiet weapon-range case, the melee gate (a melee fight only closes,
+never retreats), the pacing window, the post-walk attack resume, the
+leash skip, the streak limit and the fresh-target reset; the full hunt
+suite green (78s), `go build`, `go vet`, `golangci-lint run --new`
+clean.
+
+Status: one commit (a28121f) on feature/archer-kiting, pushed; the
+pull request references the issue. Follow-ups for the next rounds
+(recorded in the issue comment): the live acceptance round against
+the deployed stack (the kite constants measured against the real mob
+speeds), the arrow-aware timing (a step that waits the flying shot),
+and the config launch wiring of the archer type once issue #12 lands.
 ## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
 
 Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7);
