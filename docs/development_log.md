@@ -8601,3 +8601,66 @@ Result: 22 red -> 0 red, the whole hunt suite green (73.7 s).
   by design, but a trip-scoped tail view would read cleaner); the
   pre-existing `clickWaypoint` complexity finding wants the corridor
   branch extraction.
+
+## Round 122: the chat reads the skill names, the map draws the skulls (2026-09-21)
+
+- Report: four owner reports landed together, all web UI. The map kill
+  markers drew as red-orange crosses where small stylized skulls were
+  wanted. The fight banner named the hunted mob without its level. The
+  chat window clipped its topmost visible row (the widget height is
+  not a whole multiple of the row pitch). The chat texts carried
+  server artifacts: "Use 3." instead of the spell name and level, a
+  stray "?" after the protection notice ("You are no longer protected
+  from aggressive monsters. ?") and a raw skill id ("You can feel
+  1068's effect."). The auto scroll fought the reader: every 300 ms
+  snapshot re-render rebuilt the whole list and the scrolled up user
+  lost the reading position.
+
+- Root cause (chat artifacts, the class lesson): the SystemMessage
+  rendering pipeline handled the parameter types it knew (text, item,
+  npc) and fell back to the raw int for everything else - the skill
+  name parameter (type 4, two wire ints: skill id then level,
+  SystemMessage.writeImpl of the Mobius C1 sources) lost its level to
+  a Skip(4) and surfaced as the bare id ("Use 3.", "You can feel
+  1068's effect." - 1068 is Might). The stray "?" was the missing
+  parameter branch: the server sendMessage texts ride the generic
+  S1_S2 template (id 614, "$s1 $s2") with the whole sentence as the
+  ONE text parameter, so the unfilled tail rendered the literal "?".
+  The class: every new server artifact a report quotes is a dictionary
+  or parameter-type gap - read the Mobius packet source FIRST (the
+  writeImpl of SystemMessage.java names the wire ints), then check
+  the dictionary entry of the quoted text, then render the unknown
+  type through the generated name dictionaries instead of the raw
+  int, and render missing tails as nothing.
+
+- Root cause (scroll): the harness stub did not emulate the browser
+  clamp of an emptied container, so the follow flag alone passed the
+  harness while a real browser reset the view to the top on every
+  re-render. The class: a UI harness stub that omits a platform
+  behavior the code depends on makes the check lie - emulate the
+  platform (the innerHTML clear clamps scrollTop to 0) and the
+  restore logic becomes testable.
+
+- Landed: the skill level rides the param struct
+  (SystemMessageParam.Level, game_dispatch copy, state.ChatMessageParam)
+  and renderChatParam resolves skill names through the generated
+  dictionary ("Use Power Strike lvl 3.", "You can feel Might lvl 1's
+  effect."); missing parameters render as nothing with the template
+  gap trimmed; the fleet kill crosses and the spot centroid crosses
+  draw as two-pass path traced skulls (body fill in the marker
+  orange, face fill in the dark contrast; the fade buckets and the
+  toggle semantics unchanged); the fight banner appends "lvl N" for
+  the npc targets with a level; the chat head and input rows pin
+  whole pixel heights so the list leftover is 126px = 18 * 7 exactly
+  (seven whole rows, no clipped top row); renderChat captures and
+  restores the reading offset around the rebuild (clamped to the new
+  content). Harness: repro_zone_hover asserts the skull fills (body +
+  face, no cross stroke, no font glyph, TTL, toggle), repro_hud
+  emulates the browser clamp and proves the restore/clamp and the
+  level guard, repro_bot_switch pins the two fill passes of the gap
+  frame.
+
+- Verification: go build, go vet, the state/packets/connection/
+  acceptance/webserver suites green, golangci-lint full run down to
+  the single pre-existing disclosed finding (clickWaypoint cyclop,
+  the corridor extraction stays queued), all six Node harnesses pass.

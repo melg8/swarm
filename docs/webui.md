@@ -190,12 +190,16 @@ colors from the same variables).
   connect the units, never radius circles - a pack reads as a pack. The
   `social` toolbar checkbox hides the layer; the tooltips carry the
   clan help range of the hovered npc.
-- Fleet kill crosses: every recent kill of every bot draws as a small
-  orange cross that melts away over five minutes. The marks come from
+- Fleet kill skulls: every recent kill of every bot draws as a small
+  path traced orange skull (the head and jaw silhouette in the
+  marker orange, the eye dots and mouth slots in the dark contrast
+  `killMarkDetailColor`) that melts away over five minutes. No font
+  glyph - the canvas path keeps the marker palette theme independent
+  and renders identically in every environment. The marks come from
   `/api/fleet/kills` (the hunt loop publishes its kill ring to the bot
   state, `Bot.SetKillMarks`; the registry merges the rings of all bots
   oldest first, capped at 400) which the web app polls with the bot
-  list - the crosses live in the map layer, so they survive the bot
+  list - the skulls live in the map layer, so they survive the bot
   switches of the view (the per zone kill centroid of the observed bot
   alone did not). The `kills` toolbar checkbox hides the layer.
 - Bot switch gap: clicking another bot in the sidebar drops the
@@ -380,10 +384,11 @@ dozen 512px tiles per paint and is visually indistinguishable on
   in one path per style group (all future circles in a single stroke
   call, the heat fills bucketed by alpha) instead of a save/restore,
   two dash arrays and a label concatenation per zone.
-- **The kill crosses batch by fade bucket**: the fleet kill ring caps
+- **The kill skulls batch by fade bucket**: the fleet kill ring caps
   at 96 marks; each cross used to cost its own begin/stroke round
   trip per frame, the fade now quantizes into eight buckets that share
-  one stroke call each (a bucket step is invisible on a five minute
+  one fill call per pass each (the body pass and the face pass; a
+  bucket step is invisible on a five minute
   melt). The aggro circles skip sub pixel radii at the far zoom - a
   circle that reads as a dot is unreadable clutter anyway, and the
   packed field of the zoomed out view no longer strokes hundreds of
@@ -542,8 +547,10 @@ grow by the 2 s window, so the payload stays small.
   measured progress only (the engagement age, the waypoints left, the
   trip age, the eta) - the fighting detail resolves the mob name from
   the snapshot objects exactly like the target panel does (the raw
-  object id never shows), and the context restatements ("in the zone"
-  and the like) stay out. The session status takes precedence when no
+  object id never shows) and appends the mob level of the npc targets
+  ("fighting Keltir lvl 4 for 4s, eta ~9s"; a levelless or non npc
+  target shows the name alone), and the context restatements ("in the
+  zone" and the like) stay out. The session status takes precedence when no
   phase is published (the
   manual only sessions never set the phase): the banner falls back to
   the connecting/offline text. The dot pulses while the bot is active
@@ -858,12 +865,22 @@ rolling 64 line ring fed by ApplySystemMessage/ApplySocialAction and
 ApplySay). The auto scroll follows the newest line only while the view
 is at the bottom (`chatAtBottom`, 4 px tolerance): scrolling up
 detaches the follow to read the history, scrolling back to the bottom
-resumes it. The list itself is the scroll container (the box clips,
-the list scrolls). SystemMessage texts resolve through the generated
-`npcdata/system_messages.go` dictionary (id -> client text with $sN
-placeholders, substituted positionally with the packet parameters;
-item and npc name parameters resolve through the item and npc
-dictionaries). Regenerate with `task generate:system-messages`
+resumes it. The full re-render of `renderChat` keeps that reading
+position: the offset is captured before `innerHTML` clears the list
+(a real browser clamps the scrollTop of the emptied container to 0)
+and restored clamped to the new content after the rows are back -
+the scrolled up user keeps the chosen messages across the 300 ms
+snapshot re-renders. The list itself is the scroll container (the box
+clips, the list scrolls). SystemMessage texts resolve through the
+generated `npcdata/system_messages.go` dictionary (id -> client text
+with $sN placeholders, substituted positionally with the packet
+parameters; item, npc and skill name parameters resolve through the
+item, npc and skill dictionaries - the skill name parameter carries
+its level as the second wire int and renders "Name lvl N"). A
+parameter the packet does not carry renders as nothing (the server
+`sendMessage` texts ride the generic `$s1 $s2` template with the
+whole sentence as the one parameter - a rendered tail used to show
+up as a stray "?"). Regenerate with `task generate:system-messages`
 (tools/generate_system_messages.sh) after Mobius updates.
 
 The three tabs split the stream: ALL shows everything, CHAT keeps the
@@ -877,7 +894,11 @@ out). Every row pins the same whole pixel line height (18px on
 rounds per row at paint time and the vertical distance between the
 lines drifted apart on some rows - taller glyph fallback boxes (emoji,
 arrows) widen the line box the same way; the wrapped message lines
-follow the same 18px rhythm. The input row below the list sends a chat
+follow the same 18px rhythm. The box stays a whole number of rows:
+the head (18px + 4px margin) and the input row (24px + 4px margin)
+pin whole pixel heights so the list leftover is 126px = 18 * 7
+exactly - seven whole rows, no cut-off line on top of the window.
+The input row below the list sends a chat
 message through the
 bot: the channel select (all, shout, trade, party, clan, whisper),
 the whisper recipient input (whisper only), the 105 character bound

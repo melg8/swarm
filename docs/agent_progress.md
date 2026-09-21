@@ -2819,3 +2819,47 @@ count does (verified in the C1 RequestBuyItem sources).
   `clickWaypoint` (hunt/town.go, 16 over the max 15) - landed with
   the parallel skip-tracker rounds (8487365/0dc22da), disclosed
   here, the corridor branch extraction is the follow up.
+## Active task (status: complete): the web UI polish round - the kill skulls, the mob level banner, the chat artifacts and the honest scroll (2026-09-21, branch feature/improved-behaviour)
+
+Started 2026-09-21 ~11:30 UTC, closed ~12:40 UTC. Five owner reports
+landed as melg8 (a161ee7 the chat texts, 81734fa the web UI round,
+9f00b69 the lint gate), rebased over the parallel review hardening
+push and pushed. The reports: the kill crosses want skull icons, the
+fight banner wants the mob level, the chat widget clips its top row,
+the chat texts carry server artifacts (Use 3, the stray ?, the raw
+1068) and the auto scroll fights the reader.
+
+### Landed
+
+- Chat texts (state/chat.go, packets/system_message.go,
+  connection/game_dispatch.go): the skill name parameter keeps its
+  second wire int (the level, verified against SystemMessage.writeImpl
+  of the Mobius C1 sources) and renders through the generated skill
+  dictionary - "Use Power Strike lvl 3.", "You can feel Might lvl 1's
+  effect."; the missing tail parameter renders as nothing (the server
+  sendMessage texts ride the generic S1_S2 template with one
+  parameter - the stray "?" is gone) with the template gap trimmed.
+- Web UI (map.js, app.js, style.css): the fleet kill crosses and the
+  spot centroid crosses draw as two-pass path traced skulls (the
+  orange body, the dark face; fade buckets and toggle unchanged, no
+  font glyph); the fight banner appends "lvl N" for the npc targets;
+  the chat head and input rows pin whole pixel heights so the list
+  leftover is 126px = 18 * 7 exactly (no clipped top row);
+  renderChat captures and restores the reading offset around the
+  rebuild (the browser clamps the emptied scrollTop to 0 - the stub
+  emulates that now and the checks prove the restore and the clamp).
+- The full lint gate back to the single pre-existing disclosed
+  finding (clickWaypoint cyclop, the corridor extraction stays
+  queued): the zero param literal names its Level field, the church
+  entry walk fills the chat zero fields, handleChatPacket extracts
+  the chat dispatch arm of handleServerPacket.
+
+### Verification
+
+go build, go vet, the state/packets/connection/acceptance/webserver
+suites green, all six Node harnesses pass (repro_hud, repro_zone_hover
+with the rewritten skull scenario, repro_map_render, repro_bot_switch,
+repro_gear, repro_movement). Docs: webui.md (chat window, kill
+skulls, banner), development_log.md Round 122 (the RCA classes: the
+dictionary/parameter-type gap behind every quoted server artifact,
+the harness stub honesty).
