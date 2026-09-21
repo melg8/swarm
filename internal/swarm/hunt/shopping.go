@@ -305,6 +305,13 @@ func (l *Loop) refreshShoppingCache() {
 // without allocating an affordablePrefix slice: the per tick call
 // was allocating a []Purchase on every bot every 200ms (4.5 MB over
 // a 3 minute fleet run) just to sum prices and throw the slice away.
+// The keep one scroll line stays out of the total: the safety stock
+// rides every trip and buys itself back on the next one (the escape
+// spends it, the same trip's frozen plan restores it) - a plan of
+// the scroll alone never clears the trip minimum, so a fresh bot
+// walks no town errand just for the scroll (the 2026-09-21 round:
+// the 460 adena line of every SOE-less bot hijacked the trip start
+// gate, the learning trips and the blind engage fixtures alike).
 func (l *Loop) shoppingWanted() bool {
     l.refreshShoppingCache()
     if len(l.shoppingPlanCache) == 0 {
@@ -314,6 +321,9 @@ func (l *Loop) shoppingWanted() bool {
     for _, purchase := range l.shoppingPlanCache {
         if !purchase.Affordable {
             break
+        }
+        if purchase.ItemID == soeItemID {
+            continue
         }
         total += purchase.Price
     }

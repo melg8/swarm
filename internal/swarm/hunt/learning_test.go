@@ -36,6 +36,11 @@ func newLearnLoop(sp int32) (*Loop, *fakeGame, *state.Bot) {
     loop := NewLoop(game, bot)
     loop.SetNavigator(&fakeNavigator{found: true})
     loop.lastHit = time.Now().Add(-time.Minute)
+    // The standard kit rides the fixture: the escape scroll of the
+    // keep one stock is owned, so the learning flow under test never
+    // carries the scroll buy of the shopping plan (the SOE economy
+    // has its own tests in soe_test.go).
+    addSOE(bot, 1)
 
     return loop, game, bot
 }

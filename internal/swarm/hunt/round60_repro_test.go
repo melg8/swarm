@@ -119,6 +119,20 @@ func TestRound60DebtArmsOnStrandedReplacement(t *testing.T) {
         {ObjectID: 301, ItemID: 13, Count: 1, Change: 1},
         {ObjectID: 302, ItemID: 17, Count: 600, Change: 1},
     })
+    // The keep one scroll stock is owned: the replacement sale flow
+    // under test carries no scroll buy (the SOE economy has its own
+    // tests in soe_test.go). The support magic of the guide is
+    // active: the dump character farms under the full newbie buff set
+    // (the level 14 fighter row of the guide table), so the trip
+    // under test plans no guide stop either.
+    addSOE(bot, 1)
+    bot.SetBuffs([]state.BuffEntry{
+        {SkillID: 1204, Level: 2, Time: 1200},
+        {SkillID: 1040, Level: 3, Time: 1200},
+        {SkillID: 1045, Level: 1, Time: 1200},
+        {SkillID: 1068, Level: 1, Time: 1200},
+        {SkillID: 1044, Level: 1, Time: 1200},
+    })
     require.True(t, loop.shoppingWanted(),
         "the segments upgrade through the sell credit plans a trip")
 

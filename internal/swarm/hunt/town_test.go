@@ -513,6 +513,9 @@ func TestTripNoRouteArmsCooldown(t *testing.T) {
 func TestTripFullFlow(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     fillInventory(bot)
+    // The keep one scroll stock is owned: the trip flow under test
+    // carries no scroll buy (the SOE economy has its own tests).
+    addSOE(bot, 1)
 
     // The trip starts and walks to the shop.
     loop.tick()
@@ -601,6 +604,7 @@ func TestTripFullFlow(t *testing.T) {
 func TestTripSellsRemainingJunkInBatches(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     fillInventory(bot)
+    addSOE(bot, 1)
     stand := herbielStand()
     moveSelfTo(bot, stand[0], stand[1], stand[2])
 
@@ -742,6 +746,9 @@ func TestShoppingTripSellsJunkBelowTheTrigger(t *testing.T) {
         ObjectID: 999, ItemID: 57, Count: 500, Type2: 4, Change: 1,
     })
     bot.ApplyItemList(items)
+    // The keep one scroll stock is owned: the trip flow under test
+    // carries no scroll buy (the SOE economy has its own tests).
+    addSOE(bot, 1)
 
     // The shopping plan (500 adena of fillers) starts the trip.
     loop.tick()
@@ -933,6 +940,9 @@ func TestSellableJunkSkipsStarterKit(t *testing.T) {
 func TestTripClearsTheTalkedNpcSelection(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     fillInventory(bot)
+    // The keep one scroll stock is owned: the trip flow under test
+    // carries no scroll buy (the SOE economy has its own tests).
+    addSOE(bot, 1)
 
     loop.tick()
     require.Equal(t, phaseTownWalk, loop.phase)

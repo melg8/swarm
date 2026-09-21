@@ -74,6 +74,9 @@ func TestShoppingTripBuysAfterSelling(t *testing.T) {
     bot.ApplyInventoryUpdate([]state.InventoryItem{
         {ObjectID: 999, ItemID: 57, Count: 100, Type2: 4, Change: 1},
     })
+    // The keep one scroll stock is owned: the trip flow under test
+    // carries no scroll buy (the SOE economy has its own tests).
+    addSOE(bot, 1)
 
     // The trip starts on the full inventory and walks to Herbiel.
     loop.tick()
@@ -289,6 +292,9 @@ func TestPlanShoppingStopsMergesCurrentMerchant(t *testing.T) {
     bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 999, ItemID: 57, Count: 200, Type2: 4, Change: 1},
     })
+    // The keep one scroll stock is owned: the stop planning under
+    // test carries no scroll buy (the SOE economy has its own tests).
+    addSOE(bot, 1)
     loop.tripStops = []tripStop{{merchant: ariel, sell: true}}
     // The trip plan freezes at the trip start (maybeStartTownTrip);
     // the stop planning only distributes it.
@@ -636,6 +642,19 @@ func TestTripPlanFreezesPurchasesAgainstResale(t *testing.T) {
         X: 45000, Y: 50000, Z: -3500,
         MaxHP: 100, CurHP: 90, MaxMP: 40, CurMP: 30,
         PaperdollObjectIDs: test1DumpPaperdoll,
+    })
+    // The keep one scroll stock is owned: the plan freeze under test
+    // carries no scroll buy (the SOE economy has its own tests). The
+    // support magic of the guide is active (the level 14 fighter row
+    // of the guide table), so the plan under test plans no guide
+    // stop either.
+    addSOE(bot, 1)
+    bot.SetBuffs([]state.BuffEntry{
+        {SkillID: 1204, Level: 2, Time: 1200},
+        {SkillID: 1040, Level: 3, Time: 1200},
+        {SkillID: 1045, Level: 1, Time: 1200},
+        {SkillID: 1068, Level: 1, Time: 1200},
+        {SkillID: 1044, Level: 1, Time: 1200},
     })
 
     // The trip arms on the shopping trigger and freezes its plan: the
