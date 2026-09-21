@@ -624,6 +624,7 @@ function engageFightDetail(c, hunt) {
   if (hunt && hunt.targetId) {
     detail += " for " + formatAgeMs(hunt.targetForMs);
   }
+  detail += etaSuffix(hunt ? hunt.killEtaMs : 0);
 
   return detail + " in the zone";
 }
@@ -645,8 +646,18 @@ function engageSearchDetail(hunt) {
   return detail;
 }
 
-// walkDetail describes a planned walk: the remaining waypoints and
-// the trip age when the diagnostics arrived.
+// etaSuffix renders an ETA value (milliseconds, 0 = not available) as
+// the "eta ~Ns" detail suffix, rounded to whole seconds - the
+// estimate is a plan over a noisy walk or fight, not a countdown.
+function etaSuffix(etaMs) {
+  if (!etaMs || etaMs <= 0) { return ""; }
+
+  return ", eta ~" + Math.max(1, Math.round(etaMs / 1000)) + "s";
+}
+
+// walkDetail describes a planned walk: the remaining waypoints, the
+// trip age when the diagnostics arrived and the walk ETA (the
+// remaining plan length over the run speed).
 function walkDetail(fallback, hunt) {
   if (!hunt) {
     return fallback;
@@ -658,6 +669,7 @@ function walkDetail(fallback, hunt) {
   if (hunt.tripForMs > 0) {
     detail += " (" + formatAgeMs(hunt.tripForMs) + " trip)";
   }
+  detail += etaSuffix(hunt.walkEtaMs);
 
   return detail;
 }
@@ -3623,6 +3635,13 @@ function renderTarget(snap) {
   const hasLevel = target.kind === "npc" && target.level > 0;
   level.textContent = hasLevel ? "lv " + target.level : "";
   level.classList.toggle("hidden", !hasLevel);
+  const eta = document.getElementById("target-eta");
+  const hunt = snap.diagnostics && snap.diagnostics.hunt;
+  const killEtaMs = hunt ? hunt.killEtaMs : 0;
+  const hasEta = killEtaMs > 0;
+  eta.textContent = hasEta
+    ? "~" + Math.max(1, Math.round(killEtaMs / 1000)) + "s" : "—";
+  eta.classList.toggle("hidden", !hasEta);
   setVital("target-hp", target.curHp, target.maxHp, target.maxHp > 0);
   setVital("target-mp", target.curMp, target.maxMp, target.maxMp > 0);
 }

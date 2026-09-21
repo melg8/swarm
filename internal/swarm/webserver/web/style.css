@@ -692,6 +692,8 @@ body.mode-pathfind .buffs-panel { display: none; }
 .chip-rest { color: var(--green); border: 1px solid var(--green); }
 .chip-level { color: var(--text); border: 1px solid var(--border); }
 
+.chip-eta { color: var(--accent); border: 1px solid var(--border); }
+
 .bot-chip {
   font-size: 9px;
   font-weight: 700;

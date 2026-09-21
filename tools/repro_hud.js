@@ -158,6 +158,10 @@ function loadAppJs(appFile) {
         " ? setChatTab : undefined," +
         " sendChatInput: typeof sendChatInput === 'function'" +
         " ? sendChatInput : undefined," +
+        " walkDetail: typeof walkDetail === 'function'" +
+        " ? walkDetail : undefined," +
+        " engageFightDetail: typeof engageFightDetail === 'function'" +
+        " ? engageFightDetail : undefined," +
         " renderHUD: typeof renderHUD === 'function'" +
         " ? renderHUD : undefined," +
         " renderBotStatus: typeof renderBotStatus === 'function'" +
@@ -260,6 +264,56 @@ function main() {
         elements.get("target-mp-text").textContent === "—",
         "got " + JSON.stringify(
             elements.get("target-mp-text").textContent));
+
+    // The kill ETA chip rides the target panel: the diagnostics carry
+    // the estimate (0 = not available), the chip appears with the
+    // rounded seconds and hides without a running estimate.
+    sandbox.document.getElementById("target-eta");
+    const etaChip = elements.get("target-eta");
+    hud.renderTarget(snapshotWith(300, liveTarget));
+    check(results, "no diagnostics hides the kill eta chip",
+        etaChip.classList.contains("hidden"),
+        "the chip showed without diagnostics");
+    hud.renderTarget(Object.assign(snapshotWith(300, liveTarget), {
+        diagnostics: { hunt: { killEtaMs: 12400 } }
+    }));
+    check(results, "the kill eta chip shows the rounded seconds",
+        etaChip.textContent === "~12s" &&
+        !etaChip.classList.contains("hidden"),
+        "got " + JSON.stringify(etaChip.textContent));
+    hud.renderTarget(Object.assign(snapshotWith(300, liveTarget), {
+        diagnostics: { hunt: { killEtaMs: 0 } }
+    }));
+    check(results, "a zero kill eta hides the chip",
+        etaChip.classList.contains("hidden"),
+        "the chip stayed visible without an estimate");
+
+    // The walk detail and the fight detail append the ETA suffix: the
+    // walk ETA on the walk phases, the kill ETA on the fight, both
+    // rounded to whole seconds and absent at zero.
+    if (typeof hud.walkDetail !== "function"
+        || typeof hud.engageFightDetail !== "function") {
+        check(results, "the detail builders expose the eta suffix", false,
+            "walkDetail/engageFightDetail missing from app.js");
+    } else {
+        const walk = hud.walkDetail("heading back to the hunting zone",
+            { waypointsLeft: 3, tripForMs: 0, walkEtaMs: 45300 });
+        check(results, "the walk detail carries the walk eta",
+            walk === "heading back to the hunting zone, 3 waypoints left"
+            + ", eta ~45s",
+            "got " + JSON.stringify(walk));
+        const walkNoEta = hud.walkDetail("heading back",
+            { waypointsLeft: 0, tripForMs: 0, walkEtaMs: 0 });
+        check(results, "the walk detail omits an absent eta",
+            walkNoEta === "heading back",
+            "got " + JSON.stringify(walkNoEta));
+        const fight = hud.engageFightDetail(
+            { targetId: 300 },
+            { targetId: 300, targetForMs: 4000, killEtaMs: 9000 });
+        check(results, "the fight detail carries the kill eta",
+            fight === "fighting #300 for 4s, eta ~9s in the zone",
+            "got " + JSON.stringify(fight));
+    }
 
     // The experience bar renders from expPercent.
     sandbox.document.getElementById("xp-fill");
