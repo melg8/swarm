@@ -70,6 +70,26 @@ Verification: state/webserver/connection suites green, all eight
 repro harnesses green, `golangci-lint` + `gofmt-spaces` + `go vet`
 clean.
 
+Critic round (fresh context review, verdict: all five asks
+satisfied, no blockers) applied in 9590819:
+- The encoder oracle test now parses the hand written live encoder
+  output (`AppendSnapshotJSON`), not only the reflection tags.
+- The skills widget cooldown dim waits for the cast (the server
+  opens reuse at the cast start - the dim over the rising fill
+  buried the casting read); the hidden branch zeroes the restore
+  fill style.
+- ingestSkillStates prefers the biggest cast remainder; selectBot
+  drops the previous bot's countdown anchors; the webui-harness
+  skill documents the recording context transform folding.
+
+Deferred follow ups (disclosed): the JS combat-fx layer extraction
+out of the two giants (map.js 4340, app.js 4360 lines - the Go side
+honored the split rule with skill_cast.go, the JS extraction is a
+follow up round); the mob cast indicator; the skill-miss floats
+(the melee Attack misses only - the same boundary the damage
+numbers have); no live combat acceptance run (the kill flow takes
+minutes; the harnesses simulate the beats).
+
 ## Active task (status: complete): the effects panel fix round (2026-09-21, branch feature/improved-behaviour)
 
 Started 2026-09-21 ~11:55 UTC. The owner prompt reported four defects
