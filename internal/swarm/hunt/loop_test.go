@@ -1363,11 +1363,16 @@ func TestLoopRunsFromThePileUpBeforeLoggingOut(t *testing.T) {
     loop := NewLoop(game, bot)
     loop.lastHit = time.Now().Add(-time.Minute)
 
-    // The social pile up: a second gremlin joins the fight while
-    // the character is still healthy. The pack only grows, so the
-    // session will end - but not on the spot: the logout waits
-    // until the run opened the escape distance from the aggro
-    // point, so the relogin lands outside the pack's aggro range.
+    // The pile up of the hurt character: the winnable verdict needs
+    // the re-engage health - below it the pair is not tanked but run
+    // from (the healthy character tanks instead, see
+    // TestLoopTanksAWinnablePileUp).
+    hurtTo(bot, 40)
+
+    // The pack only grows, so the session will end - but not on the
+    // spot: the logout waits until the run opened the escape distance
+    // from the aggro point, so the relogin lands outside the pack's
+    // aggro range.
     for _, id := range []int32{7, 8} {
         bot.ApplyAttack(state.Attack{
             AttackerID: id, X: 45500, Y: 50000, Z: -3500,
@@ -1428,6 +1433,10 @@ func TestLoopLogsOutWhenThePileUpRunNeverMakesDistance(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.lastHit = time.Now().Add(-time.Minute)
+
+    // The hurt character cannot tank the pair: the run owns the
+    // answer (the healthy tank runs in TestLoopTanksAWinnablePileUp).
+    hurtTo(bot, 40)
 
     // A cornered run: the pack holds the character in place
     // (the escape segments keep failing, the character never moves).
