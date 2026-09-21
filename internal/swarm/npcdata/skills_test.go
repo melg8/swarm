@@ -199,3 +199,25 @@ func TestTeachersOfClass(t *testing.T) {
         require.Empty(t, TeachersOfClass(999))
     })
 }
+
+func TestSkillEffectOf(t *testing.T) {
+    t.Run("known buff answers the real level value", func(t *testing.T) {
+        // Wind Walk level 2 adds 33 run speed (the #runSpd table of
+        // the deployed skill stats, not the comment "Effect 2").
+        require.Equal(t, "+33 Speed", SkillEffectOf(1204, 2))
+    })
+    t.Run("level beyond the last run clamps to it", func(t *testing.T) {
+        require.Equal(t, "+33 Speed", SkillEffectOf(1204, 9))
+    })
+    t.Run("level below the first run answers the first run", func(t *testing.T) {
+        require.Equal(t, "+20 Speed", SkillEffectOf(1204, 0))
+    })
+    t.Run("unknown skill answers empty", func(t *testing.T) {
+        require.Empty(t, SkillEffectOf(unknownSkillID, 1))
+    })
+    t.Run("skill outside the effect table answers empty", func(t *testing.T) {
+        // Power Strike is a strike, not a running effect - the
+        // effect summary stays empty so the tooltip drops the line.
+        require.Empty(t, SkillEffectOf(powerStrikeSkillID, 1))
+    })
+}

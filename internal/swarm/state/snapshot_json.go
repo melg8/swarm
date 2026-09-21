@@ -777,6 +777,10 @@ func appendBuffSnapshotJSON(dst []byte, buff BuffSnapshot) []byte {
     dst = strconv.AppendInt(dst, int64(buff.Left), 10)
     dst = append(dst, `,"total":`...)
     dst = strconv.AppendInt(dst, int64(buff.Total), 10)
+    dst = append(dst, `,"desc":`...)
+    dst = appendJSONString(dst, buff.Desc)
+    dst = append(dst, `,"effect":`...)
+    dst = appendJSONString(dst, buff.Effect)
     dst = append(dst, '}')
 
     return dst

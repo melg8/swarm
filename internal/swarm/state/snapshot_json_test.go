@@ -267,6 +267,8 @@ func goldenSnapshot() Snapshot {
                 Icon:    "skill0091",
                 Left:    1195,
                 Total:   1200,
+                Desc:    "Temporarily increases P. Def. Effect 2.",
+                Effect:  "+12% P. Def",
             },
         },
         HuntingZones: []ZoneView{

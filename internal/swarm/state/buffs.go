@@ -41,7 +41,11 @@ const buffTotalGraceSeconds = 2
 // effect comes from with its level, the remaining seconds and the
 // seconds the effect had when it landed (Total, the denominator of
 // the remaining time percent), plus the resolved display data (name,
-// icon). The web UI buffs widget renders the list.
+// icon, the tooltip texts). The web UI buffs widget renders the
+// list; Desc is the generic client tooltip line of the level (empty
+// when the skill stats carry none) and Effect is the numeric effect
+// summary the server data bites with (empty for the skills outside
+// the effect table).
 type BuffSnapshot struct {
     SkillID int32  `json:"skillId"`
     Level   int32  `json:"level"`
@@ -49,6 +53,8 @@ type BuffSnapshot struct {
     Icon    string `json:"icon"`
     Left    int32  `json:"left"`
     Total   int32  `json:"total"`
+    Desc    string `json:"desc"`
+    Effect  string `json:"effect"`
 }
 
 // SetBuffs applies the full active effect list of the server packet:
@@ -195,6 +201,8 @@ func (b *Bot) buffSnapshotsLocked(now time.Time) []BuffSnapshot {
             Icon:    "",
             Left:    left,
             Total:   buffLeftCapped(buff.total),
+            Desc:    npcdata.SkillDescription(id, buff.level),
+            Effect:  npcdata.SkillEffectOf(id, buff.level),
         }
         if info, ok := npcdata.SkillInfoOf(id); ok {
             snapshot.Name = info.Name

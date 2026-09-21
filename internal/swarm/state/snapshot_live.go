@@ -337,6 +337,8 @@ func (b *Bot) appendLiveBuffsJSON(
             Icon:    "",
             Left:    buffLeftCapped(buff.left - elapsed),
             Total:   buffLeftCapped(buff.total),
+            Desc:    npcdata.SkillDescription(id, buff.level),
+            Effect:  npcdata.SkillEffectOf(id, buff.level),
         }
         if info, ok := npcdata.SkillInfoOf(id); ok {
             snapshot.Name = info.Name
