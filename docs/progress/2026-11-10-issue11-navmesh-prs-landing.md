@@ -77,7 +77,17 @@ magic and keeps the plain legacy sidecars readable. Verified:
 packages and the prototype, all green), `task lint:new` (0 issues) and
 `task fmt:check`. The pack binaries in `data/` are not rebuilt.
 
+### 2026-11-10 - the corpus gate lands (#55)
+
+Cherry-picked `d4b969b7` after the size round without conflicts:
+`cmd/navpack-verify` grows from the five pairwise queries into the
+recorded-corpus harness (generate / replay / compare), its tests land
+with it and `docs/navmesh.md` gains the section. Verified: build, the
+harness unit tests, `task lint:new` and `task fmt:check`. The memory
+bomb of the full-pack generate (issue #56, finding 5) stays a known
+open issue of the harness, not a regression of this landing.
+
 ## Status
 
-#26 is landed and verified; the corpus harness (#55) is the next
-step.
+#26 and #55 are landed and verified; the dual pack view (#67) is the
+next step.
