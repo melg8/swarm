@@ -1,4 +1,4 @@
-# The coverage reporting continuation - five rounds: the merge refresh, the top-up, the journal, the smoke pass and the botlog decoders (status: in review)
+# The coverage reporting continuation - six rounds: the merge refresh, the top-up, the journal, the smoke pass, the botlog decoders and the character wire formats (status: in review)
 
 Started 2026-09-22, branch feature/coverage-reporting, issue #9.
 
@@ -172,3 +172,59 @@ functions) and the probe tool smoke pass (eight tools off 0%).
 
 The botlog decoder round is on the branch; next: push, CI, the
 issue comment and the board move.
+
+### 2026-09-22 11:55 UTC - round six: the character wire formats
+- The owner moved the issue back to Ready (11:11 UTC, no comment);
+  the recorded next round started: the character wire decoders of
+  botlog, the last 0% decoders of the package.
+- botlog 51.0 -> 87.6, zero 0% functions left in the package:
+  - The recv character family (decode_recv_character_test.go):
+    CharInfo (the player spawn line with the running/standing and
+    the dead flag suffixes), UserInfo (the self vitals/load line),
+    CharSelectInfo (the two character account list, serialized
+    through the exported ToBytes serializer - the round five note
+    about the unused serializer), CharSelected (the handover line),
+    ItemList and InventoryUpdate (the adena/arrow/dagger stacks
+    with the equipped and +3 enchant suffixes, the add/modify/
+    remove change verbs).
+  - The recv world broadcasts (decode_recv_world_test.go): the
+    stance and rotation family (ChangeMoveType run/walk, StopMove,
+    the rotation pair, the auto attack start/stop), the chase and
+    placement pair (MoveToPawn, ValidateLocation), the skill book
+    (the passive Long Shot and the active Power Strike through the
+    dictionary) and the buff bar (AbnormalStatusUpdate with the
+    Wind Strike and Self Heal names) - plus the long link trimming
+    of the npc dialog (the 80/48 cut with the "..." suffix through
+    trimText).
+  - The send request family (decode_send_round_test.go) runs
+    against the PRODUCTION serializers of to_game_server (no hand
+    built twins): the session family (protocol version, enter
+    world, logout, appearing), the action click (plain and shift),
+    the session handover (auth login, character create, character
+    select), the item requests (drop, use, destroy, the run/walk
+    stance switch), the shop batches (the sell and buy continuation
+    lines), the bypass command, the skill cast (with the ctrl
+    marker), the action use, the acquire skill, the restart point
+    (village and agathion) and the validate position claim - plus
+    the unknown opcode line and the truncated send fallbacks.
+- The truncated recv dispatch table gained the four character
+  opcodes (0x03, 0x04, 0x1F, 0x21).
+- The production fix of the round: decodeRecvRotation parsed both
+  rotation packets through ParseBeginRotationPacket, but the stop
+  rotation wire is two ints shorter (speed + unknown byte behind
+  the heading, not side + speed) - every legit StopRotation logged
+  as "stop rotation (short payload)". parseRotation now picks the
+  parser by the opcode; the log renders the real stop heading.
+- The baseline regenerated from the full tree (all 36 packages,
+  the delta tool's honest run): the botlog line is the only move,
+  no drops. Total statement coverage 74.4%.
+- Gates: build, vet, golangci-lint 0 issues (full tree), fmt:check
+  clean, the botlog suite green at 87.6.
+
+## Status (round six)
+
+The character wire round is on the branch; next: the atomic
+commits, the rebase onto main, the push, the CI verdict, the issue
+comment and the board move. The botlog decoder surface is closed;
+the remaining #9 candidates are the live-stack seam design round
+(acceptance 27.8, huntaudit 24.3) and the cmd/swarm wiring.
