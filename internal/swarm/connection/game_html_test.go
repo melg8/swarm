@@ -97,6 +97,48 @@ func TestApplyNpcHTMLMessageMalformedLogsAndSkips(t *testing.T) {
     require.Equal(t, "good", html.HTML)
 }
 
+// TestLastHTMLDialogArrivalGeneration pins the arrival generation of
+// the dialog store: every parsed NpcHtmlMessage advances it (a
+// byte identical re-send of the same page counts as a fresh
+// arrival), a malformed packet does not, and the snapshot read
+// returns the page and its generation from the same arrival - the
+// gate the dialog walker of the hunt loop waits on (a stale page of
+// a previous conversation never passes a generation comparison).
+func TestLastHTMLDialogArrivalGeneration(t *testing.T) {
+    logBuf := &testLogBuffer{}
+    client := newHTMLTestClient(log.New(logBuf, "", 0))
+
+    // No page yet: the zero snapshot.
+    npcID, html, gen := client.LastHTMLDialogArrival()
+    require.Zero(t, npcID)
+    require.Empty(t, html)
+    require.Zero(t, gen)
+
+    // First page arrives: generation 1.
+    client.handleServerPacket(
+        buildNpcHTMLPayload(30599, "entry page", 0))
+    npcID, html, gen = client.LastHTMLDialogArrival()
+    require.Equal(t, int32(30599), npcID)
+    require.Equal(t, "entry page", html)
+    require.Equal(t, uint64(1), gen)
+
+    // The byte identical page arrives again (the server re-opens the
+    // same dialog): a fresh arrival, generation 2 - the content alone
+    // cannot tell the two apart, the generation can.
+    client.handleServerPacket(
+        buildNpcHTMLPayload(30599, "entry page", 0))
+    _, html, gen = client.LastHTMLDialogArrival()
+    require.Equal(t, "entry page", html)
+    require.Equal(t, uint64(2), gen)
+
+    // A malformed packet changes nothing: the page and its
+    // generation survive the failed parse.
+    client.handleServerPacket([]byte{0x1B})
+    _, html, gen = client.LastHTMLDialogArrival()
+    require.Equal(t, "entry page", html)
+    require.Equal(t, uint64(2), gen)
+}
+
 // TestSendBypassWritesRequestBypassToServer pins the outbound side:
 // SendBypass serializes a 0x21 packet with the command and writes it
 // through the encrypted game channel. The fake peer reads the frame,

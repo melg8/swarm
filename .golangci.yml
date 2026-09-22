@@ -160,6 +160,11 @@ linters:
         - .*acceptance\.archerKiteVerdicts$
         - .*acceptance\.archerKiteSample$
         # The option and stat aggregates.
+        # The dialog route steps: LinkText is the identity of the
+        # step, the answer flags (AnswerIsEffect) are rare opt-ins
+        # whose zero value is the default page answer (see
+        # DialogStep of hunt/quest_walker.go).
+        - .*hunt\.DialogStep$
         - .*navbuild\.Options$
         - .*navbuild\.BuildStats$
         - .*navbuild\.PackStats$

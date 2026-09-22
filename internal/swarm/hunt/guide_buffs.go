@@ -26,13 +26,16 @@ import (
 // The support magic constants: the wire template of the guide npc,
 // the level band the server gate accepts, the cooldown the refusal
 // arms and the wait for the buffs to trail in after the bypass.
+// guideBuffWait is a var (not a const) so the unit tests shorten
+// the buff landing wait like the dialog seams (quest_walker_test).
 const (
     guideTemplateID     = int32(7599)
     guideMinLevel       = int32(8)
     guideMaxLevel       = int32(24)
     guideRefuseCooldown = 10 * time.Minute
-    guideBuffWait       = 3 * time.Second
 )
+
+var guideBuffWait = 3 * time.Second
 
 // guideBranch names the class branch a support magic skill rides:
 // the Wind Walk and Shield auras answer both classes, the rest of
@@ -336,16 +339,19 @@ func (l *Loop) approachGuide(now time.Time) bool {
 
 // receiveGuideMagic drives the support magic dialog of the guide:
 // the entry page links into the SupportMagic.htm page and that page
-// links the apply command - the server answers it with every
-// level-eligible buff, each one an AbnormalStatusUpdate the tracker
-// applies. The wait watches the tracker for the expected buffs (the
-// packets trail the bypass by a round trip); when nothing lands the
-// refusal cooldown arms and the trip moves on - the refusal pages of
-// the gate never answer with buffs, the stop never retries them.
+// links the apply command - the server answers the apply bypass
+// with every level-eligible buff (each one an AbnormalStatusUpdate
+// the tracker applies) and with NO dialog page of its own (the
+// Mobius SupportMagic handler casts and returns, it sends html only
+// on the refusal paths), so the route's last step carries
+// AnswerIsEffect and this stop owns the outcome: the buff watch
+// waits for the expected skills, and when nothing lands the refusal
+// cooldown arms and the trip moves on - the refusal pages of the
+// gate never answer with buffs, the stop never retries them.
 func (l *Loop) receiveGuideMagic() bool {
     if err := l.DriveDialog(l.guideID, []DialogStep{
         {LinkText: "Receive help from beneficial magic."},
-        {LinkText: "Receive supplemental magic."},
+        {LinkText: "Receive supplemental magic.", AnswerIsEffect: true},
     }); err != nil {
         l.armGuideRefusal("the dialog failed: " + err.Error())
 
