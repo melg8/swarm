@@ -703,6 +703,276 @@ func (s *fakeGameServer) actionsFlow(
     }
 }
 
+// interactionActionsFlow collects the client packet opcodes of the
+// interaction session (the say, the npc clicks, the skill rounds).
+func (s *fakeGameServer) interactionActionsFlow(
+    conn net.Conn, cipher *crypt.GameCrypt,
+) {
+    expected := map[byte]bool{
+        0x38: false, // say2 (the chat text)
+        0x04: false, // action request (the clicks, the self clear)
+        0x6C: false, // request acquire skill
+        0x2F: false, // request magic skill use
+    }
+    for {
+        payload, err := s.readEncryptedResult(conn, cipher)
+        if err != nil {
+            break
+        }
+        if len(payload) == 0 {
+            continue
+        }
+        if _, known := expected[payload[0]]; known {
+            expected[payload[0]] = true
+        }
+    }
+    for opcode, seen := range expected {
+        require.True(s.t, seen, "expected client packet 0x%02x", opcode)
+    }
+}
+
+// TestGameClientSendsInteractionActions fires the interaction action
+// methods of the GameClient - the chat say, the npc clicks of the
+// teacher trips, the selection clear and the skill rounds - and
+// checks the fake server received their opcodes. The send tap
+// observes the same sends on the plaintext side.
+func TestGameClientSendsInteractionActions(t *testing.T) {
+    server := startFakeGameServerFlow(
+        t, (*fakeGameServer).interactionActionsFlow)
+
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
+
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
+    client.SetLogger(log.New(io.Discard, "", 0))
+
+    tracker := state.NewBot("actor")
+    client.SetTracker(tracker)
+    tracker.SetCharacter("actor", floodSelfID, 18,
+        45000, 50000, -3500, 50, 30)
+    tracker.ApplyNpcInfo(state.NpcInfo{
+        ObjectID:   floodNpcID,
+        TemplateID: 1001277,
+        Attackable: true,
+        X:          45100,
+        Y:          50100,
+        Z:          -3500,
+        RunSpeed:   120,
+        Name:       "Keltir",
+    })
+
+    // The send tap reads the plaintext of every outbound packet.
+    sends := &tapCollector{}
+    client.SetSendTap(sends.tap)
+
+    // A chat line on the general channel.
+    require.NoError(t, client.Say("hello village", 0, ""))
+
+    // A zero click is a no-op, an unknown object is an error and a
+    // known npc resolves its position into the action request.
+    require.NoError(t, client.ClickObject(0))
+    require.Error(t, client.ClickObject(999))
+    require.NoError(t, client.ClickObject(floodNpcID))
+
+    // The interact pull repeats the action request shape.
+    require.NoError(t, client.InteractPull(0))
+    require.Error(t, client.InteractPull(999))
+    require.NoError(t, client.InteractPull(floodNpcID))
+
+    // Without a selection the clear is a no-op; a self movement
+    // packet that targets the npc gives the character a selection
+    // and the clear click fires.
+    require.NoError(t, client.ClearTarget())
+    tracker.ApplyPawnMovement(state.PawnMovement{
+        ObjectID: floodSelfID,
+        TargetID: floodNpcID,
+        X:        45000,
+        Y:        50000,
+        Z:        -3500,
+        TargetX:  45100,
+        TargetY:  50100,
+        TargetZ:  -3500,
+    })
+    require.Equal(t, floodNpcID, tracker.SelfTargetID())
+    require.NoError(t, client.ClearTarget())
+
+    // The skill rounds: a lesson at the teacher and a cast.
+    require.NoError(t, client.AcquireSkill(1177, 1))
+    require.NoError(t, client.UseMagicSkill(1177))
+
+    // The tap observed the plaintext of the fired sends: the chat,
+    // the action requests, the acquire and the cast.
+    seen := map[byte]bool{}
+    for _, opcode := range sends.opcodes() {
+        seen[opcode] = true
+    }
+    require.True(t, seen[0x38], "the tap must see the say packet")
+    require.True(t, seen[0x04], "the tap must see the action requests")
+    require.True(t, seen[0x6C], "the tap must see the acquire skill")
+    require.True(t, seen[0x2F], "the tap must see the magic skill use")
+
+    // RequestLogout closes the socket: the server loop ends and
+    // checks the received opcode set.
+    require.NoError(t, client.RequestLogout())
+}
+
+// buildFloodCreatureSay builds a CreatureSay packet: the villager
+// greets the character on the general channel.
+func buildFloodCreatureSay() []byte {
+    data := []byte{0x5D}
+    data = appendInt32(data, floodNpcID)
+    data = appendInt32(data, 0) // channel: say
+    data = append(data, utf16Bytes("Keltir Fan")...)
+    data = append(data, utf16Bytes("welcome to the village")...)
+
+    return data
+}
+
+// creatureSayFlow feeds one valid and one truncated world chat line,
+// then drops the connection.
+func (s *fakeGameServer) creatureSayFlow(
+    conn net.Conn, cipher *crypt.GameCrypt,
+) {
+    s.writeEncrypted(conn, cipher, buildFloodCreatureSay())
+    s.writeEncrypted(conn, cipher, []byte{0x5D}) // truncated say
+    _ = conn.Close()
+}
+
+// TestGameClientAppliesCreatureSay checks the world chat dispatch:
+// the valid line lands in the tracker chat window, the truncated
+// packet logs its parse failure and never reaches the window.
+func TestGameClientAppliesCreatureSay(t *testing.T) {
+    server := startFakeGameServerFlow(t, (*fakeGameServer).creatureSayFlow)
+
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
+
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
+
+    logBuf := &bytes.Buffer{}
+    client.SetLogger(log.New(logBuf, "", 0))
+
+    tracker := state.NewBot("chatter")
+    client.SetTracker(tracker)
+
+    // The flow closes the server side: Run reports the loss after
+    // draining the chat lines.
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+    defer cancel()
+    require.Error(t, client.Run(ctx, "chatter"))
+
+    chat := tracker.Snapshot().Chat
+    require.Len(t, chat, 1, "only the valid line reaches the window")
+    require.Equal(t, "Keltir Fan", chat[0].From)
+    require.Equal(t, "welcome to the village", chat[0].Text)
+    require.Equal(t, "say", chat[0].Kind)
+
+    require.Contains(t, logBuf.String(), "Failed to parse creature say",
+        "the truncated packet must log its parse failure")
+}
+
+// buildFloodSkillList builds a SkillList packet: the mystic knows
+// Wind Strike (active) and one passive.
+func buildFloodSkillList() []byte {
+    data := []byte{0x6D}
+    data = appendInt32(data, 2) // skill count
+    data = appendInt32(data, 0) // active
+    data = appendInt32(data, 1) // level 1
+    data = appendInt32(data, 1177)
+    data = appendInt32(data, 1) // passive
+    data = appendInt32(data, 5) // level 5
+    data = appendInt32(data, 194)
+
+    return data
+}
+
+// buildFloodMagicSkillUse builds a MagicSkillUse packet: the played
+// character casts Wind Strike with a cast bar and a reuse window.
+func buildFloodMagicSkillUse() []byte {
+    data := []byte{0x5A}
+    data = appendInt32(data, floodSelfID) // caster: the character
+    data = appendInt32(data, floodNpcID)  // target: the npc
+    data = appendInt32(data, 1177)        // skill id
+    data = appendInt32(data, 1)           // skill level
+    data = appendInt32(data, 1200)        // hit time ms
+    data = appendInt32(data, 30000)       // reuse delay ms
+    data = appendInt32(data, 45000)       // caster x
+    data = appendInt32(data, 50000)       // caster y
+    data = appendInt32(data, -3500)       // caster z
+    data = appendInt32(data, 0)           // critical flag: no pad
+    data = appendInt32(data, 45100)       // target x
+    data = appendInt32(data, 50100)       // target y
+    data = appendInt32(data, -3500)       // target z
+
+    return data
+}
+
+// skillRoundFlow feeds the skill list, one self cast and one
+// truncated cast, then drops the connection.
+func (s *fakeGameServer) skillRoundFlow(
+    conn net.Conn, cipher *crypt.GameCrypt,
+) {
+    s.writeEncrypted(conn, cipher, buildFloodSkillList())
+    s.writeEncrypted(conn, cipher, buildFloodMagicSkillUse())
+    s.writeEncrypted(conn, cipher, []byte{0x5A}) // truncated cast
+    _ = conn.Close()
+}
+
+// TestGameClientAppliesSkillRound checks the skill bookkeeping: the
+// SkillList lands in the learned skills of the tracker, the self
+// cast opens the cast and reuse windows and the truncated cast logs
+// its parse failure.
+func TestGameClientAppliesSkillRound(t *testing.T) {
+    server := startFakeGameServerFlow(t, (*fakeGameServer).skillRoundFlow)
+
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
+
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
+
+    logBuf := &bytes.Buffer{}
+    client.SetLogger(log.New(logBuf, "", 0))
+
+    tracker := state.NewBot("caster")
+    client.SetTracker(tracker)
+    tracker.SetCharacter("caster", floodSelfID, 18,
+        45000, 50000, -3500, 50, 30)
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+    defer cancel()
+    require.Error(t, client.Run(ctx, "caster"))
+
+    // The skill list landed: the snapshot book keeps both skills in
+    // id order (the passive distinction reads through ActiveSkills
+    // below, the snapshot names come from the npc dictionary).
+    require.True(t, tracker.SkillsListed())
+    skills := tracker.Snapshot().Skills
+    require.Len(t, skills, 2)
+    require.Equal(t, int32(194), skills[0].SkillID)
+    require.Equal(t, int32(5), skills[0].Level)
+    require.Equal(t, int32(1177), skills[1].SkillID)
+    require.Equal(t, int32(1), skills[1].Level)
+    active := tracker.ActiveSkills()
+    require.Len(t, active, 1)
+    require.Equal(t, int32(1177), active[0].SkillID)
+
+    // The self cast opened both windows of Wind Strike.
+    states := tracker.Snapshot().SkillStates
+    require.Len(t, states, 1)
+    require.Equal(t, int32(1177), states[0].SkillID)
+    require.Equal(t, int64(1200), states[0].CastTotalMs)
+    require.Equal(t, int64(30000), states[0].ReuseTotalMs)
+    require.Positive(t, states[0].CastLeftMs)
+    require.Positive(t, states[0].ReuseLeftMs)
+
+    require.Contains(t, logBuf.String(), "Failed to parse magic skill use",
+        "the truncated cast must log its parse failure")
+    require.Contains(t, logBuf.String(), "Skill list with 2 skills")
+}
+
 // TestGameClientReportsConnectionLoss closes the server side of a live
 // session: Run must report the lost connection and take the tracker
 // offline.

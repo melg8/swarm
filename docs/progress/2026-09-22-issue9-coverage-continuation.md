@@ -49,3 +49,29 @@ remaining low-coverage packages named by the audit get topped up.
 The merge commit is in; next: the full gate pass (build, vet, lint,
 fmt, tests, the coverage regen and the delta gate), then push and
 the top-up round for the drift packages.
+
+### 2026-09-22 08:45 UTC - the top-up round: the drift packages close
+- connection 73.8 -> 82.1 (+8.3, past the 76.3 pre-drift level): the
+  interaction actions suite (Say, ClickObject, InteractPull,
+  ClearTarget, AcquireSkill, UseMagicSkill - the seven dead 0%
+  senders), the SetSendTap plaintext observer (the send-side tap
+  pair), the CreatureSay world chat dispatch (valid line lands in
+  the tracker window, truncated packet logs and never lands) and
+  the skill round (SkillList bookkeeping + the self MagicSkillUse
+  cast/reuse windows).
+- npcdata 82.5 -> 100.0 (+17.5, past the 85.6 pre-drift level): the
+  merchant spawn accessors, the self heal flags and the initial
+  consume clamps, the class teacher dictionary, ClassCastsMagic,
+  the MPCostOf clamps, the itoa fallback branches and the mapped
+  branch of NPCWireTemplateID.
+- The baseline regenerated from the merged tree (all 28 packages
+  measured fresh): only gains plus one -0.1 hunt jitter (main's
+  flake-fix test changes), no drop near the 2 pp gate.
+- Gates: build, vet, golangci-lint 0 issues, fmt:check clean, the
+  logfmt scan green, the touched suites green.
+
+## Status (updated)
+
+The merge + top-up work is complete on the branch; next: push, the
+CI verdict (verify, coverage, acceptance-list), then the issue
+comment and the board move to Ready for review.

@@ -4,14 +4,14 @@ github.com/melg8/swarm/cmd/swarm 19.6
 github.com/melg8/swarm/internal/logfmt 87.8
 github.com/melg8/swarm/internal/swarm/acceptance 27.8
 github.com/melg8/swarm/internal/swarm/acceptance/botlog 37.3
-github.com/melg8/swarm/internal/swarm/connection 73.9
+github.com/melg8/swarm/internal/swarm/connection 82.1
 github.com/melg8/swarm/internal/swarm/crypt 93.8
 github.com/melg8/swarm/internal/swarm/gear 90.3
 github.com/melg8/swarm/internal/swarm/helpers 100.0
-github.com/melg8/swarm/internal/swarm/hunt 84.3
+github.com/melg8/swarm/internal/swarm/hunt 84.2
 github.com/melg8/swarm/internal/swarm/huntaudit 24.3
 github.com/melg8/swarm/internal/swarm/memwatch 100.0
-github.com/melg8/swarm/internal/swarm/npcdata 82.5
+github.com/melg8/swarm/internal/swarm/npcdata 100.0
 github.com/melg8/swarm/internal/swarm/packets/from_auth_server 80.8
 github.com/melg8/swarm/internal/swarm/packets/from_game_server 92.7
 github.com/melg8/swarm/internal/swarm/packets/packet 100.0
