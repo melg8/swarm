@@ -87,7 +87,24 @@ harness unit tests, `task lint:new` and `task fmt:check`. The memory
 bomb of the full-pack generate (issue #56, finding 5) stays a known
 open issue of the harness, not a regression of this landing.
 
+### 2026-11-10 - the dual pack view lands (#67)
+
+Cherry-picked the two commits of `feature/navmesh-dual-view`
+(`8cad0952`, `ddc617ae`) without conflicts: the server half arms the
+compare mesh and serves `/api/navmesh/compare/geometry`, the per tile
+diff and the two mesh path answer; the viewer half renders the two
+scissor panes over one camera, the diff tints and the compare route.
+The historical fragment of the round moved straight to
+`docs/progress/archive/`. Verified: build,
+`go test ./internal/swarm/webserver/` (the seven compare tests and the
+web build test), `node tools/repro_map_render.js` (all pass),
+`task lint:new` and `task fmt:check`.
+
+The four landed commits were re-authored to the canonical
+`melg8 <public.melg8@gmail.com>` identity (the originals carried the
+retired sandbox and noreply identities).
+
 ## Status
 
-#26 and #55 are landed and verified; the dual pack view (#67) is the
-next step.
+#26, #55 and #67 are landed on the landing branch and verified; the
+remaining step is the final pre-push gate and the push of main.

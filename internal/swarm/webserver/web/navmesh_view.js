@@ -39,6 +39,20 @@ SPDX-License-Identifier: MIT
 // blue for the water to water ones and teal for the shore pairs: the
 // honest answer of where a route may cross each shared edge.
 //
+// The dual pack view (issue #59): when the server boots with a
+// compare pack (-navmesh-compare, the old and the reduced
+// decomposition of the same geodata) the canvas splits into two
+// scissor viewports over one renderer - pane A renders the primary
+// pack, pane B the compare one, both from the same flight camera so
+// every camera move compares the same world region twice. The tile
+// diff highlight fetches the per tile poly diff and tints the tile
+// where polygons vanished or appeared (the vanished rect outlines
+// draw too while the tile diff stays small), and the route pair
+// click asks the server ONCE - the answer carries both packs'
+// searches - and draws the primary route amber in pane A and the
+// compare route cyan in pane B with the counts and the duration
+// delta in the result panel. The camera, the route pair and the
+// tile selection stay shared state above the two panes.
 // The camera is a flight rig: wasd flies along the view vector (the
 // airplane feel - W follows the pitch), q/e descend and climb, the
 // pointer drag yaws and pitches, the wheel retunes the cruise speed
@@ -95,6 +109,25 @@ const WAYPOINT_COLOR = 0xffffff;
 const TILE_OUTLINE_COLOR = 0x586063;
 const TILE_HOVER_COLOR = 0xffb020;
 
+// The dual pack view colors (issue #59): the compare pane draws its
+// own route in cyan - the primary pane keeps the amber - so the two
+// answers read apart at a glance, and the per tile diff tints carry
+// the vanished (red), added (green) and mixed (amber) polygon
+// changes of the reduced pack.
+const COMPARE_PATH_COLOR = 0x35d0ff;
+const COMPARE_WAYPOINT_COLOR = 0xbdeeff;
+const DIFF_VANISHED = { r: 255, g: 72, b: 72 };
+const DIFF_ADDED = { r: 84, g: 220, b: 122 };
+const DIFF_MIXED = { r: 255, g: 190, b: 64 };
+// The per tile diff fetch draws the vanished and added rect outlines
+// only while the lists stay this small - a tile that lost half its
+// two thousand polygons tints whole instead of drawing two thousand
+// tiny rectangles (the tint already flags it).
+const DIFF_RECT_LIMIT = 512;
+// The tint overlay alpha: the tile mesh must stay readable under it.
+const DIFF_TINT_ALPHA = 0.22;
+const DIFF_TINT_ALPHA_MAX = 0.5;
+
 // The edge connection classes of the link portal records: green for
 // the field to field connections, blue for the water to water ones,
 // teal for the shore pairs and gray for the links into tiles that did
@@ -129,6 +162,12 @@ const RESIDENCY_CAP = 8;
 // Selections this small keep the classic load everything behavior.
 const RESIDENCY_MIN_TILES = 12;
 const RESIDENCY_TICK_MS = 600;
+
+// The pane names of the dual pack view: the primary pack renders in
+// pane A (the left half), the compare pack in pane B (the right
+// half). Every pane aware helper takes one of these.
+const PANE_PRIMARY = "primary";
+const PANE_COMPARE = "compare";
 
 // The Viewer bundles the three.js state behind one object so the init
 // stays a single closure.
@@ -174,9 +213,31 @@ const viewer = {
   // selections (the classic small selections load everything).
   autoResidency: false,
   residencyTick: 0,
+  // The dual pack view state (issue #59): config.compare arms it.
+  // sceneB renders pane B, compareTiles mirrors the tile entries of
+  // the compare pack, comparePresent lists the keys the compare pack
+  // actually carries (a primary tile missing there renders as the
+  // honest empty pane B), diffCounts caches the fetched per tile
+  // diffs and diffTints holds the tint and rect overlay objects per
+  // pane (null when the side needs none).
+  dual: false,
+  sceneB: null,
+  compareTiles: new Map(),
+  comparePresent: new Set(),
+  // The primary pack's own key set: the dual listing may carry
+  // compare-only rows, and a pane must not fetch a tile its pack
+  // lacks.
+  primaryPresent: new Set(),
+  diffEnabled: true,
+  diffCounts: new Map(),
+  diffTints: new Map(),
+  diffPending: new Set(),
   hover: {
     pointer: new THREE.Vector2(),
     hasPointer: false,
+    // pane is the pane the pointer rests over (the sweep and the
+    // double click route picking both raycast that pane's meshes).
+    pane: PANE_PRIMARY,
     cameraPosition: new THREE.Vector3(),
     cameraQuaternion: new THREE.Quaternion(),
     candidates: [],
@@ -196,6 +257,10 @@ const viewer = {
 function init(config) {
   const navmesh = config.navmesh;
   const view = parseViewParams();
+  // The dual pack view arms before the surface builds: the pane
+  // chrome (the divider, the pane labels, the diff toggle) and the
+  // compare tile registry both read the flag.
+  armDualView(config.compare);
   buildSurface(navmesh);
 
   if (!navmesh || !navmesh.tiles || navmesh.tiles.length === 0) {
@@ -216,8 +281,23 @@ function init(config) {
     }
   }
   const initialKeys = new Set(initial.map(tileKey));
+  // The tile listing stays the primary pack's registry (the reduced
+  // compare pack is the derivation the owner compares against); the
+  // compare-only tiles of a synthetic pair join the listing too so
+  // the pane B render stays reachable from the checkboxes.
+  const listed = new Set();
   for (const tile of navmesh.tiles) {
     addTileRow(tile, initialKeys.has(tileKey(tile)));
+    listed.add(tileKey(tile));
+    viewer.primaryPresent.add(tileKey(tile));
+  }
+  if (viewer.dual) {
+    for (const tile of config.compare.tiles) {
+      if (!listed.has(tileKey(tile))) {
+        addTileRow(tile, false);
+        listed.add(tileKey(tile));
+      }
+    }
   }
   syncAllBox();
   if (view.scale) {
@@ -243,6 +323,15 @@ function init(config) {
     const select = document.getElementById("nmv-path");
     if (select) {
       select.value = view.path;
+    }
+  }
+  // The diff tint toggle restores before the tile loads: the boot
+  // fetches the diffs only when the link asks for them.
+  if (view.diff !== null) {
+    viewer.diffEnabled = view.diff;
+    const box = document.getElementById("nmv-diff");
+    if (box) {
+      box.checked = view.diff;
     }
   }
   if (view.cam) {
@@ -272,7 +361,9 @@ function init(config) {
     updateResidency();
   } else {
     for (const tile of initial) {
-      void ensureTile(tile);
+      for (const pane of panes()) {
+        void ensureTile(tile, pane);
+      }
     }
   }
   if (view.from && view.to) {
@@ -286,11 +377,63 @@ function init(config) {
     drawStartMarker(view.from);
     showStatus("start set", "double click the destination");
   }
+  // The diff fetches ride the tile loads: the visible tiles of the
+  // dual view ask for their per tile diff once the tint toggle is on.
+  if (viewer.dual && viewer.diffEnabled) {
+    for (const key of visibleKeys()) {
+      void ensureDiff(key);
+    }
+  }
 }
 
 // tileKey names one tile of the listing.
 function tileKey(tile) {
   return tile.col + "_" + tile.row;
+}
+
+// armDualView arms the dual pack view from the boot config compare
+// section (issue #59): the compare pack registry fills, the compare
+// directory names pane B's label. Nil keeps the single pack viewer
+// untouched.
+function armDualView(compare) {
+  if (!compare || !compare.tiles) {
+    return;
+  }
+  viewer.dual = true;
+  viewer.compareDir = compare.dir || "";
+  for (const tile of compare.tiles) {
+    viewer.comparePresent.add(tileKey(tile));
+  }
+}
+
+// entriesFor answers the tile registry of one pane: the primary
+// entries render pane A, the compare entries pane B.
+function entriesFor(pane) {
+  return pane === PANE_COMPARE ? viewer.compareTiles : viewer.tiles;
+}
+
+// sceneFor answers the scene of one pane.
+function sceneFor(pane) {
+  return pane === PANE_COMPARE ? viewer.sceneB : viewer.scene;
+}
+
+// panes answers every armed pane (one in the single pack viewer, two
+// in the dual view). The tile visibility and the residency walk all
+// of them.
+function panes() {
+  return viewer.dual ? [PANE_PRIMARY, PANE_COMPARE] : [PANE_PRIMARY];
+}
+
+// geometryUrlFor answers the geometry endpoint of one pane variant:
+// the compare pack only exists as the detour mesh (its NMV2 payload
+// comes from the compare endpoint), the primary keeps the mesh and
+// original variants.
+function geometryUrlFor(pane, variant, key) {
+  if (pane === PANE_COMPARE) {
+    return "/api/navmesh/compare/geometry/" + key;
+  }
+
+  return geometryUrl(variant, key);
 }
 
 // buildSurface creates the DOM overlay, the renderer and the camera
@@ -336,6 +479,10 @@ function buildSurface(navmesh) {
         <span>waypoint coordinates</span></label>
       <label class="nmv-row"><input type="checkbox" id="nmv-edges">
         <span>edge connections</span></label>
+      <div id="nmv-diff-block">
+      <label class="nmv-row"><input type="checkbox" id="nmv-diff" checked>
+        <span>tile diff tint</span></label>
+      </div>
       <div class="nmv-section">legend</div>
       <div class="nmv-row"><span class="nmv-swatch nmv-ground"></span>
         <span>ground (height ramp)</span></div>
@@ -347,6 +494,18 @@ function buildSurface(navmesh) {
         <span>water connections</span></div>
       <div class="nmv-row"><span class="nmv-swatch nmv-conn-shore"></span>
         <span>shore connections</span></div>
+      <div id="nmv-dual-legend">
+      <div class="nmv-row"><span class="nmv-swatch nmv-path-a"></span>
+        <span>route A (primary pack)</span></div>
+      <div class="nmv-row"><span class="nmv-swatch nmv-path-b"></span>
+        <span>route B (compare pack)</span></div>
+      <div class="nmv-row"><span class="nmv-swatch nmv-diff-vanished"></span>
+        <span>diff: polys vanished</span></div>
+      <div class="nmv-row"><span class="nmv-swatch nmv-diff-added"></span>
+        <span>diff: polys added</span></div>
+      <div class="nmv-row"><span class="nmv-swatch nmv-diff-mixed"></span>
+        <span>diff: mixed change</span></div>
+      </div>
       <div class="nmv-section">share this view</div>
       <input type="text" id="nmv-link" class="nmv-link" readonly
         title="the camera, the route pair and the tile selection as one link">
@@ -372,11 +531,32 @@ function buildSurface(navmesh) {
       drag looks &middot; wheel retunes the speed &middot; double click:
       first the start, then the destination &middot; the copy button
       shares this exact view</div>`;
+  if (viewer.dual) {
+    root.innerHTML += `
+    <div class="nmv-pane-label" id="nmv-pane-a">A</div>
+    <div class="nmv-pane-label nmv-pane-b" id="nmv-pane-b">B</div>
+    <div class="nmv-divider" id="nmv-divider"></div>`;
+  }
   document.body.appendChild(root);
 
   if (navmesh) {
-    document.getElementById("nmv-dir").textContent =
-      navmesh.tileFiles + " tiles in " + navmesh.dir;
+    const dirLine = navmesh.tileFiles + " tiles in " + navmesh.dir;
+    document.getElementById("nmv-dir").textContent = viewer.dual
+      ? "A: " + dirLine
+      : dirLine;
+  }
+  if (viewer.dual) {
+    document.getElementById("nmv-pane-b").textContent =
+      "B · " + viewer.compareDir;
+  } else {
+    // The single pack viewer hides the dual only chrome (the diff
+    // toggle and the pane legend rows would read as dead UI).
+    for (const id of ["nmv-diff-block", "nmv-dual-legend"]) {
+      const block = document.getElementById(id);
+      if (block) {
+        block.remove();
+      }
+    }
   }
 
   const canvas = document.getElementById("nmv-canvas");
@@ -398,24 +578,15 @@ function buildSurface(navmesh) {
   viewer.renderer.setClearColor(0x0d1117, 1);
 
   viewer.scene = new THREE.Scene();
+  buildLightRig(viewer.scene);
+  // The compare pane scene of the dual view shares the world axes
+  // and the light rig; only the tile builds differ per scene.
+  if (viewer.dual) {
+    viewer.sceneB = new THREE.Scene();
+    buildLightRig(viewer.sceneB);
+  }
   viewer.camera = new THREE.PerspectiveCamera(
     60, 1, 16, 400000);
-  // The balanced four light rig: the ambient floor keeps every face
-  // readable (a steep quad tessellates into two triangles whose flat
-  // normals face apart - without the floor the away-facing half falls
-  // to black and reads as a hole, the "black triangles" of the solid
-  // surface round), the hemisphere models the sky, the sun and the
-  // counter fill keep the relief.
-  const ambient = new THREE.AmbientLight(0xffffff, 0.42);
-  viewer.scene.add(ambient);
-  const hemi = new THREE.HemisphereLight(0xe8eef4, 0x8a8064, 0.6);
-  viewer.scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xffffff, 0.45);
-  sun.position.set(0.45, 1, 0.25);
-  viewer.scene.add(sun);
-  const fill = new THREE.DirectionalLight(0xdfe7f0, 0.25);
-  fill.position.set(-0.5, 0.4, -0.35);
-  viewer.scene.add(fill);
 
   viewer.rig = createFlyRig(viewer.camera, canvas);
   canvas.addEventListener("dblclick", onDoubleClick);
@@ -455,11 +626,18 @@ function buildSurface(navmesh) {
   document.getElementById("nmv-edges").addEventListener("change", (e) => {
     setConnectionsVisible(e.target.checked);
   });
+  if (viewer.dual) {
+    document.getElementById("nmv-diff").addEventListener("change", (e) => {
+      setDiffVisible(e.target.checked);
+    });
+  }
 
   const resize = () => {
     const width = window.innerWidth, height = window.innerHeight;
     viewer.renderer.setSize(width, height, false);
-    viewer.camera.aspect = width / height;
+    // Each pane of the dual view draws through the half window: the
+    // camera aspect matches one pane so both panes read undistorted.
+    viewer.camera.aspect = paneWidth() / height;
     viewer.camera.updateProjectionMatrix();
   };
   window.addEventListener("resize", resize);
@@ -467,9 +645,37 @@ function buildSurface(navmesh) {
   requestAnimationFrame(renderLoop);
 }
 
-// renderLoop redraws the scene and drives the progressive cursor
+// buildLightRig adds the balanced four light rig of the viewer to
+// one scene: the ambient floor keeps every face readable (a steep
+// quad tessellates into two triangles whose flat normals face apart -
+// without the floor the away-facing half falls to black and reads as
+// a hole, the "black triangles" of the solid surface round), the
+// hemisphere models the sky, the sun and the counter fill keep the
+// relief. Both pane scenes of the dual view carry the identical rig.
+function buildLightRig(scene) {
+  scene.add(new THREE.AmbientLight(0xffffff, 0.42));
+  scene.add(new THREE.HemisphereLight(0xe8eef4, 0x8a8064, 0.6));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.45);
+  sun.position.set(0.45, 1, 0.25);
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xdfe7f0, 0.25);
+  fill.position.set(-0.5, 0.4, -0.35);
+  scene.add(fill);
+}
+
+// paneWidth answers the pixel width of one pane: the full canvas in
+// the single pack viewer, half of it in the dual view.
+function paneWidth() {
+  const width = viewer.renderer.domElement.clientWidth;
+
+  return viewer.dual ? Math.floor(width / 2) : width;
+}
+
+// renderLoop redraws the scene(s) and drives the progressive cursor
 // raycast: one candidate tile per frame, so the readout never blocks
-// the orbit.
+// the orbit. The dual view renders pane A and pane B as two scissor
+// viewports over one renderer - the same camera draws both scenes so
+// every camera move compares the same world region twice.
 function renderLoop() {
   if (viewer.rig) {
     viewer.rig.update();
@@ -477,7 +683,22 @@ function renderLoop() {
   scheduleResidency();
   hoverStep();
   if (viewer.renderer) {
-    viewer.renderer.render(viewer.scene, viewer.camera);
+    if (viewer.dual && viewer.sceneB) {
+      const width = viewer.renderer.domElement.clientWidth;
+      const height = viewer.renderer.domElement.clientHeight;
+      const half = Math.floor(width / 2);
+      viewer.renderer.setScissorTest(true);
+      viewer.renderer.setViewport(0, 0, half, height);
+      viewer.renderer.setScissor(0, 0, half, height);
+      viewer.renderer.render(viewer.scene, viewer.camera);
+      viewer.renderer.setViewport(half, 0, width - half, height);
+      viewer.renderer.setScissor(half, 0, width - half, height);
+      viewer.renderer.render(viewer.sceneB, viewer.camera);
+      viewer.renderer.setScissorTest(false);
+      viewer.renderer.setViewport(0, 0, width, height);
+    } else {
+      viewer.renderer.render(viewer.scene, viewer.camera);
+    }
   }
   requestAnimationFrame(renderLoop);
 }
@@ -651,7 +872,10 @@ function frameInitialTiles(tiles) {
   viewer.markerRadius = Math.max(10, Math.min(60, size * 0.0022));
 }
 
-// addTileRow appends one tile checkbox row.
+// addTileRow appends one tile checkbox row. The dual view creates
+// the compare pane entry too (the checkbox drives both panes; the
+// compare pack simply has nothing to load where its reduced build
+// dropped the tile).
 function addTileRow(tile, checked) {
   const list = document.getElementById("nmv-tiles");
   const row = document.createElement("label");
@@ -668,14 +892,71 @@ function addTileRow(tile, checked) {
   viewer.tiles.set(key, {
     // built caches the loaded geometry per variant (mesh / orig);
     // mesh points at the ACTIVE variant's scene object, loading
-    // tracks the in flight variant fetches.
+    // tracks the in flight variant fetches, state carries the
+    // transient status cell text (loading / failed / far).
     mesh: null,
     built: {},
     loading: {},
+    state: "",
     connections: null,
     info: tile,
     visible: checked,
   });
+  if (viewer.dual && viewer.comparePresent.has(key)) {
+    viewer.compareTiles.set(key, {
+      mesh: null,
+      built: {},
+      loading: {},
+      state: "",
+      connections: null,
+      info: tile,
+      visible: checked,
+    });
+  }
+}
+
+// updateTileStatus composes the status cell of one tile row: the
+// primary pane state first, then the compare pane state and the diff
+// counts in the dual view ("12,345 polys · 8,101 · −42/+7").
+function updateTileStatus(key) {
+  const status = document.querySelector(`[data-status="${key}"]`);
+  if (!status) {
+    return;
+  }
+  if (!viewer.dual) {
+    const entry = viewer.tiles.get(key);
+    status.textContent = primaryStatusText(entry);
+
+    return;
+  }
+  const parts = [primaryStatusText(viewer.tiles.get(key))];
+  const compareEntry = viewer.compareTiles.get(key);
+  parts.push(viewer.comparePresent.has(key)
+    ? "B " + primaryStatusText(compareEntry)
+    : "B absent");
+  const diff = viewer.diffCounts.get(key);
+  if (diff) {
+    parts.push("\u2212" + diff.vanished.length +
+      "/+" + diff.added.length);
+  }
+  status.textContent = parts.filter((part) => part !== "").join(" · ");
+}
+
+// primaryStatusText renders one tile entry state the way the status
+// cells always read it: the transient load state (loading, failed,
+// far) or the polygon count of the built mesh.
+function primaryStatusText(entry) {
+  if (!entry) {
+    return "";
+  }
+  if (entry.state) {
+    return entry.state;
+  }
+  if (entry.mesh) {
+    return entry.mesh.userData.polys.toLocaleString() + " polys";
+  }
+
+  return "";
 }
 
 // syncAllBox mirrors the per tile checkboxes into the master box.
@@ -706,15 +987,15 @@ function setAllTiles(visible) {
   }
 }
 
-// disposeTileGeometry frees every built variant of one tile: the
-// scene object leaves, the geometries and materials of the draw call
-// tree (the surface and wall quads, the region outline, the edge
+// disposeTileGeometry frees every built variant of one tile entry:
+// the scene object leaves, the geometries and materials of the draw
+// call tree (the surface and wall quads, the region outline, the edge
 // overlay) dispose, the built cache clears. The visible=false flag
 // of the old code kept every build resident - the buffers were the
 // memory wall of the full map.
 function disposeTileGeometry(entry) {
   if (entry.mesh) {
-    viewer.scene.remove(entry.mesh);
+    entry.mesh.parent && entry.mesh.parent.remove(entry.mesh);
     entry.mesh = null;
   }
   for (const variant of Object.keys(entry.built)) {
@@ -737,28 +1018,47 @@ function disposeTileGeometry(entry) {
 }
 
 // setTileVisible shows or hides one tile, loading its geometry on
-// the first show and freeing it on every hide.
+// the first show and freeing it on every hide. The dual view applies
+// the visibility to both panes - the checkbox is the shared mask.
 function setTileVisible(key, visible) {
   const entry = viewer.tiles.get(key);
   if (!entry) {
     return;
   }
-  entry.visible = visible;
+  for (const pane of panes()) {
+    const paneEntry = entriesFor(pane).get(key);
+    if (paneEntry) {
+      paneEntry.visible = visible;
+    }
+  }
   if (visible) {
     if (autoResidencyActive()) {
       // The residency manager decides: the checkbox stays the mask,
       // the nearest cap tiles load, the far ones stay disposed.
       updateResidency();
     } else {
-      void ensureTile(entry.info);
+      for (const pane of panes()) {
+        const paneEntry = entriesFor(pane).get(key);
+        if (paneEntry) {
+          void ensureTile(paneEntry.info, pane);
+        }
+      }
     }
+    if (viewer.dual && viewer.diffEnabled) {
+      void ensureDiff(key);
+    }
+
     return;
   }
-  disposeTileGeometry(entry);
-  const status = document.querySelector(`[data-status="${key}"]`);
-  if (status) {
-    status.textContent = "";
+  for (const pane of panes()) {
+    const paneEntry = entriesFor(pane).get(key);
+    if (paneEntry) {
+      disposeTileGeometry(paneEntry);
+      paneEntry.state = "";
+    }
   }
+  clearDiffOverlays(key);
+  updateTileStatus(key);
 }
 
 // autoResidencyActive reports whether the camera manages the loads:
@@ -785,13 +1085,18 @@ function autoResidencyActive() {
 // (the flat world distance from the camera to the tile rectangle)
 // and swaps the residency: the nearest cap load, the loaded rest
 // dispose. The small selections fall through to the classic ensure
-// of the visible tiles.
+// of the visible tiles. Every armed pane follows the same ranking -
+// the dual view loads and disposes both packs' builds of the same
+// key together, so the panes always compare the same region.
 function updateResidency() {
   if (!autoResidencyActive()) {
-    for (const entry of viewer.tiles.values()) {
-      if (entry.visible && !entry.mesh &&
-          !entry.built[viewer.variant] && !entry.loading[viewer.variant]) {
-        void ensureTile(entry.info);
+    for (const pane of panes()) {
+      for (const entry of entriesFor(pane).values()) {
+        const variant = pane === PANE_COMPARE ? "mesh" : viewer.variant;
+        if (entry.visible && !entry.mesh &&
+            !entry.built[variant] && !entry.loading[variant]) {
+          void ensureTile(entry.info, pane);
+        }
       }
     }
 
@@ -802,32 +1107,38 @@ function updateResidency() {
   const ranked = [];
   for (const entry of viewer.tiles.values()) {
     if (!entry.visible) {
-      if (entry.mesh || Object.keys(entry.built).length > 0) {
-        disposeTileGeometry(entry);
-      }
       continue;
     }
     const tile = entry.info;
     const dx = Math.max(tile.minX - cx, 0, cx - tile.maxX);
     const dy = Math.max(tile.minY - cy, 0, cy - tile.maxY);
-    ranked.push([dx * dx + dy * dy, entry]);
+    ranked.push([dx * dx + dy * dy, tileKey(tile)]);
   }
   ranked.sort((a, b) => a[0] - b[0]);
   for (let i = 0; i < ranked.length; i++) {
-    const entry = ranked[i][1];
-    const status = document.querySelector(
-      `[data-status="${tileKey(entry.info)}"]`);
-    if (i < RESIDENCY_CAP) {
-      if (!entry.built[viewer.variant] && !entry.loading[viewer.variant]) {
-        void ensureTile(entry.info);
+    const key = ranked[i][1];
+    for (const pane of panes()) {
+      const entry = entriesFor(pane).get(key);
+      if (!entry) {
+        continue;
       }
-      continue;
+      const variant = pane === PANE_COMPARE ? "mesh" : viewer.variant;
+      if (i < RESIDENCY_CAP) {
+        if (!entry.built[variant] && !entry.loading[variant]) {
+          void ensureTile(entry.info, pane);
+        }
+        continue;
+      }
+      if (entry.mesh || Object.keys(entry.built).length > 0) {
+        disposeTileGeometry(entry);
+      }
+      if (entry.state !== "failed") {
+        entry.state = "far";
+      }
     }
-    if (entry.mesh || Object.keys(entry.built).length > 0) {
-      disposeTileGeometry(entry);
-    }
-    if (status && status.textContent !== "failed") {
-      status.textContent = "far";
+    updateTileStatus(key);
+    if (i < RESIDENCY_CAP && viewer.dual && viewer.diffEnabled) {
+      void ensureDiff(key);
     }
   }
 }
@@ -870,23 +1181,23 @@ function setVariant(variant) {
   if (select) {
     select.value = variant;
   }
+  // The compare pane of the dual view stays untouched: it renders
+  // the compare pack's mesh at every primary variant (the compare
+  // endpoints serve no original cell render).
   for (const [key, entry] of viewer.tiles) {
     // The old active build frees entirely (the variant switch no
     // longer caches both builds - the memory wall of the full map
     // carries both, the switch back refetches); an unloaded variant
     // loads below with the status row showing the progress.
     disposeTileGeometry(entry);
+    entry.state = "";
     if (entry.visible) {
       if (autoResidencyActive()) {
         continue;
       }
-      void ensureTile(entry.info);
-    } else {
-      const status = document.querySelector(`[data-status="${key}"]`);
-      if (status) {
-        status.textContent = "";
-      }
+      void ensureTile(entry.info, PANE_PRIMARY);
     }
+    updateTileStatus(key);
   }
   if (autoResidencyActive()) {
     updateResidency();
@@ -894,47 +1205,57 @@ function setVariant(variant) {
   restartHoverSweep();
 }
 
-// ensureTile fetches and builds the ACTIVE variant's geometry of one
-// tile exactly once; the visible flag follows the checkbox.
-async function ensureTile(tile) {
+// ensureTile fetches and builds the pane's geometry of one tile
+// exactly once; the visible flag follows the checkbox. The primary
+// pane serves the mesh and orig variants, the compare pane only its
+// own mesh; a tile the pane's pack does not carry marks absent and
+// fetches nothing.
+async function ensureTile(tile, pane = PANE_PRIMARY) {
   const key = tileKey(tile);
-  const entry = viewer.tiles.get(key);
-  const variant = viewer.variant;
-  if (!entry || entry.built[variant] || entry.loading[variant]) {
+  const entries = entriesFor(pane);
+  const entry = entries.get(key);
+  const present = pane === PANE_COMPARE
+    ? viewer.comparePresent
+    : viewer.primaryPresent;
+  if (!entry || !present.has(key)) {
+    if (entry) {
+      entry.state = "absent";
+      updateTileStatus(key);
+    }
+
+    return;
+  }
+  const variant = pane === PANE_COMPARE ? "mesh" : viewer.variant;
+  if (entry.built[variant] || entry.loading[variant]) {
     return;
   }
   entry.loading[variant] = true;
-  const status = document.querySelector(`[data-status="${key}"]`);
-  if (status) {
-    status.textContent = "loading" + (variant === "orig" ? " orig" : "");
-  }
+  entry.state = "loading" + (variant === "orig" ? " orig" : "");
+  updateTileStatus(key);
   try {
-    const response = await fetch(geometryUrl(variant, key));
+    const response = await fetch(geometryUrlFor(pane, variant, key));
     if (!response.ok) {
       throw new Error("http " + response.status);
     }
     const buffer = await response.arrayBuffer();
     const mesh = buildTileMesh(key, buffer);
     entry.built[variant] = mesh;
+    entry.state = "";
     // The variant may have switched while the fetch ran: only the
     // active one enters the scene (the stale build stays cached).
-    if (viewer.variant === variant) {
+    const active = pane === PANE_COMPARE || viewer.variant === variant;
+    if (active) {
       entry.mesh = mesh;
       mesh.visible = entry.visible;
       mesh.scale.y = viewer.heightScale;
-      viewer.scene.add(mesh);
-      if (status) {
-        const polys = mesh.userData.polys;
-        status.textContent = polys.toLocaleString() + " polys";
-      }
+      sceneFor(pane).add(mesh);
     }
   } catch (err) {
-    if (status) {
-      status.textContent = "failed";
-    }
+    entry.state = "failed";
     showStatus("error", "tile " + key + " failed to load: " + err.message);
   } finally {
     entry.loading[variant] = false;
+    updateTileStatus(key);
   }
 }
 
@@ -1082,6 +1403,9 @@ function buildTileMesh(key, buffer) {
   mesh.userData.polys = polyCount;
   mesh.userData.walls = wallCount;
   mesh.userData.key = key;
+  // maxH drives the diff tint lift of the dual view (the tint plane
+  // rides above the tile's highest geometry).
+  mesh.userData.maxH = maxH;
   mesh.userData.links = {
     view: links,
     meta: new Uint8Array(buffer, linksBase, linkCount * 16),
@@ -1241,23 +1565,291 @@ function buildTileConnections(mesh) {
 }
 
 // setConnectionsVisible toggles the edge connections overlay of every
-// loaded tile, building it lazily on the first enable.
+// loaded tile, building it lazily on the first enable. Both panes
+// of the dual view toggle together.
 function setConnectionsVisible(visible) {
   viewer.showEdges = visible;
-  for (const entry of viewer.tiles.values()) {
-    if (!entry.mesh) {
-      continue;
-    }
-    if (visible && !entry.connections) {
-      entry.connections = buildTileConnections(entry.mesh);
+  for (const pane of panes()) {
+    for (const entry of entriesFor(pane).values()) {
+      if (!entry.mesh) {
+        continue;
+      }
+      if (visible && !entry.connections) {
+        entry.connections = buildTileConnections(entry.mesh);
+        if (entry.connections) {
+          entry.mesh.add(entry.connections);
+        }
+      }
       if (entry.connections) {
-        entry.mesh.add(entry.connections);
+        entry.connections.visible = visible;
       }
     }
-    if (entry.connections) {
-      entry.connections.visible = visible;
+  }
+}
+
+// paneOfClientX answers the pane the canvas x coordinate lands in:
+// the left half is pane A (the primary pack), the right half pane B
+// (the compare pack) of the dual view.
+function paneOfClientX(clientX) {
+  if (!viewer.dual) {
+    return PANE_PRIMARY;
+  }
+
+  return clientX >= paneWidth() ? PANE_COMPARE : PANE_PRIMARY;
+}
+
+// panePointerNDC reads the pointer as NDC within its pane (each pane
+// spans the full NDC square through the shared camera).
+function panePointerNDC(event) {
+  const rect = event.target.getBoundingClientRect();
+  const half = viewer.dual ? rect.width / 2 : rect.width;
+  const paneLeft = viewer.dual &&
+    event.clientX - rect.left >= half ? half : 0;
+
+  return new THREE.Vector2(
+    ((event.clientX - rect.left - paneLeft) / half) * 2 - 1,
+    -((event.clientY - rect.top) / rect.height) * 2 + 1);
+}
+
+// The per tile diff highlight of the dual pack view (issue #59):
+// every visible tile fetches its polygon diff from the compare
+// endpoint once, the tile tints by the change class (vanished red,
+// added green, mixed amber) in BOTH panes - the same world region
+// carries the same change mark - and the vanished and added
+// rectangles draw as small outlines while the lists stay small
+// enough to read.
+
+// visibleKeys lists the keys the checkboxes currently show.
+function visibleKeys() {
+  const keys = [];
+  for (const [key, entry] of viewer.tiles) {
+    if (entry.visible) {
+      keys.push(key);
     }
   }
+
+  return keys;
+}
+
+// setDiffVisible toggles the diff tint layer: off removes the
+// overlays from both scenes, on rebuilds them from the cached
+// counts (a re-fetch only answers the tiles the session has not
+// asked for yet).
+function setDiffVisible(visible) {
+  viewer.diffEnabled = visible;
+  if (!visible) {
+    for (const key of [...viewer.diffTints.keys()]) {
+      clearDiffOverlays(key);
+    }
+
+    return;
+  }
+  for (const key of visibleKeys()) {
+    if (viewer.diffCounts.has(key)) {
+      buildDiffOverlays(key);
+    } else {
+      void ensureDiff(key);
+    }
+  }
+}
+
+// ensureDiff fetches one tile's diff once (the counts cache for the
+// session) and builds the tint overlays when the toggle allows them.
+async function ensureDiff(key) {
+  if (!viewer.dual || viewer.diffCounts.has(key) ||
+      viewer.diffPending.has(key)) {
+    return;
+  }
+  viewer.diffPending.add(key);
+  try {
+    const response = await fetch("/api/navmesh/compare/diff/" + key);
+    if (!response.ok) {
+      // A tile absent from both packs has no diff to speak of; the
+      // status cell keeps the load states.
+      return;
+    }
+    const diff = await response.json();
+    viewer.diffCounts.set(key, {
+      polysA: diff.polysA || 0,
+      polysB: diff.polysB || 0,
+      vanished: diff.vanished || [],
+      added: diff.added || [],
+    });
+    updateTileStatus(key);
+    if (viewer.diffEnabled) {
+      buildDiffOverlays(key);
+    }
+  } catch {
+    // The tint is an inspection aid, not a gate: a failed fetch
+    // leaves the tile untinted and the status cell without counts.
+  } finally {
+    viewer.diffPending.delete(key);
+  }
+}
+
+// diffClassColor answers the tint color of one change mix: red when
+// the reduced pack only lost polygons, green when it only gained,
+// amber when both happened.
+function diffClassColor(vanished, added) {
+  if (vanished > 0 && added > 0) {
+    return DIFF_MIXED;
+  }
+  if (vanished > 0) {
+    return DIFF_VANISHED;
+  }
+
+  return DIFF_ADDED;
+}
+
+// buildDiffOverlays draws one tile's diff layer into both pane
+// scenes: the translucent tint quad above the tile's highest
+// geometry (the alpha scales with the changed share) plus the rect
+// outlines while the vanished and added lists stay small.
+function buildDiffOverlays(key) {
+  clearDiffOverlays(key);
+  const diff = viewer.diffCounts.get(key);
+  if (!diff || (diff.vanished.length === 0 && diff.added.length === 0)) {
+    return;
+  }
+  const [col, row] = key.split("_").map(Number);
+  const worldMinX = (col - 20) * 32768;
+  const worldMinY = (row - 18) * 32768;
+  const size = 32768;
+  const primary = viewer.tiles.get(key);
+  const compareEntry = viewer.compareTiles.get(key);
+  const built = (primary && primary.mesh) ||
+    (compareEntry && compareEntry.mesh);
+  const lift = (built ? built.userData.maxH : 0) + 40;
+  const color = diffClassColor(diff.vanished.length, diff.added.length);
+  const changed = diff.vanished.length + diff.added.length;
+  const total = Math.max(1, Math.max(diff.polysA, diff.polysB));
+  const alpha = Math.min(DIFF_TINT_ALPHA_MAX,
+    DIFF_TINT_ALPHA + (DIFF_TINT_ALPHA_MAX - DIFF_TINT_ALPHA) *
+      (changed / total));
+  const tints = { a: null, b: null, rectsA: null, rectsB: null };
+  for (const pane of panes()) {
+    const quad = new THREE.Mesh(
+      diffQuadGeometry(worldMinX, worldMinY, size, lift),
+      new THREE.MeshBasicMaterial({
+        color: (color.r << 16) | (color.g << 8) | color.b,
+        transparent: true,
+        opacity: alpha,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      }));
+    quad.renderOrder = 4;
+    sceneFor(pane).add(quad);
+    if (pane === PANE_COMPARE) {
+      tints.b = quad;
+    } else {
+      tints.a = quad;
+    }
+  }
+  const rects = [];
+  const rectColors = [];
+  if (diff.vanished.length > 0 && diff.vanished.length <= DIFF_RECT_LIMIT) {
+    for (const rect of diff.vanished) {
+      pushRectRing(rects, rectColors, rect, worldMinX, worldMinY,
+        DIFF_VANISHED);
+    }
+  }
+  if (diff.added.length > 0 && diff.added.length <= DIFF_RECT_LIMIT) {
+    for (const rect of diff.added) {
+      pushRectRing(rects, rectColors, rect, worldMinX, worldMinY,
+        DIFF_ADDED);
+    }
+  }
+  if (rects.length > 0) {
+    for (const pane of panes()) {
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position",
+        new THREE.Float32BufferAttribute(rects, 3));
+      geometry.setAttribute("color",
+        new THREE.Float32BufferAttribute(rectColors, 3));
+      const lines = new THREE.LineSegments(geometry,
+        new THREE.LineBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.85,
+        }));
+      lines.renderOrder = 5;
+      sceneFor(pane).add(lines);
+      if (pane === PANE_COMPARE) {
+        tints.rectsB = lines;
+      } else {
+        tints.rectsA = lines;
+      }
+    }
+  }
+  viewer.diffTints.set(key, tints);
+}
+
+// diffQuadGeometry builds the tint quad of one tile: a flat plane
+// covering the region at the given lift height.
+function diffQuadGeometry(worldMinX, worldMinY, size, lift) {
+  const geometry = new THREE.BufferGeometry();
+  // Two triangles facing up: (0,1,2) (2,1,3) over the corners
+  // (min,min) (max,min) (min,max) (max,max).
+  const corners = [
+    worldMinX, lift, worldMinY,
+    worldMinX + size, lift, worldMinY,
+    worldMinX, lift, worldMinY + size,
+    worldMinX + size, lift, worldMinY + size,
+  ];
+  geometry.setAttribute("position",
+    new THREE.Float32BufferAttribute(corners, 3));
+  geometry.setIndex([0, 2, 1, 1, 2, 3]);
+  geometry.computeBoundingSphere();
+
+  return geometry;
+}
+
+// pushRectRing appends the closed outline of one diff rect (region
+// local cells in, world coordinates out) in the given color: five
+// ring points into the positions array, the same five colors into
+// the colors array.
+function pushRectRing(positions, colors, rect, worldMinX, worldMinY,
+  color) {
+  const x0 = worldMinX + rect.x0 * CELL_SIZE;
+  const y0 = worldMinY + rect.y0 * CELL_SIZE;
+  const x1 = worldMinX + rect.x1 * CELL_SIZE;
+  const y1 = worldMinY + rect.y1 * CELL_SIZE;
+  const h = ((rect.h00 + rect.h10 + rect.h01 + rect.h11) / 4) *
+    viewer.heightScale + 12;
+  const ring = [
+    x0, h, y0,
+    x1, h, y0,
+    x1, h, y1,
+    x0, h, y1,
+    x0, h, y0,
+  ];
+  for (const point of ring) {
+    positions.push(point);
+  }
+  for (let i = 0; i < 5; i++) {
+    colors.push(color.r / 255, color.g / 255, color.b / 255);
+  }
+}
+
+// clearDiffOverlays removes and disposes one tile's diff layer from
+// both pane scenes.
+function clearDiffOverlays(key) {
+  const tints = viewer.diffTints.get(key);
+  if (!tints) {
+    return;
+  }
+  for (const overlay of [tints.a, tints.b, tints.rectsA, tints.rectsB]) {
+    if (overlay) {
+      overlay.parent && overlay.parent.remove(overlay);
+      if (overlay.geometry) {
+        overlay.geometry.dispose();
+      }
+      if (overlay.material) {
+        overlay.material.dispose();
+      }
+    }
+  }
+  viewer.diffTints.delete(key);
 }
 
 // onPointerMove arms the progressive cursor raycast.
@@ -1265,10 +1857,13 @@ function onPointerMove(event) {
   if (!viewer.renderer) {
     return;
   }
-  const rect = event.target.getBoundingClientRect();
-  viewer.hover.pointer.set(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1);
+  const pane = paneOfClientX(event.clientX);
+  if (pane !== viewer.hover.pane) {
+    viewer.hover.best = null;
+    viewer.hover.hitTile = null;
+  }
+  viewer.hover.pane = pane;
+  viewer.hover.pointer.copy(panePointerNDC(event));
   viewer.hover.hasPointer = true;
   restartHoverSweep();
 }
@@ -1299,7 +1894,8 @@ function clearCursorReadout() {
 // restartHoverSweep re-runs the sphere pass: the visible tiles whose
 // bounding sphere the cursor ray enters become the candidates,
 // ordered by the entry distance so the readout is right after the
-// first frames.
+// first frames. The sweep walks the pane the pointer rests over -
+// the two pane scenes share the world but not the tile builds.
 function restartHoverSweep() {
   const hover = viewer.hover;
   hover.candidates = [];
@@ -1312,7 +1908,7 @@ function restartHoverSweep() {
   const ray = raycaster.ray;
   const sphere = new THREE.Sphere();
   const entries = [];
-  for (const entry of viewer.tiles.values()) {
+  for (const entry of entriesFor(hover.pane || PANE_PRIMARY).values()) {
     if (!entry.mesh || !entry.mesh.visible) {
       continue;
     }
@@ -1428,12 +2024,16 @@ function setHoverTile(key) {
 
 // setHeightScale exaggerates the vertical axis of every tile (the
 // terrain relief of the geodata is subtle next to the 32768 unit
-// region span); the route overlays rescale with it.
+// region span); the route overlays rescale with it. Both panes of
+// the dual view rescale together - the same world must read the
+// same relief in A and B.
 function setHeightScale(scale) {
   viewer.heightScale = scale;
-  for (const entry of viewer.tiles.values()) {
-    if (entry.mesh) {
-      entry.mesh.scale.y = scale;
+  for (const pane of panes()) {
+    for (const entry of entriesFor(pane).values()) {
+      if (entry.mesh) {
+        entry.mesh.scale.y = scale;
+      }
     }
   }
   if (viewer.path) {
@@ -1446,20 +2046,20 @@ function setHeightScale(scale) {
 
 // onDoubleClick resolves the clicked mesh point and drives the two
 // click search: the first double click arms the start marker, the
-// second asks the server for the route.
+// second asks the server for the route. The picking raycasts the
+// pane the click landed in - both panes pick the same world, and the
+// dual view routes the pair through both packs on one request.
 function onDoubleClick(event) {
   if (!viewer.renderer) {
     return;
   }
   event.preventDefault();
-  const rect = event.target.getBoundingClientRect();
-  const pointer = new THREE.Vector2(
-    ((event.clientX - rect.left) / rect.width) * 2 - 1,
-    -((event.clientY - rect.top) / rect.height) * 2 + 1);
+  const pane = paneOfClientX(event.clientX);
+  const pointer = panePointerNDC(event);
   const raycaster = new THREE.Raycaster();
   raycaster.setFromCamera(pointer, viewer.camera);
   const meshes = [];
-  for (const entry of viewer.tiles.values()) {
+  for (const entry of entriesFor(pane).values()) {
     if (entry.mesh && entry.mesh.visible) {
       meshes.push(entry.mesh);
     }
@@ -1633,13 +2233,27 @@ function renderRouteAnswer(answer) {
   } else {
     showStatus("not found", "no route under the priced search");
   }
+  const compare = viewer.dual && answer.compare ? answer.compare : null;
   const timer = document.getElementById("nmv-timer");
   const timerSub = document.getElementById("nmv-timer-sub");
   if (answer.durationMs < 1) {
     timer.textContent = formatMicros(answer.durationMs);
-    timerSub.textContent = "construction time";
   } else {
     timer.textContent = answer.durationMs.toFixed(3);
+  }
+  if (compare) {
+    // The dual view names the packs: the primary timer stays the
+    // headline, the compare duration rides the sub line with the
+    // delta the owner compares.
+    const delta = compare.durationMs - answer.durationMs;
+    const compareText = compare.durationMs < 1
+      ? formatMicros(compare.durationMs)
+      : compare.durationMs.toFixed(3) + " ms";
+    timerSub.textContent = "pack A · B " + compareText +
+      " (" + (delta >= 0 ? "+" : "") + delta.toFixed(3) + " ms)";
+  } else if (answer.durationMs < 1) {
+    timerSub.textContent = "construction time";
+  } else {
     timerSub.textContent = "ms construction time";
   }
   const stats = document.getElementById("nmv-stats");
@@ -1659,6 +2273,19 @@ function renderRouteAnswer(answer) {
       " units"]);
   if (raw.length > 0) {
     rows.push(["raw funnel steps", String(raw.length)]);
+  }
+  if (compare) {
+    const compareWaypoints = activeWaypoints(compare);
+    const lengthA = routeLength(waypoints);
+    const lengthB = routeLength(compareWaypoints);
+    const lengthDelta = lengthB - lengthA;
+    rows.push(
+      ["spacer", ""],
+      ["B waypoints", String(compareWaypoints.length)],
+      ["B corridor polys", String(compare.corridor)],
+      ["B path length", Math.round(lengthB).toLocaleString() + " units"],
+      ["B length delta", (lengthDelta >= 0 ? "+" : "") +
+        Math.round(lengthDelta).toLocaleString() + " units"]);
   }
   stats.innerHTML = rows.map(([name, value]) =>
     name === "spacer"
@@ -1715,16 +2342,35 @@ function routeLength(waypoints) {
   return total;
 }
 
-// drawRouteOverlays rebuilds the path line, the waypoint dots, the
+// drawRouteOverlays rebuilds the path lines, the waypoint dots, the
 // coordinate labels and the endpoint markers from the last answer
 // through the active route variant (the height scale change and the
-// variant toggle re-render through it).
+// variant toggle re-render through it). The dual view draws the
+// primary answer amber in pane A and the compare answer cyan in
+// pane B - one request, two packs' answers, the visual diff the
+// owner asked for.
 function drawRouteOverlays(answer) {
   clearRouteOverlays();
   const waypoints = activeWaypoints(answer);
-  if (waypoints.length === 0) {
-    return;
+  if (waypoints.length > 0) {
+    drawRouteLine(waypoints, PANE_PRIMARY, PATH_COLOR, WAYPOINT_COLOR);
   }
+  if (viewer.dual && answer.compare) {
+    const compareWaypoints = activeWaypoints(answer.compare);
+    if (compareWaypoints.length > 0) {
+      drawRouteLine(compareWaypoints, PANE_COMPARE,
+        COMPARE_PATH_COLOR, COMPARE_WAYPOINT_COLOR);
+    }
+  }
+  if (waypoints.length > 0) {
+    drawStartMarker(waypoints[0]);
+    drawEndMarker(waypoints[waypoints.length - 1]);
+  }
+}
+
+// drawRouteLine builds the path line, the waypoint dots and the
+// coordinate labels of one pane from one answer's waypoints.
+function drawRouteLine(waypoints, pane, lineColor, dotColor) {
   const lift = viewer.markerRadius * 0.4;
   const positions = new Float32Array(waypoints.length * 3);
   for (let i = 0; i < waypoints.length; i++) {
@@ -1736,36 +2382,39 @@ function drawRouteOverlays(answer) {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute("position",
     new THREE.BufferAttribute(positions, 3));
-  viewer.path = answer;
+  const scene = sceneFor(pane);
   const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({
-    color: PATH_COLOR,
+    color: lineColor,
     depthTest: false,
     transparent: true,
   }));
   line.renderOrder = 9;
-  viewer.scene.add(line);
-  viewer.routeLine = line;
+  scene.add(line);
 
   const dots = new THREE.Points(geometry, new THREE.PointsMaterial({
-    color: WAYPOINT_COLOR,
+    color: dotColor,
     size: 7,
     sizeAttenuation: false,
     depthTest: false,
   }));
   dots.renderOrder = 10;
-  viewer.scene.add(dots);
-  viewer.routeDots = dots;
+  scene.add(dots);
 
   const labels = new THREE.Group();
   labels.visible = viewer.showWaypointCoords;
   for (let i = 0; i < waypoints.length; i++) {
     labels.add(makeWaypointLabel(i, waypoints.length, waypoints[i]));
   }
-  viewer.scene.add(labels);
-  viewer.waypointLabels = labels;
-
-  drawStartMarker(waypoints[0]);
-  drawEndMarker(waypoints[waypoints.length - 1]);
+  scene.add(labels);
+  if (pane === PANE_COMPARE) {
+    viewer.routeLineB = line;
+    viewer.routeDotsB = dots;
+    viewer.waypointLabelsB = labels;
+  } else {
+    viewer.routeLine = line;
+    viewer.routeDots = dots;
+    viewer.waypointLabels = labels;
+  }
 }
 
 // makeWaypointLabel builds one screen fixed sprite carrying the
@@ -1817,24 +2466,32 @@ function makeWaypointLabel(index, total, waypoint) {
   return sprite;
 }
 
-// drawStartMarker places the green start sphere.
+// drawStartMarker places the green start sphere (both scenes of the
+// dual view - the pair is shared world state).
 function drawStartMarker(world) {
-  if (viewer.startMarker) {
-    viewer.scene.remove(viewer.startMarker);
-    viewer.startMarker = null;
+  for (const pane of panes()) {
+    const key = pane === PANE_COMPARE ? "startMarkerB" : "startMarker";
+    if (viewer[key]) {
+      sceneFor(pane).remove(viewer[key]);
+      viewer[key] = null;
+    }
+    viewer[key] = makeMarker(START_COLOR, true);
+    placeMarker(viewer[key], world, pane);
   }
-  viewer.startMarker = makeMarker(START_COLOR, true);
-  placeMarker(viewer.startMarker, world);
 }
 
-// drawEndMarker places the red destination sphere.
+// drawEndMarker places the red destination sphere (both scenes of
+// the dual view).
 function drawEndMarker(world) {
-  if (viewer.endMarker) {
-    viewer.scene.remove(viewer.endMarker);
-    viewer.endMarker = null;
+  for (const pane of panes()) {
+    const key = pane === PANE_COMPARE ? "endMarkerB" : "endMarker";
+    if (viewer[key]) {
+      sceneFor(pane).remove(viewer[key]);
+      viewer[key] = null;
+    }
+    viewer[key] = makeMarker(END_COLOR, false);
+    placeMarker(viewer[key], world, pane);
   }
-  viewer.endMarker = makeMarker(END_COLOR, false);
-  placeMarker(viewer.endMarker, world);
 }
 
 // makeMarker builds one screen fixed endpoint dot (a sprite: the
@@ -1880,11 +2537,12 @@ function makeMarker(color, ring) {
   return sprite;
 }
 
-// placeMarker positions one endpoint dot over the world position.
-function placeMarker(marker, world) {
+// placeMarker positions one endpoint dot over the world position in
+// the given pane's scene.
+function placeMarker(marker, world, pane = PANE_PRIMARY) {
   marker.position.set(
     world.x, world.z * viewer.heightScale, world.y);
-  viewer.scene.add(marker);
+  sceneFor(pane).add(marker);
 }
 
 // clearRoute drops the whole search state (the button and every new
@@ -1902,13 +2560,16 @@ function clearRoute() {
   document.getElementById("nmv-stats").innerHTML = "";
 }
 
-// clearRouteOverlays removes the line, the dots, the labels and the
-// markers.
+// clearRouteOverlays removes the lines, the dots, the labels and
+// the markers of both panes.
 function clearRouteOverlays() {
   for (const key of ["routeLine", "routeDots", "waypointLabels",
-    "startMarker", "endMarker"]) {
-    if (viewer[key]) {
-      viewer.scene.remove(viewer[key]);
+    "startMarker", "endMarker", "routeLineB", "routeDotsB",
+    "waypointLabelsB", "startMarkerB", "endMarkerB"]) {
+    const overlay = viewer[key];
+    if (overlay) {
+      const pane = key.endsWith("B") ? PANE_COMPARE : PANE_PRIMARY;
+      sceneFor(pane).remove(overlay);
       viewer[key] = null;
     }
   }
@@ -1958,6 +2619,10 @@ function showStatus(kind, text) {
 //                         plan repro links of the HUD carry it (the
 //                         grid oracle of the fold is water blind and
 //                         bends the route the bot never walks).
+//   diff=0|1             the per tile diff tint of the dual pack
+//                         view (the compare pack armed by
+//                         -navmesh-compare); diff=0 boots without the
+//                         tint fetches. Omitted = the tint on.
 // The world axes mapping matters: the viewer renders three y as the
 // height, so a pasted link reads the same at every height scale (the
 // restore re-applies the scale of the link itself).
@@ -1973,6 +2638,7 @@ function parseViewParams() {
     scale: null,
     geom: null,
     path: null,
+    diff: null,
     approach: null,
     avoid: null,
     fold: null,
@@ -1993,6 +2659,10 @@ function parseViewParams() {
   const path = search.get("path");
   if (path === "smooth" || path === "raw") {
     view.path = path;
+  }
+  const diff = search.get("diff");
+  if (diff === "0" || diff === "1") {
+    view.diff = diff === "1";
   }
   const approach = Number(search.get("approach"));
   if (Number.isFinite(approach) && approach > 0) {
@@ -2102,6 +2772,9 @@ function buildViewStateUrl() {
   params.set("scale", String(viewer.heightScale));
   params.set("geom", viewer.variant);
   params.set("path", viewer.pathVariant);
+  if (viewer.dual && !viewer.diffEnabled) {
+    params.set("diff", "0");
+  }
   if (viewer.approach > 0) {
     params.set("approach", String(viewer.approach));
   }
