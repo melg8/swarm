@@ -220,7 +220,7 @@ func TestKiteDeadEndLaneRePlansAtTheNextProbe(t *testing.T) {
     // into).
     loop.combatAvoidUntil = time.Time{}
     loop.kiteAt = time.Now().Add(-kiteStepPeriod)
-    selfSwingsAt(bot, 7, 45200)
+    selfSwingsAt(bot, 45200)
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
         return to.X != 44600, nil
     }

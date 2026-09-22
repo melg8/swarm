@@ -40,7 +40,7 @@ func kiteBowBot(t *testing.T, mobX int32) (*state.Bot, *fakeGame, *Loop) {
     loop.engageAt = time.Now()
     // The fight runs: the character swings at the mob (the running
     // fight view of SelfFighting).
-    selfSwingsAt(bot, 7, mobX)
+    selfSwingsAt(bot, mobX)
     loop.lastHit = time.Now().Add(-time.Minute)
 
     return bot, game, loop
@@ -99,7 +99,7 @@ func TestKiteIsBowOnly(t *testing.T) {
     loop := NewLoop(game, bot)
     loop.target = 7
     loop.engageAt = time.Now()
-    selfSwingsAt(bot, 7, 45200)
+    selfSwingsAt(bot, 45200)
     loop.lastHit = time.Now().Add(-time.Minute)
 
     loop.tick()

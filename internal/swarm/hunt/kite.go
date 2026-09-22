@@ -222,26 +222,15 @@ func (l *Loop) kiteThreat(
     return x, y, id, dist, ok
 }
 
-// kiteFromTarget steps a bow fighting character away from the
-// hostile that armed the step (the target or a train member, see
-// kiteThreat): the archer buys back the weapon range instead of
-// tanking the melee. The step DIRECTION is the centroid away-vector
-// of the whole chaser train (the target plus every attacker in
-// range, see kiteTrainDirection), the lane prefers the open backward
-// lanes over the blocked corridors (the 45 degree fan candidates
-// behind the straight ray), and a neighborhood camp the lane would
-// wake deflects it onto the tangent ray of the camp's trigger
-// circle. A train that surrounds the character or a retreat with no
-// walkable lane resolves to the cornered hold: the archer stops
-// retreating and keeps shooting the bow at melee range - never a
-// weapon switch (the archetype rule of issue #21). The step
-// respects the movement window contract of the fight steps (the
-// forced attack re-requests wait out the walk), and the streak limit
-// (an unwinnable distance race falls back to the ordinary fight). A
-// fresh target resets the streak. Reports whether the tick issued
-// the step (the caller skips the rest of the fighting branch then -
-// the walk owns the movement).
-func (l *Loop) kiteFromTarget(now time.Time) bool {
+// kiteStepAdmitted guards the kite step of one tick: the bow and the
+// fight target must be there, the movement window must be free (a
+// running step or an impending-add walk owns it), the kite pacing
+// must have aged out (the step and the cornered hold re-probe
+// alike), the streak limit must not be spent, and a fresh target
+// resets the streak of the previous one (the distance race of one
+// mob is not the race of the next). Reports whether the step may run
+// now.
+func (l *Loop) kiteStepAdmitted(now time.Time) bool {
     if !l.bowEquipped() || l.target == 0 {
         return false
     }
@@ -269,6 +258,33 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     }
     if l.kiteStreak >= kiteStreakLimit {
         // The distance race is unwinnable: stop the shuffle, fight.
+        return false
+    }
+
+    return true
+}
+
+// kiteFromTarget steps a bow fighting character away from the
+// hostile that armed the step (the target or a train member, see
+// kiteThreat): the archer buys back the weapon range instead of
+// tanking the melee. The step DIRECTION is the centroid away-vector
+// of the whole chaser train (the target plus every attacker in
+// range, see kiteTrainDirection), the lane prefers the open backward
+// lanes over the blocked corridors (the 45 degree fan candidates
+// behind the straight ray), and a neighborhood camp the lane would
+// wake deflects it onto the tangent ray of the camp's trigger
+// circle. A train that surrounds the character or a retreat with no
+// walkable lane resolves to the cornered hold: the archer stops
+// retreating and keeps shooting the bow at melee range - never a
+// weapon switch (the archetype rule of issue #21). The step
+// respects the movement window contract of the fight steps (the
+// forced attack re-requests wait out the walk), and the streak limit
+// (an unwinnable distance race falls back to the ordinary fight). A
+// fresh target resets the streak. Reports whether the tick issued
+// the step (the caller skips the rest of the fighting branch then -
+// the walk owns the movement).
+func (l *Loop) kiteFromTarget(now time.Time) bool {
+    if !l.kiteStepAdmitted(now) {
         return false
     }
     selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()

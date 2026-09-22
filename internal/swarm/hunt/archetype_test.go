@@ -63,7 +63,7 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
     })
     loop.target = 7
     loop.engageAt = time.Now()
-    selfSwingsAt(bot, 7, 45200)
+    selfSwingsAt(bot, 45200)
     loop.lastHit = time.Now().Add(-time.Minute)
 
     loop.tick()
@@ -98,7 +98,7 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
     })
     loop2.target = 7
     loop2.engageAt = time.Now()
-    selfSwingsAt(bot2, 7, 45200)
+    selfSwingsAt(bot2, 45200)
     loop2.lastHit = time.Now().Add(-time.Minute)
     // The zone leash corners the retreat: the 400 unit step west
     // would leave the square.
