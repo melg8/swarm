@@ -6,7 +6,7 @@
 # verbatim to .github/workflows/ci.yml (a push from a workflow-scoped
 # token, or the GitHub web UI "Add file"), the content needs no
 # changes.
-
+# SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
 # SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
 #
 # SPDX-License-Identifier: MIT
@@ -20,6 +20,20 @@
 # session's budget. The tool versions come from
 # tools/install_dev_tools.sh - the same pins the dev hosts install,
 # one source of version truth.
+#
+# The time budget split (issue #40, the "no longer than 7 minutes
+# from change to final result" contract): the old single verify job
+# ran the race slice of four package trees sequentially and paid
+# 740 s for it alone (run 35706014800, the pathfind tree under -race
+# is the whale). The same gates now run as parallel jobs - the race
+# slice is sharded BY TEST NAME across a matrix (every test still
+# runs under the detector exactly once, the shards partition the
+# sorted `go test -list` output, so a new test lands in a shard
+# automatically) and the coverage job measures the suite once, both
+# the delta gate and the audit report reading the same run log.
+# Nothing was removed: build, vet, the full test suite, fmt, the
+# full lint, govulncheck, the logfmt scan, the whole race slice and
+# the coverage gate all still run - just on parallel runners.
 name: ci
 
 # The trigger split: pushes run the gate on main only, every
@@ -27,7 +41,8 @@ name: ci
 # event runs the same jobs on the PR merge ref). The old push on
 # every branch made each PR branch push start TWO identical runs
 # on the same source - one push, one pull_request - burning the
-# runner minutes twice per commit.
+# runner minutes twice per commit (observed on the PR #39 head:
+# runs 35695083356 and 35695086553, same sha, same verdicts).
 on:
   push:
     branches:
@@ -40,8 +55,43 @@ permissions:
 
 jobs:
   verify:
+    # The fast correctness gate: build, vet, the full test suite,
+    # the whitespace scan and the logfmt scan. No external tool
+    # installs - the formatter runs from the tree (`go run
+    # ./cmd/gofmt-spaces`, the exact command of the Taskfile
+    # fmt:check task), so the job needs nothing beyond the Go
+    # toolchain.
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -count=1
+
+      - name: Whitespace (spaces only, no tabs)
+        run: go run ./cmd/gofmt-spaces -l . .agents/skills
+
+      - name: Log conventions (the logfmt scan)
+        run: go test ./internal/logfmt/ -count=1 -run TestRepoLogConventions
+
+  lint:
+    # The uncapped lint gate and the vulnerability scan: the pinned
+    # developer tools (golangci-lint v2, govulncheck) install here,
+    # isolated from the fast verify lane so the toolchain install
+    # never delays the correctness feedback.
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
@@ -55,29 +105,114 @@ jobs:
       - name: Add the tool bin to PATH
         run: echo "$HOME/go/bin" >> "$GITHUB_PATH"
 
-      - name: Build
-        run: go build ./...
-
-      - name: Vet
-        run: go vet ./...
-
-      - name: Test
-        run: go test ./... -count=1
-
-      - name: Whitespace (spaces only, no tabs)
-        run: task fmt:check
-
       - name: Lint (the full uncapped gate - the tracked debt was paid 2026-09-19)
         run: golangci-lint run
-
-      - name: Race the networked packages (connection, pathfind, state, webserver)
-        run: CGO_ENABLED=1 go test ./internal/swarm/connection/... ./internal/swarm/pathfind/... ./internal/swarm/state/... ./internal/swarm/webserver/... -race -count=1 -timeout=15m
 
       - name: Vulnerability scan (govulncheck, reachable symbols only)
         run: govulncheck ./...
 
-      - name: Log conventions (the logfmt scan)
-        run: go test ./internal/logfmt/ -count=1 -run TestRepoLogConventions
+  race-net:
+    # The race slice, part one: the quick networked packages
+    # (connection, state, webserver) plus the navmesh data readers.
+    # The whole old race slice ran as one sequential step; the
+    # packages are unchanged, only the placement moved.
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Race the networked packages (connection, state, webserver, the navmesh readers)
+        run: CGO_ENABLED=1 go test ./internal/swarm/connection/... ./internal/swarm/state/... ./internal/swarm/webserver/... ./internal/swarm/pathfind/navmesh/... -race -count=1 -timeout=10m
+
+  race-pathfind:
+    # The race slice, part two: the pathfind search core, sharded
+    # by test name across SHARD_COUNT runners. The shard script
+    # sorts `go test -list` and round-robins the names, so the
+    # union of the shards is exactly the full test list - every
+    # test runs under the race detector exactly once, a new test
+    # joins a shard on its first push (nothing is skipped, the
+    # split only parallelizes the same run).
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Race the pathfind search core (shard ${{ matrix.shard }} of 3)
+        run: |
+          set -euo pipefail
+          SHARD_COUNT=3
+          SHARD_INDEX=${{ matrix.shard }}
+          mapfile -t TESTS < <(go test -list '.*' ./internal/swarm/pathfind/ 2>/dev/null | grep '^Test' | sort)
+          if [ "${#TESTS[@]}" -eq 0 ]; then
+            echo "Error the pathfind test list came back empty"
+            exit 1
+          fi
+          REGEX=""
+          COUNT=0
+          for ((i = SHARD_INDEX; i < ${#TESTS[@]}; i += SHARD_COUNT)); do
+            REGEX+="${TESTS[$i]}|"
+            COUNT=$((COUNT + 1))
+          done
+          REGEX="${REGEX%|}"
+          if [ -z "$REGEX" ]; then
+            echo "Shard $SHARD_INDEX carries no tests this round"
+            exit 0
+          fi
+          echo "Shard $SHARD_INDEX runs $COUNT of ${#TESTS[@]} tests"
+          CGO_ENABLED=1 go test ./internal/swarm/pathfind/ -race -count=1 -timeout=10m -run "^(${REGEX})$"
+
+  race-navbuild:
+    # The race slice, part three: the navmesh builder, sharded the
+    # same way (the builder is the second slowest tree under the
+    # detector - two shards keep it inside the time budget).
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Race the navmesh builder (shard ${{ matrix.shard }} of 3)
+        run: |
+          set -euo pipefail
+          SHARD_COUNT=3
+          SHARD_INDEX=${{ matrix.shard }}
+          mapfile -t TESTS < <(go test -list '.*' ./internal/swarm/pathfind/navbuild/ 2>/dev/null | grep '^Test' | sort)
+          if [ "${#TESTS[@]}" -eq 0 ]; then
+            echo "Error the navbuild test list came back empty"
+            exit 1
+          fi
+          REGEX=""
+          COUNT=0
+          for ((i = SHARD_INDEX; i < ${#TESTS[@]}; i += SHARD_COUNT)); do
+            REGEX+="${TESTS[$i]}|"
+            COUNT=$((COUNT + 1))
+          done
+          REGEX="${REGEX%|}"
+          if [ -z "$REGEX" ]; then
+            echo "Shard $SHARD_INDEX carries no tests this round"
+            exit 0
+          fi
+          echo "Shard $SHARD_INDEX runs $COUNT of ${#TESTS[@]} tests"
+          CGO_ENABLED=1 go test ./internal/swarm/pathfind/navbuild/ -race -count=1 -timeout=10m -run "^(${REGEX})$"
 
   acceptance-list:
     # The headless acceptance CLI answers `-acceptance list` without
@@ -102,15 +237,15 @@ jobs:
 
   coverage:
     # The coverage report of the issue #9 baseline: the suite runs
-    # with -cover, the per package summary compares against the
+    # with -cover ONCE, the per package summary compares against the
     # committed runs/coverage-latest.txt (the coverage_delta.sh gate
-    # fails the job on a per package drop beyond 2.0 pp) and the HTML
-    # profile uploads as an artifact for the drill down. The ranked
-    # worst-first table lands in the job log (the audit view of
-    # tools/coverage_report.sh), so the next tests to write name
-    # themselves on every push.
+    # fails the job on a per package drop beyond 2.0 pp) and the
+    # worst-first audit table reads the same run log (the -from-log
+    # mode of tools/coverage_report.sh - the old workflow paid the
+    # whole suite a second time for the ranking). The HTML profile
+    # uploads as an artifact for the drill down.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
@@ -119,10 +254,10 @@ jobs:
           go-version-file: go.mod
 
       - name: Coverage with the per package delta gate
-        run: bash tools/coverage_delta.sh
+        run: KEEP_RUN_LOG=1 bash tools/coverage_delta.sh
 
       - name: The worst-first audit report
-        run: bash tools/coverage_report.sh
+        run: bash tools/coverage_report.sh -from-log runs/.cover-run.log
 
       - name: Upload the HTML coverage profile
         uses: actions/upload-artifact@v4
