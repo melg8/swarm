@@ -231,6 +231,13 @@ type GameClient struct {
     statusAttrs    [statusAttrsCapacity]state.Attribute
     htmlMu         sync.Mutex
     lastHTML       fromgameserver.NpcHTMLMessage
+    // htmlGen counts the NpcHTMLMessage packets the connection
+    // received: the arrival generation of the dialog store above.
+    // The hunt-side dialog walker gates its page waits on it (a
+    // page left over from a previous conversation never satisfies
+    // the wait of a fresh talk), so it rides the same lock as
+    // lastHTML and the snapshot read stays consistent.
+    htmlGen uint64
     // claimsOwnStream gates the echo ticker of the client position
     // validation while the cursor key escape drives the session:
     // the claimed placements own the stream exactly the way the
