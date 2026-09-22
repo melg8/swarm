@@ -723,8 +723,22 @@ type Loop struct {
     // combatAvoidUntil marks the movement window the impending-add
     // step owns: a forced attack request interrupts a running walk
     // server-side, so the engage holds its re-requests until the step
-    // finished.
+    // finished. The kite step of the archer (see kite.go) shares the
+    // window: one movement owner per fight step.
     combatAvoidUntil time.Time
+    // kiteAt paces the archer kite steps (see kite.go): one retreat
+    // per period, the rest of the cycle stands and shoots.
+    kiteAt time.Time
+    // kiteFor is the fight the kite streak counts for (the hunt
+    // target): a fresh target resets the streak (kiteStreak). The
+    // armed threat may be a train member - the streak still counts
+    // the steps of the running fight.
+    kiteFor int32
+    // kiteStreak counts the consecutive kite steps of the kiteFor
+    // target: past kiteStreakLimit the distance race is unwinnable
+    // (a chaser at least as fast as the character) and the archer
+    // fights it out instead of shuffling forever.
+    kiteStreak int
     // zoneSegmentLogAt paces the walled direct segment diagnostic of the
     // zone return escalation (see guardZoneSegmentClick): the refusal
     // repeats every second while the character stands in the
@@ -2102,6 +2116,17 @@ func (l *Loop) engage() {
         // walk, no switch).
         if l.fightClearedRefusal() {
             l.engageAt = now
+        }
+        // The kite step of the archer (see kite.go): a hostile that
+        // closed inside the retreat radius - the bow fight target or
+        // a chasing train member - steps the character clear
+        // before the melee blows land - the forced attack re-request
+        // resumes the shooting once the step window ends. It outranks
+        // the impending-add scan: the closing hostile is the concrete
+        // damage, the add scan runs on the next tick when the threat
+        // keeps its distance.
+        if l.kiteFromTarget(now) {
+            return
         }
         // The impending add: an aggressive neighbor about to
         // join the fight gets a step of clearance BEFORE its

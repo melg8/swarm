@@ -1,0 +1,283 @@
+// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+//
+// SPDX-License-Identifier: MIT
+
+package hunt
+
+import (
+    "testing"
+    "time"
+
+    "github.com/melg8/swarm/internal/swarm/state"
+    "github.com/stretchr/testify/require"
+)
+
+// The kite behavior of the archer fight (issue #13): a bow user that
+// fights a mob steps clear when a hostile closes inside the retreat
+// radius (the fight target or a train member - the direction reads
+// the nearest chaser), the movement window pauses the forced attack
+// re-requests, and the shooting resumes once the step finished. The
+// tests pin the step geometry, the triggers that stay quiet, the
+// streak limit and the re-request resume.
+
+// kiteBowBot builds the standard kite scene: a healthy character at
+// 45000/50000 with a training bow worn (item 13, WeaponType BOW),
+// the loop in the running fight against the given mob.
+func kiteBowBot(t *testing.T, mobX int32) (*state.Bot, *fakeGame, *Loop) {
+    t.Helper()
+    bot := newTestBot()
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: true, Change: 1},
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: mobX, Y: 50000, Name: "Keltir",
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.target = 7
+    loop.engageAt = time.Now()
+    // The fight runs: the character swings at the mob (the running
+    // fight view of SelfFighting).
+    selfSwingsAt(bot, 7, mobX)
+    loop.lastHit = time.Now().Add(-time.Minute)
+
+    return bot, game, loop
+}
+
+// TestKiteStepsAwayFromTheClosedTarget pins the core behavior: a bow
+// target inside the retreat radius (250) makes the fighting character
+// walk straight away from it - the retreat step of kiteStep (400)
+// units on the self-target axis.
+func TestKiteStepsAwayFromTheClosedTarget(t *testing.T) {
+    // The mob closed to 200 units: inside the kite trigger, outside
+    // the melee range.
+    bot, game, loop := kiteBowBot(t, 45200)
+    loop.tick()
+    require.Len(t, game.walks, 1,
+        "a closed bow target must trigger the kite step")
+    step := game.walks[0]
+    _, selfY, selfZ, ok := bot.SelfPosition()
+    require.True(t, ok)
+    require.Equal(t, selfZ, step[2],
+        "the step keeps the character's deck")
+    // The step direction: straight away from the target on the x
+    // axis - 400 units from the self position.
+    require.Equal(t, int32(44600), step[0])
+    require.Equal(t, selfY, step[1])
+    require.Empty(t, game.forces,
+        "the kite tick must not re-request the attack")
+}
+
+// TestKiteStaysQuietAtWeaponRange pins the quiet case: a bow target
+// beyond the retreat radius is the good standing fight - no step, no
+// re-request (the chase stall watchdog stays quiet inside the weapon
+// range too, see the bow radii tests of user_bow_test.go).
+func TestKiteStaysQuietAtWeaponRange(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45500)
+    loop.tick()
+    require.Empty(t, game.walks,
+        "a standing bow fight inside the weapon range must not kite")
+    require.Empty(t, game.forces,
+        "a running bow fight must not re-request the attack")
+}
+
+// TestKiteIsBowOnly pins the weapon gate: a melee fighter with the
+// same closed target stays in the fight - the kite is archer
+// behavior. The melee answer of a target beyond the swing distance
+// (200 units against the 150 unit melee stall radius) is the ordinary
+// chase-stall approach walk TOWARD the target, never a retreat.
+func TestKiteIsBowOnly(t *testing.T) {
+    bot := newTestBot()
+    // No bow on the paperdoll: the bare fists or a melee weapon.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 45200, Y: 50000, Name: "Keltir",
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.target = 7
+    loop.engageAt = time.Now()
+    selfSwingsAt(bot, 7, 45200)
+    loop.lastHit = time.Now().Add(-time.Minute)
+
+    loop.tick()
+    selfX := int32(45000)
+    for _, walk := range game.walks {
+        require.Greater(t, walk[0], selfX,
+            "a melee fight may only close on its target, never retreat")
+    }
+}
+
+// TestKiteWindowHoldsTheReRequests pins the movement window contract:
+// while the kite step owns the tick (the walk runs), the engage holds
+// its forced attack re-requests even after the fighting stance lapsed
+// - a request would interrupt the running retreat walk server-side.
+func TestKiteWindowHoldsTheReRequests(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45200)
+    loop.tick()
+    require.Len(t, game.walks, 1)
+
+    // The fighting stance lapsed while the character walks (no fresh
+    // swings), but the step window still owns the movement: no
+    // forced attack may interrupt the retreat.
+    loop.tick()
+    require.Empty(t, game.forces,
+        "the kite window must hold the attack re-requests")
+    require.Len(t, game.walks, 1,
+        "the pacing period bounds the steps to one per window")
+}
+
+// TestKiteResumesTheAttackAfterTheStep pins the cycle end: once the
+// step window closed and the fighting stance lapsed (the real
+// timeline of a walk that outlives the stance freshness), the engage
+// re-requests the forced attack - the archer shoots again from the
+// opened distance (the fake keeps the character at its spot, the 200
+// unit target sits inside the bow engage radius of 450). The
+// mid-window hold itself is the shared movement gate the
+// impending-add step owns and TestFightStepHoldsTheAttackRequests
+// pins for both callers.
+func TestKiteResumesTheAttackAfterTheStep(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45200)
+    loop.tick()
+    require.Len(t, game.walks, 1)
+
+    // The walk outlives the fighting stance freshness (3s from the
+    // last swing): sleep past it so the tick lands in the honest
+    // post-walk state - stance lapsed, step window long closed.
+    time.Sleep(3200 * time.Millisecond)
+    loop.lastHit = time.Now().Add(-2 * time.Second)
+    loop.tick()
+    require.Equal(t, []int32{7}, game.forces,
+        "the kite must resume the attack after the step window")
+}
+
+// TestKiteRespectsTheLeash pins the cornered case of the issue: a
+// retreat that would leave the hunting square is skipped - the
+// leash outranks the kite, the archer stands and shoots instead of
+// dragging the fight out of its ground.
+func TestKiteRespectsTheLeash(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45200)
+    // The hunting square ends 200 units west of the character: the
+    // 400 unit retreat to the west would leave it.
+    loop.SetHuntingZone(45000, 50000, 200)
+    loop.tick()
+    require.Empty(t, game.walks,
+        "a kite step that would leave the hunting square is skipped")
+}
+
+// TestKiteStreakLimitStopsTheShuffle pins the degenerate case bound:
+// a chaser at least as fast as the character never falls behind, and
+// the endless kite shuffle would starve the fight of every swing.
+// Past the streak limit the archer stops stepping and fights it out.
+func TestKiteStreakLimitStopsTheShuffle(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45200)
+    loop.kiteFor = 7
+    loop.kiteStreak = kiteStreakLimit
+    loop.tick()
+    require.Empty(t, game.walks,
+        "a target past the streak limit must be fought, not kited")
+}
+
+// TestKiteStreakResetsForAFreshTarget pins the streak bookkeeping:
+// the limit counts the steps of ONE target - a fresh target (the
+// previous one died, the pick moved on) starts its own count.
+func TestKiteStreakResetsForAFreshTarget(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45200)
+    // The streak of the previous target exhausted the budget...
+    loop.kiteFor = 5
+    loop.kiteStreak = kiteStreakLimit
+    // ...but the current target is a fresh one.
+    loop.tick()
+    require.Len(t, game.walks, 1,
+        "a fresh target must reset the kite streak")
+}
+
+// mobChasesSelf makes the npc of objectID chase the character from
+// x: the attack broadcast the server sends for the mob's swings
+// (AttackerID the mob, TargetIDs the character) - the state reads the
+// npc as a self attacker (TargetID self, the NearestAttacker scan).
+func mobChasesSelf(bot *state.Bot, objectID int32, x, z int32) {
+    bot.ApplyAttack(state.Attack{
+        AttackerID:  objectID,
+        X:           x,
+        Y:           50000,
+        Z:           z,
+        TargetX:     45000,
+        TargetY:     50000,
+        TargetZ:     -3500,
+        TargetIDs:   [state.AttackTargets]int32{100},
+        TargetCount: 1,
+    })
+}
+
+// TestKiteTrainMemberArmsTheRetreat pins the train-member trigger of
+// the issue: a mob that chases the character (it targets self) arms
+// the retreat even while the fight target stays at range - the step
+// goes away from the CLOSER threat (the chasing member), not the
+// target the fight runs on.
+func TestKiteTrainMemberArmsTheRetreat(t *testing.T) {
+    // The fight target holds 440 units out: inside the bow engage
+    // radius (450), outside the retreat radius (250) - the target
+    // alone is the quiet standing fight.
+    bot, game, loop := kiteBowBot(t, 45440)
+    // A second mob aggros and closes to 200 units: a chase the
+    // character did not start (the server target of the mob is the
+    // character).
+    spawnMobAt(bot, 8, 45200)
+    mobChasesSelf(bot, 8, 45200, -3500)
+
+    loop.tick()
+    require.Len(t, game.walks, 1,
+        "a chasing train member inside the retreat radius must arm the kite")
+    step := game.walks[0]
+    // The step direction: straight away from the MEMBER on the x
+    // axis (self 45000, member 45200 -> the step lands west of the
+    // self), not away from the fight target at 45440.
+    require.Equal(t, int32(44600), step[0])
+    require.Empty(t, game.forces,
+        "the kite tick must not re-request the attack")
+}
+
+// TestKiteSkipsADeckGapTrainMember pins the deck guard of the train
+// member trigger: a mob on a deck the walk cannot reach (the z gap
+// past deckReachableZ) is no melee threat - it must not arm the
+// kite, the standing fight on the ranged target goes on.
+func TestKiteSkipsADeckGapTrainMember(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45440)
+    // The chasing member sits 500 units BELOW the character's deck
+    // (-3000 against -3500): past the deckReachableZ (400) gap, its
+    // swings cannot reach.
+    spawnMobAt(bot, 8, 45200)
+    mobChasesSelf(bot, 8, 45200, -3000)
+
+    loop.tick()
+    require.Empty(t, game.walks,
+        "a deck gap member must not arm the kite step")
+    require.Empty(t, game.forces,
+        "the standing bow fight keeps its re-request quiet")
+}
+
+// TestKiteDirectionReadsTheNearestChaser pins the direction choice of
+// a multi-chaser fight where BOTH hostiles sit inside the retreat
+// radius: the fight target closed at 240 units east, a train member
+// chases closer, at 180 west - the step reads the NEAREST hostile,
+// so the retreat goes away from the member (east) even though a step
+// away from the target alone would have gone west.
+func TestKiteDirectionReadsTheNearestChaser(t *testing.T) {
+    // The fight target closes at 240 units east: inside the radius,
+    // a step away from it alone would land west (x 44600).
+    bot, game, loop := kiteBowBot(t, 45240)
+    // The train member chases at 180 units west: the nearest
+    // hostile - a step away from it lands east (x 45400).
+    spawnMobAt(bot, 8, 44820)
+    mobChasesSelf(bot, 8, 44820, -3500)
+
+    loop.tick()
+    require.Len(t, game.walks, 1,
+        "the nearest chaser inside the radius must arm the kite")
+    step := game.walks[0]
+    require.Equal(t, int32(45400), step[0],
+        "the step direction reads away from the nearest chaser, "+
+            "not away from the fight target")
+}
