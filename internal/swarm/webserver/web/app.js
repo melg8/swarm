@@ -109,8 +109,9 @@ function initTheme() {
 }
 
 // Fetch the bot list and keep the sidebar in sync. The same poll
-// carries the fleet kill ring of the map: the dead mob faces of
-// every bot live in the map layer, so they survive the bot switches.
+// carries the fleet kill ring of the map: the persistent kill marks
+// of every bot live in the map layer, so they survive the bot
+// switches (issue #6).
 async function refreshBots() {
   try {
     const response = await fetch("/api/bots");
@@ -128,12 +129,13 @@ async function refreshBots() {
   }
 }
 
-// Fetch the fleet wide kill marks of /api/fleet/kills: every recent
-// kill of every bot of the process (the hunt loops publish their kill
-// rings to the bot state, the registry merges them). The map draws
-// them as the dead mob faces of the whole deployment - switching the
-// observed bot never loses them again. An older server without the
-// endpoint answers 404 and the layer simply stays empty.
+// Fetch the fleet wide kill marks of /api/fleet/kills: every kill of
+// every bot of the process (the hunt loops publish their persistent
+// kill logs to the bot state, the registry merges them). The map
+// draws them as the session death statistics of the whole deployment
+// - switching the observed bot never loses them again. An older
+// server without the endpoint answers 404 and the layer simply stays
+// empty.
 async function refreshFleetKills() {
   try {
     const response = await fetch("/api/fleet/kills");

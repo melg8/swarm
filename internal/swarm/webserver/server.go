@@ -49,9 +49,11 @@ const (
     defaultPathfindScale = 0.06
 
     // fleetKillMarkLimit bounds the fleet kill ring served by
-    // /api/fleet/kills: the cross layer of the map fades the marks
-    // after ten minutes, so an older mark would only waste wire.
-    fleetKillMarkLimit = 400
+    // /api/fleet/kills: the map draws the marks as the session death
+    // statistics (nothing expires by time, issue #6), so the bound
+    // is the count cap of the merged per bot logs - the oldest marks
+    // drop only when the fleet outgrows it.
+    fleetKillMarkLimit = 2000
 )
 
 // Poll intervals of the event stream.

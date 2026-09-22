@@ -410,10 +410,9 @@ func TestSetHuntingCellsPublishesMeshAtInstall(t *testing.T) {
 func TestCellViewPublishesKillMarks(t *testing.T) {
     loop, _, hunter := pickedCellLoop(t)
     now := time.Now()
-    hunter.kills = append(hunter.kills, killRecord{
-        cellID: "test-home", x: 46400, y: 41600, at: now,
-        respawnAt: now.Add(17 * time.Second),
-        name:      "Keltir", level: 4,
+    hunter.mapKills = append(hunter.mapKills, state.KillMarkView{
+        X: 46400, Y: 41600, AtMs: now.UnixMilli(),
+        Name: "Keltir", Level: 4,
     })
     hunter.viewAt = time.Time{}
     hunter.publishView(loop, now)
@@ -423,6 +422,69 @@ func TestCellViewPublishesKillMarks(t *testing.T) {
     require.Equal(t, "Keltir", marks[0].Name,
         "the kill mark carries the victim for the tooltip")
     require.Equal(t, int32(4), marks[0].Level)
+}
+
+// The map kill log outlives the respawn predictions: a kill older
+// than the prediction TTL vanishes from the overlay while the map
+// mark stays (issue #6 - the death statistics are a session long
+// collection, not a five minute melt).
+func TestCellMapKillLogOutlivesPredictionTTL(t *testing.T) {
+    loop, _, hunter := pickedCellLoop(t)
+    now := time.Now()
+    hunter.kills = append(hunter.kills, killRecord{
+        cellID: "test-home", x: 46400, y: 41600,
+        at:        now.Add(-2 * cellKillTTL),
+        respawnAt: now.Add(-time.Minute),
+        name:      "Keltir", level: 4,
+    })
+    hunter.mapKills = append(hunter.mapKills, state.KillMarkView{
+        X: 46400, Y: 41600, AtMs: now.Add(-2 * cellKillTTL).UnixMilli(),
+        Name: "Keltir", Level: 4,
+    })
+    hunter.viewAt = time.Time{}
+    hunter.publishView(loop, now)
+    require.Empty(t, hunter.kills,
+        "the pruneKills pass drops the expired prediction")
+    marks := loop.tracker.KillMarks()
+    require.Len(t, marks, 1,
+        "the expired prediction must not take the map mark away")
+    require.Equal(t, "Keltir", marks[0].Name)
+}
+
+// The map kill log is count capped: the oldest marks drop when the
+// hunt outgrows the cap, the newest ones stay (issue #6).
+func TestCellMapKillLogCapDropsOldest(t *testing.T) {
+    loop, _, hunter := pickedCellLoop(t)
+    now := time.Now()
+    for i := 0; i <= cellMapKillCap; i++ {
+        hunter.recordMapKill(state.KillMarkView{
+            X: int32(46000 + i), Y: 41000, AtMs: now.UnixMilli(),
+        })
+    }
+    hunter.viewAt = time.Time{}
+    hunter.publishView(loop, now)
+    marks := loop.tracker.KillMarks()
+    require.Len(t, marks, cellMapKillCap)
+    require.Equal(t, int32(46000+1), marks[0].X,
+        "the oldest mark dropped, the second one leads the ring")
+}
+
+// The marks survive the unpicked state: a hunter that lost its cell
+// keeps publishing the death log instead of clearing the map layer
+// (issue #6 - the statistics outlive the hunt stops).
+func TestCellViewPublishesKillMarksWithoutPick(t *testing.T) {
+    loop, _, hunter := pickedCellLoop(t)
+    now := time.Now()
+    hunter.mapKills = append(hunter.mapKills, state.KillMarkView{
+        X: 46400, Y: 41600, AtMs: now.UnixMilli(), Name: "Keltir",
+    })
+    hunter.picked = -1
+    hunter.viewAt = time.Time{}
+    hunter.publishView(loop, now)
+    marks := loop.tracker.KillMarks()
+    require.Len(t, marks, 1,
+        "the unpicked hunter must not clear the persistent kill log")
+    require.Equal(t, "Keltir", marks[0].Name)
 }
 
 func TestCellMobRespawnLookup(t *testing.T) {

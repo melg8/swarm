@@ -659,8 +659,9 @@ function runScenarioSpotHover(mapFile) {
 // Scenario 5: the fleet kill marks. The marks live in the map layer
 // independent of the observed bot's snapshot and draw as the dead mob
 // face (the gray corpse circle body with the X eyes in the dark
-// slate - the same icon the corpse marker carries) that melts away
-// with its age - never as a font glyph.
+// slate, issue #6) that NEVER fades: the marks are the session death
+// statistics, every age reads the same constant style - never a font
+// glyph, never a melt.
 function runScenarioKillMarks(mapFile) {
     const { MapView, record, elements, fireCanvas } = loadMapJs(mapFile);
     MapView.init();
@@ -675,7 +676,7 @@ function runScenarioKillMarks(mapFile) {
         { botId: "a", x: 45100, y: 50100, atMs: 0,
             name: "Keltir", level: 4 },
         { botId: "b", x: 45300, y: 50300, atMs: -240000 },
-        { botId: "a", x: 47000, y: 52000, atMs: -400000 }
+        { botId: "a", x: 47000, y: 52000, atMs: -3 * 3600000 }
     ]);
 
     // The body pass lands as a fill (the corpse circle in the dead
@@ -706,11 +707,11 @@ function runScenarioKillMarks(mapFile) {
         freshBody.length > 0 && freshEyes.length > 0,
         "body fills " + freshBody.length + ", eye strokes "
             + freshEyes.length);
-    check(results, "aged kill draws a smaller and fainter body",
+    check(results, "aged kill draws the same constant style",
         oldBody.length > 0 && freshBody.length > 0
         && bodyRadiusOf(oldBody[0], old)
-            < bodyRadiusOf(freshBody[0], fresh)
-        && oldBody[0].alpha < freshBody[0].alpha,
+            === bodyRadiusOf(freshBody[0], fresh)
+        && oldBody[0].alpha === freshBody[0].alpha,
         "aged body radius "
             + (oldBody.length > 0
                 ? bodyRadiusOf(oldBody[0], old).toFixed(2) : "-")
@@ -721,9 +722,10 @@ function runScenarioKillMarks(mapFile) {
         !record.texts.some(
             (t) => (t.text || "").indexOf("\u2620") >= 0),
         "the skull glyph was fillTexted");
-    check(results, "marks past the TTL never draw",
-        bodyFills(stale).length === 0 && eyeStrokes(stale).length === 0,
-        "a stale mark drew at " + JSON.stringify(stale));
+    check(results, "an hours old mark still draws",
+        bodyFills(stale).length > 0 && eyeStrokes(stale).length > 0,
+        "a session long mark dropped its draw at "
+            + JSON.stringify(stale));
 
     // The hover pick resolves the fresh mark with its victim data
     // (the empty map ground 60px away resolves nothing).
