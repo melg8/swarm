@@ -81,7 +81,7 @@ mode they select.
 | `proxyGame` | `-proxy-game` | comma separated proxy game listen addresses |
 | `proxyLog` | `-proxy-log` | the proxy connection log file |
 | `sessionDir` | `-session-dir` | session journal directory, empty disables the journal |
-| `bots` | `-bots` | the fleet composition: an array of `{type, count}` entries |
+| `bots` | `-bots` | the fleet composition: an array of `{type, count, kite}` entries (the optional `kite` section tunes the archer kite fight, see below) |
 
 ## The composition
 
@@ -101,6 +101,52 @@ The implemented bot types today:
 | --- | --- |
 | `fighter` | the elven melee fighter of the current hunt loop |
 | `archer` | the ranged archetype: the ranged weapon preference with kiting and bow shots even at melee range. The bow gear plan is live (the weapon milestone buys the bow, the quiver restocks behind it, the arrows arm onto the left hand); the kiting lands in its own slices (#18-#20 of #13) |
+
+The optional `kite` section of an archer entry carries the per-spec
+overrides of the kite fight (owner issue #29): the standing-archer
+baseline (the kite disabled) and the tuned profile switch by editing
+the file instead of a code edit and a rebuild between the measurement
+runs. The section is an archer knob - a fighter spec carrying it
+refuses the launch - and the pointer fields distinguish "not set in
+the file" (the shipped tuning applies) from an explicit value:
+
+```json
+"bots": [
+    { "type": "archer", "count": 3, "kite": {
+        "enabled": false
+    }},
+    { "type": "archer", "count": 3, "kite": {
+        "enabled": true,
+        "retreatRadius": 300,
+        "step": 450,
+        "stepPeriod": "4s",
+        "reengageDelay": "500ms"
+    }}
+]
+```
+
+The first spec runs the **standing-archer baseline** (the bow fight
+with the kite layer off - the mob closes and the archer trades from
+melee reach), the second runs the **tuned profile**. The fields:
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `enabled` | `true` | the kite layer gate whole: `false` turns every bow fight into the standing fight the baseline measures |
+| `retreatRadius` | 250 | the trigger distance of the kite step and the inner edge of the optimal band |
+| `step` | 400 | the retreat length away from the closed threat |
+| `stepPeriod` | `"3s"` | the pacing of the steps and the cornered hold re-probes (a Go duration string) |
+| `reengageDelay` | `"0s"` | the hold between the step walk ending and the first forced attack re-request (a Go duration string) |
+
+Every omitted field keeps the shipped default, the shipped numbers
+are the constants block of `internal/swarm/hunt/kite.go` (the
+"knobs as pinned" table of issue #29), and a broken line (a
+non-positive distance, an unparsable duration, the section on a
+fighter) refuses the launch with the spec index and the field named -
+the same fail-loudly contract the rest of the file follows. The
+remaining kite constants (the streak limit, the train scan band, the
+lane fan) stay package constants: the tuning round names these four
+knobs, the rest ride the shipped values until the measured numbers
+ask otherwise.
 
 A config naming an unimplemented type fails validation with the list
 of implemented types in the error, so a config written for a newer

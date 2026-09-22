@@ -177,6 +177,75 @@ const (
     kiteHoldLogPeriod = 15 * time.Second
 )
 
+// KiteParams is the tunable block of the kite fight (owner issue
+// #29): the four named knobs the live tuning round adjusts from the
+// measured numbers, plus the enable gate. The launch config carries
+// one per bot spec (the "kite" section of launch_config.go), so the
+// standing-archer baseline (a bow bot with the kite disabled) and the
+// tuned profile switch by editing the file instead of a code edit and
+// a rebuild between the measurement runs. Every remaining kite
+// constant (the streak limit, the train scan, the lane fan) stays a
+// package constant on purpose: the tuning round names these four,
+// the rest ride the shipped values until the numbers ask otherwise.
+type KiteParams struct {
+    // Enabled gates the kite layer whole: false turns every bow fight
+    // into the standing archer the baseline measures (the mob closes,
+    // the archer stands and shoots - the melee fallback rate of the
+    // baseline comes from exactly this).
+    Enabled bool
+    // RetreatRadius is the trigger distance of the kite step and the
+    // inner edge of the optimal band (kiteRetreatRadius is the
+    // shipped value).
+    RetreatRadius float64
+    // Step is the retreat length away from the closed threat
+    // (kiteStep is the shipped value).
+    Step float64
+    // StepPeriod paces the steps and the cornered hold re-probes
+    // (kiteStepPeriod is the shipped value).
+    StepPeriod time.Duration
+    // ReengageDelay is the hold between the step walk ending and the
+    // first forced attack re-request (kiteReengageDelay is the
+    // shipped value).
+    ReengageDelay time.Duration
+}
+
+// DefaultKiteParams returns the shipped tuning: the constants block
+// above read into the params shape. A loop starts with these - the
+// config file overrides per bot spec, everything else keeps the
+// behavior the acceptance scenario (#28) pins.
+func DefaultKiteParams() KiteParams {
+    return KiteParams{
+        Enabled:       true,
+        RetreatRadius: kiteRetreatRadius,
+        Step:          kiteStep,
+        StepPeriod:    kiteStepPeriod,
+        ReengageDelay: kiteReengageDelay,
+    }
+}
+
+// SetKiteParams overrides the tunable block of the loop. A
+// non-positive number or period falls back to the shipped value (a
+// broken config line degrades to the shipped tuning, never to a
+// degenerate fight), the re-engage delay keeps zero - it is a
+// legitimate value (the window end IS the re-engage) - so only the
+// negative side normalizes. The kite state carries over: the override
+// between fights never resets the pacing or the streak.
+func (l *Loop) SetKiteParams(p KiteParams) {
+    if p.RetreatRadius <= 0 {
+        p.RetreatRadius = kiteRetreatRadius
+    }
+    if p.Step <= 0 {
+        p.Step = kiteStep
+    }
+    if p.StepPeriod <= 0 {
+        p.StepPeriod = kiteStepPeriod
+    }
+    if p.ReengageDelay < 0 {
+        p.ReengageDelay = kiteReengageDelay
+    }
+    l.kite = p
+}
+
 // The optimal band of the kite fight is the distance range where the
 // standing archer is the good case: the inner edge is
 // kiteRetreatRadius (a hostile below it arms the next step), the
@@ -231,7 +300,10 @@ func (l *Loop) kiteThreat(
 // mob is not the race of the next). Reports whether the step may run
 // now.
 func (l *Loop) kiteStepAdmitted(now time.Time) bool {
-    if !l.bowEquipped() || l.target == 0 {
+    // The params gate comes first: a kite-disabled profile (the
+    // standing-archer baseline of issue #29) never arms the layer,
+    // whatever the bow and the fight report.
+    if !l.kite.Enabled || !l.bowEquipped() || l.target == 0 {
         return false
     }
     // A step window that is still running (this step or an
@@ -240,7 +312,7 @@ func (l *Loop) kiteStepAdmitted(now time.Time) bool {
     if now.Before(l.combatAvoidUntil) {
         return false
     }
-    if !l.kiteAt.IsZero() && now.Sub(l.kiteAt) < kiteStepPeriod {
+    if !l.kiteAt.IsZero() && now.Sub(l.kiteAt) < l.kite.StepPeriod {
         return false
     }
     // The cornered hold owns its own pacing: a retreat with no
@@ -248,7 +320,7 @@ func (l *Loop) kiteStepAdmitted(now time.Time) bool {
     // the failed probe attempt itself must never become the idle
     // stutter the issue forbids. A fresh target re-probes at once.
     if !l.kiteHeldAt.IsZero() && l.kiteHeldFor == l.target &&
-        now.Sub(l.kiteHeldAt) < kiteStepPeriod {
+        now.Sub(l.kiteHeldAt) < l.kite.StepPeriod {
         return false
     }
     if l.kiteFor != l.target {
@@ -292,7 +364,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
         return false
     }
     _, _, threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
-    if !ok || dist >= kiteRetreatRadius || dist < 1 {
+    if !ok || dist >= l.kite.RetreatRadius || dist < 1 {
         return false
     }
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
@@ -325,7 +397,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     // (see the combatAvoidUntil gate of the engage branch). The
     // re-engage delay rides the same timestamp - the knob of the
     // tuning round.
-    l.combatAvoidUntil = now.Add(kiteStepWindow + kiteReengageDelay)
+    l.combatAvoidUntil = now.Add(kiteStepWindow + l.kite.ReengageDelay)
     l.logger.Printf("Hunt: hostile %d closed to %d units of the "+
         "fight on %d, kiting clear (step %d of %d)",
         threatID, int(math.Round(dist)), l.target,
@@ -411,8 +483,8 @@ func (l *Loop) kiteRetreatLane(
     selfX, selfY, selfZ int32, dirX, dirY float64,
 ) (int32, int32, bool) {
     // The straight away-ray is the lane of record.
-    endX := selfX + int32(math.Round(dirX*kiteStep))
-    endY := selfY + int32(math.Round(dirY*kiteStep))
+    endX := selfX + int32(math.Round(dirX*l.kite.Step))
+    endY := selfY + int32(math.Round(dirY*l.kite.Step))
     if laneX, laneY, ok := l.kiteLaneResolve(
         selfX, selfY, selfZ, endX, endY, dirX, dirY); ok {
         return laneX, laneY, true
@@ -423,8 +495,8 @@ func (l *Loop) kiteRetreatLane(
         angle := kiteFanStep * float64(step)
         for _, sign := range [2]float64{1, -1} {
             candX, candY := rotatePlanar(dirX, dirY, sign*angle)
-            endX = selfX + int32(math.Round(candX*kiteStep))
-            endY = selfY + int32(math.Round(candY*kiteStep))
+            endX = selfX + int32(math.Round(candX*l.kite.Step))
+            endY = selfY + int32(math.Round(candY*l.kite.Step))
             if laneX, laneY, ok := l.kiteLaneResolve(
                 selfX, selfY, selfZ, endX, endY, dirX, dirY); ok {
                 return laneX, laneY, true
@@ -563,8 +635,8 @@ func (l *Loop) kiteDeflectFromCamps(
         segmentX/segmentLen, segmentY/segmentLen,
         threat.AggroRange+avoidClearance)
 
-    return selfX + int32(math.Round(defX*kiteStep)),
-        selfY + int32(math.Round(defY*kiteStep)), true
+    return selfX + int32(math.Round(defX*l.kite.Step)),
+        selfY + int32(math.Round(defY*l.kite.Step)), true
 }
 
 // kiteHoldGround arms the cornered hold of the kite: the archer
