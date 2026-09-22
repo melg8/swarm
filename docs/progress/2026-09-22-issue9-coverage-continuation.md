@@ -1,4 +1,4 @@
-# The coverage reporting continuation - the merge refresh, the top-up and the journal rounds (status: in review)
+# The coverage reporting continuation - four rounds: the merge refresh, the top-up, the journal and the smoke pass (status: in review)
 
 Started 2026-09-22, branch feature/coverage-reporting, issue #9.
 
@@ -139,3 +139,14 @@ the cmd/swarm wiring, the probe tool smoke pass.
 The smoke pass is on the branch; next: push, CI, the issue comment
 and the board move. The remaining #9 candidates stay the live-stack
 seam design round and the cmd/swarm wiring.
+
+### 2026-09-22 10:35 UTC - round four closes
+- c674d23: all 11 checks green, PR #24 mergeable clean.
+- The issue comment carries the round report; the claims are clean.
+
+## Status (round four, final)
+
+In review: PR #24 head c674d23. Four rounds on this issue today:
+the merge repair, the drift top-up (npcdata 100, connection past
+its pre-drift level), the journal round (connection 86.2, no 0%
+functions) and the probe tool smoke pass (eight tools off 0%).
