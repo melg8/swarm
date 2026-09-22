@@ -485,6 +485,67 @@ are references, not copies):
 | `kiteFanStep` / `kiteFanSteps` | pi/4 / 2 | the lane fan - the 45 and 90 degree candidates each side |
 | `kiteHalfPlaneSlack` | -0.05 | the away half-plane guard (no fold-back into the train) |
 | `kiteHoldLogPeriod` | 15s | the cornered hold diagnostic pacing |
+| `kiteShotWindow` | 700ms | the freshness window of the own-shot broadcast that arms the shot-paced retreat |
+
+### The shot-paced retreat (issue #60)
+
+The proximity trigger of the ladder above arms the step only after
+the hostile crossed the 250 unit radius - a fast chaser spends the
+shot cycle closing unopposed and reaches the swings between the
+steps (the 2026-09-22 dump of issue #60: the mob glued at 12-57
+units, one 10 damage blow per second through every kite step). The
+shot-paced layer flips the trigger: the character's own Attack
+broadcast arms the same retreat the moment the shot released, so the
+bow cooldown is spent walking and the cycle becomes shoot, run the
+reload, gain distance, shoot again - the melee uptime drops to the
+stand moments and a chaser slower than the character never reaches
+the swings.
+
+The server facts the layer rides (verified by the Mobius C1 source
+read, `Creature.doAttack` / `doAttackHitByBow` / `onHitTimer`, and
+the shot cadence of the issue #60 dump):
+
+- The Attack packet is the shot COMMIT, not the hit: the hit roll,
+  the arrow consumption and the HitTask schedule all happen before
+  the packet broadcast, and the damage task carries no attacker
+  movement check - moving after the broadcast never cancels the
+  shot.
+- The bow disable window is `timeAtk + reuse`
+  (`calculateTimeBetweenAttacks` 500000/pAtkSpd plus
+  `calculateReuseTime` reuseDelay*333/pAtkSpd - roughly three
+  seconds for the Short Bow), mirrored to the client by the
+  SetupGauge(RED) packet and the "Getting ready to shoot arrows"
+  message. The 2s step window fits inside it.
+- A forced attack request while moving stops the walk and attacks
+  (`stopMove` before the launch) - the re-request after the step
+  window owns the re-engage, the same contract the proximity path
+  uses.
+
+The layer (kiteFromShot) shares the whole step machinery with the
+proximity path - the train direction, the camp deflection, the
+leash, the wall and the water gates, the cornered and encircled
+holds, the movement window - and differs in three rules:
+
+- The trigger: the shot broadcast inside kiteShotWindow (700ms - the
+  loop ticks four times a second, the broadcast stays catchable for
+  at least two ticks) while the nearest hostile holds the pursue
+  band (inside the bow engage radius, 450 - a mob that keeps
+  chasing). Beyond the band the standing fight and the stall
+  watchdog's re-approach own the scene.
+- The pacing: the shot cycle paces the steps (the 3s step period
+  would collide with the ~3s bow cooldown); the step re-arms on the
+  next broadcast, the movement window guards the double trigger.
+- The streak exemption: the rhythm does NOT count into the
+  kiteStreak limit. The bound exists because an endless step race
+  starves the fight of every swing - the rhythm keeps swinging once
+  per cooldown, so the shuffle bound does not apply to the fight
+  itself. The proximity path keeps its own counting (the
+  composition test pins the bookkeeping through the chase-fresh
+  scene).
+
+The telemetry marker of the layer: the step line reads "shot
+released on <target>, hostile <id> holds <dist> units, kiting the
+reload".
 
 The telemetry anchors: the step line ("kiting clear (step") and the
 hold line ("holding ground and shooting") are the two markers the

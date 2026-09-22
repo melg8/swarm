@@ -2146,6 +2146,16 @@ func (l *Loop) engage() {
         if l.fightClearedRefusal() {
             l.engageAt = now
         }
+        // The shot-paced kite of the archer (see kite.go, issue #60):
+        // the character's own Attack broadcast is the server commit of
+        // the bow shot, so the retreat starts the moment the shot
+        // released - the bow cooldown is spent walking instead of
+        // standing, and the chasing mob eats arrows instead of
+        // swings. It outranks the proximity kite: the fresh shot is
+        // the earliest possible trigger of the same step.
+        if l.kiteFromShot(now) {
+            return
+        }
         // The kite step of the archer (see kite.go): a hostile that
         // closed inside the retreat radius - the bow fight target or
         // a chasing train member - steps the character clear

@@ -170,9 +170,12 @@ func TestKiteRespectsTheLeash(t *testing.T) {
 // TestKiteStreakLimitStopsTheShuffle pins the degenerate case bound:
 // a chaser at least as fast as the character never falls behind, and
 // the endless kite shuffle would starve the fight of every swing.
-// Past the streak limit the archer stops stepping and fights it out.
+// Past the streak limit the proximity path stops stepping and fights
+// it out. The fight freshness rides the chase step (no shot
+// committed): the shot-paced rhythm is the one layer the bound does
+// not own (kite_shot_test.go pins the exemption).
 func TestKiteStreakLimitStopsTheShuffle(t *testing.T) {
-    _, game, loop := kiteBowBot(t, 45200)
+    _, game, loop := kiteBowBotChaseFresh(t, 45200)
     loop.kiteFor = 7
     loop.kiteStreak = kiteStreakLimit
     loop.tick()
@@ -182,9 +185,10 @@ func TestKiteStreakLimitStopsTheShuffle(t *testing.T) {
 
 // TestKiteStreakResetsForAFreshTarget pins the streak bookkeeping:
 // the limit counts the steps of ONE target - a fresh target (the
-// previous one died, the pick moved on) starts its own count.
+// previous one died, the pick moved on) starts its own count. The
+// chase-fresh scene keeps the shot-paced rhythm out of the answer.
 func TestKiteStreakResetsForAFreshTarget(t *testing.T) {
-    _, game, loop := kiteBowBot(t, 45200)
+    _, game, loop := kiteBowBotChaseFresh(t, 45200)
     // The streak of the previous target exhausted the budget...
     loop.kiteFor = 5
     loop.kiteStreak = kiteStreakLimit
@@ -243,9 +247,11 @@ func TestKiteTrainMemberArmsTheRetreat(t *testing.T) {
 // TestKiteSkipsADeckGapTrainMember pins the deck guard of the train
 // member trigger: a mob on a deck the walk cannot reach (the z gap
 // past deckReachableZ) is no melee threat - it must not arm the
-// kite, the standing fight on the ranged target goes on.
+// kite, the standing fight on the ranged target goes on. The
+// chase-fresh scene keeps the shot-paced rhythm out of the answer
+// (a fresh shot with the target inside the band would retreat).
 func TestKiteSkipsADeckGapTrainMember(t *testing.T) {
-    bot, game, loop := kiteBowBot(t, 45440)
+    bot, game, loop := kiteBowBotChaseFresh(t, 45440)
     // The chasing member sits 500 units BELOW the character's deck
     // (-3000 against -3500): past the deckReachableZ (400) gap, its
     // swings cannot reach.

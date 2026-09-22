@@ -63,7 +63,15 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
     })
     loop.target = 7
     loop.engageAt = time.Now()
-    selfSwingsAt(bot, 45200)
+    // The fight freshness rides the character's own chase step: the
+    // shot-paced rhythm stays quiet without a fresh shot, the
+    // proximity path answers the closed mob and its bookkeeping is
+    // what the asserts below pin.
+    bot.ApplyPawnMovement(state.PawnMovement{
+        ObjectID: 100, TargetID: 7, Distance: 40,
+        X: 45000, Y: 50000, TargetX: 45200, TargetY: 50000,
+        TargetZ: -3500,
+    })
     loop.lastHit = time.Now().Add(-time.Minute)
 
     loop.tick()
