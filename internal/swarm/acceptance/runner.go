@@ -203,16 +203,26 @@ func (m *Manager) wireSessionTaps(
     game.SetSendTap(runLog.Send)
 }
 
+// sessionLoopHook customizes the hunt loop of one session before
+// the goroutine starts: the scenarios that launch a typed fleet slot
+// apply their type wiring through it (the archer type sets the bow
+// gear profile the same way the config launch of cmd/swarm does for
+// its fleet - the loop is constructed inside runSession, so a hook
+// is the only injection point that does not fork the runner).
+type sessionLoopHook func(*hunt.Loop)
+
 // runSession plays the temp character until the context ends: the
 // full runBot wiring (login, handshake, authentication, the character
 // selection, the world entry, the hunt loop with the geodata
 // navigator, the proxy registration) squeezed into the acceptance
 // runner. The autonomous flag mirrors -hunt of the command line: the
 // farm scenarios hunt on their own, the lifetime and proxy scenarios
-// stay in the manual only mode.
+// stay in the manual only mode. The optional hooks run on the fresh
+// hunt loop before Run starts (see sessionLoopHook).
 func (m *Manager) runSession(
     ctx context.Context, account string, password string, char string,
     autonomous bool, registrar *proxy.Server, logLine func(string),
+    hooks ...sessionLoopHook,
 ) error {
     tracker := m.registryTracker(account)
     tracker.ResetSession()
@@ -272,6 +282,23 @@ func (m *Manager) runSession(
     // learns on its own; without it executes the manual commands only
     // (the web UI stays interactive either way).
     loop := hunt.NewLoop(game, tracker)
+    wireSessionLoop(m, loop, tracker, autonomous, logLine, hooks)
+    go loop.Run(ctx)
+
+    return game.Run(ctx, char)
+}
+
+// wireSessionLoop builds the hunt loop of one session: the logger
+// mirror, the navigator of the live integration (the mesh corridor
+// search the fleet bot serves when the mesh loaded, the pure grid
+// navigator otherwise), the autonomy switch (with autonomy it hunts,
+// shops and learns on its own; without it the manual commands of the
+// web UI own the character) and the type hooks of the typed fleet
+// slots (see sessionLoopHook).
+func wireSessionLoop(
+    m *Manager, loop *hunt.Loop, tracker *state.Bot, autonomous bool,
+    logLine func(string), hooks []sessionLoopHook,
+) {
     loop.SetLogger(sessionLogger(tracker, logLine))
     if m.engine != nil && m.mesh != nil {
         // The mesh navigator of the live integration: the scenarios
@@ -286,9 +313,9 @@ func (m *Manager) runSession(
     } else {
         loop.SetAutonomy(false)
     }
-    go loop.Run(ctx)
-
-    return game.Run(ctx, char)
+    for _, hook := range hooks {
+        hook(loop)
+    }
 }
 
 // runSessionSupervised keeps the temp session alive the way the
@@ -297,16 +324,19 @@ func (m *Manager) runSession(
 // after the tracker login cooldown with a growing backoff, and the
 // run context ends the loop. The supervisor answers when the run
 // context ended: the loop itself never gives up (every session loss
-// is a reconnect), so there is no error to report.
+// is a reconnect), so there is no error to report. The optional hooks
+// pass through to every session of the supervision (see
+// sessionLoopHook).
 func (m *Manager) runSessionSupervised(
     ctx context.Context, account string, password string, char string,
     registrar *proxy.Server, logLine func(string),
+    hooks ...sessionLoopHook,
 ) {
     delay := sessionReconnectMinDelay
     for {
         started := time.Now()
         err := m.runSession(ctx, account, password, char, true,
-            registrar, logLine)
+            registrar, logLine, hooks...)
         if ctx.Err() != nil {
             return
         }

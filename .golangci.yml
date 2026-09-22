@@ -149,6 +149,16 @@ linters:
         - .*state\.WalkPlan$
         - .*acceptance\.characterReset$
         - .*acceptance\.fullDressWatch$
+        # The archer kite telemetry aggregates: the log counter, the
+        # monitor watch, the verdict view and the observation sample
+        # all carry documented zero starts (the counters, the
+        # latches, the done flags, the not-yet observations); the
+        # sites set only the non zero starts (the 100 HP, the -1
+        # sentinels, the detail strings) next to the literal.
+        - .*acceptance\.archerKiteLog$
+        - .*acceptance\.archerKiteWatch$
+        - .*acceptance\.archerKiteVerdicts$
+        - .*acceptance\.archerKiteSample$
         # The option and stat aggregates.
         - .*navbuild\.Options$
         - .*navbuild\.BuildStats$

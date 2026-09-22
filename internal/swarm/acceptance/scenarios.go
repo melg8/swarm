@@ -118,6 +118,37 @@ const fullDressTimeout = 5 * time.Minute
 func Definitions() []TestDef {
     return []TestDef{
         {
+            ID:      archerKiteScenarioID,
+            Title:   "archer kite · the ranged farm contract",
+            Account: archerKiteAccount,
+            Timeout: archerKiteTimeout(),
+            Description: "Start: the elven fighter temp18 resets " +
+                "onto the Kaboo Orc Grunt SW-5 cell focus (36000 " +
+                "50229 -3456, the aggressive melee orcs of the " +
+                "mass 4 ground) as the level 7 character of the " +
+                "vitals table with the bow kit in the bag - the " +
+                "short bow, the 600 arrow quiver and the wooden " +
+                "outfit - and launches as the archer type of the " +
+                "fleet (the gear profile hook the config launch " +
+                "wiring mirrors). Flow: the auto equipment dresses " +
+                "the kit, the quiver arms behind the bow and the " +
+                "bot farms the window (SWARM_ARCHER_KITE_MINUTES, " +
+                "default the 10 minute smoke) under the kiting " +
+                "contract - the engage requests start the shots " +
+                "inside the bow range, the closing orcs arm the " +
+                "kite steps and the cornered holds keep shooting " +
+                "the bow. Pass: the bow is worn with the quiver " +
+                "on, the fight telemetry stays at the bow radii " +
+                "(the majority of the fight samples beyond the " +
+                "melee radius, none past the stall radius), the " +
+                "kite log lines narrate repeated retreats, the bot " +
+                "stays online the window with the HP never " +
+                "bottoming, and the arrow stock never empties " +
+                "(issue #28, the acceptance half of the archer " +
+                "support).",
+            Scenario: archerKiteScenario,
+        },
+        {
             ID:      "plaza-herbiel",
             Title:   "plaza Herbiel walk · the ping-pong corridor",
             Account: plazaHerbielAccount,
