@@ -11,7 +11,7 @@ github.com/melg8/swarm/cmd/stuckprobe 47.6
 github.com/melg8/swarm/cmd/swarm 19.6
 github.com/melg8/swarm/internal/logfmt 87.8
 github.com/melg8/swarm/internal/swarm/acceptance 27.8
-github.com/melg8/swarm/internal/swarm/acceptance/botlog 37.3
+github.com/melg8/swarm/internal/swarm/acceptance/botlog 51.0
 github.com/melg8/swarm/internal/swarm/connection 86.2
 github.com/melg8/swarm/internal/swarm/crypt 93.8
 github.com/melg8/swarm/internal/swarm/gear 90.3

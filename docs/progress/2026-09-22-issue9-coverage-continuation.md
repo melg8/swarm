@@ -150,3 +150,25 @@ In review: PR #24 head c674d23. Four rounds on this issue today:
 the merge repair, the drift top-up (npcdata 100, connection past
 its pre-drift level), the journal round (connection 86.2, no 0%
 functions) and the probe tool smoke pass (eight tools off 0%).
+
+### 2026-09-22 11:05 UTC - round five: the botlog decoder round
+- The "live-stack-bound" label on acceptance/botlog was partly
+  wrong: its gaps are mostly the recv packet decoders - pure
+  functions over packet bytes, needing fixtures not live sockets.
+- botlog 37.3 -> 51.0: the movement family (MoveToLocation), the
+  target family (TargetSelected/Unselected/MyTargetSelected), the
+  status update (with the attribute name table), the ground item
+  flow (SpawnItem/DropItem/GetItem/DeleteObject), the npc dialog,
+  the social action, the teleport and the wait type - plus the
+  truncated-packet table walking the dispatch with one byte
+  packets (every decoder's short fallback).
+- The remaining 0% decoders (CharInfo, UserInfo, CharSelectInfo,
+  CharSelected, ItemList/InventoryUpdate internals) need the
+  heavier character wire formats - recorded for the next round.
+- Gates: build, vet, lint 0 issues, fmt clean. Baseline line
+  updated.
+
+## Status (round five)
+
+The botlog decoder round is on the branch; next: push, CI, the
+issue comment and the board move.
