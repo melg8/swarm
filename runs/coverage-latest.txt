@@ -10,7 +10,7 @@ github.com/melg8/swarm/cmd/navmesh-export 25.0
 github.com/melg8/swarm/cmd/stuckprobe 47.6
 github.com/melg8/swarm/cmd/swarm 27.4
 github.com/melg8/swarm/internal/logfmt 87.8
-github.com/melg8/swarm/internal/swarm/acceptance 27.8
+github.com/melg8/swarm/internal/swarm/acceptance 29.5
 github.com/melg8/swarm/internal/swarm/acceptance/botlog 87.6
 github.com/melg8/swarm/internal/swarm/connection 86.2
 github.com/melg8/swarm/internal/swarm/crypt 93.8
