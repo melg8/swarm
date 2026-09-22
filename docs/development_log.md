@@ -1,5 +1,11 @@
 # Development log
 
+> FROZEN ARCHIVE (2026-09-22, the merge clash policy round, issue
+> #33): the rounds up to 2026-09-21, closed for appends - new
+> rounds live as fragment files in `docs/devlog/` (one file per
+> round, see docs/devlog/README.md). Read for history only; the
+> `## Round N` navigation below still works.
+
 Running log of the work on the `mobius-c1-client-1` branch. Newest entries at
 the bottom. This file exists so the context does not have to be repeated in
 agent prompts: read this file first.

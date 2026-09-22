@@ -1,5 +1,10 @@
 # Agent progress archive
 
+> FROZEN ARCHIVE (2026-09-22, the merge clash policy round, issue
+> #33): the pre-split archive, closed for appends - finished task
+> fragments live in `docs/progress/archive/` now (one file per
+> task, see docs/progress/README.md). Read for history only.
+
 Finished task entries and completed progress streams of
 `docs/agent_progress.md`. Append-only, chronological order preserved
 from the original file. Nothing here is lost context - the durable
