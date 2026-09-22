@@ -7,7 +7,6 @@ package connection
 import (
     "context"
     "encoding/binary"
-    "errors"
     "net"
     "testing"
     "time"
@@ -92,20 +91,28 @@ func absorbingFlowWithMoves(
         selected = binary.LittleEndian.AppendUint64(selected, 30)
         s.writeEncrypted(conn, cipher, selected)
 
-        deadline := time.Now().Add(4 * time.Second)
-        for time.Now().Before(deadline) {
-            _ = conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+        // The absorb budget: ONE read deadline at the budget end,
+        // never a rolling per-iteration deadline. A rolling short
+        // deadline races the client's 1 s validation ticker: when it
+        // fires mid frame, io.ReadFull has consumed the leading bytes
+        // of the packet and loses them, the framing desyncs and every
+        // later read returns garbage opcodes - the observed flake
+        // mode where the client sent its validations and the server
+        // captured none of them. The single budget-end deadline keeps
+        // every read whole: a packet arrives complete or the budget
+        // closes the flow (the client's own logout close ends it
+        // earlier on every clean session). The budget must outlive
+        // the longest session window of the callers (5 s today) with
+        // margin for a loaded runner.
+        const absorbBudget = 10 * time.Second
+        _ = conn.SetReadDeadline(time.Now().Add(absorbBudget))
+        for {
             payload, err := s.readEncryptedResult(conn, cipher)
             if err != nil {
-                // The read deadline between the sparse client
-                // packets: keep waiting until the session budget
-                // closes (the flow must not tear the connection down
-                // while the client session still runs).
-                var netErr net.Error
-                if errors.As(err, &netErr) && netErr.Timeout() {
-                    continue
-                }
-
+                // The budget closed or the client went away: both end
+                // the flow without tearing down a live session (the
+                // flow must not close the connection while the client
+                // session still runs - the budget guarantees it).
                 return
             }
             forwardCapture(payload, validations, moves)
