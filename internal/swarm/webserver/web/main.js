@@ -10,6 +10,7 @@ SPDX-License-Identifier: MIT
 // regular bot control boots the bot list and the event streams, the
 // pathfind test mode boots the interactive path search instead.
 window.addEventListener("DOMContentLoaded", async () => {
+  initBuildWatch();
   initTheme();
   initTabs();
   initBuffsPanel();

@@ -166,6 +166,13 @@ type Server struct {
     // demand (nil when no engine backs the viewer).
     navmeshOriginal map[navmesh.RegionKey][]byte
     navmeshRegions  func(navmesh.RegionKey) (*pathfind.Region, error)
+    // webBuild is the content hash of the embedded web interface and
+    // indexPage is the index.html bytes with the build meta injected
+    // (both prepared once at startup, issue #48: the page and the
+    // /api/bots poll carry the id, a stale tab reloads itself when
+    // the binary - and with it the UI - moved on).
+    webBuild  string
+    indexPage []byte
 }
 
 // ProxyController drives the client proxy from the web UI: which bot a
@@ -287,6 +294,14 @@ func (s *Server) handleProxySelect(w http.ResponseWriter, r *http.Request) {
 // newServer builds the shared server shell with the static files.
 func newServer(address string, logger *log.Logger) *Server {
     mux := http.NewServeMux()
+    // The build identity of the embedded UI and the index page with
+    // the meta injected: both are constants of the binary (issue #48).
+    build := webBuildID(webContent)
+    var indexPage []byte
+    raw, readErr := fs.ReadFile(webContent, "web/index.html")
+    if readErr == nil {
+        indexPage = []byte(injectBuildMeta(string(raw), build))
+    }
     server := &Server{
         registry:        nil,
         pathfinder:      nil,
@@ -309,6 +324,8 @@ func newServer(address string, logger *log.Logger) *Server {
         navmeshGeoMu:    sync.Mutex{},
         navmeshOriginal: nil,
         navmeshRegions:  nil,
+        webBuild:        build,
+        indexPage:       indexPage,
     }
     //nolint:exhaustruct_v5 // the zero defaults of http.Server are intended
     server.httpServer = &http.Server{
@@ -326,7 +343,7 @@ func newServer(address string, logger *log.Logger) *Server {
     if err != nil {
         logger.Printf("Error web content unavailable: %v", err)
     }
-    mux.Handle("GET /", http.FileServerFS(staticFS))
+    mux.Handle("GET /", server.staticHandler(http.FileServerFS(staticFS)))
 
     return server
 }
@@ -365,8 +382,12 @@ func (s *Server) Shutdown(ctx context.Context) error {
     return s.httpServer.Shutdown(ctx)
 }
 
-// handleBotList responds with the compact info of all bots.
+// handleBotList responds with the compact info of all bots. The
+// response carries the build id of the binary (X-Swarm-Build): the
+// web app reads it on every poll and reloads the page when the
+// running server moved to a new UI build (issue #48).
 func (s *Server) handleBotList(w http.ResponseWriter, _ *http.Request) {
+    w.Header().Set("X-Swarm-Build", s.webBuild)
     writeJSON(w, s.logger, s.registry.List())
 }
 
