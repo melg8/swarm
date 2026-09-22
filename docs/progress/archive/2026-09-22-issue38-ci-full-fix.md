@@ -75,10 +75,32 @@ expiry desynced the framing. Measured on the sandbox: the flaky test
 passes 10/10 under -race -count=10 (previously ~50% fail at count>=2),
 the whole connection package passes under -race in 11 s (was 35 s with
 the drain tax), the full `go test ./...` is green, `task lint:new` 0
-issues, `task fmt:check` clean. Next: the ledger rows for the true
-mechanisms, the ci trigger dedup, the coverage baseline refresh.
+issues, `task fmt:check` clean.
+
+### 2026-09-22 07:30 UTC - ci: the trigger split
+
+Pushes run the gate on main only; every branch arrives through its
+pull request. The double run (push + pull_request on the same sha,
+observed as runs 35695083356/35695086553 on the PR #39 head) is gone.
+The canonical `docs/ci_workflow.yml` also gains the coverage job the
+live workflow already runs (the drift repair), byte identical with
+PR #24's canonical block so the branches merge without a text clash.
+
+### 2026-09-22 07:35 UTC - test: the coverage baseline refresh
+
+`runs/coverage-latest.txt` refreshed through the gate's own path
+(COVER_DROP_LIMIT=10, the suite clean, 28 packages, total 71.6%).
+The three red packages explained: acceptance dropped mechanically
+(the botlog split moved covered code out; botlog needs its own row
+at 37.3), connection grew feature code ahead of tests (the crit
+flag, the cast icon, the chat plumbing), npcdata's generated tables
+grew (the merchant world stands). The ledger row of the morning got
+its follow-up: the repeated entry records the true mechanisms (the
+mid-frame deadline desync, the inverted creation order, the budget
+under the window) and the three determinism pins.
 
 ## Status
 
-In progress. The flake fixes are verified locally; the ledger, the
-workflow triggers and the coverage baseline remain.
+In review. All three owner asks are implemented on the branch; the
+final gates (prepush, the push, the CI observation of the PR head)
+close the round.
