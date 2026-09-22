@@ -2252,36 +2252,21 @@ func (l *Loop) waypointPassedBehind(
 
 // clickWaypoint aims the current waypoint, bends the click around the
 // idle aggressive camps, guards the line against the server refusal
-// and sends it. The segment splitting caps the click at the
-// server move request limit; the short click extension re-aims the
-// clicks under the server rescue floor at the plan polyline (see
-// minWalkClick); the server click validation runs after the steering
-// so the line it verifies is the one actually
-// being sent. Without a navigator the guard stays off (the walk was
-// planned elsewhere, the follower only walks it).
-//
-//nolint:funlen,cyclop // one linear gate chain; the split is issue #32
+// and sends it. The coordinate half (the z anchoring and the server
+// move request limit clip) lives in anchorWaypointClick, the short
+// click extension and the backward holds live in resolveClickExtension
+// (see minWalkClick); the remaining ladder reads as the linear gate
+// chain: the hold verdicts, the aggro camp skip, the aggro aware
+// steering and the server click validation - the validation runs after
+// the steering so the line it verifies is the one actually being
+// sent. Without a navigator the guard stays off (the walk was planned
+// elsewhere, the follower only walks it).
 func (l *Loop) clickWaypoint(
     selfX, selfY, selfZ int32, now time.Time,
 ) {
     wp := l.waypoints[l.wpIndex]
-    dx := wp.X - float64(selfX)
-    dy := wp.Y - float64(selfY)
-    dist := math.Hypot(dx, dy)
-    // The click z rides the server frame transport (see
-    // click_frame.go): the mesh frame waypoint height plus the
-    // measured vintage shift of the standing surface - the server
-    // resolves the click's destination layer by the nearest height to
-    // this z, and the raw mesh z names the wrong layer wherever the
-    // packs disagree (the village sandwich refusals).
-    wpZ := anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
-    moveX, moveY, moveZ := wp.X, wp.Y, wpZ
-    if dist > maxMoveDistance {
-        frac := maxMoveDistance / dist
-        moveX = float64(selfX) + dx*frac
-        moveY = float64(selfY) + dy*frac
-        moveZ = float64(selfZ) + (wpZ-float64(selfZ))*frac
-    }
+    moveX, moveY, moveZ, dist := l.anchorWaypointClick(
+        selfX, selfY, selfZ, wp)
     // The backward walk guard: an aimed waypoint the character already
     // moved PAST along the route itself (see waypointPassedAlongRoute)
     // would walk it BACK off the ground the route samples just covered
@@ -2290,52 +2275,9 @@ func (l *Loop) clickWaypoint(
     // verdict too (the far V-detour waypoint whose leaving segment
     // already points back, see waypointBehindRoute).
     passedBehind := l.waypointPassedBehind(wp, selfX, selfY, selfZ)
-    switch {
-    case dist < minWalkClick:
-        // The rescue floor discipline runs IMMEDIATELY, no stuck
-        // verdict needed: the server's findPath branch only takes a
-        // collapsed click over the rescue threshold, a shorter one is
-        // silently canceled with ActionFailed and never moves a cell
-        // (the 2026-09-11 11:34 dump froze two whole trip cycles on
-        // the 22 unit first waypoint click) - the sub-floor aim
-        // re-aims at the forward route samples before any click
-        // leaves the bot. No sample validating keeps the plain
-        // waypoint click: the refusal machinery of
-        // clickServerValidated answers it exactly like today.
-        extX, extY, extZ, ok := l.extendShortClick(
-            selfX, selfY, selfZ, moveX, moveY, moveZ)
-        if ok {
-            moveX, moveY, moveZ = extX, extY, extZ
-        }
-    case l.extendArmed && (passedBehind || waypointBehindRoute(
-        l.waypoints, l.wpIndex, selfX, selfY)):
-        // The recovery of a stuck segment (extendArmed): the stuck
-        // proved the plain clicks of this segment do not move the
-        // character (a server side refusal the offline click
-        // validation cannot see), so the primary target behind the
-        // character on the route gives way to the forward route
-        // samples.
-        extX, extY, extZ, ok := l.extendShortClick(
-            selfX, selfY, selfZ,
-            moveX, moveY, moveZ)
-        if ok {
-            moveX, moveY, moveZ = extX, extY, extZ
-        } else {
-            // No forward sample validates and the
-            // waypoint is behind: clicking it walks
-            // the character backward into the pocket
-            // the route samples just escaped. Hold
-            // the click - the stuck window re-plans
-            // from the standing cell, and the
-            // planner knows the wall the server-side
-            // routing has to route around.
-            return
-        }
-    case passedBehind:
-        // The same hold without the armed extension: a backward
-        // click is ground loss no matter the recovery state, and the
-        // stuck window owns the answer (the skip ladder walks the
-        // first clear successor, the re-path plans around the wall).
+    moveX, moveY, moveZ, send := l.resolveClickExtension(
+        selfX, selfY, selfZ, dist, passedBehind, moveX, moveY, moveZ)
+    if !send {
         return
     }
     // A waypoint inside an idle mob's trigger circle cannot be reached
@@ -2397,6 +2339,95 @@ func (l *Loop) clickWaypoint(
         int32(moveZ)); err != nil {
         l.logf("Hunt: town walk request failed: %v", err)
     }
+}
+
+// anchorWaypointClick resolves the click target coordinates of the
+// aimed waypoint: the click z rides the server frame transport (see
+// click_frame.go) - the mesh frame waypoint height plus the measured
+// vintage shift of the standing surface - the server resolves the
+// click's destination layer by the nearest height to this z, and the
+// raw mesh z names the wrong layer wherever the packs disagree (the
+// village sandwich refusals). A far waypoint's click clips to the
+// server move request limit along the line to the character, the z
+// interpolated along the same line. The distance to the waypoint
+// comes back too: the extension ladder of resolveClickExtension keys
+// its rescue floor on it.
+func (l *Loop) anchorWaypointClick(
+    selfX, selfY, selfZ int32, wp pathfind.Vec3,
+) (moveX, moveY, moveZ, dist float64) {
+    dx := wp.X - float64(selfX)
+    dy := wp.Y - float64(selfY)
+    dist = math.Hypot(dx, dy)
+    wpZ := anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
+    moveX, moveY, moveZ = wp.X, wp.Y, wpZ
+    if dist > maxMoveDistance {
+        frac := maxMoveDistance / dist
+        moveX = float64(selfX) + dx*frac
+        moveY = float64(selfY) + dy*frac
+        moveZ = float64(selfZ) + (wpZ-float64(selfZ))*frac
+    }
+
+    return moveX, moveY, moveZ, dist
+}
+
+// resolveClickExtension runs the extension ladder of the aimed
+// waypoint click - the minWalkClick interplay and the backward holds.
+//
+// The rescue floor discipline runs IMMEDIATELY, no stuck verdict
+// needed: the server's findPath branch only takes a collapsed click
+// over the rescue threshold, a shorter one is silently canceled with
+// ActionFailed and never moves a cell (the 2026-09-11 11:34 dump
+// froze two whole trip cycles on the 22 unit first waypoint click) -
+// the sub-floor aim re-aims at the forward route samples before any
+// click leaves the bot. No sample validating keeps the plain waypoint
+// click: the refusal machinery of clickServerValidated answers it
+// exactly like today.
+//
+// The recovery of a stuck segment (extendArmed): the stuck proved the
+// plain clicks of this segment do not move the character (a server
+// side refusal the offline click validation cannot see), so the
+// primary target behind the character on the route gives way to the
+// forward route samples. No forward sample validating and the
+// waypoint behind: clicking it walks the character backward into the
+// pocket the route samples just escaped. Hold the click - the stuck
+// window re-plans from the standing cell, and the planner knows the
+// wall the server-side routing has to route around.
+//
+// The same hold without the armed extension: a backward click is
+// ground loss no matter the recovery state, and the stuck window owns
+// the answer (the skip ladder walks the first clear successor, the
+// re-path plans around the wall).
+//
+// Returns the click target to send and whether the click may leave
+// the bot at all - the hold verdicts answer false and the caller
+// drops the click.
+func (l *Loop) resolveClickExtension(
+    selfX, selfY, selfZ int32,
+    dist float64, passedBehind bool,
+    moveX, moveY, moveZ float64,
+) (float64, float64, float64, bool) {
+    switch {
+    case dist < minWalkClick:
+        extX, extY, extZ, ok := l.extendShortClick(
+            selfX, selfY, selfZ, moveX, moveY, moveZ)
+        if ok {
+            return extX, extY, extZ, true
+        }
+    case l.extendArmed && (passedBehind || waypointBehindRoute(
+        l.waypoints, l.wpIndex, selfX, selfY)):
+        extX, extY, extZ, ok := l.extendShortClick(
+            selfX, selfY, selfZ,
+            moveX, moveY, moveZ)
+        if ok {
+            return extX, extY, extZ, true
+        }
+
+        return moveX, moveY, moveZ, false
+    case passedBehind:
+        return moveX, moveY, moveZ, false
+    }
+
+    return moveX, moveY, moveZ, true
 }
 
 // waypointBehindRoute reports whether the waypoint at the index sits
