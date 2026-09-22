@@ -55,6 +55,89 @@ func TestExpectedGuideBuffsByLevel(t *testing.T) {
     }
 }
 
+// shortenGuideSeams squeezes the guide stop waits (the dialog seams
+// of the walker and the buff landing wait) so the dialog drive of
+// the guide tests runs in well under a second; the production
+// values return on cleanup.
+func shortenGuideSeams(t *testing.T) {
+    t.Helper()
+    shortenDialogSeams(t)
+    wait := guideBuffWait
+    guideBuffWait = 20 * time.Millisecond
+    t.Cleanup(func() { guideBuffWait = wait })
+}
+
+// TestReceiveGuideMagicLandsTheBuffs pins the support magic drive of
+// the issue #35 fix end to end: the dialog walks the two guide links
+// (the entry page, the SupportMagic.htm page), the apply bypass
+// answers with the effect and NO page (the route's last step carries
+// AnswerIsEffect), the buff watch sees the landing skill and the
+// stop reports success - no refusal cooldown arms on the happy path
+// (the old final page wait failed the walk after the buffs landed
+// and armed the 10 minute cooldown on every success).
+func TestReceiveGuideMagicLandsTheBuffs(t *testing.T) {
+    shortenGuideSeams(t)
+    bot := state.NewBot("guide")
+    setGuideLevel(bot, 13)
+    // The server answer of the apply bypass: the level-eligible
+    // support magic trails in as abnormal status updates.
+    bot.SetBuffs([]state.BuffEntry{
+        {SkillID: 1204, Level: 1, Time: 1200},
+        {SkillID: 1040, Level: 1, Time: 1200},
+    })
+    script := &dialogScript{
+        cur: -1,
+        pages: []scriptPage{
+            {npc: 30599, html: guideEntryPage},
+            {npc: 30599, html: guideSupportPage},
+            // No third page: the apply bypass answers with the
+            // buffs, never with a dialog page.
+        },
+    }
+    game := &scriptGame{fakeGame: &fakeGame{}, script: script}
+    loop := NewLoop(game, bot)
+    loop.guideID = 30599
+
+    require.True(t, loop.receiveGuideMagic())
+    require.Len(t, game.bypasses, 2,
+        "the entry link and the apply link fired")
+    require.Equal(t, "npc_30599_Link default/SupportMagic.htm",
+        game.bypasses[0])
+    require.Equal(t, "npc_30599_SupportMagic", game.bypasses[1])
+    require.Equal(t, []string{"npc_30599_SupportMagic"}, script.dropped,
+        "only the apply bypass is unanswered - its answer is the "+
+            "buff effect, the entry link was answered with the page")
+    require.True(t, loop.guideRefusedAt.IsZero(),
+        "the happy path never arms the refusal cooldown")
+}
+
+// TestReceiveGuideMagicArmsRefusalWithoutBuffs pins the refusal
+// path: the apply bypass fired but nothing landed (the refusal html
+// of the server gate - the level band, the account), the buff watch
+// times out and the stop arms the cooldown so the later trips stay
+// away instead of retrying the refusal in a loop.
+func TestReceiveGuideMagicArmsRefusalWithoutBuffs(t *testing.T) {
+    shortenGuideSeams(t)
+    bot := state.NewBot("guide")
+    setGuideLevel(bot, 13)
+    script := &dialogScript{
+        cur: -1,
+        pages: []scriptPage{
+            {npc: 30599, html: guideEntryPage},
+            {npc: 30599, html: guideSupportPage},
+        },
+    }
+    game := &scriptGame{fakeGame: &fakeGame{}, script: script}
+    loop := NewLoop(game, bot)
+    loop.guideID = 30599
+
+    require.True(t, loop.receiveGuideMagic())
+    require.Len(t, game.bypasses, 2,
+        "the dialog itself walked clean - the refusal is the answer")
+    require.False(t, loop.guideRefusedAt.IsZero(),
+        "the missing buffs arm the refusal cooldown")
+}
+
 // TestPlanGuideStopAppendsTheStop pins the trip planning: the stop
 // of the Newbie Guide closes the trip behind the learning stops and
 // plans once per trip.
