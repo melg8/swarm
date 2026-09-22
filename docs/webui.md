@@ -107,6 +107,16 @@ colors from the same variables).
   panning camera (the follow mode of a walking bot) never flashes the
   bare background for the loading gap; the
   grid, the zone square, the units and the links draw on top.
+- The void base (issue #53): the tiles never cover the whole world -
+  the `show-map` toggle skips them, a scroll past the tile pack
+  leaves them out. The offscreen cache raster opens with an opaque
+  fill of the `--bg-map` theme variable (the calm canvas void, light
+  and dark) BEFORE the static layers paint, so the areas without
+  tiles composite as a flat backdrop. The blit never clears the main
+  canvas by design (the cache is expected to overwrite every pixel),
+  and a transparent hole in the cache would keep the PREVIOUS
+  frame's pixels visible through it - the glitchy smear of the
+  missing background the void base closes.
 
 ## Map rendering
 
