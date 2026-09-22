@@ -824,26 +824,98 @@ func templateWanted(templateID int32, templates []int32) bool {
 // delevel policy compares the character level against it to detect a
 // hunting ground whose monsters are too low for the character. Nil zones
 // mean no limit and return zero.
+//
+// The scan runs on the delevel trigger gate of every hunt tick (the
+// cooldown gate ahead of it goes permanently open a minute after the
+// last delevel), so the levels slice it used to materialize per call
+// was a steady per tick allocation on every bot. The median now comes
+// from a stack bucket count (one pass, zero allocations); the sort
+// fallback only arms for a level past the bucket bound, which the C1
+// data never carries (the xml levels cap far below it).
 func (b *Bot) MedianZoneMobLevel(zone ZoneArea) int32 {
     b.mu.RLock()
     defer b.mu.RUnlock()
     if areaNil(zone) {
         return 0
     }
-    levels := make([]int32, 0, len(b.world.hot))
+    var buckets [256]int32
+    count, overflow := b.countZoneMobLevels(zone, &buckets)
+    if count == 0 {
+        return 0
+    }
+    if !overflow {
+        return bucketMedian(&buckets, count)
+    }
+
+    return b.sortedZoneMedian(zone, count)
+}
+
+// zoneMobLevelCandidate reports whether the world record counts
+// toward the zone median: a living, attackable npc of a positive
+// level.
+func zoneMobLevelCandidate(obj *objectHot) bool {
+    return obj.Kind == kindNPC && obj.Attackable && !obj.Dead &&
+        obj.Level > 0
+}
+
+// countZoneMobLevels runs the single allocation-free pass over the
+// hot records: the level histogram of the zone's mob candidates
+// fills the stack buckets, and the second answer reports a level
+// past the bucket bound (the sort fallback re-scans when it arms).
+// The caller holds the bot lock.
+func (b *Bot) countZoneMobLevels(
+    zone ZoneArea, buckets *[256]int32,
+) (int32, bool) {
+    count := int32(0)
+    overflow := false
     for i := range b.world.hot {
         obj := &b.world.hot[i]
-        if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
-            obj.Level <= 0 {
+        if !zoneMobLevelCandidate(obj) ||
+            !zone.Contains(obj.X, obj.Y) {
             continue
         }
-        if !zone.Contains(obj.X, obj.Y) {
+        count++
+        if obj.Level < int32(len(buckets)) {
+            buckets[obj.Level]++
+        } else {
+            overflow = true
+        }
+    }
+
+    return count, overflow
+}
+
+// bucketMedian walks the ascending level axis to the median rank:
+// the first level whose cumulative count passes count/2 (0 based,
+// the rank of the ascending sequence's middle element). Zero when
+// the walk exhausts the buckets without reaching the rank, which a
+// consistent histogram never produces.
+func bucketMedian(buckets *[256]int32, count int32) int32 {
+    seen := int32(0)
+    for level := 1; level < len(buckets); level++ {
+        seen += buckets[level]
+        if seen > count/2 {
+            return int32(level)
+        }
+    }
+
+    return 0
+}
+
+// sortedZoneMedian is the overflow fallback of the median scan: the
+// candidate levels collect into a scratch slice and the sort answers
+// the middle element. The C1 data never carries a level past the
+// bucket bound (the xml levels cap far below it), so the allocation
+// never arms in practice. The caller holds the bot lock.
+func (b *Bot) sortedZoneMedian(zone ZoneArea, count int32) int32 {
+    levels := make([]int32, 0, count)
+    for i := range b.world.hot {
+        obj := &b.world.hot[i]
+        if !zoneMobLevelCandidate(obj) ||
+            !zone.Contains(obj.X, obj.Y) {
             continue
         }
         levels = append(levels, obj.Level)
-    }
-    if len(levels) == 0 {
-        return 0
     }
     slices.Sort(levels)
 
