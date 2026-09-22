@@ -751,10 +751,13 @@ func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
     // expires by time, only the cap drops the oldest ones (issue #6:
     // the map answers "where did the fleet kill everything" for the
     // whole session, not for the last five minutes).
-    h.recordMapKill(state.KillMarkView{
-        X: x, Y: y, AtMs: now.UnixMilli(),
-        Name: name, Level: level,
-    })
+    h.recordMapKill(
+        //nolint:exhaustruct_v5 // BotID stays 0: the registry stamps
+        // the owning bot at the merge (Registry.FleetKillMarks).
+        state.KillMarkView{
+            X: x, Y: y, AtMs: now.UnixMilli(),
+            Name: name, Level: level,
+        })
     metric := &h.metrics[ground]
     metric.visitKills++
     if !metric.killPosKnown {
