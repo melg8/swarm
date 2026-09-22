@@ -973,6 +973,153 @@ func TestGameClientAppliesSkillRound(t *testing.T) {
     require.Contains(t, logBuf.String(), "Skill list with 2 skills")
 }
 
+// buildFloodQuestList builds a QuestList packet: two active quests
+// and two quest bound item stacks.
+func buildFloodQuestList() []byte {
+    data := []byte{0x98}
+    data = appendUint16(data, 2)  // quest count
+    data = appendInt32(data, 406) // the starter quest
+    data = appendInt32(data, 2)   // state: cond 2
+    data = appendInt32(data, 1)   // a second quest
+    data = appendInt32(data, 5)
+    data = appendUint16(data, 2)  // quest item count
+    data = appendInt32(data, 500) // object id
+    data = appendInt32(data, 756) // item id
+    data = appendInt32(data, 3)   // count
+    data = appendInt32(data, 0)   // body part
+    data = appendInt32(data, 501)
+    data = appendInt32(data, 757)
+    data = appendInt32(data, 1)
+    data = appendInt32(data, 0)
+
+    return data
+}
+
+// buildFloodAbnormalStatus builds an AbnormalStatusUpdate packet:
+// two running effects on the character.
+func buildFloodAbnormalStatus() []byte {
+    data := []byte{0x97}
+    data = appendUint16(data, 2)   // effect count
+    data = appendInt32(data, 1204) // Wind Walk
+    data = appendUint16(data, 2)   // level 2
+    data = appendInt32(data, 300)  // 300 seconds left
+    data = appendInt32(data, 1068) // Shield
+    data = appendUint16(data, 3)   // level 3
+    data = appendInt32(data, 1200) // 1200 seconds left
+
+    return data
+}
+
+// buildFloodNpcHTML builds an NpcHTMLMessage packet: the gatekeeper
+// dialog with two bypass buttons.
+func buildFloodNpcHTML() []byte {
+    html := "<html>Greetings.<br><a action=\"bypass -h npc_7155_Chat 0\">Talk</a>" +
+        "<a action=\"bypass -h npc_7155_teleport 1 2\">Teleport</a></html>"
+    data := []byte{0x1B}
+    data = appendInt32(data, 7155) // the gatekeeper npc
+    data = append(data, utf16Bytes(html)...)
+    data = appendInt32(data, 0) // the npc html scope carries no item
+
+    return data
+}
+
+// journalFlow feeds the quest journal, the buff bar, the npc dialog
+// and one truncated journal packet, then drops the connection.
+func (s *fakeGameServer) journalFlow(
+    conn net.Conn, cipher *crypt.GameCrypt,
+) {
+    s.writeEncrypted(conn, cipher, buildFloodQuestList())
+    s.writeEncrypted(conn, cipher, buildFloodAbnormalStatus())
+    s.writeEncrypted(conn, cipher, buildFloodNpcHTML())
+    s.writeEncrypted(conn, cipher, []byte{0x98}) // truncated journal
+    _ = conn.Close()
+}
+
+// TestGameClientAppliesQuestJournal checks the journal round: the
+// quest journal lands in the tracker (the states and the quest bound
+// items), the buff bar replaces the effect list and the npc dialog
+// reaches both the last-html latch and the tracker dialog page.
+func TestGameClientAppliesQuestJournal(t *testing.T) {
+    server := startFakeGameServerFlow(t, (*fakeGameServer).journalFlow)
+
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
+
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
+
+    logBuf := &bytes.Buffer{}
+    client.SetLogger(log.New(logBuf, "", 0))
+
+    tracker := state.NewBot("journal")
+    client.SetTracker(tracker)
+
+    ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+    defer cancel()
+    require.Error(t, client.Run(ctx, "journal"))
+
+    // The quest journal landed with both quests and both items.
+    require.Equal(t, 2, tracker.QuestCount())
+    cond, active := tracker.QuestCond(406)
+    require.True(t, active)
+    require.Equal(t, int32(2), cond)
+    _, active = tracker.QuestCond(999)
+    require.False(t, active)
+    require.True(t, tracker.IsQuestItem(756))
+    require.False(t, tracker.IsQuestItem(999))
+
+    // The buff bar carries both effects with their levels (the
+    // snapshot orders them by skill id).
+    buffs := tracker.Snapshot().Buffs
+    require.Len(t, buffs, 2)
+    require.Equal(t, int32(1068), buffs[0].SkillID)
+    require.Equal(t, int32(3), buffs[0].Level)
+    require.Equal(t, int32(1204), buffs[1].SkillID)
+    require.Equal(t, int32(2), buffs[1].Level)
+
+    // The npc dialog reached the latch and the tracker page.
+    npcID, html := client.LastHTMLDialog()
+    require.Equal(t, int32(7155), npcID)
+    require.Contains(t, html, "Greetings")
+    require.Equal(t, int32(7155), tracker.DialogOrigin())
+    links := tracker.DialogLinks()
+    require.Len(t, links, 2)
+    require.Equal(t, "npc_7155_Chat 0", links[0].Command)
+    require.Equal(t, "Talk", links[0].Text)
+    require.Equal(t, "npc_7155_teleport 1 2", links[1].Command)
+
+    // The truncated journal logged its parse failure.
+    require.Contains(t, logBuf.String(), "Failed to parse quest list")
+    require.Contains(t, logBuf.String(),
+        "Quest journal with 2 quests, 2 quest items")
+}
+
+// quietFlow drains the connection until the client side closes.
+func (s *fakeGameServer) quietFlow(
+    conn net.Conn, _ *crypt.GameCrypt,
+) {
+    _, _ = io.Copy(io.Discard, conn)
+}
+
+// TestGameClientCloseLifecycle checks the client side close: the
+// first Close answers nil, the second reports the already closed
+// connection, and a send after the close fails instead of hanging.
+func TestGameClientCloseLifecycle(t *testing.T) {
+    server := startFakeGameServerFlow(t, (*fakeGameServer).quietFlow)
+
+    conn, err := net.Dial("tcp", server.Addr())
+    require.NoError(t, err)
+
+    client, err := NewGameClient(conn)
+    require.NoError(t, err)
+    client.SetLogger(log.New(io.Discard, "", 0))
+
+    require.NoError(t, client.Close())
+    require.Error(t, client.Close(), "the second close reports")
+    require.Error(t, client.Say("anyone there", 0, ""),
+        "a send after the close must fail")
+}
+
 // TestGameClientReportsConnectionLoss closes the server side of a live
 // session: Run must report the lost connection and take the tracker
 // offline.

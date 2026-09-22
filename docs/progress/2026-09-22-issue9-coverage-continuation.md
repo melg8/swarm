@@ -87,3 +87,22 @@ comment and the board move to Ready for review.
 In review: PR #24 head 15b3270, green, mergeable. The next round of
 this issue (if it reopens) starts from the remaining candidates list
 in the issue comment.
+
+### 2026-09-22 09:40 UTC - round three: the journal dispatches close
+- connection 82.1 -> 86.2, zero 0% functions left in the package:
+  the quest journal (QuestList 0x98: the states, the quest bound
+  items, the truncated parse failure), the buff bar
+  (AbnormalStatusUpdate 0x97: both effects with levels through
+  Snapshot().Buffs), the npc dialog round (NpcHTMLMessage 0x1B: the
+  last-html latch through LastHTMLDialog, the bypass links through
+  dialogLinks into the tracker dialog page) and the client Close
+  lifecycle (the first close nil, the second errors, a send after
+  the close fails).
+- The baseline line moves with the measurement (the test-only change
+  touches no other package).
+- Gates: build, vet, lint 0 issues, fmt clean, logfmt green.
+
+## Status (round three)
+
+The journal round is on the branch; next: push, the CI verdict,
+the issue comment and the board move.
