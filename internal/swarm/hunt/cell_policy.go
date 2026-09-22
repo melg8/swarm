@@ -85,6 +85,12 @@ const (
     // prunes the predictions the world already invalidated.
     cellKillLogCap = 96
     cellKillTTL    = 5 * time.Minute
+    // cellMapKillCap bounds the persistent map kill log (the death
+    // statistics layer of the web map): the marks never expire by
+    // time - the oldest ones drop only when the log outgrows the cap
+    // (issue #6: the kill read of the map is a long term collection
+    // of the death places, not a five minute melt).
+    cellMapKillCap = 400
     // cellMaxLevelSlack mirrors the engage ceiling: the hard guard
     // above the character level (targetMaxLevelSlack).
     cellMaxLevelSlack = targetMaxLevelSlack
@@ -137,6 +143,11 @@ type cellHunter struct {
     // kills is the respawn overlay: the recent kill records with
     // their predicted respawn times.
     kills []killRecord
+    // mapKills is the persistent kill log the web map draws (the
+    // fleet wide death statistics): every kill appends and nothing
+    // expires by time - the respawn predictions above keep their own
+    // short lifecycle, the map marks outlive them (issue #6).
+    mapKills []state.KillMarkView
     // lastAdena and adenaKnown baseline the income attribution,
     // lastAccumAt paces the active time accumulation.
     lastAdena   int32
@@ -735,6 +746,15 @@ func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
     if len(h.kills) > cellKillLogCap {
         h.kills = h.kills[len(h.kills)-cellKillLogCap:]
     }
+    // The persistent map kill log rides along: the same record the
+    // respawn overlay holds, minus the lifecycle - the mark never
+    // expires by time, only the cap drops the oldest ones (issue #6:
+    // the map answers "where did the fleet kill everything" for the
+    // whole session, not for the last five minutes).
+    h.recordMapKill(state.KillMarkView{
+        X: x, Y: y, AtMs: now.UnixMilli(),
+        Name: name, Level: level,
+    })
     metric := &h.metrics[ground]
     metric.visitKills++
     if !metric.killPosKnown {
@@ -1060,6 +1080,16 @@ func (h *cellHunter) pruneKills(now time.Time) {
         }
     }
     h.kills = kept
+}
+
+// recordMapKill appends one kill to the persistent map log and holds
+// the count cap: the marks never expire by time, the oldest ones drop
+// only when the log outgrows cellMapKillCap (issue #6).
+func (h *cellHunter) recordMapKill(mark state.KillMarkView) {
+    h.mapKills = append(h.mapKills, mark)
+    if len(h.mapKills) > cellMapKillCap {
+        h.mapKills = h.mapKills[len(h.mapKills)-cellMapKillCap:]
+    }
 }
 
 // earliestPendingRespawn resolves the earliest UNEXPIRED prediction

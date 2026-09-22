@@ -62,9 +62,10 @@ func (h *cellHunter) publishMesh(l *Loop) {
 // snapshot: the identity and the state (farming or moving - the map
 // highlights the cell the bot is heading to), the respawn clock of
 // the overlay, the measured income, the death heat and the kill
-// centroid EMA. The kill ring rides along: the positions of the
-// recent kills feed the fleet wide cross layer of the map (every
-// kill of every bot, independent of the observed bot).
+// centroid EMA. The persistent kill log rides along: the death places
+// of the whole session feed the fleet wide statistics layer of the
+// map (every kill of every bot, independent of the observed bot and
+// of the picked cell - issue #6).
 func (h *cellHunter) publishView(l *Loop, now time.Time) {
     if l.tracker == nil {
         return
@@ -75,10 +76,14 @@ func (h *cellHunter) publishView(l *Loop, now time.Time) {
     h.viewAt = now
     h.pruneKills(now)
     h.publishMesh(l)
+    // The persistent kill log publishes on every view tick, picked
+    // cell or not: the marks are the session death statistics of the
+    // bot, they survive the hunt stops and the rotations (the map
+    // layer owns the whole fleet read, issue #6).
+    l.tracker.SetKillMarks(h.mapKills)
     if h.picked < 0 {
         //nolint:exhaustruct_v5 // the zero view clears the record
         l.tracker.SetHuntingCellLive(state.CellLiveView{})
-        l.tracker.SetKillMarks(nil)
 
         return
     }
@@ -116,16 +121,4 @@ func (h *cellHunter) publishView(l *Loop, now time.Time) {
         view.KillY = int32(metric.killY)
     }
     l.tracker.SetHuntingCellLive(view)
-
-    // The kill ring: the fleet wide skull layer of the map.
-    marks := make([]state.KillMarkView, 0, len(h.kills))
-    for index := range h.kills {
-        kill := &h.kills[index]
-        //nolint:exhaustruct_v5 // BotID stays 0
-        marks = append(marks, state.KillMarkView{
-            X: kill.x, Y: kill.y, AtMs: kill.at.UnixMilli(),
-            Name: kill.name, Level: kill.level,
-        })
-    }
-    l.tracker.SetKillMarks(marks)
 }
