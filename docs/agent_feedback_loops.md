@@ -98,10 +98,11 @@ cheapest sufficient implementation.
   fight stats, trip counters, stall lists) and the compact report
   the agent actually reads after a 24 hour run.
 - The state dump (`GET /api/bots/{id}/dump`,
-  `tools/dump_state.sh`): build identity, character sheet, world
-  objects by distance, inventory, walk plan, combat events, chat,
-  the 600 entry event log - the offline reproduction artifact of
-  the dump-state-repro skill.
+  `tools/dump_state.sh`): build identity, character sheet, the buff
+  strip (every active effect with its level, remaining seconds and
+  the derived applied age), world objects by distance, inventory,
+  walk plan, combat events, chat, the 600 entry event log - the
+  offline reproduction artifact of the dump-state-repro skill.
 - The web API surface (`internal/swarm/webserver/server.go`):
   `/api/bots`, the per bot state/events/dump/commands, the fleet
   kills, the stats, the acceptance endpoints, the proxy status,
