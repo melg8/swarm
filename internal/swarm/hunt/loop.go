@@ -809,6 +809,13 @@ type Loop struct {
     // hemisphere (the straight ray plus the fan).
     kiteWalkDeadCells [1 + 2*kiteFanSteps][2]int32
     kiteWalkDeadCount int
+    // kiteDeadFor is the fight the dead-cell memory belongs to: the
+    // memory persists across the walk cycles of one target (the
+    // terrain does not change between the shots - the later cycles
+    // start on a lane that already proved walkable instead of paying
+    // the probe tax on the same dead straight cell every cycle) and
+    // resets on the target change.
+    kiteDeadFor int32
     // kite carries the tunable block of the kite fight (see
     // kite.go): the loop starts at DefaultKiteParams - the shipped
     // tuning the acceptance scenario pins - and the launch config

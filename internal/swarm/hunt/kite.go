@@ -256,11 +256,19 @@ const (
     // accepted click answers with the broadcast inside it.
     kiteProbeElapsed = 1200 * time.Millisecond
     // kiteRefusalAnswerWindow bounds the ActionFailed attribution of
-    // the kite clicks: the refusal answer of a refused endpoint
-    // arrives within the round trip (the acceptance dump shows it
-    // landing the same millisecond), so a failure older than this
-    // past the click belongs to some other request, not the click.
-    kiteRefusalAnswerWindow = time.Second
+    // the kite clicks: the genuine refusal answer of a refused
+    // endpoint arrives within the round trip (the acceptance dump
+    // shows it landing the same millisecond), so a failure older
+    // than one tick past the click belongs to some other request,
+    // not the click. The window is deliberately TIGHT: the server
+    // AI's own attack retries answer ActionFailed at a one-second
+    // cadence through the whole bow disable (Creature.doAttack
+    // schedules notifyActionReadyToAct a second ahead, each retry
+    // on a still-disabled bow bounces) - a wide window would
+    // misattribute that cadence to the kite clicks and rotate
+    // healthy endpoints away (the local acceptance round caught
+    // exactly that cascade before the tightening).
+    kiteRefusalAnswerWindow = 250 * time.Millisecond
     // kiteBowReuseDelay is the reuse delay of the bow family the
     // fleet shoots (the C1 item data: the Short Bow and the D-grade
     // bows carry 1500, dist/game/data/stats/items - the value feeds
@@ -480,8 +488,8 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
 
         return false
     }
-    stepX, stepY, found := l.kiteRetreatLane(
-        selfX, selfY, selfZ, dirX, dirY)
+    stepX, stepY, found := l.kiteRetreatLaneSkipping(
+        selfX, selfY, selfZ, dirX, dirY, l.kiteDeadCellsFor())
     if !found {
         // Cornered: no walkable lane in the whole away hemisphere.
         // The hold ground answer is the archetype rule - the bow is
@@ -558,8 +566,8 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
 
         return false
     }
-    stepX, stepY, found := l.kiteRetreatLane(
-        selfX, selfY, selfZ, dirX, dirY)
+    stepX, stepY, found := l.kiteRetreatLaneSkipping(
+        selfX, selfY, selfZ, dirX, dirY, l.kiteDeadCellsFor())
     if !found {
         // Cornered: the hold ground answer of the archetype rule.
         l.kiteHoldGround(now, false)
@@ -607,7 +615,19 @@ func (l *Loop) kiteIssueWalk(
     l.kiteReclickAt = now
     l.kiteReclicks = 0
     l.kiteWalkDead = false
-    l.kiteWalkDeadCount = 0
+    if l.kiteDeadFor != l.target {
+        // A fresh fight: the dead-cell memory of the previous
+        // target is history - the terrain refusal verdicts belong
+        // to the ground the OLD fight stood on. The memory of THIS
+        // target persists across the walk cycles (the cells the
+        // server refused stay refused - the terrain does not
+        // change between the shots, and the later cycles start on
+        // a lane that already proved walkable instead of paying
+        // the probe tax on the same dead straight cell every
+        // cycle).
+        l.kiteDeadFor = l.target
+        l.kiteWalkDeadCount = 0
+    }
     if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
         l.logger.Printf("Hunt: kite walk failed: %v", err)
     }
@@ -816,13 +836,20 @@ func (l *Loop) kiteReclickVerdict(
     now time.Time, selfX, selfY, selfZ int32, refused bool,
 ) bool {
     if refused && !l.kiteWalkDead {
-        // The evidence verdict: the server refused the endpoint cell
-        // outright - the probe line lands once per walk so the dump
-        // names the mechanism, the rotation follows at once.
+        // The evidence verdict: the server answered the click with
+        // ActionFailed inside the round trip. The probe line lands
+        // once per walk so the dump names the mechanism; the
+        // ROTATION itself waits for the probe age below - a refusal
+        // answer of the server AI's own attack retries (the bow
+        // disable path schedules them a second apart, each retry on
+        // a still-disabled bow bounces) rides the same packet and
+        // only the age gate separates it from the movement
+        // broadcast that may still be in flight for a healthy
+        // click.
         l.kiteWalkDead = true
         l.logger.Printf("Hunt: the kite walk click on target %d "+
             "was refused by the server (standing on %d %d), "+
-            "rotating the retreat lane at once",
+            "rotating the retreat lane at the probe age",
             l.target, selfX, selfY)
     } else if !refused && !l.kiteWalkDead &&
         now.Sub(l.kiteWalkIssuedAt) >= kiteProbeElapsed {
@@ -837,13 +864,21 @@ func (l *Loop) kiteReclickVerdict(
             "on %d %d), rotating the retreat lane",
             l.target, l.kiteReclicks+1, selfX, selfY)
     }
-    if !l.kiteWalkDead {
+    if !l.kiteWalkDead ||
+        now.Sub(l.kiteWalkIssuedAt) < kiteProbeElapsed {
+        // No verdict yet, or the walk is still younger than the
+        // broadcast gate: the re-click keeps hitting the endpoint -
+        // the spam the owner asked for, and the movement broadcast
+        // of a healthy click still gets its chance to clear the
+        // ladder before any rotation spends the fan battery.
         return true
     }
     if !l.kiteRotateDeadEndpoint(selfX, selfY, selfZ) {
         // The rotation found nothing: every candidate of the away
         // hemisphere is refused or blocked - the cornered answer
-        // owns the cycle, the next shot re-arms the retreat fresh.
+        // owns the cycle, the next shot re-arms the retreat fresh
+        // (the dead-cell memory persists per target, the next
+        // cycle starts on what the battery has left).
         l.logger.Printf("Hunt: no walkable retreat lane left on "+
             "target %d (every candidate refused or silent), "+
             "holding ground", l.target)
@@ -855,17 +890,34 @@ func (l *Loop) kiteReclickVerdict(
     return true
 }
 
+// kiteDeadCellsFor returns the dead-cell memory of the CURRENT
+// fight: the cells the server refused (or that stayed silent
+// through the probe) stay skipped by the initial lane resolution of
+// every later cycle of the same target - the terrain does not
+// change between the shots, and a cycle that starts on a lane that
+// already proved walkable never pays the probe tax on the same dead
+// straight cell again. A memory of another target (or an empty one)
+// answers nil - the plain resolution.
+func (l *Loop) kiteDeadCellsFor() [][2]int32 {
+    if l.kiteDeadFor != l.target || l.kiteWalkDeadCount == 0 {
+        return nil
+    }
+
+    return l.kiteWalkDeadCells[:l.kiteWalkDeadCount]
+}
+
 // kiteWalkClear stands the re-click ladder down: the endpoint fields
 // stay (they name the walk of record for the diagnostics), the gate
-// (kiteWalkUntil), the issue stamp, the click count, the probe latch
-// and the refused-cell set reset - the next kite step arms the
-// ladder whole through kiteIssueWalk.
+// (kiteWalkUntil), the issue stamp, the click count and the probe
+// latch reset - the next kite step arms the ladder whole through
+// kiteIssueWalk. The dead-cell memory STAYS: it belongs to the
+// target, not the walk, and the next cycle of the same fight skips
+// the cells the server already refused.
 func (l *Loop) kiteWalkClear() {
     l.kiteWalkUntil = time.Time{}
     l.kiteWalkIssuedAt = time.Time{}
     l.kiteReclicks = 0
     l.kiteWalkDead = false
-    l.kiteWalkDeadCount = 0
 }
 
 // kiteTrainDirection resolves the retreat DIRECTION of one kite
@@ -931,29 +983,20 @@ func (l *Loop) kiteTrainDirection(
     return sumX / sumLen, sumY / sumLen, false
 }
 
-// kiteRetreatLane resolves the retreat endpoint of one kite step:
+// kiteRetreatLaneSkipping resolves the retreat lane of one kite step:
 // the straight away-ray first, then the fan candidates at kiteFanStep
 // increments each side of it - the open backward lanes over the
-// blocked corridors, the hemisphere edge as the last resort. Every
-// candidate runs the full lane gate battery (the camp deflection,
-// the leash, the away half-plane, the wall and the water). Reports
-// the endpoint and whether a walkable lane exists.
-func (l *Loop) kiteRetreatLane(
-    selfX, selfY, selfZ int32, dirX, dirY float64,
-) (int32, int32, bool) {
-    return l.kiteRetreatLaneSkipping(
-        selfX, selfY, selfZ, dirX, dirY, nil)
-}
-
-// kiteRetreatLaneSkipping resolves the retreat lane exactly like
-// kiteRetreatLane minus the candidates whose RESOLVED endpoints sit
+// blocked corridors, the hemisphere edge as the last resort - minus
+// the candidates whose RESOLVED endpoints sit
 // in the dead set: the re-click ladder rotates a dead endpoint onto
 // the next fan candidate (the destination-cell refusal answer of
 // issue #60 - a cell the server refuses never starts a walk, so
 // clicking it again changes nothing) and the rotation needs the
 // lane battery to answer "which lane comes after these". An empty
 // dead set keeps every candidate (the plain resolution of the
-// first round). Reports the endpoint and whether a walkable lane
+// first round). Every candidate runs the full lane gate battery
+// (the camp deflection, the leash, the away half-plane, the wall
+// and the water). Reports the endpoint and whether a walkable lane
 // exists.
 func (l *Loop) kiteRetreatLaneSkipping(
     selfX, selfY, selfZ int32, dirX, dirY float64,

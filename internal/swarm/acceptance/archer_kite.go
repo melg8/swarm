@@ -234,10 +234,14 @@ const (
 )
 
 // The kite log line markers of the hunt loop (kite.go): the step
-// line narrates every retreat hop, the hold lines narrate the
-// cornered and the surrounded standing fights.
+// lines narrate every retreat hop - the proximity step ("kiting
+// clear") and the shot-paced rhythm step ("kiting the reload", the
+// issue #60 layer that fires at the own Attack broadcast and owns
+// the majority of the retreats since it merged) - and the hold
+// lines narrate the cornered and the surrounded standing fights.
 const (
     kiteStepMark = "kiting clear (step"
+    kiteShotMark = "kiting the reload"
     kiteHoldMark = "holding ground and shooting"
 )
 
@@ -264,7 +268,8 @@ func newArcherKiteLog(next func(string)) *archerKiteLog {
 // markers and forwards the line unchanged.
 func (l *archerKiteLog) line(line string) {
     l.mu.Lock()
-    if strings.Contains(line, kiteStepMark) {
+    if strings.Contains(line, kiteStepMark) ||
+        strings.Contains(line, kiteShotMark) {
         l.steps++
     }
     if strings.Contains(line, kiteHoldMark) {

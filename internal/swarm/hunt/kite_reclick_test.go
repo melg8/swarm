@@ -60,32 +60,43 @@ func TestKiteReclickLadderReissuesTheDeadClick(t *testing.T) {
         "a re-click inside the broadcast gate aims the same endpoint")
 }
 
-// TestKiteRefusalRotatesAtOnce pins the refusal-evidence rotation:
-// the server answered the kite click with ActionFailed (the instant
-// refusal the third-round acceptance dump shows - the MoveToLocation
-// handler refuses specific destination cells), so the ladder rotates
-// the endpoint onto the next fan candidate ON THE NEXT TICK, no
-// probe wait, no pacing wait - a refused cell never starts a walk.
-func TestKiteRefusalRotatesAtOnce(t *testing.T) {
+// TestKiteRefusalRotatesAtTheProbeAge pins the refusal-evidence
+// rotation: the server answered the kite click with ActionFailed
+// (the instant refusal the third-round acceptance dump shows - the
+// MoveToLocation handler refuses specific destination cells). The
+// verdict latches at once, the ROTATION lands at the probe age -
+// the age gate separates a genuine click refusal from the straggler
+// refusals of the server AI's own attack retries (the bow disable
+// path answers ActionFailed at a one-second cadence while the
+// character stands), and a young walk keeps its endpoint so the
+// movement broadcast of a healthy click still clears the ladder.
+func TestKiteRefusalRotatesAtTheProbeAge(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     loop.tick()
     require.Len(t, game.walks, 1)
 
-    // The server's refusal answer lands right after the click.
-    bot2 := loop.tracker
-    bot2.ApplyActionFailed(time.Now())
-
-    // The pacing is FRESH - the evidence alone must drive the
-    // re-click.
+    // The server's refusal answer lands right after the click: the
+    // verdict latches, the young walk keeps its endpoint (the age
+    // gate separates the straggler refusals of the server AI's own
+    // attack retries from a genuine click refusal).
+    loop.tracker.ApplyActionFailed(time.Now())
     loop.tick()
     require.Len(t, game.walks, 2,
-        "the refusal evidence re-clicks without waiting the pacing")
-    require.NotEqual(t, game.walks[0], game.walks[1],
-        "the refused endpoint rotated onto the fan lane")
-    require.Equal(t, [3]int32{44717, 49717, -3500}, game.walks[1],
-        "the rotation takes the next fan candidate")
+        "the young walk re-clicks its endpoint")
+    require.Equal(t, game.walks[0], game.walks[1],
+        "no rotation before the probe age")
     require.True(t, loop.kiteWalkDead,
         "the refusal evidence latched the dead verdict")
+
+    // The walk ages past the probe: the rotation lands.
+    ageKiteReclick(loop)
+    ageKiteWalkIssue(loop)
+    loop.tick()
+    require.Len(t, game.walks, 3)
+    require.NotEqual(t, game.walks[1], game.walks[2],
+        "the refused endpoint rotated onto the fan lane")
+    require.Equal(t, [3]int32{44717, 49717, -3500}, game.walks[2],
+        "the rotation takes the next fan candidate")
 }
 
 // TestKiteRefusalNeverReClicksTheRefusedCell pins the refused-cell
@@ -99,9 +110,11 @@ func TestKiteRefusalNeverReClicksTheRefusedCell(t *testing.T) {
     refused := map[[2]int32]bool{}
     for i := range 4 {
         loop.tracker.ApplyActionFailed(time.Now())
+        ageKiteReclick(loop)
+        ageKiteWalkIssue(loop)
         loop.tick()
         require.Len(t, game.walks, 2+i,
-            "each refusal rotates and re-clicks")
+            "each aged refusal rotates and re-clicks")
         endpoint := [2]int32{game.walks[1+i][0], game.walks[1+i][1]}
         require.False(t, refused[endpoint],
             "the rotation never re-clicks a refused cell: %v", endpoint)
@@ -147,14 +160,38 @@ func TestKiteRefusalWithNoLaneLeftStandsDown(t *testing.T) {
         "the straight lane carried the step")
     require.Equal(t, [3]int32{44600, 50000, -3500}, game.walks[0])
 
-    // The straight cell got refused: the rotation has no alternative
-    // lane (the fans are walled), the ladder stands down.
+    // The straight cell got refused and the walk aged past the
+    // probe: the rotation has no alternative lane (the fans are
+    // walled) and the verdict is old enough to trust - the ladder
+    // stands down.
     loop.tracker.ApplyActionFailed(time.Now())
+    ageKiteWalkIssue(loop)
     loop.tick()
     require.Len(t, game.walks, 1,
         "a rotation with no lane left sends no re-click")
     require.True(t, loop.kiteWalkUntil.IsZero(),
         "the ladder stood down")
+}
+
+// TestKiteYoungWalkSurvivesAStragglerRefusal pins the straggler
+// guard: the server AI's own attack retries answer ActionFailed at
+// a one second cadence through the bow disable, and a straggler of
+// that cadence on a YOUNG walk (the movement broadcast still in
+// flight) rotates the lane but never stands the ladder down - the
+// broadcast gate must get its chance, the walk keeps running.
+func TestKiteYoungWalkSurvivesAStragglerRefusal(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45200)
+    loop.tick()
+    require.Len(t, game.walks, 1)
+
+    // A straggler refusal answer lands right after the initial
+    // click (the walk is young - the broadcast gate still open).
+    loop.tracker.ApplyActionFailed(time.Now())
+    loop.tick()
+    require.Len(t, game.walks, 2,
+        "the young walk re-clicks through the straggler")
+    require.False(t, loop.kiteWalkUntil.IsZero(),
+        "a young walk survives the straggler refusal")
 }
 
 // TestKiteReclickLadderBoundsTheClicks pins the packet budget of
