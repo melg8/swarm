@@ -1107,6 +1107,124 @@ function runScenarioFacingNearContact(mapFile) {
     return results;
 }
 
+// runScenarioPackContact covers the pack fight (issue #7, the
+// "reappeared" round): a real melee is rarely a single pair - the
+// bot fights two or three melee mobs at once, every one of them at
+// the collision distance. The pairwise slide must separate the whole
+// pack (every pair of the pack touches face to face at full radii),
+// the units must not cross (the mob that started east of the
+// character stays east - the position and the look direction must
+// never mismatch) and nothing may shrink.
+function runScenarioPackContact(mapFile) {
+    const { MapView, record } = loadMapJs(mapFile);
+    MapView.init();
+    const snap = buildSnapshot(0, false);
+    // The pack: four melee mobs at 30 world units (3.6px on the
+    // harness canvas) east, west, south and north of the character,
+    // all in combat - the standard multi mob melee the fleet fights.
+    // The snapshot carries two npcs; the pack adds two more (fresh
+    // object ids, the same npc shape).
+    const spots = [
+        { dx: 30, dy: 0 }, { dx: -30, dy: 0 },
+        { dx: 0, dy: 30 }, { dx: 0, dy: -30 },
+    ];
+    const mobs = snap.objects.filter((o) => o.kind === "npc");
+    for (let i = 0; i < spots.length - mobs.length; i++) {
+        snap.objects.push({
+            objectId: 900 + i, kind: "npc",
+            name: "PackMob" + i,
+            x: WORLD.self.x, y: WORLD.self.y, z: -3500,
+            heading: 0, moving: false, speed: 0, targetId: 0,
+            dead: false, attackable: true, aggressive: false,
+            inCombat: false, level: 2
+        });
+    }
+    mobs.push(...snap.objects.filter((o) => o.kind === "npc"
+        && !mobs.includes(o)));
+    for (let i = 0; i < mobs.length && i < spots.length; i++) {
+        mobs[i].x = WORLD.self.x + spots[i].dx;
+        mobs[i].y = WORLD.self.y + spots[i].dy;
+        mobs[i].inCombat = true;
+    }
+    MapView.update(snap);
+    MapView.draw();
+
+    const results = [];
+    // The unit body fill of one draw pass: the harness records the
+    // whole paint twice (the update warm up and the explicit draw),
+    // so the bodies dedupe by style and position - the checks read
+    // the geometry, the duplicate paint call is harness noise.
+    const seen = new Map();
+    for (const fill of record.fills) {
+        if (fill.arcs.length !== 1) { continue; }
+        if (fill.style !== MARK.self && fill.style !== MARK.combat
+            && fill.style !== MARK.passive) { continue; }
+        const key = fill.style + ":" + fill.arcs[0][0].toFixed(1)
+            + ":" + fill.arcs[0][1].toFixed(1);
+        if (!seen.has(key)) { seen.set(key, fill); }
+    }
+    const bodies = [...seen.values()];
+    check(results, "every pack unit body drew", bodies.length === 5,
+        "bodies: " + bodies.length + " at " + bodies.map((b) =>
+            String(b.style) + " " + Math.round(b.arcs[0][0]) + ","
+            + Math.round(b.arcs[0][1]) + " r"
+            + b.arcs[0][2].toFixed(1)).join(" | "));
+
+    // Full radii everywhere: nothing in the pack shrinks.
+    const shrunken = bodies.filter((b) =>
+        Math.abs(b.arcs[0][2] - 6) > 0.5);
+    check(results, "no pack circle shrinks",
+        shrunken.length === 0,
+        "offending radii: " + shrunken.map((b) =>
+            b.arcs[0][2].toFixed(1)).join(", "));
+
+    // Every pair of the pack separates to at least the touch
+    // distance (the sum of the radii minus the measurement slack).
+    let worst = 0;
+    for (let i = 0; i < bodies.length; i++) {
+        for (let j = i + 1; j < bodies.length; j++) {
+            const d = Math.hypot(
+                bodies[j].arcs[0][0] - bodies[i].arcs[0][0],
+                bodies[j].arcs[0][1] - bodies[i].arcs[0][1]);
+            const sum = bodies[i].arcs[0][2] + bodies[j].arcs[0][2];
+            if (d < sum - 0.75) { worst = Math.max(worst, sum - d); }
+        }
+    }
+    check(results, "the pack separates without overlaps",
+        worst < 0.75,
+        "worst overlap depth: " + worst.toFixed(2));
+
+    // The east mob stays east of the character, the west mob west,
+    // the south mob south, the north mob north - the pack separates
+    // outward, never crossing through the character to the wrong
+    // side (the position and the look direction stay consistent).
+    const cx = CANVAS_W / 2;
+    const cy = CANVAS_H / 2;
+    const selfBody = bodies.find((b) => b.style === MARK.self);
+    const east = bodies.find((b) => b !== selfBody
+        && b.arcs[0][0] > cx + 2 && Math.abs(b.arcs[0][1] - cy) < 6);
+    const west = bodies.find((b) => b !== selfBody
+        && b.arcs[0][0] < cx - 2 && Math.abs(b.arcs[0][1] - cy) < 6);
+    const south = bodies.find((b) => b !== selfBody
+        && b.arcs[0][1] > cy + 2 && Math.abs(b.arcs[0][0] - cx) < 6);
+    const north = bodies.find((b) => b !== selfBody
+        && b.arcs[0][1] < cy - 2 && Math.abs(b.arcs[0][0] - cx) < 6);
+    check(results, "the east mob stays east of the self",
+        !!east && !!selfBody && east.arcs[0][0] > selfBody.arcs[0][0],
+        "east: " + (east && east.arcs[0][0]));
+    check(results, "the west mob stays west of the self",
+        !!west && !!selfBody && west.arcs[0][0] < selfBody.arcs[0][0],
+        "west: " + (west && west.arcs[0][0]));
+    check(results, "the south mob stays south of the self",
+        !!south && !!selfBody && south.arcs[0][1] > selfBody.arcs[0][1],
+        "south: " + (south && south.arcs[0][1]));
+    check(results, "the north mob stays north of the self",
+        !!north && !!selfBody && north.arcs[0][1] < selfBody.arcs[0][1],
+        "north: " + (north && north.arcs[0][1]));
+
+    return results;
+}
+
 function runScenario(mapFile, verbose) {
     const { MapView, record } = loadMapJs(mapFile);
     MapView.init();
@@ -2131,6 +2249,7 @@ function main() {
         ["stacked contact", runScenarioStackedContact(mapFile)],
         ["facing contact", runScenarioFacingContact(mapFile)],
         ["facing near contact", runScenarioFacingNearContact(mapFile)],
+        ["pack contact", runScenarioPackContact(mapFile)],
         ["cast icon", runScenarioCastIcon(mapFile)],
         ["bow shot", runScenarioBowShot(mapFile)],
         ["resting marker", runScenarioRestMarker(mapFile)],

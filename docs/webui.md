@@ -142,11 +142,20 @@ colors from the same variables).
   slightly above the center, tick slate on the gray body (the issue #6
   icon round, the "x eyes" variant) - so a corpse reads "killed here"
   instead of a faded alive mob. Overlapping markers never shrink
-  and never merge: the contact pass slides the overlapping pair apart
-  at its full radii until the circles touch face to face, and a pair
-  that meets too tight (closer than the packet jitter) separates along
-  the shared look line - each unit backs away from what it looks at -
-  so the slide direction can never mismatch the direction ticks.
+  and never merge: the contact pass slides the overlapping units
+  apart at their full radii until the circles touch face to face.
+  The pass relaxes the whole pack (the accumulated pushes of every
+  overlapping pair apply once per round, a few rounds until no pair
+  overlaps), so a real melee - the bot fighting two or three mobs
+  at once - spreads radially instead of piling onto one line, and
+  no unit crosses through another to the wrong side. A pair that
+  meets too tight (closer than the packet jitter) separates along
+  the shared look line when both units' look lines agree as one
+  line - each unit backs away from what it looks at - so the slide
+  direction can never mismatch the direction ticks; a tight pair
+  whose look lines disagree (the bot looks east, a second mob closes
+  from the south) falls back to the true connecting axis, which the
+  pack needs to spread instead of collapsing onto one look line.
 - Map target links: the map renders the selection of every visible
   player, not only the own one. The own target is a red dashed line
   with a ring; the targets of other players are violet dashed lines
