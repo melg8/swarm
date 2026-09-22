@@ -185,6 +185,12 @@ func TestNPCClanMask(t *testing.T) {
 }
 
 func TestNPCWireTemplateID(t *testing.T) {
+    t.Run("mapped internal id translates to the wire id", func(t *testing.T) {
+        // The converter table maps the Mobius xml id onto the C4
+        // display id plus the 1000000 wire offset.
+        require.Equal(t, int32(1012077), NPCWireTemplateID(12077))
+    })
+
     t.Run("unmapped id passes through unchanged", func(t *testing.T) {
         // An id not in the converter table returns itself.
         require.Equal(t, int32(123456789), NPCWireTemplateID(123456789))

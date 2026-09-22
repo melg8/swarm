@@ -9038,3 +9038,57 @@ styles, buffs.js, style.css, the state tracker), the owner prompt of
 - Verification: all nine web UI harnesses green (repro_map_render
   grown to 114 checks), the whitespace gate clean, node --check
   clean; no Go source touched, the change is web only.
+
+## Round 129: the coverage reporting repaired and the packet builder error paths walked (2026-09-21, branch feature/coverage-reporting, issue #9)
+
+- Report: the coverage reporting task of issue #9 ("Improve test
+  coverage") delivered in three pieces: the repaired
+  `tools/coverage_delta.sh` (the `test:cover` task), the fresh
+  per package baseline committed to `runs/coverage-latest.txt`, and
+  the packet builder error paths turned from structurally dead
+  coverage into live tests.
+
+- The tool bug: the first python block of `coverage_delta.sh` read
+  `rowsatch.group(1)]` - a dropped `[m` of `rows[match.group(1)]`
+  that syntax-errors the parser the moment the suite finishes, so
+  the tool could never complete a run in that shape and the
+  committed baseline drifted silently. Repaired to the intended
+  `rows[match.group(1)]`; the whole tree run (~4.5 min, inside the
+  6 minute cap) now completes and prints the per package delta
+  table against the committed baseline.
+
+- The dead coverage finding: `packet.Writer` embeds
+  `bytes.Buffer`, whose writes never fail - so every guarded
+  `if err := writer.WriteInt32(...); err != nil` of the packet
+  builders was unreachable and the builder packages sat at 65-78%
+  coverage with ALL of their behavior already tested. The honest
+  fix is a test seam, not a rewrite: `Writer.FailWrites(err)` arms
+  a sticky failure and `Writer.FailWritesAfter(n, err)` arms a
+  counted one (the first n writes pass), six lines of production
+  code, nil default keeps production behavior byte identical.
+
+- The walk: `TestEveryBuilderPropagatesTheArmedWriteFailure`
+  (to_game_server, 24 builders) and
+  `TestEveryAuthBuilderPropagatesTheArmedWriteFailure`
+  (to_auth_server, 4 builders) step the arm position through the
+  whole write sequence - at every position the injected error must
+  surface from `ToBytes` (no swallow, no panic, no success over a
+  partial packet). `TestFailWritesAfterCountsTheWritesDown` pins
+  the seam itself (the budget writes land, the rest fail).
+
+- Numbers: to_game_server 65.3 -> 97.9 (+32.6 pp), to_auth_server
+  78.1 -> 98.6 (+20.5 pp), the packet package holds 100.0%. The
+  refreshed baseline also surfaced three REAL drifts that predate
+  this round (measured on the tree before any test change):
+  acceptance 33.0 -> 27.8, npcdata 85.6 -> 82.5, connection
+  76.3 -> 73.9 - the recent feature rounds (#12/#17/#18 stacks)
+  added uncovered statements; the baseline now tracks them and the
+  follow-up test rounds can start from the honest numbers.
+
+- Still open on #9 (recorded in the issue): cmd/swarm 11.4% (the
+  main.go wiring - the launch config logic itself is tested), the
+  live-stack-bound orchestration packages (acceptance 27.8%,
+  huntaudit 24.3%, botlog 37.3% - their flows need the game
+  server; unit seams are a design round of their own), and the
+  eight probe cmd tools at 0% (thin dev tooling around tested
+  libraries).
