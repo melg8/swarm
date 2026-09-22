@@ -1,4 +1,4 @@
-# The coverage reporting continuation - the merge refresh and the top-up rounds (status: in progress)
+# The coverage reporting continuation - the merge refresh and the top-up rounds (status: in review)
 
 Started 2026-09-22, branch feature/coverage-reporting, issue #9.
 
@@ -75,3 +75,15 @@ the top-up round for the drift packages.
 The merge + top-up work is complete on the branch; next: push, the
 CI verdict (verify, coverage, acceptance-list), then the issue
 comment and the board move to Ready for review.
+
+### 2026-09-22 09:05 UTC - the round closes
+- Pushed 15b3270: CI verify, coverage and acceptance-list all
+  success, the PR mergeable clean against main.
+- The issue comment carries the round report; the board card sits
+  in Ready for review.
+
+## Status (final)
+
+In review: PR #24 head 15b3270, green, mergeable. The next round of
+this issue (if it reopens) starts from the remaining candidates list
+in the issue comment.
