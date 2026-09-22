@@ -120,3 +120,22 @@ In review: PR #24 head dc75e52. The connection package is at 86.2
 with every dispatch path, sender and observer under test. The
 remaining #9 candidates: the live-stack packages (a design round),
 the cmd/swarm wiring, the probe tool smoke pass.
+
+### 2026-09-22 10:25 UTC - round four: the probe tool smoke pass
+- The eight 0% cmd tools all carry tests now: navmesh-export 25.0
+  (the region spec and the endpoint parsers), navmesh-build 28.1
+  (the region selection: the spec forms and the directory scan),
+  navanalyze 16.0 (the z fight counter on synthetic tiles),
+  cornerprobe 7.1 (the leg height back extrapolation, the adapters,
+  the hunt navigator filter mirror), dbpos 22.2 (the plain name
+  filter), counterprobe 2.5 (the id parse, the region path
+  arithmetic, the key readback), geotest 58.8 and stuckprobe 47.6
+  (the missing-data smoke runs: no panic, clean exit).
+- The baseline gains the eight tool lines (36 packages total).
+- Gates: build, vet, lint 0 issues, fmt clean, logfmt green.
+
+## Status (round four)
+
+The smoke pass is on the branch; next: push, CI, the issue comment
+and the board move. The remaining #9 candidates stay the live-stack
+seam design round and the cmd/swarm wiring.

@@ -1,5 +1,13 @@
 github.com/melg8/swarm/cmd/benchdiff 75.3
+github.com/melg8/swarm/cmd/cornerprobe 7.1
+github.com/melg8/swarm/cmd/counterprobe 2.5
+github.com/melg8/swarm/cmd/dbpos 22.2
+github.com/melg8/swarm/cmd/geotest 58.8
 github.com/melg8/swarm/cmd/gofmt-spaces 84.5
+github.com/melg8/swarm/cmd/navanalyze 16.0
+github.com/melg8/swarm/cmd/navmesh-build 28.1
+github.com/melg8/swarm/cmd/navmesh-export 25.0
+github.com/melg8/swarm/cmd/stuckprobe 47.6
 github.com/melg8/swarm/cmd/swarm 19.6
 github.com/melg8/swarm/internal/logfmt 87.8
 github.com/melg8/swarm/internal/swarm/acceptance 27.8
