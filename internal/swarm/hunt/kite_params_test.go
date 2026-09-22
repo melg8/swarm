@@ -53,11 +53,12 @@ func TestKiteDisabledRunsTheStandingFight(t *testing.T) {
 // retreat radius arms the step from farther out - the fight picks
 // the bigger optimal band the config names, nothing else changes
 // (the step length and the direction ride their own knobs and the
-// train geometry).
+// train geometry). The chase-fresh scene keeps the shot-paced rhythm
+// out of the answer: the widened radius itself must arm the step.
 func TestKiteParamsWidenTheRetreatRadius(t *testing.T) {
     // 300 units out: beyond the shipped trigger, inside the widened
     // one.
-    _, game, loop := kiteBowBot(t, 45300)
+    _, game, loop := kiteBowBotChaseFresh(t, 45300)
     loop.SetKiteParams(KiteParams{
         Enabled:       true,
         RetreatRadius: 400,
