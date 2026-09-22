@@ -32,7 +32,7 @@ func TestFakePattern(t *testing.T) {
             continue
         }
         rl, err := extractRegion(data, col, row,
-            DefaultOptions().DedupDelta)
+            DefaultOptions().DedupDelta, 0)
         if err != nil {
             continue
         }

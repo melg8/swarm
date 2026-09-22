@@ -74,7 +74,7 @@ func auditRegionInteriorWalls(t *testing.T, col, row int16) {
     t.Helper()
     data := realRegionData(t, col, row)
     opts := DefaultOptions()
-    rl, err := extractRegion(data, col, row, opts.DedupDelta)
+    rl, err := extractRegion(data, col, row, opts.DedupDelta, 0)
     require.NoError(t, err)
     sh := assignSheets(rl, opts.Climb, opts.MinSheetLayers)
     _, polyAt := buildRects(rl, sh, opts.Climb)

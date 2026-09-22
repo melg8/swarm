@@ -53,11 +53,18 @@ func main() {
             "height 0, fully open) with the nearest real surface blend "+
             "(the bay filler turns into the sea floor water, the land "+
             "gaps into the connecting ground)")
+    heightStep := flag.Int("height-step", 0,
+        "snap every cell height to the nearest multiple of the step "+
+            "before the decomposition (0 keeps the exact geodata "+
+            "heights; the height quantization evaluation of issue #56 "+
+            "measures the candidate steps 16, 24, 32, 40 - the 40 "+
+            "unit climb limit bounds the walkable verdict noise)")
     flag.Parse()
 
     opts := navbuild.DefaultOptions()
     opts.Workers = *workers
     opts.RepairFake = *repairFake
+    opts.HeightStep = int32(*heightStep)
     if err := run(*geodataDir, *outDir, *regions, *force, *compress,
         opts); err != nil {
         fmt.Println("Error:", err)

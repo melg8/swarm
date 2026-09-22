@@ -50,7 +50,7 @@ func loadRegionForDump(t *testing.T, col int16,
     if err != nil {
         t.Fatalf("region %d_22: %v", col, err)
     }
-    rl, err := extractRegion(data, col, 22, DefaultOptions().DedupDelta)
+    rl, err := extractRegion(data, col, 22, DefaultOptions().DedupDelta, 0)
     if err != nil {
         t.Fatalf("region %d_22: %v", col, err)
     }

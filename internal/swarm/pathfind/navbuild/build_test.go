@@ -351,7 +351,7 @@ func TestExtractRegionDedupNoise(t *testing.T) {
         }
     })
 
-    rl, err := extractRegion(data, 21, 19, DefaultOptions().DedupDelta)
+    rl, err := extractRegion(data, 21, 19, DefaultOptions().DedupDelta, 0)
     require.NoError(t, err)
 
     // The measured pair collapses to the higher open surface.

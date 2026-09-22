@@ -57,7 +57,7 @@ type regionLayers struct {
 // the same surface twice with a small jitter, and no real walkable
 // geometry stacks two surfaces 32 units apart in one cell).
 func extractRegion(
-    data []byte, col, row int16, dedupDelta int32,
+    data []byte, col, row int16, dedupDelta int32, heightStep int32,
 ) (*regionLayers, error) {
     region, err := pathfind.ParseRegionData(data,
         pathfind.RegionKey{Col: col, Row: row})
@@ -84,12 +84,20 @@ func extractRegion(
             kept := int16(0)
             count := 0
             for _, layer := range stack {
+                height := layer.Height
+                if heightStep > 1 {
+                    // The height quantization of the structural
+                    // round (#56): the snap runs before the dedup
+                    // and the decomposition, the whole downstream
+                    // sees the coarser grid as the geodata truth.
+                    height = snapHeight(height, heightStep)
+                }
                 if count > 0 &&
-                    abs16(layer.Height-kept) <= dedupDelta {
+                    abs16(height-kept) <= dedupDelta {
                     // The within-delta duplicate: keep the higher
                     // surface (the one the character stands on).
-                    if layer.Height > kept {
-                        kept = layer.Height
+                    if height > kept {
+                        kept = height
                         flat.layers[len(flat.layers)-1] = cellLayer{
                             h: kept, nswe: layer.NSWE}
                     }
@@ -97,9 +105,9 @@ func extractRegion(
                     continue
                 }
                 flat.layers = append(flat.layers, cellLayer{
-                    h: layer.Height, nswe: layer.NSWE})
+                    h: height, nswe: layer.NSWE})
                 flat.cellIndexOf = append(flat.cellIndexOf, int32(idx))
-                kept = layer.Height
+                kept = height
                 count++
             }
             flat.cellCnt[idx] = uint16(count)
@@ -107,6 +115,23 @@ func extractRegion(
     }
 
     return flat, nil
+}
+
+// snapHeight rounds one cell height to the nearest multiple of the
+// step (ties round away from zero so the snap of a half step never
+// collapses onto the wrong side of the surface). The step must
+// exceed 1 (the callers gate it).
+func snapHeight(h int16, step int32) int16 {
+    v := int32(h)
+    q := v / step
+    r := v - q*step
+    if r*2 >= step {
+        q++
+    } else if r*2 <= -step {
+        q--
+    }
+
+    return int16(q * step)
 }
 
 // abs16 is the absolute value of an int16 as int32.
