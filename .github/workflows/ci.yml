@@ -13,10 +13,17 @@
 # one source of version truth.
 name: ci
 
+# The trigger split: pushes run the gate on main only, every
+# branch's code arrives through its pull request (the pull_request
+# event runs the same jobs on the PR merge ref). The old push on
+# every branch made each PR branch push start TWO identical runs
+# on the same source - one push, one pull_request - burning the
+# runner minutes twice per commit (observed on the PR #39 head:
+# runs 35695083356 and 35695086553, same sha, same verdicts).
 on:
   push:
     branches:
-      - '**'
+      - main
   pull_request:
   workflow_dispatch:
 

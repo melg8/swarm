@@ -22,10 +22,16 @@
 # one source of version truth.
 name: ci
 
+# The trigger split: pushes run the gate on main only, every
+# branch's code arrives through its pull request (the pull_request
+# event runs the same jobs on the PR merge ref). The old push on
+# every branch made each PR branch push start TWO identical runs
+# on the same source - one push, one pull_request - burning the
+# runner minutes twice per commit.
 on:
   push:
     branches:
-      - '**'
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -93,3 +99,33 @@ jobs:
           for id in soak farm-readiness bot-lifetime proxy-relay; do
             echo "$output" | grep -q "$id" || { echo "Error missing scenario id $id"; exit 1; }
           done
+
+  coverage:
+    # The coverage report of the issue #9 baseline: the suite runs
+    # with -cover, the per package summary compares against the
+    # committed runs/coverage-latest.txt (the coverage_delta.sh gate
+    # fails the job on a per package drop beyond 2.0 pp) and the HTML
+    # profile uploads as an artifact for the drill down. The ranked
+    # worst-first table lands in the job log (the audit view of
+    # tools/coverage_report.sh), so the next tests to write name
+    # themselves on every push.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Coverage with the per package delta gate
+        run: bash tools/coverage_delta.sh
+
+      - name: The worst-first audit report
+        run: bash tools/coverage_report.sh
+
+      - name: Upload the HTML coverage profile
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: runs/cover.out
