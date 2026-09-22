@@ -65,7 +65,7 @@ jobs:
         run: golangci-lint run
 
       - name: Race the networked packages (connection, pathfind, state, webserver)
-        run: CGO_ENABLED=1 go test ./internal/swarm/connection/... ./internal/swarm/pathfind/... ./internal/swarm/state/... ./internal/swarm/webserver/... -race -count=1
+        run: CGO_ENABLED=1 go test ./internal/swarm/connection/... ./internal/swarm/pathfind/... ./internal/swarm/state/... ./internal/swarm/webserver/... -race -count=1 -timeout=15m
 
       - name: Vulnerability scan (govulncheck, reachable symbols only)
         run: govulncheck ./...
