@@ -1,4 +1,4 @@
-# The archetype integration branch rides the new main (status: in progress)
+# The archetype integration branch rides the new main (status: in review)
 
 Started 2026-09-22, branch feature/archer-archetype-check, issue #21.
 
@@ -68,6 +68,12 @@ budget.
 
 ## Status
 
-The fixes are committed locally; the push and the CI watch are the
-next step. After green: report in issue #21, move to Ready for
-review, remove the claim message.
+The push landed (a335d69..c0d0024): PR #31 mergeable clean, all
+11 CI checks of the sharded workflow green on head c0d0024 (verify,
+coverage with the refreshed baseline, acceptance-list, the lint
+step and every race shard). The issue report is posted; the board
+moves to Ready for review. The follow-up rounds to watch: the slice
+PRs (#15, #16, #23, #25) - once they land on main, this PR collapses
+to the contract test and the merge structure alone (the previous
+round's note); the live-stack acceptance and the tuning stay with
+issue #20.
