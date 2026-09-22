@@ -755,6 +755,46 @@ type Loop struct {
     // the hold re-probes at the kite period, not every tick, and the
     // diagnostic line lands once per hold episode.
     kiteHeldAt time.Time
+    // kiteWalkX/Y/Z carry the endpoint of the in-flight kite retreat
+    // walk: the re-click ladder (see kiteReclickWalk, kite.go, issue
+    // #60 the second round) re-issues the click toward exactly this
+    // cell while the movement window runs and the character stands
+    // still on the issue cell - the single click of the first round
+    // died silently too often (the stance transition swallow, the
+    // endpoint cell refusal, the H-006 silent drop) and the
+    // character stood through the whole bow reload the owner's dump
+    // reports. The fields arm through kiteIssueWalk and clear with
+    // the ladder (a fresh step re-arms them whole).
+    kiteWalkX int32
+    kiteWalkY int32
+    kiteWalkZ int32
+    // kiteWalkUntil bounds the re-click ladder with the same window
+    // the kite step set (kiteStepWindow plus the re-engage delay):
+    // past it the forced attack re-request owns the tick, and a
+    // re-click would only fight the re-engage for the movement. The
+    // zero value disarms the ladder.
+    kiteWalkUntil time.Time
+    // kiteWalkBaseX/Y is the cell the kite walk was issued from -
+    // the ladder's dead-click oracle: a character still standing on
+    // this cell past the probe pace never moved whatever the
+    // next dump says about the clicks, and a character that left it
+    // tells the ladder the click moved something after all.
+    kiteWalkBaseX int32
+    kiteWalkBaseY int32
+    // kiteReclickAt stamps the last click of the ladder (the initial
+    // click included): the kiteReclickPeriod pacing rides it.
+    kiteReclickAt time.Time
+    // kiteReclicks counts the re-clicks spent on the current kite
+    // walk: the probe ordinal and the rotation read it - the second
+    // re-click latches the dead-click probe and rotates the dead
+    // endpoint onto the next fan candidate, the third is the last
+    // try of the rotated lane inside the window.
+    kiteReclicks int
+    // kiteWalkDead latches the probe verdict of the current walk:
+    // one diagnostic line per walk, the next dump reads the latch
+    // (and the rotation that follows it) to name the mechanism that
+    // ate the clicks.
+    kiteWalkDead bool
     // kite carries the tunable block of the kite fight (see
     // kite.go): the loop starts at DefaultKiteParams - the shipped
     // tuning the acceptance scenario pins - and the launch config
@@ -1187,6 +1227,8 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         combatAvoidScanAt:   time.Time{},
         combatAvoidAt:       time.Time{},
         combatAvoidUntil:    time.Time{},
+        kiteWalkUntil:       time.Time{},
+        kiteReclickAt:       time.Time{},
         fleeAt:              time.Time{},
         fleeSince:           time.Time{},
         panicAt:             time.Time{},
@@ -2116,6 +2158,25 @@ func (l *Loop) engage() {
             // keeps running otherwise.
             l.maybeBeginLure(now)
         }
+    }
+    // The re-click ladder of the kite walk (see kite.go, issue #60,
+    // the second round): the retreat click of the kite proved
+    // fragile three ways (the stance transition swallow, the
+    // endpoint cell refusal, the H-006 silent drop) and the single
+    // click of the first round left the character standing through
+    // the whole bow reload the owner's dump reports. The ladder
+    // re-issues the click while the walk window runs and the
+    // character stands still on the issue cell - the manual
+    // behavior the owner demonstrated ("i can manually start
+    // clicking behind character and it runs 2 seconds no problem,
+    // covering large distance, and bot can replicate it right
+    // now"). It ticks HERE, ahead of the fight flag branch, so it
+    // runs whether the server still holds the fighting stance or
+    // the walk already tore it down - the dead click must not wait
+    // for a flag that says the character is fighting when the dump
+    // says it stands.
+    if l.kiteReclickWalk(now) {
+        return
     }
     if l.tracker.SelfFighting(l.target) {
         if l.lureArmed() && l.lureTick(now) {

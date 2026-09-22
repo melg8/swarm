@@ -96,6 +96,27 @@ package hunt
 // shuffle bound exists for the swing-starving race, the rhythm keeps
 // shooting once per cooldown.
 //
+// The re-click ladder of the issue #60 second round owns the WALK
+// of the retreat: the owner's follow-up dump showed the rhythm
+// trigger working (a "shot released" line every cycle) with the
+// character still standing through every reload ("moving: no",
+// the mob closing ~380 units per cycle) - the single retreat click
+// barely executed. The manual clicking the owner demonstrated
+// ("clicking behind the character runs 2 seconds no problem") is
+// the recovery the ladder replicates: while the movement window
+// runs and the character stands still on the issue cell, the click
+// goes out again at the 600ms pace - the same endpoint first, then
+// (once the probe names the endpoint click dead at the second
+// re-click) the next fan candidate, then the rotated endpoint once
+// more. The three candidate mechanisms the ladder answers: the
+// stance transition swallow (the click lands while the server side
+// ATTACK intention of the just-broadcast shot is still tearing
+// down), the destination-cell refusal (the server refuses the cell
+// the bot side LineOfSight blessed) and the H-006 silent drop (the
+// deployment that swallows accepted move requests). The probe line
+// and the rotation line of the ladder are the dump markers that
+// name which mechanism ate the clicks of a given fight.
+//
 // The behavior arms itself on the weapon in hand (bowEquipped): no
 // config, no class check - whatever bot ends up holding a bow (the
 // planned archer type of the config launch, a lured guard round)
@@ -202,6 +223,44 @@ const (
     // first second of the bow cooldown, before the chaser eats the
     // opened gap back.
     kiteShotWindow = 700 * time.Millisecond
+    // kiteReclickPeriod paces the re-click ladder of the kite walk
+    // (issue #60, the second round - the owner feedback: the bot
+    // click "doesnt cover enough distance, dont start running",
+    // while the manual clicking behind the character "runs 2
+    // seconds no problem, covering large distance"): while the kite
+    // movement window runs and the character still stands on the
+    // issue cell, the retreat click goes out again at this pace -
+    // the manual behavior the owner demonstrated, replicated by
+    // the bot one click at a time. The period sits under the
+    // server's once per second movement broadcast gate on purpose:
+    // an accepted click may take up to a second to answer with the
+    // broadcast, and a re-click that lands inside that gate just
+    // re-aims the same endpoint server-side (the walk continues,
+    // the click is not wasted) - exactly what the repeated manual
+    // clicks do.
+    kiteReclickPeriod = 600 * time.Millisecond
+    // kiteReclickLimit bounds the re-clicks of one kite walk: the
+    // initial click plus this many re-issues inside the 2s movement
+    // window at the 600ms pace (the fourth re-click would fall past
+    // the window anyway - the bound pins the log and packet budget
+    // of a dead transport instead of relying on the window alone).
+    kiteReclickLimit = 3
+    // kiteReclickProbe is the re-click ordinal that arms the probe
+    // and the rotation: the first re-click (roughly 600ms past the
+    // initial click) retries the same endpoint - the stance
+    // transition swallow (the click lands ~250ms after the own
+    // Attack broadcast while the server side ATTACK intention is
+    // still tearing down) clears on a plain retry, and at 600ms the
+    // broadcast of a healthy accepted click may legitimately not
+    // have arrived yet, so no verdict is possible. The second
+    // re-click (roughly 1.2s past the issue, past the broadcast
+    // gate plus the pacing headroom) is the evidence point: a
+    // character still standing on the issue cell names the endpoint
+    // click dead, the probe line lands once per walk and the dead
+    // endpoint rotates onto the next fan candidate (the
+    // destination-cell refusal answer - a cell the server refuses
+    // never starts a walk, clicking it again changes nothing).
+    kiteReclickProbe = 2
 )
 
 // KiteParams is the tunable block of the kite fight (owner issue
@@ -433,9 +492,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
         "fight on %d, kiting clear (step %d of %d)",
         threatID, int(math.Round(dist)), l.target,
         l.kiteStreak, kiteStreakLimit)
-    if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
-        l.logger.Printf("Hunt: kite walk failed: %v", err)
-    }
+    l.kiteIssueWalk(now, selfX, selfY, selfZ, stepX, stepY)
 
     return true
 }
@@ -506,11 +563,168 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
     l.logger.Printf("Hunt: shot released on %d, hostile %d holds "+
         "%d units, kiting the reload", l.target, threatID,
         int(math.Round(dist)))
+    l.kiteIssueWalk(now, selfX, selfY, selfZ, stepX, stepY)
+
+    return true
+}
+
+// kiteIssueWalk sends the retreat click of one kite step and arms
+// the re-click ladder on it (issue #60, the second round): the walk
+// endpoint, the issue cell and the window land in the ladder state
+// (see kiteReclickWalk) so the dead-click recovery - the repeated
+// click the owner's manual evidence names - rides the SAME retreat
+// instead of the character standing through the reload a swallowed
+// click leaves it. Both kite layers (the shot-paced rhythm and the
+// proximity path) issue their walks through this one seam; a fresh
+// step resets the ladder whole (a walk already in flight owns the
+// movement, the layer gates hold the double step).
+func (l *Loop) kiteIssueWalk(
+    now time.Time, selfX, selfY, selfZ, stepX, stepY int32,
+) {
+    l.kiteWalkX, l.kiteWalkY, l.kiteWalkZ = stepX, stepY, selfZ
+    l.kiteWalkBaseX, l.kiteWalkBaseY = selfX, selfY
+    l.kiteWalkUntil = now.Add(kiteStepWindow + l.kite.ReengageDelay)
+    l.kiteReclickAt = now
+    l.kiteReclicks = 0
+    l.kiteWalkDead = false
     if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
         l.logger.Printf("Hunt: kite walk failed: %v", err)
     }
+}
+
+// kiteReclickWalk is the re-click ladder of the kite retreat (issue
+// #60, the second round): the single retreat click of the first
+// round proved fragile three ways, and the owner's dump shows the
+// character standing through the whole bow reload while the mob
+// closed - "moving: no" through every kite cycle. The three
+// candidate mechanisms: the stance transition swallow (the click
+// lands ~250ms after the character's own Attack broadcast while the
+// server side ATTACK intention is still tearing down - the shot
+// itself just ran stopMove on the pre-shot move; the manual click
+// at an arbitrary time runs fine, the kite click does not), the
+// destination-cell refusal (the C1 MoveToLocation handler answers
+// ActionFailed for a destination the bot side LineOfSight blessed -
+// isCompletelyBlocked on the cell, a door on the lane, the
+// out-of-control guard) and the H-006 silent drop (the deployment
+// that swallows accepted move requests). The ladder answers all
+// three with the manual behavior itself: while the movement window
+// runs, the character stands still on the issue cell and the pacing
+// ages, the click goes out again - the same endpoint first (the
+// stance swallow clears on the plain retry), then, once the probe
+// names the endpoint click dead (still no movement past the probe
+// ordinal), the next fan candidate (the cell refusal clears), then
+// the rotated endpoint once more (the silent drop gets its extra
+// try). The ladder stands down when the walk runs (the movement
+// broadcasts - the SelfWalking oracle), when the window ends (the
+// forced attack re-request owns the tick) or when the character
+// left the issue cell (the click moved something after all).
+// Reports whether this tick spent a re-click so the caller yields
+// the tick to the walk.
+func (l *Loop) kiteReclickWalk(now time.Time) bool {
+    if l.kiteWalkUntil.IsZero() {
+        return false
+    }
+    if now.After(l.kiteWalkUntil) {
+        // The window ended: the re-engage machinery owns the next
+        // ticks (the forced attack re-request restarts the shooting
+        // from the opened distance), and a re-click past it would
+        // only fight the re-engage for the movement.
+        l.kiteWalkClear()
+
+        return false
+    }
+    if l.tracker.SelfWalking() {
+        // The walk runs: the click landed, the manual-clicking
+        // replication stops. The walk owns the movement until the
+        // window ends server-side interrupts it.
+        l.kiteWalkClear()
+
+        return false
+    }
+    selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
+    if !selfOK {
+        return false
+    }
+    if selfX != l.kiteWalkBaseX || selfY != l.kiteWalkBaseY {
+        // The character left the issue cell: the click started
+        // something (the ground truth moved before the broadcast -
+        // or the walk already ran and finished short). The ladder
+        // stands down, the next shot cycle re-arms it fresh.
+        l.kiteWalkClear()
+
+        return false
+    }
+    if now.Sub(l.kiteReclickAt) < kiteReclickPeriod {
+        return false
+    }
+    if l.kiteReclicks >= kiteReclickLimit {
+        return false
+    }
+    l.kiteReclicks++
+    l.kiteReclickAt = now
+    if l.kiteReclicks == kiteReclickProbe {
+        // The probe: the initial click, one plain re-click and the
+        // character still stands on the issue cell - the movement
+        // never started (an accepted click answers with the
+        // movement broadcast inside the once-per-second gate plus
+        // the pacing headroom, and 1.2s of standing is past it).
+        // One line per walk: the dump reads it to name the
+        // mechanism that ate the clicks - the rotated endpoint
+        // starting the walk below names the destination-cell
+        // refusal, a plain retry starting it names the stance
+        // swallow, nothing ever moving names the H-006 silent
+        // drop.
+        l.kiteWalkDead = true
+        l.logger.Printf("Hunt: the kite walk click on target %d "+
+            "never started the movement (%d clicks out, standing "+
+            "on %d %d), rotating the retreat lane",
+            l.target, l.kiteReclicks+1, selfX, selfY)
+        // The dead endpoint rotation, exactly once per walk: the
+        // lane re-probe skips the endpoint that already proved
+        // dead (a cell the server refuses never starts a walk,
+        // clicking it again changes nothing) and takes the next
+        // fan candidate - the fresh train direction included, the
+        // chasers moved while the character stood. The last
+        // re-click below retries the rotated lane (a 600ms-old
+        // rotated click is too young for its own dead verdict -
+        // the broadcast gate alone explains its silence). A lane
+        // battery that finds no alternative (cornered on the
+        // rotation) keeps the dead endpoint: the last re-click
+        // still retries the transport, the hold answer belongs to
+        // the next shot cycle.
+        dirX, dirY, encircled := l.kiteTrainDirection(
+            selfX, selfY, selfZ)
+        if !encircled {
+            if stepX, stepY, found := l.kiteRetreatLaneSkipping(
+                selfX, selfY, selfZ, dirX, dirY,
+                l.kiteWalkX, l.kiteWalkY); found {
+                l.logger.Printf("Hunt: rotating the kite retreat "+
+                    "of target %d onto the fan lane %d %d (the "+
+                    "endpoint %d %d refused or silent)",
+                    l.target, stepX, stepY, l.kiteWalkX,
+                    l.kiteWalkY)
+                l.kiteWalkX, l.kiteWalkY = stepX, stepY
+            }
+        }
+    }
+    if err := l.game.WalkTo(
+        l.kiteWalkX, l.kiteWalkY, l.kiteWalkZ); err != nil {
+        l.logger.Printf("Hunt: kite re-click failed: %v", err)
+
+        return false
+    }
 
     return true
+}
+
+// kiteWalkClear stands the re-click ladder down: the endpoint fields
+// stay (they name the walk of record for the diagnostics), the gate
+// (kiteWalkUntil), the click count and the probe latch reset - the
+// next kite step arms the ladder whole through kiteIssueWalk.
+func (l *Loop) kiteWalkClear() {
+    l.kiteWalkUntil = time.Time{}
+    l.kiteReclicks = 0
+    l.kiteWalkDead = false
 }
 
 // kiteTrainDirection resolves the retreat DIRECTION of one kite
@@ -586,26 +800,55 @@ func (l *Loop) kiteTrainDirection(
 func (l *Loop) kiteRetreatLane(
     selfX, selfY, selfZ int32, dirX, dirY float64,
 ) (int32, int32, bool) {
-    // The straight away-ray is the lane of record.
-    endX := selfX + int32(math.Round(dirX*l.kite.Step))
-    endY := selfY + int32(math.Round(dirY*l.kite.Step))
-    if laneX, laneY, ok := l.kiteLaneResolve(
-        selfX, selfY, selfZ, endX, endY, dirX, dirY); ok {
-        return laneX, laneY, true
-    }
-    // Then the fan candidates, widening symmetrically around it -
-    // the 45 degree lanes before the 90 degree ones.
+    return l.kiteRetreatLaneSkipping(
+        selfX, selfY, selfZ, dirX, dirY, 0, 0)
+}
+
+// kiteRetreatLaneSkipping resolves the retreat lane exactly like
+// kiteRetreatLane minus the candidate whose RESOLVED endpoint is the
+// skipped cell: the re-click ladder rotates a dead endpoint onto the
+// next fan candidate (the destination-cell refusal answer of issue
+// #60, the second round - a cell the server refuses never starts a
+// walk, so clicking it again changes nothing) and the rotation needs
+// the lane battery to answer "which lane comes after this one". A
+// zero skip cell keeps every candidate (the plain resolution of the
+// first round). Reports the endpoint and whether a walkable lane
+// exists.
+func (l *Loop) kiteRetreatLaneSkipping(
+    selfX, selfY, selfZ int32, dirX, dirY float64,
+    skipX, skipY int32,
+) (int32, int32, bool) {
+    // The candidate rays of the away hemisphere: the straight
+    // away-ray first (the lane of record), then the fan candidates
+    // widening symmetrically around it - the 45 degree lanes before
+    // the 90 degree ones.
+    var rays [1 + 2*kiteFanSteps][2]float64
+    rays[0] = [2]float64{dirX, dirY}
+    count := 1
     for step := 1; step <= kiteFanSteps; step++ {
         angle := kiteFanStep * float64(step)
         for _, sign := range [2]float64{1, -1} {
-            candX, candY := rotatePlanar(dirX, dirY, sign*angle)
-            endX = selfX + int32(math.Round(candX*l.kite.Step))
-            endY = selfY + int32(math.Round(candY*l.kite.Step))
-            if laneX, laneY, ok := l.kiteLaneResolve(
-                selfX, selfY, selfZ, endX, endY, dirX, dirY); ok {
-                return laneX, laneY, true
-            }
+            rays[count][0], rays[count][1] =
+                rotatePlanar(dirX, dirY, sign*angle)
+            count++
         }
+    }
+    for _, ray := range rays[:count] {
+        endX := selfX + int32(math.Round(ray[0]*l.kite.Step))
+        endY := selfY + int32(math.Round(ray[1]*l.kite.Step))
+        laneX, laneY, ok := l.kiteLaneResolve(
+            selfX, selfY, selfZ, endX, endY, dirX, dirY)
+        if !ok {
+            continue
+        }
+        if laneX == skipX && laneY == skipY {
+            // The dead endpoint the rotation skips: the cell the
+            // server already refused (or swallowed the click to) -
+            // the next fan candidate serves the retreat instead.
+            continue
+        }
+
+        return laneX, laneY, true
     }
 
     return 0, 0, false
