@@ -53,11 +53,20 @@ func main() {
             "height 0, fully open) with the nearest real surface blend "+
             "(the bay filler turns into the sea floor water, the land "+
             "gaps into the connecting ground)")
+    mergeTolerance := flag.Int("merge-tolerance", 0,
+        "the maximal height delta an adjacent cell pair inside one "+
+            "grown rectangle may carry (0 keeps the exact same-height "+
+            "rule; the merge tolerance evaluation of issue #57 "+
+            "measures the candidates 8, 16, 24, 32, 40 - the 40 unit "+
+            "climb limit caps the walkable merge from above; the "+
+            "route regression corpus of navpack-verify must replay "+
+            "identical before anything lands)")
     flag.Parse()
 
     opts := navbuild.DefaultOptions()
     opts.Workers = *workers
     opts.RepairFake = *repairFake
+    opts.MergeTolerance = int32(*mergeTolerance)
     if err := run(*geodataDir, *outDir, *regions, *force, *compress,
         opts); err != nil {
         fmt.Println("Error:", err)
