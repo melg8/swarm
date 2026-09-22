@@ -51,6 +51,37 @@ func BowLurer(profile Profile) bool {
     return bowLurer(profile)
 }
 
+// quiverCarrier reports whether the profile shoots bow ammo: the
+// melee lurer (the ranged tool) and the archer (the primary weapon)
+// both keep a quiver. The shop strategy's arrow restock phase and
+// the hunt loop's junk keep set consult it - the arrow stacks score
+// zero under every profile (a consumable, not gear), so without the
+// explicit keep the junk flows would sell the ammo at the first
+// vendor visit.
+func quiverCarrier(profile Profile) bool {
+    switch profile.(type) {
+    case MeleeFighter, Archer:
+        return true
+    default:
+        return false
+    }
+}
+
+// QuiverCarrier is the exported form of quiverCarrier: the quiver
+// restock and the ammo keeps of the hunt loop.
+func QuiverCarrier(profile Profile) bool {
+    return quiverCarrier(profile)
+}
+
+// IsArcher reports whether the profile is the archer: the hunt loop
+// arms the quiver onto the paperdoll for it (the ammo is not planner
+// managed, see Archer in profile.go).
+func IsArcher(profile Profile) bool {
+    _, ok := profile.(Archer)
+
+    return ok
+}
+
 // ownedBow scans the inventory for the best bow the character owns
 // (equipped or bagged) and reports its attack stat. A character
 // without any bow answers zero.
@@ -214,25 +245,31 @@ func ownedArrowCount(equipment Equipment, itemID int32) int32 {
     return count
 }
 
-// bowPhase plans the ranged luring tool of the melee hunter: the best
-// affordable bow strictly stronger than the owned one (the gradual
-// upgrade - the wallet buys the next rung once the weapon milestone
-// spent its share), then the arrow restock when the quiver runs low.
-// The phase runs behind the weapon milestone: the virtual paperdoll
-// carries the worn or the just planned melee weapon, a bare-handed
-// hunter spends the wallet on the sword before the luring tool (the
-// weapon run flow of the hunt loop).
+// bowPhase plans the ranged tooling: the melee lurer's bow upgrade
+// behind its weapon milestone (the virtual paperdoll carries the
+// worn or the just planned melee weapon, a bare-handed hunter spends
+// the wallet on the sword before the luring tool), then the quiver
+// restock for every bow shooter - the melee lurer's tool ammo and the
+// archer's primary ammo alike (the archer's weapon milestone bought
+// the bow itself: the profile ranks the bows, so the generic weapon
+// candidates carry them).
 func (w *planWalk) bowPhase() {
-    if w.tailDone() || !bowLurer(w.profile) {
-        return
-    }
-    if w.virtual[SlotRHand].Score <= 0 {
-        // No melee weapon worn or planned: the weapon milestone owns
-        // the wallet first, the tool follows on the next trip.
-        return
-    }
-    w.planBowUpgrade()
     if w.tailDone() {
+        return
+    }
+    if bowLurer(w.profile) {
+        if w.virtual[SlotRHand].Score <= 0 {
+            // No melee weapon worn or planned: the weapon milestone
+            // owns the wallet first, the tool follows on the next
+            // trip.
+            return
+        }
+        w.planBowUpgrade()
+        if w.tailDone() {
+            return
+        }
+    }
+    if !quiverCarrier(w.profile) {
         return
     }
     w.planArrowRestock()

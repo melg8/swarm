@@ -30,10 +30,15 @@ func attackerHits(bot *state.Bot, attackerID int32, x int32) {
     })
 }
 
+// stagedMobID is the object id of the fight mob every scene of the
+// combat suite stages: the tracker info, the loop target and the
+// swung-at id of the scenes all answer it.
+const stagedMobID = int32(7)
+
 // selfSwingsAt models the attack broadcast of the character: the
-// server armed the fighting stance toward the mob (the running fight
-// view of SelfFighting).
-func selfSwingsAt(bot *state.Bot, targetID int32, x int32) {
+// server armed the fighting stance toward the staged fight mob (the
+// running fight view of SelfFighting).
+func selfSwingsAt(bot *state.Bot, x int32) {
     bot.ApplyAttack(state.Attack{
         AttackerID:  100,
         X:           45000,
@@ -42,7 +47,7 @@ func selfSwingsAt(bot *state.Bot, targetID int32, x int32) {
         TargetX:     x,
         TargetY:     50000,
         TargetZ:     -3500,
-        TargetIDs:   [state.AttackTargets]int32{targetID},
+        TargetIDs:   [state.AttackTargets]int32{stagedMobID},
         TargetCount: 1,
     })
 }
@@ -171,7 +176,7 @@ func TestFightPotionDrinksUnderHalf(t *testing.T) {
     // The target is set directly - the aggro answer would flee the
     // hurt character below the re-engage health.
     mobHitsCharacter(bot)
-    selfSwingsAt(bot, 7, 45600)
+    selfSwingsAt(bot, 45600)
     hurtTo(bot, 40)
     loop.target = 7
 

@@ -1,0 +1,25 @@
+{
+    "login": "127.0.0.1:2106",
+    "account": "test1",
+    "password": "test",
+    "char": "test1",
+    "web": "127.0.0.1:8080",
+    "hunt": false,
+    "geodata": "",
+    "navmesh": "",
+    "proxy": false,
+    "proxyLogin": "127.0.0.1:2107,127.0.0.1:2106,127.0.0.2:2106,127.0.0.2:2107",
+    "proxyGame": "127.0.0.1:7778,127.0.0.2:7778",
+    "proxyLog": "proxy.log",
+    "sessionDir": "logs",
+    "bots": [
+        {
+            "type": "fighter",
+            "count": 3
+        },
+        {
+            "type": "archer",
+            "count": 3
+        }
+    ]
+}

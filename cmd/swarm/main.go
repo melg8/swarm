@@ -24,6 +24,7 @@ import (
 
     "github.com/melg8/swarm/internal/swarm/acceptance"
     "github.com/melg8/swarm/internal/swarm/connection"
+    "github.com/melg8/swarm/internal/swarm/gear"
     "github.com/melg8/swarm/internal/swarm/hunt"
     "github.com/melg8/swarm/internal/swarm/huntaudit"
     "github.com/melg8/swarm/internal/swarm/memwatch"
@@ -115,6 +116,21 @@ type config struct {
     proxyGame   string
     proxyLog    string
     bots        int
+    // configPath is the -config flag: the launch configuration file
+    // driving the shared parameters and the fleet composition (see
+    // launch_config.go). Empty keeps the plain flag defaults.
+    configPath string
+    // botPlans is the expanded fleet composition (classicFleetPlan /
+    // launchConfig.expand): the account and the bot type of every
+    // fleet slot, whatever the origin of the composition (the
+    // -config file or the plain -bots count). Nil until the launch
+    // normalization fills it.
+    botPlans []botPlan
+    // botType is the type of the bot this configuration launches
+    // ("fighter" today): the fleet goroutine and the single bot path
+    // set it from their plan slot, the future per-type behaviors (the
+    // archer of issue #13) branch on it.
+    botType string
     // acceptanceRun selects the headless acceptance test mode: the
     // process launches no fleet bot supervisor, just the acceptance
     // manager and the requested scenario. "list" prints the available
@@ -202,6 +218,9 @@ func parseFlags() config {
         proxyGame:        "",
         proxyLog:         "",
         bots:             1,
+        configPath:       "",
+        botPlans:         nil,
+        botType:          "",
         acceptanceRun:    "",
         sessionDir:       "",
         acceptanceLogDir: "",
@@ -275,6 +294,13 @@ func parseFlags() config {
             "-geodata and proxy settings. The server auto-creates "+
             "missing accounts, so the first run of -bots 3 makes "+
             "test1, test2, test3 on the fly.")
+    flag.StringVar(&cfg.configPath, "config", "",
+        "launch configuration file (JSON): the shared launch parameters "+
+            "and the fleet composition - the bot types with their counts "+
+            "(see configs/swarm.json and docs/launch_config.md). An "+
+            "explicitly set flag overrides the matching file value, an "+
+            "omitted file field keeps the flag default, and without the "+
+            "file the plain flag defaults apply")
     flag.StringVar(&cfg.acceptanceRun, "acceptance", "",
         "run an acceptance scenario headless instead of the bot: "+
             "the value is a scenario id (soak, farm-readiness, "+
@@ -364,6 +390,22 @@ func parseFlags() config {
         "cap on the printed -session-query records (0 keeps "+
             "everything)")
     flag.Parse()
+
+    // The launch configuration file folds in after the flag parse:
+    // an explicitly set flag wins over the file (flag.Visit names
+    // them), an omitted file field keeps its flag default, and a
+    // broken file refuses to launch (a typo'd key silently falling
+    // back to a default is the worst failure mode a config can have).
+    if cfg.configPath != "" {
+        lc, err := loadLaunchConfig(cfg.configPath)
+        if err != nil {
+            fmt.Fprintf(os.Stderr, "swarm: %v\n", err)
+            os.Exit(1)
+        }
+        explicit := map[string]bool{}
+        flag.Visit(func(f *flag.Flag) { explicit[f.Name] = true })
+        applyLaunchConfig(&cfg, lc, explicit)
+    }
 
     return cfg
 }
@@ -540,6 +582,17 @@ func runBot( //nolint:funlen // linear session script
     // web UI (map clicks, equipment drags) so the interface stays
     // interactive in both launch modes.
     loop := hunt.NewLoop(game, tracker)
+    // The launch bot type seeds the gear profile: an archer typed slot
+    // scores the ranged gear (the bow as the weapon milestone, the
+    // quiver as the ammo, issue #17) from its very first equip
+    // decision. The fighter and every mode run without a type keep
+    // the melee fighter default of the loop, and the class based pick
+    // of the loop may still override a caster class later (the
+    // physical class wins over the label - a mystic cannot shoot the
+    // bow the label pretends).
+    if cfg.botType == botTypeArcher {
+        loop.SetGearProfile(gear.Archer{})
+    }
     // Every session start IS a relogin into the same world spot: the
     // spawn protection settle holds the character there while it
     // regenerates and opens the first fight deliberately (see
@@ -817,6 +870,16 @@ func main() {
     cfg := parseFlags()
     log.SetOutput(os.Stdout)
 
+    // The fleet composition normalizes to one plan whatever its
+    // origin: the -config file (validated, expanded) or the plain
+    // -bots ladder. The mode switches below (the acceptance runs,
+    // the viewers, the journal queries) never launch a bot session,
+    // so the normalization only has to precede the fleet dispatch.
+    if cfg.botPlans == nil {
+        cfg.botPlans = classicFleetPlan(cfg.account, cfg.bots)
+    }
+    cfg.botType = cfg.botPlans[0].Type
+
     if cfg.sessionAnomalies != "" {
         runSessionAnomaliesCLI(cfg)
 
@@ -871,13 +934,14 @@ func main() {
         return
     }
 
-    if cfg.bots > 1 {
+    if len(cfg.botPlans) > 1 {
         runFleet(cfg)
 
         return
     }
 
-    log.Println("Starting swarm bot for account " + cfg.account)
+    log.Println("Starting swarm bot for account " + cfg.account +
+        " (type " + cfg.botType + ")")
     // The identity line pairs every bot log with the exact code state
     // - the state dump of the web UI carries the same line.
     log.Printf("Build: %s", version.Identity())
@@ -952,19 +1016,20 @@ func main() {
 //
 //nolint:funlen // the fleet start walks the phases in order
 func runFleet(cfg config) {
-    log.Printf("Starting swarm fleet of %d bots", cfg.bots)
+    plan := cfg.botPlans
+    log.Printf("Starting swarm fleet of %d bots (%s)",
+        len(plan), compositionText(plan))
     log.Printf("Build: %s", version.Identity())
 
     registry := state.NewRegistry()
-    trackers := make([]*state.Bot, 0, cfg.bots)
-    for i := range cfg.bots {
-        account := fleetAccountName(cfg.account, i)
-        tracker := state.NewBot(account)
+    trackers := make([]*state.Bot, 0, len(plan))
+    for _, entry := range plan {
+        tracker := state.NewBot(entry.Account)
         tracker.SetKind(state.KindLongRunning)
         registry.Add(tracker)
         trackers = append(trackers, tracker)
     }
-    log.Printf("Fleet accounts: %s", fleetAccountList(cfg.account, cfg.bots))
+    log.Printf("Fleet accounts: %s", fleetAccountList(cfg.account, len(plan)))
 
     // The journal opens before the web interface so the session
     // report endpoint registers with it (the fleet mode once missed
@@ -1007,16 +1072,20 @@ func runFleet(cfg config) {
     }
 
     // Launch every bot supervisor in its own goroutine. A per-bot
-    // config carries the derived account and char name; the rest of
-    // the flags (login, hunt, geodata, navmesh, proxy) stay shared.
+    // config carries the plan slot (the derived account and the bot
+    // type); the rest of the flags (login, hunt, geodata, navmesh,
+    // proxy) stay shared.
     var wg sync.WaitGroup
     for i, tracker := range trackers {
         botCfg := cfg
-        botCfg.account = fleetAccountName(cfg.account, i)
-        botCfg.charName = botCfg.account
+        botCfg.account = plan[i].Account
+        botCfg.charName = plan[i].Account
+        botCfg.botType = plan[i].Type
         wg.Add(1)
         go func(c config, t *state.Bot) {
             defer wg.Done()
+            log.Printf("Bot %s of type %s joining the fleet",
+                c.account, c.botType)
             runBotForever(ctx, c, t, engine, mesh, proxyServer, journal,
                 journalWG)
         }(botCfg, tracker)

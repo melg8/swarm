@@ -137,6 +137,64 @@ func (MysticFighter) WeaponPoints(stats npcdata.GearStats) int32 {
     return stats.MAtk
 }
 
+// Archer is the profile of the ranged class (the archer bot type of
+// the launch config, issue #17): bows ranked by their ranged output,
+// the melee families score zero - the archetype never swaps to a
+// melee weapon, the bow is the always-weapon (the owner spec of
+// #21). Armor ranks by pDef and jewels by mDef like the fighter; the
+// shield scores zero because the left hand carries the quiver (the
+// arrow stack), never a shield. The ammo itself is NOT planner
+// managed - the arrows are a consumable that scores zero under every
+// profile, the quiver restock and the arming are the shop strategy's
+// and the loop's own steps (see bow.go and hunt/equip.go).
+type Archer struct{}
+
+// Name of the archer profile.
+func (Archer) Name() string {
+    return "archer"
+}
+
+// WeaponScore ranks bows by their ranged damage output proxy: the
+// damage per shot scales with pAtk and the shot rate with the attack
+// speed - the same proxy the melee fighter uses, restricted to the
+// bow family.
+func (Archer) WeaponScore(stats npcdata.GearStats) float64 {
+    if stats.WeaponType != weaponTypeBow {
+        return 0
+    }
+
+    return float64(stats.PAtk) * float64(stats.PAtkSpd)
+}
+
+// ArmorScore ranks armor by its physical defense (the archer wears
+// the same leather set the fighter does).
+func (Archer) ArmorScore(stats npcdata.GearStats) float64 {
+    return float64(stats.PDef)
+}
+
+// JewelScore ranks jewels by their magical defense.
+func (Archer) JewelScore(stats npcdata.GearStats) float64 {
+    return float64(stats.MDef)
+}
+
+// ShieldScore is zero for everything: the left hand of a bow user
+// carries the quiver, and a two hand weapon drops a shield anyway -
+// the planner must never place one (the virtual paperdoll keeps the
+// left hand free for the ammo the loop arms).
+func (Archer) ShieldScore(_ npcdata.GearStats) float64 {
+    return 0
+}
+
+// WeaponPoints is the damage per shot of the bow (the zone gating
+// value of the ranged weapon).
+func (Archer) WeaponPoints(stats npcdata.GearStats) int32 {
+    if stats.WeaponType != weaponTypeBow {
+        return 0
+    }
+
+    return stats.PAtk
+}
+
 // scoreStats dispatches the profile scoring on the gear family of the
 // stats.
 func scoreStats(profile Profile, stats npcdata.GearStats) float64 {

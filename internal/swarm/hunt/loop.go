@@ -739,6 +739,13 @@ type Loop struct {
     // (a chaser at least as fast as the character) and the archer
     // fights it out instead of shuffling forever.
     kiteStreak int
+    // kiteHeldFor is the target the cornered hold belongs to (see
+    // kite.go): the hold of one target never paces another.
+    kiteHeldFor int32
+    // kiteHeldAt stamps the last cornered-hold probe (see kite.go):
+    // the hold re-probes at the kite period, not every tick, and the
+    // diagnostic line lands once per hold episode.
+    kiteHeldAt time.Time
     // zoneSegmentLogAt paces the walled direct segment diagnostic of the
     // zone return escalation (see guardZoneSegmentClick): the refusal
     // repeats every second while the character stands in the
@@ -1569,6 +1576,11 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
     // caster gear from its very first equip decision.
     l.maybePickGearProfile()
     l.maybeEquipGear()
+    // The archer quiver follows the auto equipment: the bow the
+    // planner placed shoots only with the arrows worn, and the ammo
+    // is invisible to the planner (it scores zero - a consumable, not
+    // gear), so the arming is the loop's own step right behind it.
+    l.maybeArmQuiver()
     // The replaced starter kit follows the equips: the unsellable,
     // undroppable Squire's pieces leave the bag through the destroy
     // request as soon as their replacement is worn.

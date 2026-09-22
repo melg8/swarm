@@ -16,6 +16,7 @@ the area you are about to touch, not all of them.
 | Document | Area |
 | --- | --- |
 | [deployment.md](deployment.md) | Bringing the Mobius C1 stack up: the fast deploy, the bootstrap, the script inventory, the Windows host layout, stack logs, the operational pitfalls |
+| [launch_config.md](launch_config.md) | The launch configuration file (the -config flag): the JSON format, the flag precedence rules, the fleet composition of bot types and counts, the default config |
 | [proxy.md](proxy.md) | The MITM client proxy: running it, the l2.ini recipes, the protocol the client sees, the relogin handoff, debugging |
 
 ## The bot
