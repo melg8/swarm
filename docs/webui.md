@@ -113,7 +113,7 @@ colors from the same variables).
 - Every unit (character, mob, player) is a circle with a short look
   direction tick from the center over the edge (L2Bot2.0 style),
   colored by threat: friendly gray, passive monster green, aggressive
-  amber, fighting red, dead gray with the X eyes face, players
+  amber, fighting red, dead gray, players
   violet, self blue with an accent ring; ground items are gold
   diamonds. The dashed square is the server loaded zone: the 3x3
   world region block (region size 2048,
@@ -138,10 +138,12 @@ colors from the same variables).
   character draws the breathing zZ marker above its dot. Unit markers
   draw the look direction tick only outside the circle; inside the
   radius the marker is a solid fill. Dead units draw no look direction
-  at all: their circle carries the dead face - two small X eyes
-  slightly above the center, tick slate on the gray body (the issue #6
-  icon round, the "x eyes" variant) - so a corpse reads "killed here"
-  instead of a faded alive mob. Overlapping markers never shrink
+  at all and carry no special face either: the corpse marker is a
+  plain faded gray circle (issue #6, the persistent kill marks round
+  - the transient X eyes face retired with it). The death read lives
+  on the fleet kill marks layer: every kill of the session stays on
+  the map as the gray circle with the X eyes, so a death place reads
+  there long after the corpse despawned. Overlapping markers never shrink
   and never merge: the contact pass slides the overlapping units
   apart at their full radii until the circles touch face to face.
   The pass relaxes the whole pack (the accumulated pushes of every
@@ -209,24 +211,26 @@ colors from the same variables).
   connect the units, never radius circles - a pack reads as a pack. The
   `social` toolbar checkbox hides the layer; the tooltips carry the
   clan help range of the hovered npc.
-- Fleet kill skulls: every recent kill of every bot draws as a small
-  path traced orange skull (the head and jaw silhouette in the
-  marker orange, the eye dots and mouth slots in the dark contrast
-  `killMarkDetailColor`) that melts away over five minutes. The
-  fresh skull reads at 2.5x of the old cross size (r 10, the spot
-  centroid 12.5 - a bit smaller than the mob dots); hovering a skull
+- Fleet kill marks: every kill of every bot of the session draws as
+  the dead mob face - the gray circle body (`mapColors.dead`) with
+  the two X eyes in the dark slate - and STAYS on the map: the marks
+  are the persistent death statistics of the fleet (issue #6), so
+  nothing fades and nothing expires by time. The ring is count
+  capped (400 kills per bot, 2000 merged on the wire) and drops its
+  oldest marks only when the hunt outgrows the cap; hovering a mark
   shows the victim tooltip (the name with the level and the kill
   age, `killMarkAt` picks within 13 px where no unit tooltip
   claims the cursor, the victim data rides `KillMarkView.Name` and
   `.Level` captured at the kill). No font
   glyph - the canvas path keeps the marker palette theme independent
   and renders identically in every environment. The marks come from
-  `/api/fleet/kills` (the hunt loop publishes its kill ring to the bot
-  state, `Bot.SetKillMarks`; the registry merges the rings of all bots
-  oldest first, capped at 400) which the web app polls with the bot
-  list - the skulls live in the map layer, so they survive the bot
-  switches of the view (the per zone kill centroid of the observed bot
-  alone did not). The `kills` toolbar checkbox hides the layer.
+  `/api/fleet/kills` (the hunt loop publishes its persistent kill log
+  to the bot state, `Bot.SetKillMarks`; the registry merges the logs
+  of all bots oldest first, capped at 2000) which the web app polls
+  with the bot list - the marks live in the map layer, so they
+  survive the bot switches of the view (the per zone kill centroid of
+  the observed bot alone did not). The `kills` toolbar checkbox hides
+  the layer.
 - Bot switch gap: clicking another bot in the sidebar drops the
   observed bot state (its objects, its zones, its walk line, its
   combat effects) ahead of the new event stream (`MapView.resetBot`),
@@ -409,12 +413,11 @@ dozen 512px tiles per paint and is visually indistinguishable on
   in one path per style group (all future circles in a single stroke
   call, the heat fills bucketed by alpha) instead of a save/restore,
   two dash arrays and a label concatenation per zone.
-- **The kill skulls batch by fade bucket**: the fleet kill ring caps
-  at 96 marks; each cross used to cost its own begin/stroke round
-  trip per frame, the fade now quantizes into eight buckets that share
-  one fill call per pass each (the body pass and the face pass; a
-  bucket step is invisible on a five minute
-  melt). The aggro circles skip sub pixel radii at the far zoom - a
+- **The kill marks draw in two paint calls**: the persistent fleet
+  ring renders as ONE body fill pass and ONE eye stroke pass per
+  frame (a single constant style needs no fade bucketing) no matter
+  how many marks the session log holds. The aggro circles skip sub
+  pixel radii at the far zoom - a
   circle that reads as a dot is unreadable clutter anyway, and the
   packed field of the zoomed out view no longer strokes hundreds of
   them.

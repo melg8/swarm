@@ -2141,14 +2141,14 @@ function runScenarioWalkCursor(mapFile) {
     return results;
 }
 
-// runScenarioDeadFace covers the corpse marker of the dead mob icon
-// round (issue #6, the variant 26 "x eyes" face of the research
-// gallery): a dead unit keeps its circle footprint but carries no
-// look direction tick - two small X eyes replace it, so a corpse
-// reads "killed here" instead of a faded alive mob. The checks pin
-// the geometry: the gray circle body at the dead radius, the two eye
-// X strokes at the eye line, and the absence of the radial heading
-// tick the alive units keep.
+// runScenarioDeadFace covers the corpse marker of the persistent
+// kill marks round (issue #6, the review round): the transient
+// corpse marker is a plain faded gray circle - no look direction
+// tick, no X eyes face. The X eyes death read lives on the fleet
+// kill marks layer (see repro_zone_hover), the corpse itself only
+// stops the draw early. The checks pin the geometry: the gray circle
+// body at the dead radius, NO eye X strokes at the eye line, and the
+// absence of the radial heading tick the alive units keep.
 function runScenarioDeadFace(mapFile) {
     const { MapView, record } = loadMapJs(mapFile);
     const results = [];
@@ -2184,26 +2184,22 @@ function runScenarioDeadFace(mapFile) {
         "fills " + JSON.stringify(record.fills.filter((fill) =>
             fill.style === MARK.dead).map((fill) => fill.arcs)));
 
-    // The eye line: two X strokes, one per eye, each two crossing
-    // segments of half size 0.7 around the eye centers (the x is
-    // +/-0.32r of the center, the y is 0.12r above it), in the tick
-    // slate like every marker detail.
+    // The face is gone: no two segment X strokes near the corpse (the
+    // eye line the retired dead face used to draw). The fleet kill
+    // marks carry the X eyes now - the corpse marker is plain.
     const eye = 0.7;
     const eyY = p.y - r * 0.12;
     const eyeStrokes = record.strokes.filter((stroke) =>
         stroke.segments.length === 2 && stroke.style === MARK.tick
-        && stroke.width === 0.7
         && stroke.segments.every((seg) =>
-            Math.hypot((seg[0] + seg[2]) / 2
-                - (p.x + (seg[0] < p.x ? -r * 0.32 : r * 0.32)),
-                (seg[1] + seg[3]) / 2 - eyY) < 1.5)
-        && stroke.segments.every((seg) =>
-            Math.hypot(seg[0] - seg[2], seg[1] - seg[3]) > 2 * eye - 0.2));
-    check(results, "the corpse draws the two X eyes",
-        eyeStrokes.length === 2,
-        "eye strokes " + JSON.stringify(record.strokes.filter((stroke) =>
-            stroke.segments.length === 2).map((stroke) =>
-                stroke.segments)) + " at " + p.x + "," + p.y);
+            Math.hypot((seg[0] + seg[2]) / 2 - p.x,
+                (seg[1] + seg[3]) / 2 - eyY) < 1.5));
+    check(results, "the corpse draws no X eyes face",
+        eyeStrokes.length === 0,
+        "eye strokes " + JSON.stringify(eyeStrokes.map((stroke) =>
+            stroke.segments)) + " at " + p.x + "," + p.y
+        + " (eye half " + eye + ", eye line y offset "
+        + eyY.toFixed(2) + ")");
 
     // The look direction tick is gone for the dead: no single segment
     // stroke leaving the corpse circle edge along the heading (the
