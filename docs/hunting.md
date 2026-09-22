@@ -488,8 +488,9 @@ are references, not copies):
 
 The telemetry anchors: the step line ("kiting clear (step") and the
 hold line ("holding ground and shooting") are the two markers the
-archer acceptance scenario of issue #28 counts - the scenario asserts
-the same contract this section documents: the fight samples stay at
+archer acceptance scenario counts (acceptance/archer_kite.go, the
+ranged farm contract of issue #28) - the scenario asserts the same
+contract this section documents: the fight samples stay at
 the bow radii (the ranged share of the samples), the kite lines
 narrate the retreats, the online status and the HP hold through the
 window, and the arrow stock never empties (the restock gates of the
