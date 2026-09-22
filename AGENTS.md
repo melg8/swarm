@@ -347,6 +347,32 @@ conversation or in a commit message: it lives in the registry below.
 - Status: open (the bot-side recovery shipped in 481dfdc and 8487365; the
   server side stays unobserved).
 
+### H-007: the bow shot commit rides the Attack broadcast
+
+- Assumption: the server finalizes a bow shot the moment it
+  broadcasts the character's own Attack packet - the hit roll, the
+  arrow consumption and the HitTask schedule all happen before the
+  broadcast, and the damage task carries no attacker movement check,
+  so a character that starts moving after the packet still lands the
+  shot. The bow re-use window is `timeAtk + reuse`
+  (500000/pAtkSpd + reuseDelay*333/pAtkSpd, ~3s for the Short Bow),
+  and a forced attack request while moving stops the walk and
+  attacks.
+- Relied on by: the shot-paced kite retreat of the archer fight
+  (kiteFromShot, internal/swarm/hunt/kite.go, issue #60) - the
+  retreat starts on the broadcast and spends the cooldown walking.
+- Verify: read `Creature.doAttack`, `Creature.doAttackHitByBow`
+  (the roll, `reduceArrowCount`, the HitTask schedule at `sAtk`, the
+  SetupGauge(RED, sAtk + reuse)), `Creature.onHitTimer` (no
+  attacker-movement check), `Creature.calculateTimeBetweenAttacks` /
+  `calculateReuseTime` / `useWeapon` (the `_disableBowAttackEndTime`
+  gate) and `Creature.stopMove` before the attack launch; the shot
+  cadence of the live dumps corroborates (the issue #60 dump: one
+  "Getting ready to shoot arrows" per ~3.2s kite cycle).
+- Status: verified 2026-09-22 by the Mobius C1 source read (the
+  mechanisms above) plus the issue #60 dump cadence; see
+  docs/hunting.md (the shot-paced retreat section).
+
 ## Mandatory first step of every task: deploy and verify the environment
 
 Any task in this repository - a bug fix, a feature, a refactor, a test
