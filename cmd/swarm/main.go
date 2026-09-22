@@ -104,6 +104,11 @@ type config struct {
     testFightUIV1 bool
     geodataDir    string
     navmeshDir    string
+    // navmeshCompareDir is the -navmesh-compare flag: the second
+    // tile pack of the dual pack view (issue #59). The -show-navmesh
+    // viewer renders it in pane B beside the -navmesh pack of pane
+    // A, with the per tile poly diff and the compare pathfind.
+    navmeshCompareDir string
     // navmeshShow is the -show-navmesh flag: the 3D mesh viewer mode
     // over the navmesh tile directory. A bare -show-navmesh loads
     // every tile stitched together, -show-navmesh=21_19 (comma
@@ -208,47 +213,48 @@ type config struct {
 //nolint:funlen // the flag surface is one linear block by design
 func parseFlags() config {
     cfg := config{
-        loginAddress:     "",
-        account:          "",
-        password:         "",
-        charName:         "",
-        webAddress:       "",
-        hunt:             false,
-        pathfindTest:     false,
-        testFightUI:      false,
-        testFightUIV1:    false,
-        geodataDir:       "",
-        navmeshDir:       "",
-        navmeshShow:      navmeshShowFlag{tiles: nil, enabled: false},
-        maxPassable:      uint(pathfind.DefaultMaxPassableHeight),
-        proxy:            false,
-        proxyLogin:       "",
-        proxyGame:        "",
-        proxyLog:         "",
-        bots:             1,
-        configPath:       "",
-        botPlans:         nil,
-        botType:          "",
-        kite:             nil,
-        acceptanceRun:    "",
-        sessionDir:       "",
-        acceptanceLogDir: "",
-        sessionReport:    "",
-        sessionQuery:     "",
-        sessionAnomalies: "",
-        queryFrom:        "",
-        queryTo:          "",
-        queryEvents:      "",
-        queryMatch:       "",
-        queryContext:     0,
-        queryLimit:       0,
-        huntAudit:        "",
-        auditWait:        0,
-        auditAccount:     "",
-        auditAnchors:     "",
-        auditFilter:      "",
-        auditStride:      0,
-        auditFresh:       false,
+        loginAddress:      "",
+        account:           "",
+        password:          "",
+        charName:          "",
+        webAddress:        "",
+        hunt:              false,
+        pathfindTest:      false,
+        testFightUI:       false,
+        testFightUIV1:     false,
+        geodataDir:        "",
+        navmeshDir:        "",
+        navmeshCompareDir: "",
+        navmeshShow:       navmeshShowFlag{tiles: nil, enabled: false},
+        maxPassable:       uint(pathfind.DefaultMaxPassableHeight),
+        proxy:             false,
+        proxyLogin:        "",
+        proxyGame:         "",
+        proxyLog:          "",
+        bots:              1,
+        configPath:        "",
+        botPlans:          nil,
+        botType:           "",
+        kite:              nil,
+        acceptanceRun:     "",
+        sessionDir:        "",
+        acceptanceLogDir:  "",
+        sessionReport:     "",
+        sessionQuery:      "",
+        sessionAnomalies:  "",
+        queryFrom:         "",
+        queryTo:           "",
+        queryEvents:       "",
+        queryMatch:        "",
+        queryContext:      0,
+        queryLimit:        0,
+        huntAudit:         "",
+        auditWait:         0,
+        auditAccount:      "",
+        auditAnchors:      "",
+        auditFilter:       "",
+        auditStride:       0,
+        auditFresh:        false,
     }
     flag.StringVar(&cfg.loginAddress, "login", defaultLoginAddress,
         "login server address")
@@ -287,6 +293,13 @@ func parseFlags() config {
             "-show-navmesh=21_19 (comma separated) opens the named "+
             "tiles only; double click two mesh points in the browser "+
             "to run the corridor search with its construction timer")
+    flag.StringVar(&cfg.navmeshCompareDir, "navmesh-compare", "",
+        "second navmesh tile directory for the -show-navmesh dual "+
+            "pack view (issue #59): pane B renders this pack beside "+
+            "the -navmesh one of pane A, the per tile poly diff "+
+            "tints the changed regions and every route pair runs "+
+            "through both packs (the old and the reduced "+
+            "decomposition of the same geodata)")
     registerProxyFlags(&cfg)
     flag.UintVar(&cfg.maxPassable, "max-passable",
         uint(pathfind.DefaultMaxPassableHeight),
@@ -1434,6 +1447,26 @@ func navmeshViewerInitial(mesh *navmesh.Mesh, dir string,
     return initial
 }
 
+// navmeshComparePack loads the -navmesh-compare tile pack of the
+// dual pack view (issue #59): the second directory renders in pane B
+// beside the primary one. An explicitly passed directory that holds
+// no tiles answers ok=false and the mode stops - a silent single
+// pack fallback would read as a typo'd pane B with no explanation.
+func navmeshComparePack(dir string) (*navmesh.Mesh, bool) {
+    mesh := navmesh.NewMesh(dir)
+    stats := mesh.Stats()
+    if stats.TileFiles == 0 {
+        log.Println("Navmesh viewer: the -navmesh-compare " +
+            "directory holds no tiles in " + dir)
+
+        return nil, false
+    }
+    log.Printf("Navmesh viewer: the compare pack arms pane B: "+
+        "%d tiles in %s", stats.TileFiles, stats.Dir)
+
+    return mesh, true
+}
+
 func runNavmeshViewer(cfg config) {
     if cfg.webAddress == "" {
         log.Println("Navmesh viewer needs the web interface, " +
@@ -1459,6 +1492,18 @@ func runNavmeshViewer(cfg config) {
 
         return
     }
+    // The compare pack of the dual pack view (issue #59): the second
+    // directory renders in pane B. An explicitly passed directory
+    // that holds no tiles stops the mode - a silent single pack
+    // fallback would read as a typo'd pane B with no explanation.
+    var compare *navmesh.Mesh
+    if cfg.navmeshCompareDir != "" {
+        pack, ok := navmeshComparePack(cfg.navmeshCompareDir)
+        if !ok {
+            return
+        }
+        compare = pack
+    }
     engine := newBotEngine(cfg)
     initial := navmeshViewerInitial(mesh, dir, cfg.navmeshShow.tiles,
         stats.TileFiles, stats.Dir)
@@ -1467,7 +1512,7 @@ func runNavmeshViewer(cfg config) {
         log.Default(), webserver.NavmeshOptions{
             InitialTiles: initial,
             Engine:       engine,
-            CompareMesh:  nil,
+            CompareMesh:  compare,
         })
     go func() {
         if err := server.ListenAndServe(); err != nil {

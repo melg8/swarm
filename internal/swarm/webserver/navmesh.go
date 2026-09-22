@@ -328,7 +328,6 @@ func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
 // or one plan repro search of a pathfind link (the approach radius,
 // the ban circles, the raw answer), and measures the construction
 // time.
-//
 func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     body, err := io.ReadAll(io.LimitReader(r.Body, navmeshPathBodyLimit))
     if err != nil {
