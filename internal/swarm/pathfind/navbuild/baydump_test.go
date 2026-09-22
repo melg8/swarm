@@ -44,7 +44,7 @@ func TestBayCellDump(t *testing.T) {
             continue
         }
         rl, err := extractRegion(data, col, row,
-            DefaultOptions().DedupDelta)
+            DefaultOptions().DedupDelta, 0)
         if err != nil {
             t.Logf("(%0.f, %0.f) region %d_%d cell %d %d: parse %v",
                 p[0], p[1], col, row, localX, localY, err)
@@ -70,7 +70,7 @@ func TestBayCellDump(t *testing.T) {
         col, row))
     if err == nil {
         rl, err := extractRegion(data, col, row,
-            DefaultOptions().DedupDelta)
+            DefaultOptions().DedupDelta, 0)
         if err == nil {
             t.Logf("the Gludio harbor transect (region 19_21, from the" +
                 " harbor cell east/north into the water):")

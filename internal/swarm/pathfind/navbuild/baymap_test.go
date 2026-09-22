@@ -35,7 +35,7 @@ func TestBayAreaMap(t *testing.T) {
             continue
         }
         rl, err := extractRegion(data, col, row,
-            DefaultOptions().DedupDelta)
+            DefaultOptions().DedupDelta, 0)
         if err != nil {
             t.Logf("%d_%d: parse error: %v", col, row, err)
 

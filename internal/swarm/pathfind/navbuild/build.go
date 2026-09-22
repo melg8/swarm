@@ -33,6 +33,14 @@ type Options struct {
     // blend (fakerepair.go): the bay filler turns into the sea floor
     // water, the land gaps into the connecting ground.
     RepairFake bool
+    // HeightStep snaps every cell height to the nearest multiple of
+    // the step before the dedup, the sheet decomposition and the
+    // rectangle growth run (0 keeps the exact geodata heights). The
+    // height quantization evaluation of issue #56: the coarser step
+    // merges the neighbouring near-equal surfaces into fewer
+    // rectangles - the pack structural round measures the size win
+    // and the route answer drift per candidate step.
+    HeightStep int32
 }
 
 // DefaultOptions returns the production tunables.
@@ -80,7 +88,8 @@ func BuildRegion(
     data []byte, col, row int16, opts Options,
 ) (*RegionBuild, error) {
     started := time.Now()
-    rl, err := extractRegion(data, col, row, opts.DedupDelta)
+    rl, err := extractRegion(data, col, row, opts.DedupDelta,
+        opts.HeightStep)
     if err != nil {
         return nil, err
     }
