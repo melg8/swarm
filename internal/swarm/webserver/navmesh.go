@@ -49,6 +49,13 @@ type NavmeshOptions struct {
     // the capsule clearance of the route answers. A nil engine keeps
     // the viewer mesh only with the raw funnel pivots (the tests).
     Engine *pathfind.Engine
+    // CompareMesh arms the dual pack view (issue #59): the second
+    // pack the viewer renders side by side with the primary one -
+    // the old and the reduced decomposition of the same geodata -
+    // with the per tile poly diff and the compare pathfind (one
+    // click pair, both meshes answer). Nil keeps the single pack
+    // viewer.
+    CompareMesh *navmesh.Mesh
 }
 
 // NewNavmeshServer creates the web server of the navmesh viewer mode:
@@ -62,6 +69,7 @@ func NewNavmeshServer(
     server.navmeshMesh = mesh
     server.navmeshTiles = options.InitialTiles
     server.navmeshEngine = options.Engine
+    server.navmeshCompare = options.CompareMesh
     if options.Engine != nil && options.Engine.CapsuleRadius() > 0 {
         server.navmeshCapsule = pathfind.NewCapsule(options.Engine)
     }
@@ -81,14 +89,21 @@ func NewNavmeshServer(
     mux.HandleFunc("GET /api/navmesh/original/{key}",
         server.handleNavmeshOriginal)
     mux.HandleFunc("POST /api/navmesh/path", server.handleNavmeshPath)
+    mux.HandleFunc("GET /api/navmesh/compare/geometry/{key}",
+        server.handleNavmeshCompareGeometry)
+    mux.HandleFunc("GET /api/navmesh/compare/diff/{key}",
+        server.handleNavmeshCompareDiff)
 
     return server
 }
 
-// navmeshConfigResponse is the boot payload of the viewer page.
+// navmeshConfigResponse is the boot payload of the viewer page. The
+// compare section arms the dual pack view (issue #59): nil when the
+// viewer runs single pack.
 type navmeshConfigResponse struct {
-    Mode    string        `json:"mode"`
-    Navmesh navmeshConfig `json:"navmesh"`
+    Mode    string         `json:"mode"`
+    Navmesh navmeshConfig  `json:"navmesh"`
+    Compare *navmeshConfig `json:"compare,omitempty"`
 }
 
 // navmeshConfig tells the viewer which tiles exist and which of them
@@ -168,6 +183,10 @@ type navmeshPathResponse struct {
     DurationMs   float64        `json:"durationMs"`
     Explored     int            `json:"explored"`
     Corridor     int            `json:"corridor"`
+    // Compare carries the same query's answer over the second pack of
+    // the dual pack view (nil when the viewer runs single pack) - the
+    // same click routes both meshes, the viewer draws both answers.
+    Compare *navmeshPathResponse `json:"compare,omitempty"`
 }
 
 // handleNavmeshConfig answers the mode and the tile listing of the
@@ -179,7 +198,7 @@ func (s *Server) handleNavmeshConfig(w http.ResponseWriter, _ *http.Request) {
     if len(s.navmeshTiles) > 0 {
         initial = tileKeysOf(s.navmeshTiles)
     }
-    writeJSON(w, s.logger, navmeshConfigResponse{
+    answer := navmeshConfigResponse{
         Mode: modeNavmesh,
         Navmesh: navmeshConfig{
             Dir:          stats.Dir,
@@ -187,7 +206,18 @@ func (s *Server) handleNavmeshConfig(w http.ResponseWriter, _ *http.Request) {
             Tiles:        tiles,
             InitialTiles: initial,
         },
-    })
+        Compare: nil,
+    }
+    if s.navmeshCompare != nil {
+        compareStats := s.navmeshCompare.Stats()
+        answer.Compare = &navmeshConfig{
+            Dir:          compareStats.Dir,
+            TileFiles:    compareStats.TileFiles,
+            Tiles:        meshTileKeys(s.navmeshCompare),
+            InitialTiles: nil,
+        }
+    }
+    writeJSON(w, s.logger, answer)
 }
 
 // handleNavmeshTiles lists the tile files of the mesh directory with
@@ -299,7 +329,6 @@ func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
 // the ban circles, the raw answer), and measures the construction
 // time.
 //
-//nolint:funlen // the handler mirrors the validation steps in order
 func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     body, err := io.ReadAll(io.LimitReader(r.Body, navmeshPathBodyLimit))
     if err != nil {
@@ -313,25 +342,32 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
 
         return
     }
-    // The priced search: the water polygons stay walkable at the
-    // swim rate (the run/swim speed ratio - swimming is slower than
-    // running), so a crossing competes with the land detours on the
-    // honest travel time. The pricing follows the server water zone
-    // data: the water polygons a C1 WaterZone cuboid covers swim at
-    // the ratio, the river beds the zone data omits walk at the
-    // plain land rate (the zone data, not the depth, prices the
-    // swim).
-    filter := navmesh.DefaultFilter()
-    filter.WaterZones = navmesh.C1WaterZones()
-    clearance := 0.0
-    if s.navmeshEngine != nil {
-        clearance = s.navmeshEngine.CapsuleRadius()
+    response := s.navmeshSearchAnswer(s.navmeshMesh, &request, "")
+    if s.navmeshCompare != nil {
+        // The dual pack view (issue #59): the same click pair routes
+        // the second mesh with the identical filter contract, and the
+        // answer rides the response - the viewer draws both routes
+        // and compares them by eye.
+        compare := s.navmeshSearchAnswer(
+            s.navmeshCompare, &request, "compare")
+        response.Compare = &compare
     }
-    filter.WaypointClearance = clearance
-    filter.Smooth = clearance > 0
-    if s.navmeshCapsule != nil {
-        filter.Guard = s.navmeshCapsule
-    }
+    writeJSON(w, s.logger, response)
+}
+
+// navmeshSearchAnswer runs one corridor search of the given mesh
+// between the two double clicked points (the exact destination, the
+// fold pipeline) or one plan repro search of a pathfind link (the
+// approach radius, the ban circles, the raw answer), and measures the
+// construction time. The filter contract is identical for every mesh
+// of the view (the water pricing, the capsule clearance, the ban
+// circles) - the packs decompose the same geodata, the answers differ
+// by the decomposition only, which is the comparison of issue #59.
+// The label distinguishes the console lines of the two packs.
+func (s *Server) navmeshSearchAnswer(
+    mesh *navmesh.Mesh, request *navmeshPathRequest, label string,
+) navmeshPathResponse {
+    filter, clearance := s.navmeshRouteFilter()
 
     start := navmesh.Pos{X: request.Start.X, Y: request.Start.Y,
         Z: request.Start.Z}
@@ -346,38 +382,15 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     }
     began := time.Now()
     var route *navmesh.Route
+    var err error
     if request.Approach > 0 {
-        route, err = s.navmeshMesh.RouteApproach(start, end,
+        route, err = mesh.RouteApproach(start, end,
             request.Approach, filter)
     } else {
-        route, err = s.navmeshMesh.Route(start, end, filter)
+        route, err = mesh.Route(start, end, filter)
     }
     duration := time.Since(began)
-    // The console line keeps the construction cost observable from
-    // the server window (the viewer answer carries the same number
-    // in the duration field): the cold request pays the tile decode,
-    // the repeat answers from the resident mesh.
-    if err != nil {
-        s.logger.Printf("Navmesh route: failed in %.1f ms: %v",
-            float64(duration.Nanoseconds())/1e6, err)
-    } else {
-        if route == nil {
-            s.logger.Printf("Navmesh route: no path in %.1f ms",
-                float64(duration.Nanoseconds())/1e6)
-        } else {
-            status := "no path"
-            switch {
-            case route.Found:
-                status = "found"
-            case route.Partial:
-                status = "partial"
-            }
-            s.logger.Printf("Navmesh route: %s in %.1f ms - "+
-                "%d waypoints, %d regions", status,
-                float64(duration.Nanoseconds())/1e6,
-                len(route.Waypoints), len(route.Corridor))
-        }
-    }
+    s.logNavmeshRoute(label, route, err, duration)
 
     response := navmeshPathResponse{
         Found:        false,
@@ -388,12 +401,12 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         DurationMs:   float64(duration.Nanoseconds()) / 1e6,
         Explored:     0,
         Corridor:     0,
+        Compare:      nil,
     }
     if err != nil {
         response.Error = err.Error()
-        writeJSON(w, s.logger, response)
 
-        return
+        return response
     }
     if route != nil {
         response.Found = route.Found
@@ -419,7 +432,69 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
         response.RawWaypoints = toNavmeshPoints(
             s.legacyWaypoints(route.RawWaypoints, clearance))
     }
-    writeJSON(w, s.logger, response)
+
+    return response
+}
+
+// navmeshRouteFilter builds the search filter of the navmesh viewer
+// queries: the priced search (the water polygons stay walkable at the
+// swim rate - the run/swim speed ratio - so a crossing competes with
+// the land detours on the honest travel time; the pricing follows the
+// server water zone data), the capsule clearance of the viewer engine
+// and the guard of the armed capsule pass. Every mesh of the view
+// searches under the same filter - the answers differ by the
+// decomposition only.
+func (s *Server) navmeshRouteFilter() (navmesh.Filter, float64) {
+    filter := navmesh.DefaultFilter()
+    filter.WaterZones = navmesh.C1WaterZones()
+    clearance := 0.0
+    if s.navmeshEngine != nil {
+        clearance = s.navmeshEngine.CapsuleRadius()
+    }
+    filter.WaypointClearance = clearance
+    filter.Smooth = clearance > 0
+    if s.navmeshCapsule != nil {
+        filter.Guard = s.navmeshCapsule
+    }
+
+    return filter, clearance
+}
+
+// logNavmeshRoute keeps the construction cost observable from the
+// server window (the viewer answer carries the same number in the
+// duration field): the cold request pays the tile decode, the repeat
+// answers from the resident mesh. The label distinguishes the two
+// packs of the dual view.
+func (s *Server) logNavmeshRoute(label string, route *navmesh.Route,
+    err error, duration time.Duration,
+) {
+    logLabel := "Navmesh route"
+    if label != "" {
+        logLabel = "Navmesh route (" + label + ")"
+    }
+    if err != nil {
+        s.logger.Printf("%s: failed in %.1f ms: %v", logLabel,
+            float64(duration.Nanoseconds())/1e6, err)
+
+        return
+    }
+    if route == nil {
+        s.logger.Printf("%s: no path in %.1f ms", logLabel,
+            float64(duration.Nanoseconds())/1e6)
+
+        return
+    }
+    status := "no path"
+    switch {
+    case route.Found:
+        status = "found"
+    case route.Partial:
+        status = "partial"
+    }
+    s.logger.Printf("%s: %s in %.1f ms - "+
+        "%d waypoints, %d regions", logLabel, status,
+        float64(duration.Nanoseconds())/1e6,
+        len(route.Waypoints), len(route.Corridor))
 }
 
 // clearedWaypoints runs the answer waypoints through the capsule
@@ -551,33 +626,44 @@ func tileKeyOf(key navmesh.RegionKey) navmeshTileKey {
 // tile together with its ETag.
 func (s *Server) navmeshGeometry(key navmesh.RegionKey,
 ) ([]byte, string, error) {
+    return s.navmeshGeometryCached(s.navmeshMesh, s.navmeshGeo,
+        key, "")
+}
+
+// navmeshGeometryCached is the shared encode-and-cache core of the
+// pack geometry endpoints: the payload of one tile of the given mesh
+// rasterizes once per process (the map answers the repeats) and the
+// ETag lets the browser revalidate for free. The label names the pack
+// in the console line and in the load error (the primary answers as
+// today, the compare pack of the dual view marks itself).
+func (s *Server) navmeshGeometryCached(
+    mesh *navmesh.Mesh, cache map[navmesh.RegionKey][]byte,
+    key navmesh.RegionKey, label string,
+) ([]byte, string, error) {
     s.navmeshGeoMu.Lock()
     defer s.navmeshGeoMu.Unlock()
-    if s.navmeshGeo == nil {
-        s.navmeshGeo = make(map[navmesh.RegionKey][]byte)
-    }
-    if payload, ok := s.navmeshGeo[key]; ok {
+    if payload, ok := cache[key]; ok {
         return payload, navmeshGeoETag(key, payload), nil
     }
 
-    tile, err := s.navmeshMesh.Tile(key)
+    tile, err := mesh.Tile(key)
     if err != nil {
-        return nil, "", fmt.Errorf("load navmesh tile %d_%d: %w", key.Col,
-            key.Row, err)
+        return nil, "", fmt.Errorf("load %snavmesh tile %d_%d: %w",
+            label, key.Col, key.Row, err)
     }
     began := time.Now()
-    payload, err := encodeNavmeshGeometry(s.navmeshMesh, tile)
+    payload, err := encodeNavmeshGeometry(mesh, tile)
     duration := time.Since(began)
     // The first open of a tile pays the polygon soup encode (the
     // process cache answers the repeats); the console line keeps
     // that cost observable.
-    s.logger.Printf("Navmesh geometry %d_%d: %.1f ms, %.1f MB",
-        key.Col, key.Row, float64(duration.Nanoseconds())/1e6,
+    s.logger.Printf("Navmesh %sgeometry %d_%d: %.1f ms, %.1f MB",
+        label, key.Col, key.Row, float64(duration.Nanoseconds())/1e6,
         float64(len(payload))/(1024*1024))
     if err != nil {
         return nil, "", err
     }
-    s.navmeshGeo[key] = payload
+    cache[key] = payload
 
     return payload, navmeshGeoETag(key, payload), nil
 }
