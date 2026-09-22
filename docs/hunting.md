@@ -486,9 +486,11 @@ are references, not copies):
 | `kiteHalfPlaneSlack` | -0.05 | the away half-plane guard (no fold-back into the train) |
 | `kiteHoldLogPeriod` | 15s | the cornered hold diagnostic pacing |
 | `kiteShotWindow` | 700ms | the freshness window of the own-shot broadcast that arms the shot-paced retreat |
-| `kiteReclickPeriod` | 600ms | the re-click pace of the kite walk ladder (under the once-per-second movement broadcast gate) |
-| `kiteReclickLimit` | 3 | the re-click bound of one kite walk (the initial click plus three) |
-| `kiteReclickProbe` | 2 | the re-click ordinal that latches the dead-click probe and rotates the endpoint |
+| `kiteReclickPeriod` | 250ms | the re-click pace of the kite walk ladder (the tick cadence - the owner ask: spam much faster) |
+| `kiteReclickLimit` | 8 | the re-click bound of one kite walk (the packet budget of a dead transport) |
+| `kiteProbeElapsed` | 1.2s | the silent-verdict age of the walk (past the movement broadcast gate - the H-006 signature) |
+| `kiteRefusalAnswerWindow` | 1s | the round-trip window of the ActionFailed attribution |
+| `kiteBowReuseDelay` | 1500 | the reuse delay of the bow family (the C1 item data) feeding the walk window formula |
 
 ### The shot-paced retreat (issue #60)
 
@@ -560,74 +562,93 @@ narrate the retreats, the online status and the HP hold through the
 window, and the arrow stock never empties (the restock gates of the
 gear plan feed the quiver).
 
-### The re-click ladder of the kite walk (issue #60, the second round)
+### The re-click ladder of the kite walk (issues #60, rounds two and three)
 
 The first round of the shot-paced retreat shipped the rhythm - the
 retreat arms at the own Attack broadcast, the dump showed a "shot
-released" line every cycle - but the owner's follow-up dump showed
+released" line every cycle - but the owner's follow-up dumps showed
 the WALK barely executing: "moving: no" through every reload while
-the mob closed ~380 units per cycle, the character covering ~0 of
-its 400 unit retreat. The manual clicking the owner demonstrated
-behind the character ("it runs 2 seconds no problem, covering large
-distance") proved the server accepts the retreat clicks fine when
-they arrive right - the single bot click of each cycle was the
-problem, not the lane.
+the mob closed ~380 units per cycle. The manual clicking the owner
+demonstrated behind the character ("it runs 2 seconds no problem,
+covering large distance") proved the server accepts the retreat
+clicks fine when they arrive right - the single bot click of each
+cycle was the problem, not the lane.
 
-The three candidate mechanisms that eat a single kite click, all
-named in the tree already:
+The third-round acceptance dump named the dominant dead-click
+mechanism exactly: the server answers SOME destination cells with an
+instant bare ActionFailed (the send and the answer land the same
+millisecond) while the rotated fan lane a few cells aside walks
+fine. The MoveToLocation handler refusal family is the source (the
+Mobius C1 packet handler runs `isCompletelyBlocked` on the
+destination cell - among other checks - BEFORE any movement starts),
+and the bot's own geodata reads the dump's refused cells open (the
+offline probe of the round: every dead endpoint of the dump passes
+the shipped pack's own cell check), so only the ONLINE evidence
+settles a refusal. The three candidate mechanisms the ladder
+answers:
 
-- The stance transition swallow: the click lands ~250ms after the
-  own Attack broadcast while the server side ATTACK intention of
-  the just-committed shot is still tearing down (the shot itself
-  ran `stopMove` on the pre-shot move). The manual click at an
-  arbitrary time runs fine; the kite click rides exactly the wrong
-  window.
-- The destination-cell refusal: the C1 `MoveToLocation` handler
-  answers ActionFailed for a destination the bot side LineOfSight
-  blessed (`isCompletelyBlocked` on the cell, a door on the lane,
-  the out-of-control guard). A refused cell never starts a walk -
-  clicking it again changes nothing.
+- The destination-cell refusal (the dominant one, the dump
+  evidence): the server refuses the cell outright - a refused cell
+  never starts a walk, clicking it again changes nothing. The
+  rotation onto the next fan candidate is the answer, and the
+  ActionFailed answer of the click is the trigger.
+- The stance transition swallow (the round-two theory): the click
+  lands ~250ms after the own Attack broadcast while the server side
+  ATTACK intention of the just-committed shot is still tearing down.
+  The plain same-endpoint retry at the 250ms pace answers it.
 - The H-006 silent drop: the deployment that swallows accepted move
-  requests whole (no movement broadcast, no ActionFailed) - the
-  same transport the town walk machinery needed the frozen-skip
-  rule against.
+  requests whole (no broadcast, no ActionFailed). The silent probe
+  answers it - a walk unanswered past kiteProbeElapsed with the
+  character still on the issue cell names the endpoint dead.
 
 The ladder (kiteReclickWalk, armed by kiteIssueWalk on every kite
-step of both layers) replicates the manual behavior: while the
-movement window runs (kiteStepWindow, the same window the step set)
-and the character still stands on the issue cell - the SelfWalking
-tracker flag is the oracle, the issue cell the baseline - the click
-goes out again every kiteReclickPeriod (600ms, deliberately under
-the once-per-second movement broadcast gate: an accepted click may
-take up to a second to answer with the broadcast, and a re-click
-inside that gate just re-aims the same endpoint server-side). The
-ladder stands down the moment the walk runs (the movement
-broadcast), the character leaves the issue cell (the click moved
-something after all) or the window ends (the forced attack
-re-request owns the tick - a re-click past it would only fight the
-re-engage).
+step of both layers) replicates the manual behavior, faster per the
+third-round ask: while the movement window runs and the character
+still stands on the issue cell - the SelfWalking tracker flag is the
+oracle, the issue cell the baseline - the click goes out again every
+kiteReclickPeriod (250ms, the tick cadence; a re-click inside the
+once-per-second broadcast gate just re-aims the same endpoint
+server-side, the click is not wasted). The moment the refusal
+evidence lands (kiteClickRefused - the ActionFailed answer the
+server gave the last click, correlated by the send time the same way
+the town walker's refusalEvidence runs), the dead endpoint rotates
+onto the next fan candidate AT ONCE: no probe wait, no pacing wait.
+The refused cell joins the refused-cell set (kiteWalkDeadCells) and
+the lane battery (kiteRetreatLaneSkipping) resolves the next
+walkable lane skipping the whole set - a refused cell is never
+re-clicked. The silent probe stays as the H-006 fallback: a walk
+unanswered past kiteProbeElapsed rotates the same way. A rotation
+with nothing left (an encircled train, every candidate refused or
+blocked) stands the ladder down - the cornered hold owns the answer.
+The ladder also stands down when the walk runs (the movement
+broadcast), the character leaves the issue cell, or the window ends.
 
-The verdict point is the second re-click (kiteReclickProbe, roughly
-1.2s past the issue): a character still standing on the issue cell
-names the endpoint click dead - the probe line lands once per walk
-and the dead endpoint rotates onto the next fan candidate
-(kiteRetreatLaneSkipping resolves the lane battery minus the dead
-endpoint, the fresh train direction included). The last re-click
-retries the rotated lane: a 600ms-old rotated click is too young
-for its own dead verdict - the broadcast gate alone explains its
-silence. The whole ladder is bounded by kiteReclickLimit (the
-initial click plus three re-issues inside the 2s window) - a dead
-transport spends the bound and stops; the next shot cycle arms a
-fresh ladder whole.
+The walk WINDOW itself is the bow-aware one now (kiteWalkWindow -
+the third-round ask: the proper archering delays from the C1 Mobius
+formulas): the C1 disable window the server enforces between the
+shots, timeAtk + reuse = 500000/pAtkSpd + reuseDelay*333/pAtkSpd
+(Creature.calculateTimeBetweenAttacks and calculateReuseTime), read
+from the live pAtkSpd the StatusUpdate broadcasts (attribute 0x12 -
+the acceptance dump shows 337 for the Short Bow kit, giving roughly
+(500000 + 1500*333)/337 = 2.97s, the "3 seconds to draw shot" the
+owner measured by hand; the reuse 1500 is the bow family value of
+the C1 item data). The walk then spends the WHOLE cooldown running -
+if it is not shooting it is moving away from the target - and the
+forced attack re-request lands the moment the window ends (the
+engage retry pacing of 1s already sat inside the window), closing
+the cycle to walk-the-disable, shoot, walk again. A missing or
+absurd pAtkSpd broadcast falls back to the shipped kiteStepWindow
+(2s) - the walk contract never depends on the packet being parsed.
 
-The dump markers the ladder adds, and what each names: the probe
-line ("the kite walk click on target ... never started the
-movement") followed by the walk starting on the rotated endpoint
-names the destination-cell refusal; the probe line followed by a
-plain retry starting the walk names the stance swallow; the probe
-line with nothing ever moving across the whole ladder names the
-H-006 silent drop. The rotation line ("rotating the kite retreat
-... onto the fan lane") is the second marker of the pair.
+The dump markers the ladder adds, and what each names: the refusal
+verdict line ("the kite walk click on target ... was refused by the
+server") followed by the walk starting on the rotated endpoint names
+the destination-cell refusal working as designed; the silent probe
+line ("never started the movement") with nothing ever moving across
+the whole ladder names the H-006 silent drop; the rotation line
+("rotating the kite retreat ... onto the lane") is the second marker
+of the pair; the "no walkable retreat lane left" line names the
+cornered-by-refusal answer.
 
 The measured numbers of the live tuning round (issue #29: the kited
 archer against the standing-archer baseline - a bow bot with the kite

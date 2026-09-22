@@ -360,6 +360,24 @@ func (e *Engine) OverWater(x, y float64, refZ int16) bool {
     return layer.Height < WaterLevel
 }
 
+// CellBlockedAtZ mirrors the packet level isCompletelyBlocked check
+// of the Mobius MoveToLocation handler: the click validation port
+// (ValidateClick) walks the terrain-following z along its Bresenham
+// line the way the server AI correction does, but the PACKET handler
+// asks the destination cell directly at the CLICK's own z - the
+// layer nearest to that z decides, and an upper layer (a tree
+// canopy, a cliff band) whose walls are all closed refuses the whole
+// click with an instant ActionFailed even though the ground under it
+// is walkable (the issue #60 acceptance dump: the kite endpoints on
+// the hill deck bounce instantly while the rotated fan lanes a few
+// cells aside walk fine). The fight steps that click straight lines
+// (the kite retreat) read this gate BEFORE sending: a refused
+// endpoint never starts a walk, clicking it only burns the movement
+// window.
+func (e *Engine) CellBlockedAtZ(x, y float64, z int16) bool {
+    return e.cellBlocked(WorldToCell(x, y), z)
+}
+
 // ClosestHeight resolves the height of the geodata layer at the world
 // position that is closest to refZ: the deck the server itself would
 // pick for a destination at (x, y) named with z = refZ (its own

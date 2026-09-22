@@ -121,8 +121,20 @@ type CharacterState struct {
     // release moment the kite retreat rides: everything after it is
     // the cooldown the character may spend walking away (issue #60).
     LastSelfShotAt time.Time
-    CurrentLoad    int32
-    MaxLoad        int32
+    // PAtkSpd carries the live physical attack speed of the played
+    // character (the StatusUpdate ATK_SPD attribute 0x12 the server
+    // rebroadcasts whenever the equipment or the buffs move it). The
+    // bow fight reads it through SelfPAtkSpd for the cooldown window
+    // math: the C1 disable window is timeAtk + reuse =
+    // 500000/pAtkSpd + reuseDelay*333/pAtkSpd (Creature.
+    // calculateTimeBetweenAttacks / calculateReuseTime), so the walk
+    // window that spends the whole cooldown walking scales with the
+    // weapon speed the server actually runs (issue #60, the third
+    // round - the owner ask: the proper archering delays from the C1
+    // Mobius formulas, not a fixed guess).
+    PAtkSpd     int32
+    CurrentLoad int32
+    MaxLoad     int32
 }
 
 // newCharacterState creates a zero valued character state.
@@ -168,6 +180,7 @@ func newCharacterState() CharacterState {
         LastLandedHitAt:     time.Time{},
         LastLandedHitTarget: 0,
         LastSelfShotAt:      time.Time{},
+        PAtkSpd:             0,
         CurrentLoad:         0,
         MaxLoad:             0,
     }
@@ -773,6 +786,17 @@ func (b *Bot) SelfLastShotAt() time.Time {
     defer b.mu.RUnlock()
 
     return b.char.LastSelfShotAt
+}
+
+// SelfPAtkSpd returns the live physical attack speed of the played
+// character (the StatusUpdate ATK_SPD attribute): the bow cooldown
+// window math reads it (see CharacterState.PAtkSpd - the C1 disable
+// window formulas). Zero when the server never broadcast it yet.
+func (b *Bot) SelfPAtkSpd() int32 {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.char.PAtkSpd
 }
 
 // SelfWalking reports whether the character is moving right now: the
@@ -2284,6 +2308,11 @@ const (
     AttrMaxMP   = 0x0C
     AttrCurLoad = 0x0E
     AttrMaxLoad = 0x0F
+    // AttrAtkSpd is the ATK_SPD attribute: the live physical attack
+    // speed of the character, rebroadcast on every equipment or buff
+    // change of it. The bow fight reads it for the cooldown window
+    // (the C1 formulas: 500000/pAtkSpd + reuseDelay*333/pAtkSpd).
+    AttrAtkSpd = 0x12
 )
 
 // ApplyStatusUpdate applies vitals attribute changes to self or an object.
@@ -2345,6 +2374,8 @@ func (b *Bot) applyCharAttr(attr Attribute) {
         b.char.CurrentLoad = attr.Value
     case AttrMaxLoad:
         b.char.MaxLoad = attr.Value
+    case AttrAtkSpd:
+        b.char.PAtkSpd = attr.Value
     }
 }
 
