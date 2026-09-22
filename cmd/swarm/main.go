@@ -1467,6 +1467,7 @@ func runNavmeshViewer(cfg config) {
         log.Default(), webserver.NavmeshOptions{
             InitialTiles: initial,
             Engine:       engine,
+            CompareMesh:  nil,
         })
     go func() {
         if err := server.ListenAndServe(); err != nil {
