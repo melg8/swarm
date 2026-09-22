@@ -1,4 +1,4 @@
-# The persistent kill marks and the corpse face retirement (status: in progress)
+# The persistent kill marks and the corpse face retirement (status: in review)
 
 Started 2026-09-22, branch feature/persistent-kill-marks, issue #6.
 
@@ -73,6 +73,9 @@ What done means:
 
 ## Status
 
-The implementation is complete on the branch; the next steps are the
-pull request (Fixes #6), the rebase on main, the CI watch and the
-issue report.
+In review: the branch rebased onto the merged main (57eed69, the
+contact pack relaxation of PR #45 - one docs/webui.md hunk merged by
+hand, both sides kept), force pushed, PR #46 rides head 5a21081 with
+the full 11 check CI green and a clean mergeable state. The next step
+is the reviewer read on the issue; the live stack read of the map is
+the only unverified leg.
