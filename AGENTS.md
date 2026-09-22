@@ -336,7 +336,13 @@ conversation or in a commit message: it lives in the registry below.
 - Relied on by: the frozen skip rule of the town walk follower
   (skipMoveFresh, internal/swarm/hunt/town.go) - a skip that moved
   the character nothing may not repeat, the re-path ladder and the
-  cursor key escape own the dead click transport instead.
+  cursor key escape own the dead click transport instead. The kite
+  re-click ladder of the archer retreat (kiteReclickWalk,
+  internal/swarm/hunt/kite.go, issue #60 second round) rides the
+  same hypothesis from the fight side: the retreat click that moved
+  nothing gets its paced re-issues and the fan rotation, and the
+  probe line of the ladder names the silent drop in the hunt dumps
+  exactly the way the town walk skip rule does.
 - Verify: reproduce on the deployed stack - place a character on
   the dump cell, click a waypoint the local oracle validates, and
   record the server answers (the game server log with a

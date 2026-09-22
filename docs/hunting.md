@@ -486,6 +486,9 @@ are references, not copies):
 | `kiteHalfPlaneSlack` | -0.05 | the away half-plane guard (no fold-back into the train) |
 | `kiteHoldLogPeriod` | 15s | the cornered hold diagnostic pacing |
 | `kiteShotWindow` | 700ms | the freshness window of the own-shot broadcast that arms the shot-paced retreat |
+| `kiteReclickPeriod` | 600ms | the re-click pace of the kite walk ladder (under the once-per-second movement broadcast gate) |
+| `kiteReclickLimit` | 3 | the re-click bound of one kite walk (the initial click plus three) |
+| `kiteReclickProbe` | 2 | the re-click ordinal that latches the dead-click probe and rotates the endpoint |
 
 ### The shot-paced retreat (issue #60)
 
@@ -556,6 +559,75 @@ the bow radii (the ranged share of the samples), the kite lines
 narrate the retreats, the online status and the HP hold through the
 window, and the arrow stock never empties (the restock gates of the
 gear plan feed the quiver).
+
+### The re-click ladder of the kite walk (issue #60, the second round)
+
+The first round of the shot-paced retreat shipped the rhythm - the
+retreat arms at the own Attack broadcast, the dump showed a "shot
+released" line every cycle - but the owner's follow-up dump showed
+the WALK barely executing: "moving: no" through every reload while
+the mob closed ~380 units per cycle, the character covering ~0 of
+its 400 unit retreat. The manual clicking the owner demonstrated
+behind the character ("it runs 2 seconds no problem, covering large
+distance") proved the server accepts the retreat clicks fine when
+they arrive right - the single bot click of each cycle was the
+problem, not the lane.
+
+The three candidate mechanisms that eat a single kite click, all
+named in the tree already:
+
+- The stance transition swallow: the click lands ~250ms after the
+  own Attack broadcast while the server side ATTACK intention of
+  the just-committed shot is still tearing down (the shot itself
+  ran `stopMove` on the pre-shot move). The manual click at an
+  arbitrary time runs fine; the kite click rides exactly the wrong
+  window.
+- The destination-cell refusal: the C1 `MoveToLocation` handler
+  answers ActionFailed for a destination the bot side LineOfSight
+  blessed (`isCompletelyBlocked` on the cell, a door on the lane,
+  the out-of-control guard). A refused cell never starts a walk -
+  clicking it again changes nothing.
+- The H-006 silent drop: the deployment that swallows accepted move
+  requests whole (no movement broadcast, no ActionFailed) - the
+  same transport the town walk machinery needed the frozen-skip
+  rule against.
+
+The ladder (kiteReclickWalk, armed by kiteIssueWalk on every kite
+step of both layers) replicates the manual behavior: while the
+movement window runs (kiteStepWindow, the same window the step set)
+and the character still stands on the issue cell - the SelfWalking
+tracker flag is the oracle, the issue cell the baseline - the click
+goes out again every kiteReclickPeriod (600ms, deliberately under
+the once-per-second movement broadcast gate: an accepted click may
+take up to a second to answer with the broadcast, and a re-click
+inside that gate just re-aims the same endpoint server-side). The
+ladder stands down the moment the walk runs (the movement
+broadcast), the character leaves the issue cell (the click moved
+something after all) or the window ends (the forced attack
+re-request owns the tick - a re-click past it would only fight the
+re-engage).
+
+The verdict point is the second re-click (kiteReclickProbe, roughly
+1.2s past the issue): a character still standing on the issue cell
+names the endpoint click dead - the probe line lands once per walk
+and the dead endpoint rotates onto the next fan candidate
+(kiteRetreatLaneSkipping resolves the lane battery minus the dead
+endpoint, the fresh train direction included). The last re-click
+retries the rotated lane: a 600ms-old rotated click is too young
+for its own dead verdict - the broadcast gate alone explains its
+silence. The whole ladder is bounded by kiteReclickLimit (the
+initial click plus three re-issues inside the 2s window) - a dead
+transport spends the bound and stops; the next shot cycle arms a
+fresh ladder whole.
+
+The dump markers the ladder adds, and what each names: the probe
+line ("the kite walk click on target ... never started the
+movement") followed by the walk starting on the rotated endpoint
+names the destination-cell refusal; the probe line followed by a
+plain retry starting the walk names the stance swallow; the probe
+line with nothing ever moving across the whole ladder names the
+H-006 silent drop. The rotation line ("rotating the kite retreat
+... onto the fan lane") is the second marker of the pair.
 
 The measured numbers of the live tuning round (issue #29: the kited
 archer against the standing-archer baseline - a bow bot with the kite
