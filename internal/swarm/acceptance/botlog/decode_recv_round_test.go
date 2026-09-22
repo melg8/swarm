@@ -247,12 +247,16 @@ func TestRecvDecodeSocialTeleportAndWaitType(t *testing.T) {
 func TestRecvDecodeTruncatedPacketsFallBackToShortLines(t *testing.T) {
     cases := map[byte]string{
         0x01: "move to location",
+        0x03: "char info",
+        0x04: "user info",
         0x06: "attack",
         0x15: "spawn item",
         0x16: "drop item",
         0x17: "get item",
         0x1B: "npc html",
         0x1E: "delete object",
+        0x1F: "char select info",
+        0x21: "char selected",
         0x27: "item list",
         0x37: "inventory update",
         0x39: "target selected",

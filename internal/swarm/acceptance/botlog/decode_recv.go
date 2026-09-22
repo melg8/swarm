@@ -715,18 +715,41 @@ func decodeRecvAbnormalStatus(payload []byte) []string {
     return []string{line.String()}
 }
 
-// decodeRecvRotation renders the turn broadcasts (the begin and
-// stop rotation packets share the object id and heading shape).
+// decodeRecvRotation renders the turn broadcasts: the begin and the
+// stop rotation packets share the object id and heading fields but
+// differ behind them (the begin packet carries the side and the
+// speed ints, the stop packet only the speed and an unknown byte),
+// so each parses through its own wire shape.
 func decodeRecvRotation(payload []byte, name string) []string {
-    packet := fromgameserver.NewBeginRotationPacket()
-    if err := fromgameserver.ParseBeginRotationPacket(
-        packet, payload); err != nil {
+    objectID, heading, err := parseRotation(payload)
+    if err != nil {
         return []string{shortLine(name)}
     }
 
     return []string{name + ": object " +
-        strconv.Itoa(int(packet.ObjectID)) + " heading " +
-        strconv.Itoa(int(packet.Heading))}
+        strconv.Itoa(int(objectID)) + " heading " +
+        strconv.Itoa(int(heading))}
+}
+
+// stopRotationOpcode picks the stop rotation wire shape inside
+// parseRotation (the dispatch switch above routes the packet here).
+const stopRotationOpcode = 0x78
+
+// parseRotation reads the object id and the heading of the begin
+// and stop rotation packets: the opcode picks the wire shape (the
+// stop wire is two ints shorter, so the begin parser reads a real
+// stop packet as a short payload).
+func parseRotation(payload []byte) (int32, int32, error) {
+    if payload[0] == stopRotationOpcode {
+        packet := fromgameserver.NewStopRotationPacket()
+        err := fromgameserver.ParseStopRotationPacket(packet, payload)
+
+        return packet.ObjectID, packet.Heading, err
+    }
+    packet := fromgameserver.NewBeginRotationPacket()
+    err := fromgameserver.ParseBeginRotationPacket(packet, payload)
+
+    return packet.ObjectID, packet.Heading, err
 }
 
 // decodeRecvAutoAttackStart renders the combat stance broadcast.
