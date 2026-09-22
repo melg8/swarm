@@ -293,3 +293,38 @@ func TestDumpEmptySlotsBlockers(t *testing.T) {
     require.NotContains(t, report, "empty slots: rhand",
         "the filled right hand never names a hole")
 }
+
+// TestDumpBuffsSection pins the active effect section of the issue
+// #37 round: the dump lists every running buff with its level, the
+// remaining seconds over the full duration and the derived applied
+// age, so a problem report answers "what was up and for how long"
+// without the web UI (an empty strip prints its zero count too -
+// the guide buff diagnosis of issue #35 needed exactly that).
+func TestDumpBuffsSection(t *testing.T) {
+    bot := state.NewBot("buffed")
+    bot.SetCharacter("buffed", 100, 18, 45000, 50000, -3500, 50, 30)
+    report := BuildStateDump(bot)
+    require.Contains(t, report, "buffs (0):",
+        "the empty strip prints its zero count")
+
+    bot.SetBuffs([]state.BuffEntry{
+        {SkillID: 1204, Level: 1, Time: 1200},
+        {SkillID: 1068, Level: 3, Time: 900},
+    })
+    report = BuildStateDump(bot)
+    require.Contains(t, report, "buffs (2):")
+    require.Contains(t, report, "(1204) lvl 1: 1200/1200s left",
+        "the fresh guide Wind Walk reads full")
+    require.Contains(t, report, "applied ~0s ago",
+        "the fresh cast derives a zero age")
+    // The Might entry reports 900 seconds left; the skill stats
+    // know the full abnormal time of the level 3 cast (1200s), so
+    // the strip reads 900 of 1200 - a mid-buff observation with the
+    // applied age derived from the gap (the first-observation rule
+    // of SetBuffs, the honest reading of a login inside a running
+    // buff).
+    require.Contains(t, report, "(1068) lvl 3: 900/1200s left",
+        "the Might entry carries its level and the known full time")
+    require.Contains(t, report, "applied ~5m0s ago",
+        "the mid-buff observation derives its age from the gap")
+}

@@ -59,6 +59,7 @@ func BuildStateDump(bot *state.Bot) string {
 
     writeDumpHeader(b, snap)
     writeDumpCharacter(b, snap)
+    writeDumpBuffs(b, snap)
     writeDumpAttackers(b, snap)
     writeDumpZone(b, snap)
     writeDumpInventory(b, snap)
@@ -121,6 +122,27 @@ func writeDumpCharacter(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintf(b, "  load: %d/%d, slots %d/%d, adena %d\n",
         c.CurrentLoad, c.MaxLoad, c.InventorySlots, c.InventoryMax,
         c.Adena)
+    fmt.Fprintln(b)
+}
+
+// writeDumpBuffs lists the active effects of the character with
+// their remaining time: the buff strip state the web UI renders,
+// in the report so a problem report answers "what was up and for
+// how long" without a browser (the guide buff round of issue #35
+// paid exactly this gap - the dump could not show the support
+// magic never landed). The applied age derives from the full
+// duration the remaining seconds drain against (Total - Left, the
+// recast detection of SetBuffs keeps the total honest).
+func writeDumpBuffs(b *strings.Builder, snap state.Snapshot) {
+    fmt.Fprintf(b, "buffs (%d):\n", len(snap.Buffs))
+    for i := range snap.Buffs {
+        buff := &snap.Buffs[i]
+        fmt.Fprintf(b,
+            "  %s (%d) lvl %d: %d/%ds left, applied ~%s ago\n",
+            buff.Name, buff.SkillID, buff.Level, buff.Left,
+            buff.Total, (time.Duration(buff.Total-buff.Left) *
+                time.Second).Round(time.Minute))
+    }
     fmt.Fprintln(b)
 }
 
