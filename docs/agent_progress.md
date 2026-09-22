@@ -1,5 +1,12 @@
 # Agent progress log
 
+> FROZEN ARCHIVE (2026-09-22, the merge clash policy round, issue
+> #33): this file is the handover log as it stood before the fragment
+> split - read it for history, NEVER append to it. New task entries
+> live in `docs/progress/` (one file per task, see
+> docs/progress/README.md); the shared-append protocol retired
+> because every append forced a rebase on every concurrent branch.
+
 Crash-safe task tracking: the current task, its full context and
 per-commit progress live here (see the "Work protocol" section in
 AGENTS.md). Entries are append-only; a new agent resumes the newest
