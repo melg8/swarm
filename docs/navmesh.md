@@ -330,7 +330,41 @@ go test ./internal/swarm/pathfind/navmesh/ ./internal/swarm/pathfind/navbuild/ -
 
 # the benchmarks (build, hard pair, nearest poly, decode, escape):
 go test ./internal/swarm/pathfind/navbuild/ -run '^$' -bench BenchmarkReal -benchmem
+
+# the route regression corpus (owner issue #27):
+go run ./cmd/navpack-verify generate -mesh data/navmesh -out corpus.json -seed 1 -samples 256
+go run ./cmd/navpack-verify replay -mesh data/navmesh-reduced -corpus corpus.json
+go run ./cmd/navpack-verify compare -old data/navmesh -new data/navmesh-reduced -corpus corpus.json
 ```
+
+## The route regression corpus
+
+`cmd/navpack-verify` carries the corpus harness the structural pack
+rounds gate on (owner issue #27): a structural change of the pack
+(the polygon count reduction, the height quantization, the merge
+tolerance) must prove the route answers stay identical before it
+lands, and the harness is what "identical" means mechanically.
+
+- `generate` walks a deterministic query set over one pack - the
+  town trip and hunt cell anchors (the real traffic endpoints, kept
+  verbatim from the transport round), the region to region corridors,
+  and the seeded random pairs drawn straight off the pack polygons
+  (the rect center of a random polygon at its exact surface height,
+  so every sample sits on the walkable world). Each query records its
+  answer: the verdict (found / partial / refused), the error class of
+  a refusal, the waypoint count and the hash of the waypoint stream,
+  plus the first and last waypoints for the debugging.
+- `replay` runs the recorded queries over one pack and fails on any
+  answer drift - the verdict must not flip, the waypoint stream must
+  not move. This is the gate the structural rounds iterate against.
+- `compare` keeps the two pack pairwise form of the transport round
+  (the same queries over both packs, the answers must match side for
+  side) - the compressed transport proved itself exactly this way.
+
+The generator is deterministic: the same pack, seed and sample count
+produce the same query set, so the recorded corpus of one round
+replays against the packs of the later rounds. The corpus file gates
+its wire version, a foreign version refuses instead of comparing.
 
 ## The mesh viewer
 
