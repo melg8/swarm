@@ -2745,13 +2745,22 @@ const MapView = {
         r: radiusOf(obj, threatOf(obj)) * k,
         heading: (rt ? rt.drawHeading : obj.heading) || 0 });
     }
-    // The separation pass: pairwise pushes over the working
-    // positions, where a later pair sees the pairs before it
-    // resolved (a chain of touching units settles in one round, the
-    // second catches the rare leftovers). The pairs run in the
-    // deterministic snapshot order (the self first, then the sorted
-    // objects), so the offsets never flicker frame to frame.
-    for (let round = 0; round < 2; round++) {
+    // The separation pass: the pack relaxation. Every overlapping
+    // pair accumulates its push onto the working positions of the
+    // round and the accumulated pushes apply once per round (the
+    // net push of a unit reads all of its partners of the round,
+    // never the already moved neighbor - the pair order cannot
+    // chase a unit across another, the pack of a real melee fight
+    // spreads radially instead of piling onto the look line). The
+    // rounds repeat until no pair overlaps or the round budget
+    // ends; a real fight pack of a dozen units settles in a few.
+    // The pairs run in the deterministic snapshot order (the self
+    // first, then the sorted objects), so the offsets never flicker
+    // frame to frame.
+    const rounds = 8;
+    for (let round = 0; round < rounds; round++) {
+      let overlapped = false;
+      for (const u of units) { u.px = 0; u.py = 0; }
       for (let i = 0; i < units.length; i++) {
         for (let j = i + 1; j < units.length; j++) {
           const a = units[i];
@@ -2765,12 +2774,18 @@ const MapView = {
           const dist = Math.hypot(dx, dy);
           if (dist >= want) { continue; }
           const push = (want - dist) / 2;
-          const axis = contactAxis(a, dx, dy, dist);
-          a.x -= axis.x * push;
-          a.y -= axis.y * push;
-          b.x += axis.x * push;
-          b.y += axis.y * push;
+          const axis = contactAxis(a, b, dx, dy, dist);
+          a.px -= axis.x * push;
+          a.py -= axis.y * push;
+          b.px += axis.x * push;
+          b.py += axis.y * push;
+          overlapped = true;
         }
+      }
+      if (!overlapped) { break; }
+      for (const u of units) {
+        u.x += u.px;
+        u.y += u.py;
       }
     }
     if (this.contactOffsets) {
@@ -4589,6 +4604,18 @@ const contactGap = 0.5;
 // the look direction owns the slide axis instead (see contactAxis).
 const contactAxisEpsilon = 3;
 
+// lookLineAgreeCos is the line agreement bound of a tight pair: the
+// two look directions count as ONE line (mod the direction flip)
+// when the absolute dot of their vectors clears it - 30 degrees of
+// slack around parallel. A pair whose look lines agree separates
+// along that shared line; a pair whose look lines disagree (the bot
+// looks east, the mob it drags south looks north) has no facing
+// line to trust, and the true connecting axis takes over - the
+// pack spreads radially instead of collapsing onto one unit's look
+// direction (the pack fight regression of issue #7).
+
+const lookLineAgreeCos = 0.866;
+
 // headingVec returns the screen space look direction of one heading
 // value - the same 65536 step circle drawUnitTick renders the tick
 // with. The contact pass must resolve its axes in exactly the space
@@ -4604,35 +4631,51 @@ function headingVec(heading) {
 // contactAxis resolves the separation axis of one overlapping pair:
 // the connecting center axis while the gap between the centers is
 // real geometry (a healthy overlap - the axis IS the approach line
-// of the two units), rotating into the look axis of the first unit
-// of the pair as the gap shrinks under contactAxisEpsilon. The
-// rotation blends by the gap fraction, so a pair wobbling around
-// the epsilon does not pop between two directions frame to frame.
-// The look axis kills the facing mismatch at the source: a pair
-// that faces each other separates along the shared facing line with
-// each unit backing away from what it looks at (the character that
-// looks south slides north, the mob that looks north slides south),
-// two units facing the same way line up nose to tail along their
-// course, and the old stacked fallback survives only for units
-// without heading data (heading 0 reads as looking east, so the
-// no-data pair still splits horizontally, deterministic as before).
-function contactAxis(a, dx, dy, dist) {
-  const look = headingVec(a.heading);
+// of the two units). Under contactAxisEpsilon the measured direction
+// is jitter, and the axis comes from the pair's look lines instead:
+// two units whose look lines agree as one line separate along that
+// shared line, each unit backing away from what it looks at (the
+// character that looks south slides north, the mob that looks north
+// slides south) - the facing mismatch dies at the source. Two units
+// whose look lines disagree have no facing line to trust, and the
+// true connecting axis separates them - the pack around a shared
+// target spreads radially instead of collapsing onto one unit's
+// look line (the pack fight regression of issue #7). The pair
+// wobbles read the same geometry every frame: the rules are
+// deterministic in the snapshot, no frame to frame popping.
+function contactAxis(a, b, dx, dy, dist) {
+  const la = headingVec(a.heading);
   if (dist >= contactAxisEpsilon) {
     return { x: dx / dist, y: dy / dist };
   }
-  if (dist <= 0.001) {
-    return look;
-  }
-  const t = dist / contactAxisEpsilon;
-  const from = Math.atan2(look.y, look.x);
-  const to = Math.atan2(dy, dx);
-  let delta = to - from;
-  while (delta > Math.PI) { delta -= 2 * Math.PI; }
-  while (delta < -Math.PI) { delta += 2 * Math.PI; }
-  const angle = from + delta * t;
+  // The tight pair: the measured connecting direction is jitter, so
+  // the pair's own look lines own the axis - but only when they
+  // agree as one line (the units face each other, or both face
+  // along the same line). A pair whose look lines disagree (the bot
+  // looks east at one target while a second mob closes from the
+  // south) has no facing line to trust: the true connecting axis
+  // separates it instead, and the pack spreads radially instead of
+  // collapsing onto one unit's look line.
+  const lb = headingVec(b.heading);
+  if (Math.abs(la.x * lb.x + la.y * lb.y) < lookLineAgreeCos) {
+    if (dist <= 0.001) {
+      // A disagreeing exact stack has no residual to orient with:
+      // the horizontal fallback keeps the deterministic read.
+      return { x: 1, y: 0 };
+    }
 
-  return { x: Math.cos(angle), y: Math.sin(angle) };
+    return { x: dx / dist, y: dy / dist };
+  }
+  // The shared look line, oriented by the residual connecting
+  // direction; an exact stack (no residual) sends each unit against
+  // its own look - the facing pair backs apart, the same way pair
+  // splits along the line it walks.
+  const along = dx * la.x + dy * la.y;
+  if (along < 0) {
+    return { x: -la.x, y: -la.y };
+  }
+
+  return la;
 }
 
 // easeOutQuad eases t out: fast at the start, settled at the end.
