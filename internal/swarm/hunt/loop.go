@@ -755,6 +755,13 @@ type Loop struct {
     // the hold re-probes at the kite period, not every tick, and the
     // diagnostic line lands once per hold episode.
     kiteHeldAt time.Time
+    // kite carries the tunable block of the kite fight (see
+    // kite.go): the loop starts at DefaultKiteParams - the shipped
+    // tuning the acceptance scenario pins - and the launch config
+    // overrides it per bot spec (SetKiteParams, the tuning knobs of
+    // owner issue #29). The zero value never leaks: NewLoop fills
+    // the defaults before the first tick.
+    kite KiteParams
     // zoneSegmentLogAt paces the walled direct segment diagnostic of the
     // zone return escalation (see guardZoneSegmentClick): the refusal
     // repeats every second while the character stands in the
@@ -1010,6 +1017,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         lastHit:            time.Time{},
         fightStartAt:       time.Time{},
         fightStartFor:      0,
+        kite:               DefaultKiteParams(),
         lootID:             0,
         lootAt:             time.Time{},
         lootMoveAt:         time.Time{},

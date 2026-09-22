@@ -131,6 +131,14 @@ type config struct {
     // set it from their plan slot, the future per-type behaviors (the
     // archer of issue #13) branch on it.
     botType string
+    // kite is the per-plan kite fight override (the "kite" section
+    // of the bot spec, owner issue #29): nil keeps the shipped
+    // tuning of DefaultKiteParams, a set section overrides the
+    // named knobs for this bot whole - the standing-archer baseline
+    // and the tuned profile switch by config, not by rebuild. The
+    // fleet goroutine and the single bot path set it from their plan
+    // slot next to the bot type.
+    kite *botKiteSpec
     // acceptanceRun selects the headless acceptance test mode: the
     // process launches no fleet bot supervisor, just the acceptance
     // manager and the requested scenario. "list" prints the available
@@ -221,6 +229,7 @@ func parseFlags() config {
         configPath:       "",
         botPlans:         nil,
         botType:          "",
+        kite:             nil,
         acceptanceRun:    "",
         sessionDir:       "",
         acceptanceLogDir: "",
@@ -593,6 +602,14 @@ func runBot( //nolint:funlen // linear session script
     if cfg.botType == botTypeArcher {
         loop.SetGearProfile(gear.Archer{})
     }
+    // The per-plan kite override lands after the gear profile: an
+    // archer spec with a kite section runs the named knobs (the
+    // baseline profile disables the layer whole, the tuned profile
+    // edits the numbers - owner issue #29), every other spec keeps
+    // the shipped tuning of DefaultKiteParams.
+    if cfg.kite != nil {
+        loop.SetKiteParams(cfg.kite.toParams())
+    }
     // Every session start IS a relogin into the same world spot: the
     // spawn protection settle holds the character there while it
     // regenerates and opens the first fight deliberately (see
@@ -879,6 +896,7 @@ func main() {
         cfg.botPlans = classicFleetPlan(cfg.account, cfg.bots)
     }
     cfg.botType = cfg.botPlans[0].Type
+    cfg.kite = cfg.botPlans[0].Kite
 
     if cfg.sessionAnomalies != "" {
         runSessionAnomaliesCLI(cfg)
@@ -1081,6 +1099,7 @@ func runFleet(cfg config) {
         botCfg.account = plan[i].Account
         botCfg.charName = plan[i].Account
         botCfg.botType = plan[i].Type
+        botCfg.kite = plan[i].Kite
         wg.Add(1)
         go func(c config, t *state.Bot) {
             defer wg.Done()

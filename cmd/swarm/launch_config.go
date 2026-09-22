@@ -12,7 +12,9 @@ import (
     "os"
     "sort"
     "strings"
+    "time"
 
+    "github.com/melg8/swarm/internal/swarm/hunt"
     "github.com/melg8/swarm/internal/swarm/proxy"
 )
 
@@ -50,19 +52,69 @@ type launchConfig struct {
 
 // botSpec is one entry of the swarm composition: a bot type and how
 // many bots of that type the fleet launches. An empty type is the
-// default fighter, so {"count": 3} reads as three fighters.
+// default fighter, so {"count": 3} reads as three fighters. The
+// optional kite section carries the per-spec overrides of the kite
+// fight (the tuning knobs of owner issue #29) - an archer typed spec
+// only, the fighters have no kite to tune.
 type botSpec struct {
-    Type  string `json:"type"`
-    Count int    `json:"count"`
+    Type  string       `json:"type"`
+    Count int          `json:"count"`
+    Kite  *botKiteSpec `json:"kite"`
+}
+
+// botKiteSpec is the JSON shape of the per-spec kite overrides. The
+// pointer fields distinguish "not set in the file" (the shipped
+// tuning applies) from an explicit value, so a profile names exactly
+// the knobs it tunes - the standing-archer baseline is
+// {"enabled": false} and the tuned profile edits the numbers, both
+// without a rebuild between the measurement runs.
+type botKiteSpec struct {
+    Enabled       *bool    `json:"enabled"`
+    RetreatRadius *float64 `json:"retreatRadius"`
+    Step          *float64 `json:"step"`
+    StepPeriod    *string  `json:"stepPeriod"`
+    ReengageDelay *string  `json:"reengageDelay"`
+}
+
+// toParams reads the spec into the hunt params: the unset fields
+// keep the shipped defaults (DefaultKiteParams), the set fields
+// override. The durations arrive as Go duration strings ("3s",
+// "500ms" - validate checked the parse already).
+func (s *botKiteSpec) toParams() hunt.KiteParams {
+    p := hunt.DefaultKiteParams()
+    if s.Enabled != nil {
+        p.Enabled = *s.Enabled
+    }
+    if s.RetreatRadius != nil {
+        p.RetreatRadius = *s.RetreatRadius
+    }
+    if s.Step != nil {
+        p.Step = *s.Step
+    }
+    if s.StepPeriod != nil {
+        if d, err := time.ParseDuration(*s.StepPeriod); err == nil {
+            p.StepPeriod = d
+        }
+    }
+    if s.ReengageDelay != nil {
+        if d, err := time.ParseDuration(*s.ReengageDelay); err == nil {
+            p.ReengageDelay = d
+        }
+    }
+
+    return p
 }
 
 // botPlan is one expanded fleet slot: the type the bot runs and the
-// account (and character) name it connects under. The account ladder
-// walks the whole composition in order: two fighters then two archers
-// over the base test1 make test1, test2, test3, test4.
+// account (and character) name it connects under. The kite override
+// rides the slot the same way - the plan is the whole per-bot
+// identity the fleet launches with. The account ladder walks the
+// whole composition in order: two fighters then two archers over the
+// base test1 make test1, test2, test3, test4.
 type botPlan struct {
     Type    string
     Account string
+    Kite    *botKiteSpec
 }
 
 // botTypeFighter is the melee bot type: the elven fighter of the
@@ -112,8 +164,8 @@ func defaultLaunchConfig() launchConfig {
         ProxyLog:   defaultProxyLogPath,
         SessionDir: "logs",
         Bots: []botSpec{
-            {Type: botTypeFighter, Count: 3},
-            {Type: botTypeArcher, Count: 3},
+            {Type: botTypeFighter, Count: 3, Kite: nil},
+            {Type: botTypeArcher, Count: 3, Kite: nil},
         },
     }
 }
@@ -170,6 +222,55 @@ func (lc launchConfig) validate() error {
                 "bots[%d] (%s): the count must be at least 1, got %d",
                 i, typ, spec.Count)
         }
+        if err := validateKiteSpec(i, typ, spec.Kite); err != nil {
+            return err
+        }
+    }
+
+    return nil
+}
+
+// validateKiteSpec checks the optional kite section of one bot spec
+// (owner issue #29): the section is an archer knob (the fighters have
+// no kite fight to tune), the distances must be positive and the
+// durations must parse as Go duration strings. A broken line refuses
+// the launch with the spec index and the field name - the same
+// fail-loudly contract the rest of the file follows.
+func validateKiteSpec(i int, typ string, kite *botKiteSpec) error {
+    if kite == nil {
+        return nil
+    }
+    if typ != botTypeArcher {
+        return fmt.Errorf(
+            "bots[%d] (%s): the kite section tunes the archer fight, "+
+                "it does not apply to this type", i, typ)
+    }
+    if kite.RetreatRadius != nil && *kite.RetreatRadius <= 0 {
+        return fmt.Errorf(
+            "bots[%d] (archer): kite.retreatRadius must be positive, got %g",
+            i, *kite.RetreatRadius)
+    }
+    if kite.Step != nil && *kite.Step <= 0 {
+        return fmt.Errorf(
+            "bots[%d] (archer): kite.step must be positive, got %g",
+            i, *kite.Step)
+    }
+    for _, field := range []struct {
+        name  string
+        value *string
+    }{
+        {"kite.stepPeriod", kite.StepPeriod},
+        {"kite.reengageDelay", kite.ReengageDelay},
+    } {
+        if field.value == nil {
+            continue
+        }
+        if _, err := time.ParseDuration(*field.value); err != nil {
+            return fmt.Errorf(
+                "bots[%d] (archer): %s %q is not a duration (use the "+
+                    "Go form: 3s, 500ms): %w",
+                i, field.name, *field.value, err)
+        }
     }
 
     return nil
@@ -190,6 +291,7 @@ func (lc launchConfig) expand() []botPlan {
             plans = append(plans, botPlan{
                 Type:    typ,
                 Account: fleetAccountName(lc.Account, len(plans)),
+                Kite:    spec.Kite,
             })
         }
     }
@@ -319,6 +421,7 @@ func classicFleetPlan(base string, count int) []botPlan {
         plans = append(plans, botPlan{
             Type:    botTypeFighter,
             Account: fleetAccountName(base, i),
+            Kite:    nil,
         })
     }
 
