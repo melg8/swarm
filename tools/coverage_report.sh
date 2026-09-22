@@ -15,7 +15,11 @@
 # runs/coverage-latest.txt (see coverage_delta.sh): pipe the output
 # into it when the refreshed numbers should ship with a change.
 #
-# Usage: bash tools/coverage_report.sh [-html]
+# Usage: bash tools/coverage_report.sh [-from-log <run.log>] [-html]
+# -from-log skips the suite run and reads the per package log a
+# coverage_delta.sh KEEP_RUN_LOG=1 run left behind (the CI coverage
+# job measures the suite once, both views reading the same run;
+# the raw profile runs/cover.out of that run must exist).
 # (the full tree run takes minutes; keep the 6 minutes per run cap of
 # AGENTS.md in mind on the constrained agent hosts)
 
@@ -23,15 +27,46 @@ set -euo pipefail
 
 REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 RUNS_DIR="${REPO_DIR}/runs"
+RUN_LOG=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -from-log)
+            if [ $# -lt 2 ]; then
+                echo "Error -from-log needs the run log path" >&2
+                exit 2
+            fi
+            RUN_LOG="$2"
+            shift 2
+            ;;
+        -html)
+            HTML=1
+            shift
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            exit 2
+            ;;
+    esac
+done
 
 cd "${REPO_DIR}"
 mkdir -p "${RUNS_DIR}"
 
-echo "Running the suite with coverage (the raw profile: runs/cover.out)"
-go test ./... -cover -count=1 -coverprofile="${RUNS_DIR}/cover.out" | \
-    tee "${RUNS_DIR}/.cover-report-run.log"
+if [ -n "${RUN_LOG}" ]; then
+    echo "Reading the coverage run log: ${RUN_LOG}"
+    if [ ! -f "${RUN_LOG}" ] || [ ! -f "${RUNS_DIR}/cover.out" ]; then
+        echo "Error -from-log needs ${RUN_LOG} and ${RUNS_DIR}/cover.out" >&2
+        exit 1
+    fi
+else
+    echo "Running the suite with coverage (the raw profile: runs/cover.out)"
+    go test ./... -cover -count=1 -coverprofile="${RUNS_DIR}/cover.out" | \
+        tee "${RUNS_DIR}/.cover-report-run.log"
+    RUN_LOG="${RUNS_DIR}/.cover-report-run.log"
+fi
 
-python3 - "${RUNS_DIR}/.cover-report-run.log" <<'PYEOF'
+python3 - "${RUN_LOG}" <<'PYEOF'
 import re
 import sys
 
@@ -66,10 +101,12 @@ total=$(go tool cover -func="${RUNS_DIR}/cover.out" | tail -n 1 | \
     awk '{print $NF}')
 echo "Total statement coverage: ${total}"
 
-if [ "${1:-}" = "-html" ]; then
+if [ "${HTML:-}" = "1" ]; then
     go tool cover -html="${RUNS_DIR}/cover.out" \
         -o "${RUNS_DIR}/coverage.html"
     echo "HTML report written to ${RUNS_DIR}/coverage.html"
 fi
 
-rm -f "${RUNS_DIR}/.cover-report-run.log"
+if [ -z "${RUN_LOG}" ] || [ "${RUN_LOG}" = "${RUNS_DIR}/.cover-report-run.log" ]; then
+    rm -f "${RUNS_DIR}/.cover-report-run.log"
+fi

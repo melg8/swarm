@@ -26,6 +26,17 @@ RUNS_DIR="${REPO_DIR}/runs"
 PREV="${RUNS_DIR}/coverage-latest.txt"
 CUR="${RUNS_DIR}/.coverage-current.txt"
 
+# cleanup_run_log drops the scratch files of the run - unless
+# KEEP_RUN_LOG=1 asks to preserve the per package run log (the CI
+# coverage job feeds the same log to coverage_report.sh -from-log,
+# so the suite runs once, not twice).
+cleanup_run_log() {
+    rm -f "${CUR}"
+    if [ "${KEEP_RUN_LOG:-0}" != "1" ]; then
+        rm -f "${RUNS_DIR}/.cover-run.log"
+    fi
+}
+
 cd "${REPO_DIR}"
 mkdir -p "${RUNS_DIR}"
 
@@ -57,7 +68,7 @@ PYEOF
 
 if [ ! -f "${PREV}" ]; then
     cp "${CUR}" "${PREV}"
-    rm -f "${CUR}" "${RUNS_DIR}/.cover-run.log"
+    cleanup_run_log
     total=$(go tool cover -func=runs/cover.out | tail -n 1 | awk '{print $NF}')
     echo "Total statement coverage: ${total}"
     echo "First coverage summary written to ${PREV} (commit it as the baseline)"
@@ -110,4 +121,4 @@ total=$(go tool cover -func=runs/cover.out | tail -n 1 | awk '{print $NF}')
 echo "Total statement coverage: ${total}"
 cp "${CUR}" "${PREV}"
 echo "Fresh summary written to ${PREV} (commit it together with the change)"
-rm -f "${CUR}" "${RUNS_DIR}/.cover-run.log"
+cleanup_run_log
