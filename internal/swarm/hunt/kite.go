@@ -80,6 +80,22 @@ package hunt
 //     already flying shots - a shot fired a moment before the step
 //     still lands. Not modeled beyond that.
 //
+// The shot-paced layer of issue #60 rides the same machinery and
+// flips the trigger: the character's own Attack broadcast is the
+// server commit of the shot (the Mobius doAttack rolls the hit,
+// consumes the arrow and schedules the HitTask BEFORE the packet
+// goes out, and the damage task carries no attacker movement check),
+// so the retreat starts the moment the shot released - inside the
+// bow cooldown (timeAtk + reuse, roughly three seconds for the short
+// bow) instead of after the mob crossed the retreat radius. The
+// cycle becomes shoot, run the reload, gain distance, shoot again:
+// the melee uptime drops to the stand moments, a chaser slower than
+// the character never reaches the swings. The shot-paced step paces
+// itself on the shot cycle, shares the lane battery and the holds
+// with the proximity path and skips the streak counting - the
+// shuffle bound exists for the swing-starving race, the rhythm keeps
+// shooting once per cooldown.
+//
 // The behavior arms itself on the weapon in hand (bowEquipped): no
 // config, no class check - whatever bot ends up holding a bow (the
 // planned archer type of the config launch, a lured guard round)
@@ -175,6 +191,17 @@ const (
     // per period - a cornered fight is a standing fight, the line is
     // its visibility, not a complaint.
     kiteHoldLogPeriod = 15 * time.Second
+    // kiteShotWindow is the freshness window of the character's own
+    // Attack broadcast that arms the shot-paced retreat (issue #60):
+    // the packet is the server commit of the shot (the hit roll, the
+    // arrow consumption and the HitTask schedule all happened before
+    // the broadcast, and the damage task carries no attacker movement
+    // check), so the walk may start at once. The loop ticks four
+    // times a second - the window keeps the broadcast catchable for
+    // at least two ticks while still starting the retreat inside the
+    // first second of the bow cooldown, before the chaser eats the
+    // opened gap back.
+    kiteShotWindow = 700 * time.Millisecond
 )
 
 // KiteParams is the tunable block of the kite fight (owner issue
@@ -262,16 +289,16 @@ func (l *Loop) SetKiteParams(p KiteParams) {
 // projected NearestAttacker scan reads it, see scans.go) - whichever
 // sits closer. A mob on a deck the walk cannot reach (the z gap past
 // deckReachableZ, the same test the pick uses) is no melee threat.
-// Returns the threat position, its identity for the logs and its
-// ground distance to the character.
+// Returns the threat identity for the logs and its ground distance
+// to the character (the retreat DIRECTION weighs the whole train
+// through kiteTrainDirection, so the position itself has no reader).
 func (l *Loop) kiteThreat(
     selfX, selfY, selfZ int32,
-) (x, y float64, id int32, dist float64, ok bool) {
+) (id int32, dist float64, ok bool) {
     if tx, ty, _, tok := l.tracker.ObjectPosition(l.target); tok {
         dx := float64(selfX) - float64(tx)
         dy := float64(selfY) - float64(ty)
-        x, y, id, dist, ok =
-            float64(tx), float64(ty), l.target, math.Hypot(dx, dy), true
+        id, dist, ok = l.target, math.Hypot(dx, dy), true
     }
     if attacker, aok := l.tracker.NearestAttacker(); aok &&
         attacker.ObjectID != l.target {
@@ -281,46 +308,50 @@ func (l *Loop) kiteThreat(
             dy := float64(selfY) - float64(attacker.Y)
             adist := math.Hypot(dx, dy)
             if !ok || adist < dist {
-                x, y, id, dist, ok =
-                    float64(attacker.X), float64(attacker.Y),
-                    attacker.ObjectID, adist, true
+                id, dist, ok = attacker.ObjectID, adist, true
             }
         }
     }
 
-    return x, y, id, dist, ok
+    return id, dist, ok
 }
 
-// kiteStepAdmitted guards the kite step of one tick: the bow and the
-// fight target must be there, the movement window must be free (a
-// running step or an impending-add walk owns it), the kite pacing
-// must have aged out (the step and the cornered hold re-probe
-// alike), the streak limit must not be spent, and a fresh target
-// resets the streak of the previous one (the distance race of one
-// mob is not the race of the next). Reports whether the step may run
-// now.
-func (l *Loop) kiteStepAdmitted(now time.Time) bool {
+// kiteLayerGates covers the gates every kite layer shares: the
+// params triple (the enabled profile, the bow in hand, the fight
+// target), the movement window (a running step or an impending-add
+// walk owns it - no second walk may interrupt it) and the cornered
+// hold pacing (a retreat with no walkable lane re-probes at the
+// kite period, not every tick). Reports whether a kite step of any
+// layer may run now.
+func (l *Loop) kiteLayerGates(now time.Time) bool {
     // The params gate comes first: a kite-disabled profile (the
     // standing-archer baseline of issue #29) never arms the layer,
     // whatever the bow and the fight report.
     if !l.kite.Enabled || !l.bowEquipped() || l.target == 0 {
         return false
     }
-    // A step window that is still running (this step or an
-    // impending-add step) owns the movement: no second walk may
-    // interrupt it.
     if now.Before(l.combatAvoidUntil) {
         return false
     }
-    if !l.kiteAt.IsZero() && now.Sub(l.kiteAt) < l.kite.StepPeriod {
-        return false
-    }
-    // The cornered hold owns its own pacing: a retreat with no
-    // walkable lane re-probes at the kite period, not every tick -
-    // the failed probe attempt itself must never become the idle
-    // stutter the issue forbids. A fresh target re-probes at once.
     if !l.kiteHeldAt.IsZero() && l.kiteHeldFor == l.target &&
         now.Sub(l.kiteHeldAt) < l.kite.StepPeriod {
+        return false
+    }
+
+    return true
+}
+
+// kiteStepAdmitted guards the kite step of one tick: the shared
+// layer gates must pass (see kiteLayerGates), the kite pacing must
+// have aged out (the step re-probe), the streak limit must not be
+// spent, and a fresh target resets the streak of the previous one
+// (the distance race of one mob is not the race of the next).
+// Reports whether the step may run now.
+func (l *Loop) kiteStepAdmitted(now time.Time) bool {
+    if !l.kiteLayerGates(now) {
+        return false
+    }
+    if !l.kiteAt.IsZero() && now.Sub(l.kiteAt) < l.kite.StepPeriod {
         return false
     }
     if l.kiteFor != l.target {
@@ -363,7 +394,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !selfOK {
         return false
     }
-    _, _, threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
+    threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
     if !ok || dist >= l.kite.RetreatRadius || dist < 1 {
         return false
     }
@@ -402,6 +433,79 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
         "fight on %d, kiting clear (step %d of %d)",
         threatID, int(math.Round(dist)), l.target,
         l.kiteStreak, kiteStreakLimit)
+    if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
+        l.logger.Printf("Hunt: kite walk failed: %v", err)
+    }
+
+    return true
+}
+
+// kiteFromShot steps the bow fighting character away the moment its
+// own shot released (issue #60): the Attack broadcast of the
+// character is the server commit of the bow shot - the hit roll, the
+// arrow consumption and the HitTask schedule all happened before the
+// packet, the damage task carries no attacker movement check, so
+// everything after the broadcast is the bow cooldown the character
+// may spend walking. The retreat fires once per shot while a hostile
+// holds the pursue band (inside the bow engage radius - a mob that
+// keeps chasing the fight), producing the shoot - run the reload -
+// gain distance - shoot again cycle the issue asks for: the melee
+// uptime drops to the stand moments only, a properly kiting archer
+// barely takes hits. The step shares the whole lane machinery with
+// the proximity kite (the train direction, the camp deflection, the
+// leash, the wall and the water gates, the cornered hold), paces
+// itself on the shot cycle instead of the step period and does NOT
+// count toward the streak limit: the rhythm keeps swinging once per
+// cooldown (the shots never starve - the unwinnable-race bound of
+// the shuffle does not apply to the fight itself). A hostile beyond
+// the band leaves the standing fight (the stall watchdog owns the
+// re-approach), and the encircled or cornered holds answer as
+// always. Reports whether the tick issued the step.
+func (l *Loop) kiteFromShot(now time.Time) bool {
+    if !l.kiteLayerGates(now) {
+        return false
+    }
+    // The trigger itself: the character's own shot, fresh inside the
+    // broadcast window.
+    shotAt := l.tracker.SelfLastShotAt()
+    if shotAt.IsZero() || now.Sub(shotAt) > kiteShotWindow {
+        return false
+    }
+    selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
+    if !selfOK {
+        return false
+    }
+    threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
+    if !ok || dist >= userBowEngageRadius || dist < 1 {
+        return false
+    }
+    dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
+    if encircled {
+        // The train surrounds the character - the same answer as the
+        // proximity path: hold ground and shoot through it.
+        l.kiteHoldGround(now, true)
+
+        return false
+    }
+    stepX, stepY, found := l.kiteRetreatLane(
+        selfX, selfY, selfZ, dirX, dirY)
+    if !found {
+        // Cornered: the hold ground answer of the archetype rule.
+        l.kiteHoldGround(now, false)
+
+        return false
+    }
+    l.kiteHeldAt = time.Time{}
+    l.kiteAt = now
+    // The shared movement window of the fighting steps: the engage
+    // holds its forced attack re-requests until the walk finished.
+    // The walk covers the first chunk of the bow disable window
+    // (timeAtk + reuse); the re-request waits for the ordinary
+    // post-window machinery.
+    l.combatAvoidUntil = now.Add(kiteStepWindow + l.kite.ReengageDelay)
+    l.logger.Printf("Hunt: shot released on %d, hostile %d holds "+
+        "%d units, kiting the reload", l.target, threatID,
+        int(math.Round(dist)))
     if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
         l.logger.Printf("Hunt: kite walk failed: %v", err)
     }
