@@ -353,6 +353,161 @@ manages its own budgets). Covered by hunt/loop_los_test.go
 stale stance timeout, timeout hold, attempt scoping, fresh fight
 guard) and the state tracker test of the refusal recording.
 
+## The archer kite (hunt/kite.go)
+
+The typed fleet of the config launch (docs/launch_config.md) runs
+`archer` bots: the ranged archetype whose weapon preference is the bow -
+the gear plan arms it (the weapon milestone buys the bow, the quiver
+restocks behind it, the arrows hold the left hand) and the fight NEVER
+switches to a melee weapon (the archetype rule of issue #21: a cornered
+archer holds ground and keeps shooting, it never degrades to a melee
+trade). The standing archer's problem is the mob that closes: the
+Mobius server AI stands the shooter still while the auto attack runs,
+and a melee mob inside its swing range simply trades blow for blow with
+a bot it could outrange. The kite is the answer: while the bow fight
+runs, a hostile that crossed the retreat radius makes the character
+step away, the movement window pauses the forced attack re-requests (a
+forced attack request interrupts a running walk server-side, the same
+contract the impending-add step follows), and once the step finished
+the re-request shoots again from the opened distance. The cycle -
+stand, shoot, step clear, shoot - trades a slice of damage speed for a
+melee uptime the mob cannot pay. The layer landed in slices: the core
+step (#18, PR #15), the edge cases - the train centroid, the cornered
+hold, the lane fan (#19, PR #25), the archetype composition (#21, PR
+#31).
+
+The radii of the ranged fight (hunt/loop.go): the melee swing range
+sits around 150 units and the chasers run 120+ units per second, so
+the kite trigger `kiteRetreatRadius` (250) fires while the closing
+hostile is still a second or two from the blows; the bow approach
+`userBowEngageRadius` (450) is the outer edge of the standing fight,
+and the optimal band between the two - 250 to 450 - is where the
+standing archer is the good case (a fight sample beyond the chase
+stall boundary `userBowStallRadius`, 650, belongs to the stall
+watchdogs, not the kite). The band edges are pinned as references on
+purpose: the outer edge IS the engage radius the fight fights with, a
+copy of it in kite.go would drift.
+
+The state machine of one kite step (the tick ladder of the fighting
+branch, loop.go - the kite sits after the engage/reposition rungs and
+before the impending-add step):
+
+- The admission (kiteStepAdmitted): the bow must be equipped and a
+  fight target held; the shared movement window must be free (a
+  running step or an impending-add walk owns it, combatAvoidUntil);
+  the kite pacing must have aged out (kiteStepPeriod, 3s - the cycle
+  spends the step window walking and the rest standing and shooting,
+  the period bounds the walking share from above); and the streak
+  limit must not be spent (kiteStreakLimit, 8 consecutive steps per
+  target - a fresh target resets the streak, the distance race of one
+  mob is not the race of the next).
+- The threat (kiteThreat): the fight target or the nearest projected
+  attacker (the NearestAttacker scan), whichever sits closer - a mob
+  on a deck the walk cannot reach (the z gap past deckReachableZ) is
+  no melee threat. The step arms when the threat closes inside 250.
+- The direction (kiteTrainDirection): the centroid away-vector of the
+  whole chaser train - the target's own away unit vector plus every
+  SelfAttackers member within kiteTrainScanRange (800) on a reachable
+  deck, each chaser weighing one unit. A train whose away vectors
+  cancel (the summed length under kiteEncircleShare, 0.3, of its
+  count - chasers stand on every side) has no direction at all: too
+  wide to outrun, the archer holds ground and shoots through it. The
+  chaser positions are the raw last-known packet ones - the projected
+  scan serves only the nearest chaser, and the 250 unit trigger
+  margin absorbs the broadcast lag.
+- The lane (kiteRetreatLane): the straight away-ray of kiteStep (400
+  units) first, then the fan candidates at 45 and 90 degrees each
+  side (kiteFanStep pi/4, kiteFanSteps 2 - the open backward lanes
+  over the blocked corridors, widening symmetrically). Every
+  candidate runs the full gate battery (kiteLaneResolve): the camp
+  deflection bends the endpoint onto the tangent ray of the first
+  idle-aggressive threat circle the straight segment would wake (the
+  same geometry as the transit steering of loop_avoid.go, minus its
+  destination exemption - a retreat meets no mob on purpose; the
+  chasers themselves never deflect the lane, they already hold the
+  character), the zone leash rejects an endpoint outside the hunting
+  square, the away half-plane rejects any deflection that folded back
+  toward the train (the lane unit's retreat component under
+  kiteHalfPlaneSlack, -0.05), and the terrain gates need the
+  navigator - a wall behind (the geodata line of sight) or water
+  behind (the OverWater oracle) closes the lane; without a navigator
+  (the no-geodata runtime) the leash alone fences the step.
+- The step: the window is stamped (combatAvoidUntil = now +
+  kiteStepWindow 2s + kiteReengageDelay 0), the streak counts up, the
+  log line lands ("kiting clear (step N of 8)"), and the walk issues.
+  The forced attack re-requests of the engage branch wait out the
+  window - the re-engage knob (kiteReengageDelay, 0 today: the window
+  end IS the re-engage) is pinned for the live tuning round of #29.
+
+The fallbacks, in the order the machine meets them:
+
+- The encircled train: the centroid cancelled, every step direction
+  walks INTO a chaser - the archer holds ground and shoots through
+  the train ("the chasers surround the bow fight ..., holding ground
+  and shooting through the train"), the pile up and losing fight
+  machinery still owning a train that outdamages the standing fight.
+- The cornered hold: no walkable lane in the whole away hemisphere -
+  a wall, water, the leash or a failed fan. The archetype rule
+  answers: the archer stops retreating and KEEPS SHOOTING the bow at
+  melee range ("no walkable retreat lane ... (cornered), holding
+  ground and shooting the bow"). The hold re-probes at the kite
+  pacing, not every tick - a failed probe never becomes the idle
+  stutter - and the diagnostic lands once per hold episode
+  (kiteHoldLogPeriod, 15s): a standing fight that names itself stays
+  diagnosable. The hunt loop's watchdogs stay quiet through it: the
+  stuck timeout only owns a fight that never started (the cornered
+  fight runs), and the chase stall watchdog only owns the stretches
+  beyond 650 (the cornered fight sits at ~150).
+- The streak limit: a chaser at least as fast as the character never
+  falls behind, and past 8 steps the archer stops shuffling THIS
+  target and fights it out - the losing fight machinery (the panic
+  run) still owns the death risk.
+- The refused walk: a retreat the gates cleared but the server
+  refused (the click validation collapses, a mob body sits on the
+  click point) surfaces through the ordinary move-start watchdogs -
+  the kite re-probes on its pacing and picks the next fan candidate
+  then.
+
+The knobs of kite.go as pinned on main (the tuning round of #29
+adjusts the first four from live measurements; the band edges above
+are references, not copies):
+
+| constant | value | meaning |
+|---|---|---|
+| `kiteRetreatRadius` | 250.0 | the trigger distance and the inner edge of the optimal band |
+| `kiteStep` | 400.0 | the retreat length, sized so the distance after the step lands back inside the band |
+| `kiteStepWindow` | 2s | the movement window the step owns (the re-request pause) |
+| `kiteReengageDelay` | 0 | the hold between the walk end and the first re-request |
+| `kiteStepPeriod` | 3s | the step pacing - bounds the walking share of the cycle |
+| `kiteStreakLimit` | 8 | the consecutive step bound per target, then the fight |
+| `kiteTrainScanRange` | 800.0 | the chaser scan band of the retreat direction |
+| `kiteEncircleShare` | 0.3 | the encirclement threshold (hold and shoot through) |
+| `kiteFanStep` / `kiteFanSteps` | pi/4 / 2 | the lane fan - the 45 and 90 degree candidates each side |
+| `kiteHalfPlaneSlack` | -0.05 | the away half-plane guard (no fold-back into the train) |
+| `kiteHoldLogPeriod` | 15s | the cornered hold diagnostic pacing |
+
+The telemetry anchors: the step line ("kiting clear (step") and the
+hold line ("holding ground and shooting") are the two markers the
+archer acceptance scenario counts (acceptance/archer_kite.go, the
+ranged farm contract of issue #28) - the scenario asserts the same
+contract this section documents: the fight samples stay at
+the bow radii (the ranged share of the samples), the kite lines
+narrate the retreats, the online status and the HP hold through the
+window, and the arrow stock never empties (the restock gates of the
+gear plan feed the quiver).
+
+The measured numbers of the live tuning round (issue #29: the kited
+archer against the standing-archer baseline - a bow bot with the kite
+disabled - on the deployment stack) land in the table below; every
+parameter change of the round arrives with its before/after row.
+
+| metric | standing baseline | kited (current knobs) | kited (tuned) |
+|---|---|---|---|
+| retreat frequency per fight | - | - | - |
+| melee fallback rate (blows taken in melee reach) | - | - | - |
+| kill rate | - | - | - |
+| death rate | - | - | - |
+
 ## Hexagon cell hunting (hunt/cell*.go, hunt/cells_elven.go)
 
 The cell mode replaces the square zone ladder of the elven lands (the
