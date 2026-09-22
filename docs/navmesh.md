@@ -514,7 +514,79 @@ The endpoints behind the page (the mode of `GET /api/config` is
   of the walk: `waypoints` is the smoothed answer (the merged chords)
   and `rawWaypoints` is the raw funnel answer it merged - the viewer
   route variant toggle draws one or the other from one search (the
-  `path=smooth|raw` view link parameter restores the pick).
+  `path=smooth|raw` view link parameter restores the pick). The
+  dual pack view (below) rides the same endpoint: when the compare
+  mesh arms, the reply carries `compare` - the same query answered
+  over the second pack under the identical filter contract, and the
+  console line marks it `Navmesh route (compare)`;
+- `GET /api/navmesh/compare/geometry/{col}_{row}` - the NMV2 payload
+  of one tile of the COMPARE pack (the dual pack view of issue #59,
+  the same binary contract as the primary geometry endpoint with its
+  own ETag cache). 501 when no compare pack armed, 404 for a tile
+  the reduced pack dropped;
+- `GET /api/navmesh/compare/diff/{col}_{row}` - the per tile
+  polygon diff of the two packs: `{polysA, polysB, vanished,
+  added}` where the rect lists carry the region local cell bounds
+  and the four corner heights of every polygon one pack holds and
+  the other does not (the identity is the full wire rect, so the
+  decompositions that agree share polygons byte for byte). A tile
+  absent on one side diffs against the empty set - the whole tile
+  vanished or appeared; both absent answers 404.
+
+## The dual pack view
+
+The structural pack rounds (#27, the polygon count reduction, the
+route regression corpus of navpack-verify) needed their visual
+counterpart: the owner ask was to demonstrate the old and the
+reduced pack side by side, with the changed polygons visible and
+both pathfinds comparable on one click. The `-navmesh-compare`
+flag arms it:
+
+```bash
+# pane A renders the old pack, pane B the reduced one:
+go run ./cmd/swarm -show-navmesh -navmesh data/navmesh \
+    -navmesh-compare data/navmesh-reduced -web 127.0.0.1:8080
+```
+
+The canvas splits into two scissor viewports over one renderer.
+Pane A (left) is the `-navmesh` pack, pane B (right) the compare
+pack; ONE flight camera draws both scenes, so every camera move
+compares the same world region twice - the dual view stays the
+usual flight rig, the panes are two windows over one world. Every
+pane loads its own tile builds (the compare pack serves no original
+cell render - the geometry variant select acts on pane A only), the
+tile checkboxes drive both panes, and a tile the reduced pack
+dropped renders as the honest empty pane B with the status cell
+reading `B absent`. The camera residency applies to both panes
+together: the same cap keys load in A and in B.
+
+The compare pathfind is one request: a double click pair (in either
+pane - both pick the same world) POSTs once, the server routes both
+meshes under the identical filter (the water pricing, the capsule
+clearance, the ban circles), and the answer draws the primary route
+amber in pane A and the compare route cyan in pane B. The result
+panel carries both packs' counts - waypoints, corridor polys, path
+length, the construction time of both searches and the length
+delta - the numbers the pack rounds read next to the corpus
+verdicts. `copy view link` freezes the same state as before; the
+`diff=0` parameter boots a link without the tint layer.
+
+The per tile diff highlight fetches
+`GET /api/navmesh/compare/diff/{key}` for every visible tile once
+and tints the tile in BOTH panes: red when the reduced pack only
+lost polygons, green when it only gained, amber when both happened,
+the alpha scaling with the changed share so a one-poly drift reads
+lighter than a half-tile rewrite. While the vanished and added
+lists stay small (512 rects a tile) the changed polygons draw as
+their own outlines - red for the polys pane B dropped, green for
+the ones it added - so the merge decisions are readable at polygon
+granularity; a tile that lost thousands tints whole instead (the
+tile status cell carries the `-vanished/+added` counts either way).
+The `tile diff tint` toggle hides the layer without refetching.
+
+A compare directory that holds no tiles stops the mode with an
+explanation - the flag names an explicit pair, and a silent single
+pack fallback would read as a typo'd pane B.
 
 ## The shortcut pass (the smoothing)
 

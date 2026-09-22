@@ -160,6 +160,12 @@ type Server struct {
     // tiles; navmeshGeoMu guards the lazy fills.
     navmeshGeo   map[navmesh.RegionKey][]byte
     navmeshGeoMu sync.Mutex
+    // navmeshCompare is the second mesh of the dual pack view (nil
+    // when the viewer runs single pack) and navmeshCompareGeo caches
+    // its geometry payloads - issue #59, the visual counterpart of
+    // the navpack-verify corpus.
+    navmeshCompare    *navmesh.Mesh
+    navmeshCompareGeo map[navmesh.RegionKey][]byte
     // navmeshOriginal caches the encoded ORIGINAL geometry payloads
     // (the raw l2j cell render of the comparison toggle);
     // navmeshRegions loads and parses one raw geodata region on
@@ -303,30 +309,37 @@ func newServer(address string, logger *log.Logger) *Server {
         indexPage = []byte(injectBuildMeta(string(raw), build))
     }
     server := &Server{
-        registry:        nil,
-        pathfinder:      nil,
-        pathfindView:    nil,
-        geodataTiles:    newGeodataTileCache(),
-        iconsDir:        atomic.Value{},
-        proxy:           nil,
-        acceptance:      nil,
-        journal:         nil,
-        logger:          logger,
-        httpServer:      nil,
-        eventsDone:      make(chan struct{}),
-        shutdown:        nil,
-        stats:           nil,
-        navmeshMesh:     nil,
-        navmeshTiles:    nil,
-        navmeshEngine:   nil,
-        navmeshCapsule:  nil,
-        navmeshGeo:      nil,
-        navmeshGeoMu:    sync.Mutex{},
-        navmeshOriginal: nil,
-        navmeshRegions:  nil,
-        webBuild:        build,
-        indexPage:       indexPage,
+        registry:          nil,
+        pathfinder:        nil,
+        pathfindView:      nil,
+        geodataTiles:      newGeodataTileCache(),
+        iconsDir:          atomic.Value{},
+        proxy:             nil,
+        acceptance:        nil,
+        journal:           nil,
+        logger:            logger,
+        httpServer:        nil,
+        eventsDone:        make(chan struct{}),
+        shutdown:          nil,
+        stats:             nil,
+        navmeshMesh:       nil,
+        navmeshTiles:      nil,
+        navmeshEngine:     nil,
+        navmeshCapsule:    nil,
+        navmeshGeo:        nil,
+        navmeshGeoMu:      sync.Mutex{},
+        navmeshCompare:    nil,
+        navmeshCompareGeo: nil,
+        navmeshOriginal:   nil,
+        navmeshRegions:    nil,
+        webBuild:          build,
+        indexPage:         indexPage,
     }
+    // The geometry caches start ready: the dual view endpoints share
+    // the mutex and the same cached contract, the lazy make moved
+    // into the constructor (issue #59).
+    server.navmeshGeo = make(map[navmesh.RegionKey][]byte)
+    server.navmeshCompareGeo = make(map[navmesh.RegionKey][]byte)
     //nolint:exhaustruct_v5 // the zero defaults of http.Server are intended
     server.httpServer = &http.Server{
         Addr:              address,

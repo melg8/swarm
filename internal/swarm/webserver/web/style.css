@@ -3937,3 +3937,44 @@ body.mode-navmesh .app { display: none; }
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* The dual pack view of the navmesh viewer (issue #59): the pane
+   labels name the two scissor viewports (A the primary pack, B the
+   compare one), the divider marks the split, and the diff legend
+   swatches carry the per tile change colors. */
+.nmv-pane-label {
+  position: absolute;
+  /* Below the cursor readout bar (it owns the top center of the
+     canvas): the labels mark the split halves without clashing. */
+  top: 52px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  color: var(--text-dim);
+  font-size: 11px;
+  padding: 3px 10px;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.nmv-pane-label#nmv-pane-a { left: 50%; transform: translateX(calc(-100% - 8px)); }
+.nmv-pane-label#nmv-pane-b { left: 50%; transform: translateX(8px); }
+
+.nmv-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  background: var(--border);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 6;
+}
+
+.nmv-path-a { background: #ffb020; }
+.nmv-path-b { background: #35d0ff; }
+.nmv-diff-vanished { background: rgba(255, 72, 72, 0.55); }
+.nmv-diff-added { background: rgba(84, 220, 122, 0.55); }
+.nmv-diff-mixed { background: rgba(255, 190, 64, 0.55); }
