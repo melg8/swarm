@@ -19,8 +19,9 @@
 #   4. the open hypotheses - the H-NNN entries with Status: open
 #      (the work rule: advance or close one per session when the
 #      touched area matches its verification plan);
-#   5. the active task - the headline of the newest Progress entry
-#      in docs/agent_progress.md (resume it or close it first).
+#   5. the active tasks - the task fragments in docs/progress/
+#      (one file per task, newest by name; resume it or close it
+#      first - the board's "In progress" column names the owner).
 #
 # Usage: bash tools/session_start.sh
 # Environment: SKIP_FETCH=1 skips the origin fetch (offline runs).
@@ -93,18 +94,20 @@ else
     mark "open hypotheses: none (the registry is clean)" "ok"
 fi
 
-# 5. The active task headline (the newest Progress entry).
-headline="$(grep -n '^### Progress' "${REPO_DIR}/docs/agent_progress.md" 2>/dev/null | tail -n 1 | cut -d: -f1)"
-if [ -n "${headline}" ]; then
-    active="$(sed -n "$(( headline + 1 )),$(( headline + 2 ))p" \
-        "${REPO_DIR}/docs/agent_progress.md" | grep -v '^$' | head -n 1)"
-    if [ -n "${active}" ]; then
-        mark "active task (docs/agent_progress.md, newest entry): ${active}" "ok"
+# 5. The active task fragments (docs/progress/, one file per task).
+progress_dir="${REPO_DIR}/docs/progress"
+if [ -d "${progress_dir}" ]; then
+    fragments=$(find "${progress_dir}" -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | sort)
+    fragment_count=$(printf '%s\n' "${fragments}" | grep -c . || true)
+    if [ "${fragment_count}" -gt 0 ]; then
+        newest=$(printf '%s\n' "${fragments}" | tail -n 1)
+        headline=$(grep -m1 -v '^$' "${newest}" 2>/dev/null | head -c 120)
+        mark "active task fragments: ${fragment_count} in docs/progress/ (newest: $(basename "${newest}")) - ${headline}" "ok"
     else
-        mark "the newest Progress entry has no headline - fix docs/agent_progress.md" "warn"
+        mark "no active fragments in docs/progress/ - take work from the board (Ready) and start a fragment per docs/progress/README.md" "warn"
     fi
 else
-    mark "no Progress entries found - docs/agent_progress.md is missing or empty" "warn"
+    mark "docs/progress/ is missing - check the checkout (the legacy docs/agent_progress.md is a frozen archive, never appended)" "warn"
 fi
 
 echo "session_start: checklist done (the [!!] lines are the work order)"

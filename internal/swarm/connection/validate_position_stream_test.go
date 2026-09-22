@@ -7,7 +7,6 @@ package connection
 import (
     "context"
     "encoding/binary"
-    "errors"
     "net"
     "testing"
     "time"
@@ -92,20 +91,28 @@ func absorbingFlowWithMoves(
         selected = binary.LittleEndian.AppendUint64(selected, 30)
         s.writeEncrypted(conn, cipher, selected)
 
-        deadline := time.Now().Add(4 * time.Second)
-        for time.Now().Before(deadline) {
-            _ = conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+        // The absorb budget: ONE read deadline at the budget end,
+        // never a rolling per-iteration deadline. A rolling short
+        // deadline races the client's 1 s validation ticker: when it
+        // fires mid frame, io.ReadFull has consumed the leading bytes
+        // of the packet and loses them, the framing desyncs and every
+        // later read returns garbage opcodes - the observed flake
+        // mode where the client sent its validations and the server
+        // captured none of them. The single budget-end deadline keeps
+        // every read whole: a packet arrives complete or the budget
+        // closes the flow (the client's own logout close ends it
+        // earlier on every clean session). The budget must outlive
+        // the longest session window of the callers (5 s today) with
+        // margin for a loaded runner.
+        const absorbBudget = 10 * time.Second
+        _ = conn.SetReadDeadline(time.Now().Add(absorbBudget))
+        for {
             payload, err := s.readEncryptedResult(conn, cipher)
             if err != nil {
-                // The read deadline between the sparse client
-                // packets: keep waiting until the session budget
-                // closes (the flow must not tear the connection down
-                // while the client session still runs).
-                var netErr net.Error
-                if errors.As(err, &netErr) && netErr.Timeout() {
-                    continue
-                }
-
+                // The budget closed or the client went away: both end
+                // the flow without tearing down a live session (the
+                // flow must not close the connection while the client
+                // session still runs - the budget guarantees it).
                 return
             }
             forwardCapture(payload, validations, moves)
@@ -283,6 +290,9 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
 
     // The walking character: the tracker placement keeps stepping
     // while the session runs, the way the server echoes of a walk do.
+    // The walk caps at 800 units (the report envelope the assertions
+    // below pin) and then holds, so a longer session window changes
+    // how long the placement sits at the walk end, not the envelope.
     stopNudger := make(chan struct{})
     go func() {
         step := int32(0)
@@ -293,7 +303,9 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
             case <-stopNudger:
                 return
             case <-ticker.C:
-                step++
+                if step < 8 {
+                    step++
+                }
                 tracker.ApplyPlacement(state.Placement{
                     ObjectID: 100,
                     X:        45768 - step*100,
@@ -305,7 +317,13 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
     }()
     defer close(stopNudger)
 
-    ctx, cancel := context.WithTimeout(context.Background(), 2600*time.Millisecond)
+    // The window covers the handshake (the char-create drain alone
+    // waits up to charCreateOkWait) plus at least two fires of the
+    // one second validation ticker: under -race on a loaded CI
+    // runner the 2600 ms window starved the ticker (0-1 fires where
+    // 2 are asserted, issue #38) - five seconds leaves the ticker
+    // its margin without weakening the assertion.
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
     require.NoError(t, client.Run(ctx, "unittest1"))
 
@@ -315,7 +333,7 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
     // stream that never reports fails for its own reason, not by
     // hanging the suite.
     reports := 0
-    pollDeadline := time.Now().Add(3 * time.Second)
+    pollDeadline := time.Now().Add(5 * time.Second)
     for time.Now().Before(pollDeadline) {
         select {
         case payload := <-validations:

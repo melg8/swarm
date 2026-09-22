@@ -1,5 +1,10 @@
 # Agent progress archive
 
+> FROZEN ARCHIVE (2026-09-22, the merge clash policy round, issue
+> #33): the pre-split archive, closed for appends - finished task
+> fragments live in `docs/progress/archive/` now (one file per
+> task, see docs/progress/README.md). Read for history only.
+
 Finished task entries and completed progress streams of
 `docs/agent_progress.md`. Append-only, chronological order preserved
 from the original file. Nothing here is lost context - the durable
@@ -10260,3 +10265,58 @@ the reported window.
 
 Status: done (2026-09-13, the tile load storm throttle closed the
 load window fps dip of the zoomed out map).
+## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
+
+Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7);
+the review round 2026-09-21 ~19:52 UTC (the owner feedback on the
+first implementation).
+
+The owner ask: "Bot and npcs should not reduce their icon size even
+if they get close to each other. When bot fights and it is too
+close to enemy both icons should just touch facing each other, but
+should not change size." The review ask: a bot and a mob that meet
+too tight drifted apart SIDEWAYS (a north-south pair read west-east
+while both kept looking north-south) - the facing and the rendered
+positions must never mismatch.
+
+Design (verified against the Round 124 contact pass):
+
+- The shrink is replaced by a slide: the contact pass computes per
+  frame screen-space OFFSETS (computeContactOffsets) instead of
+  radii factors - every overlapping pair keeps both radii and
+  pushes apart along the axis that connects the two centers, so
+  the circles touch face to face with a 0.5px hair (contactGap).
+- Two Gauss-Seidel rounds over the deterministic snapshot order
+  (self first, then the sorted objects) so the offsets never
+  flicker; a cheap axis-aligned early-out guards the pair loop;
+  the per unit drift is capped at 2x its radius so a dense crowd
+  stays anchored near its true spot.
+- One new resolver (unitScreenPos) feeds every marker-anchored
+  visual - the circle body, the look tick, the name band, the
+  target rings, the combat floats and swings, the cast plate, the
+  social links, the hover hit test - so the whole unit slides
+  together. The world-anchored layers (the aggro range circles,
+  the kill marks, the walk plans) keep the true positions: they
+  are world facts, not unit plates.
+- The review round fix: the separation axis of a tight pair comes
+  from the LOOK DIRECTION, not the connecting centers. Under the
+  new contactAxisEpsilon (3px screen) the center-to-center
+  direction of a pair is packet jitter, not geometry - the old
+  code split a stacked pair on a fixed west-east fallback and a
+  sub pixel residual could aim the slide sideways, which read as
+  the icons drifting perpendicular to the facing. contactAxis
+  rotates the slide axis into the heading line of the pair (the
+  same 65536-step circle the tick renders, so the axis lives in
+  exactly the space the tick draws in), blending by the gap
+  fraction so a pair wobbling around the epsilon does not pop: a
+  pair that faces each other separates along the shared facing
+  line with each unit backing away from what it looks at, two
+  units facing the same way line up nose to tail, and the units
+  without heading data (heading 0) keep the old horizontal split.
+
+Status: the review round implementation complete, all nine web UI
+harnesses green (repro_map_render grown with the facing contact
+and the facing near contact scenarios - both fail on the pre-fix
+map.js, pinning the reported drift), the change is web only, the
+branch pushed for the PR review.
+

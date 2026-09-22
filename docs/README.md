@@ -46,7 +46,7 @@ the area you are about to touch, not all of them.
 | --- | --- |
 | [ROADMAP.md](ROADMAP.md) | The goal ladder: the milestones with binary live-acceptance criteria; every change must advance one |
 | [project_description.md](project_description.md) | The long term design goals and scalability ideas |
-| [development_log.md](development_log.md) | The permanent record of the development rounds with root cause analyses |
+| [devlog/](devlog/) | The permanent record of the development rounds, one fragment file per round with the root cause analyses (development_log.md is the frozen pre-split archive) |
 | [recast_pathfinding.md](recast_pathfinding.md) | The recastnavigation research: what Detour gives the geodata pathfinder, the converter, the prototype, the migration verdict |
 | [fastpath_research.md](fastpath_research.md) | The fast route planning research: the measured baseline, the hierarchical options, the 10 second budget |
 | [quality_review_and_agent_prompts.md](quality_review_and_agent_prompts.md) | The 2026-09-07 architecture review and improvement program (historical snapshot) |
@@ -63,8 +63,9 @@ the area you are about to touch, not all of them.
 
 | Document | Area |
 | --- | --- |
-| [agent_progress.md](agent_progress.md) | The active task handover file (crash-safe progress tracking); finished entries move to agent_progress_archive.md |
-| [agent_progress_archive.md](agent_progress_archive.md) | The archive of the finished agent rounds (the append-only history the handover file points back to) |
+| [progress/](progress/) | The active task handover fragments, one file per task (crash-safe progress tracking, the shared-file clash policy); finished fragments move to progress/archive/ |
+| [agent_progress.md](agent_progress.md) | FROZEN ARCHIVE: the pre-split handover log - read for history, never append |
+| [agent_progress_archive.md](agent_progress_archive.md) | FROZEN ARCHIVE: the archive of the finished pre-split agent rounds |
 | [ci_workflow.yml](ci_workflow.yml) | The CI verification gate designed for GitHub Actions (build, vet, test, whitespace, the full lint, the race slice, govulncheck): inactive until a workflow-scoped token copies it to .github/workflows/ci.yml |
 | [agent_feedback_loops.md](agent_feedback_loops.md) | The audit of the feedback an autonomous agent receives: the verification loop, the live acceptance, the observability, the process memory |
 | [flake_ledger.md](flake_ledger.md) | The searchable memory of observed test flakes: every flake gets one row (the cause, the fix, the pin that closed it) |

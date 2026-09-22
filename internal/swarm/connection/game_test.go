@@ -107,14 +107,23 @@ func (s *fakeGameServer) characterFlow(conn net.Conn, cipher *crypt.GameCrypt) {
     race := binary.LittleEndian.Uint32(payload[1+len("unittest1")*2+2:])
     require.Equal(s.t, uint32(1), race, "elf race id")
 
-    s.writeEncrypted(conn, cipher,
-        append([]byte{0x25}, 0x01, 0x00, 0x00, 0x00))
-
+    // The creation answer rides the real server's wire order
+    // (CharacterCreate.java: initNewChar sends the updated
+    // CharSelectionInfo list and only then the trailing CharCreateOk
+    // leaves the handler): the updated list first, the ok last. The
+    // inverted order made the client's drainCharCreateOk wait out its
+    // whole 2 s budget on every handshake - awaitCharacterCreation
+    // had already consumed both packets, so the ok the drain waits
+    // for never arrived - a flat 2 s tax on every fake-server test
+    // and the wall-clock pressure behind the CI window flakes.
     var updated []byte
     updated = append(updated, 0x1F)
     updated = binary.LittleEndian.AppendUint32(updated, 1)
     updated = append(updated, buildCharacterEntry()...)
     s.writeEncrypted(conn, cipher, updated)
+
+    s.writeEncrypted(conn, cipher,
+        append([]byte{0x25}, 0x01, 0x00, 0x00, 0x00))
 
     payload = s.readEncrypted(conn, cipher)
     require.Equal(s.t, byte(0x0D), payload[0])

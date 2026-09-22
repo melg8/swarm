@@ -21,8 +21,12 @@ the documentation map below) and is read on demand, not upfront.
    code in its area (the Agent skills section below names them;
    for Go source work the vendored `golang-*` collection is the
    knowledge base).
-4. Read `docs/agent_progress.md` for the active task context; if an
-   entry is unfinished, resume it before taking new work.
+4. Find the active task context: the GitHub project board (the "In
+   progress" column) names the issue, the issue comments carry the
+   claim and the findings, and the task fragment under
+   `docs/progress/` on the task's feature branch carries the working
+   state. The legacy `docs/agent_progress.md` is a frozen archive -
+   never append to it (the shared-file clash policy below).
 5. Deploy first (`tools/swarm_fast_deploy.sh`, the mandatory first
    step below) - no task runs against an undeployed stack.
 
@@ -172,8 +176,8 @@ one of them is the reference for its subsystem:
 | `docs/recast_pathfinding.md` | The recastnavigation research of feature/new-pathfind: what the Detour navmesh gives the geodata pathfinder, the sheet decomposition converter, the Go runtime prototype and the migration verdict |
 | `docs/proxy.md` | The MITM client proxy: running it, the l2.ini recipes, the protocol the client sees, the relogin handoff, debugging proxy.log |
 | `docs/protocol_description.md` | The wire protocol: packet framing, the login and game flows, per-packet layouts (originally written against l2j-lisvus; Mobius C1 is the current reference) |
-| `docs/development_log.md` | The permanent record of the development rounds with root cause analyses - read it before reworking movement rendering or the hunt behavior |
-| `docs/agent_progress.md` | The crash-safe task handover file (see the work protocol below) |
+| `docs/devlog/` | The permanent record of the development rounds, one fragment file per round with the root cause analyses (`docs/development_log.md` is the frozen pre-split archive) - read the matching rounds before reworking movement rendering or the hunt behavior |
+| `docs/progress/` | The crash-safe task handover fragments, one file per task (see the work protocol below; `docs/agent_progress.md` and `docs/agent_progress_archive.md` are the frozen pre-split archive) |
 | `docs/agent_feedback_loops.md` | The audit of the feedback an autonomous agent receives (the verification loop, the live acceptance, the observability, the process memory), what is good, what to improve, what is missing |
 | `docs/project_description.md` | The long term design goals, scalability ideas (packet deduplication, "eyes" bot concept, synchronized party behavior) - read it before making architectural decisions |
 | `docs/quality_review_and_agent_prompts.md` | The 2026-09-07 architecture review and its improvement program (a historical snapshot - verify the state of a finding against the code before acting on it) |
@@ -395,38 +399,74 @@ is ~5.5 minutes total (measured): deploy ~99 s, dev tools ~10 s,
 (pathfind dominates at ~99 s), `mobius_e2e.sh 45` ~47 s. Use these
 numbers to budget a verification loop.
 
-## Work protocol: atomic commits and progress tracking in the repo
+## Work protocol: atomic commits and per-task fragments
 
 - **Commit early, commit often.** Every finished logical unit of work
   (a function, a fix, a config slice, a test) is its own small atomic
   commit pushed to the remote branch immediately after it is ready -
   never let meaningful changes sit only in the working tree.
-- **Track the current task and its progress inside the repository**, in
-  `docs/agent_progress.md`: at the start of a task write its full
-  context (goal, constraints, acceptance criteria), and after every
+- **Track the current task and its progress inside the repository, in
+  a per-task fragment file under `docs/progress/`** (the naming, the
+  structure and the rules: `docs/progress/README.md`): at the start of
+  a task write its full context (goal, constraints, acceptance
+  criteria) into a NEW fragment named for the task, and after every
   atomic commit append a dated progress entry (what was done, what
-  changed, what is next). Update and push that file together with every
-  atomic commit. Keep the file lean: finished tasks move to
-  `docs/agent_progress_archive.md` so a new session reads only the
-  active context.
+  changed, what is next). Update and push the fragment together with
+  every atomic commit. When the task completes, move the fragment to
+  `docs/progress/archive/` in the last commit of the branch, so main
+  only ever receives it archived and `docs/progress/` reads as the
+  active set.
 - **Rationale: crash-safe handover.** The agent session can die at any
   moment (connection loss, sandbox restart). A new agent must be able
-  to `git pull`, read `AGENTS.md` + `docs/agent_progress.md` and
-  continue the task from the exact point where the previous agent
-  stopped, without rediscovering context or losing progress. Never keep
-  task state only in the conversation, only in the working tree or only
+  to `git pull`, read `AGENTS.md` + the task fragment and continue
+  the task from the exact point where the previous agent stopped,
+  without rediscovering context or losing progress. Never keep task
+  state only in the conversation, only in the working tree or only
   locally.
-- Before starting any task, read `docs/agent_progress.md` first: if it
-  contains an unfinished task entry, resume that task (verify the
-  described state against the code, then continue from the recorded
-  "next" step) before taking a new one.
+- Before starting any task, check the board's "In progress" column,
+  the issue comments and `ls docs/progress/` first: an unfinished
+  fragment of a stalled task (the board issue sits in "In progress"
+  with no fresh claim) is resumed - verify the described state against
+  the code, then continue from the recorded next step - before any new
+  work is taken.
 - **Task coordination.** The claim/lease task queue is retired
   (2026-09-12, removed by the owner decision): do not take work
-  from any queue - resume the unfinished entries of
-  `docs/agent_progress.md` only. Every change must still advance a
+  from any queue - the GitHub project board and the issue claims are
+  the coordination layer. Every change must still advance a
   milestone of the goal ladder in `docs/ROADMAP.md` (the progress
   of the project is the highest green milestone) - do not invent
   disconnected work.
+
+## The shared-file clash policy (why the logs are fragment files)
+
+- **Never append to a shared monolithic log or table from a feature
+  branch.** Measured 2026-09-22 (issue #33): the retired protocol
+  ("update `docs/agent_progress.md` with every atomic commit") put a
+  mandatory write of ONE shared file into every branch, and 7 of the
+  8 then-open PRs conflicted with plain main on that file alone -
+  every landed PR forced a rebase on every other branch. The
+  fragment directories end this by construction: two agents working
+  different tasks write different files, and a merge of both is a
+  set union, not a text clash.
+- The frozen legacy logs (`docs/agent_progress.md`,
+  `docs/agent_progress_archive.md`, `docs/development_log.md`) keep
+  the pre-split history and stay read-only forever. A branch still
+  carrying legacy edits to them (opened before the policy): on its
+  rebase drop the legacy appends and carry that context in a
+  `docs/progress/` fragment of its own instead - one transition
+  rebase, then the branch is clash-free.
+- Per-round root-cause records go to `docs/devlog/` fragment files
+  (see `docs/devlog/README.md`) - never to the frozen development
+  log.
+- The low-frequency residue: documentation map rows (the tables in
+  AGENTS.md and `docs/README.md`) are added by rounds that introduce
+  a new doc. Insert the row in the section's alphabetical position;
+  when a concurrent round added a neighboring row, the resolution is
+  mechanical - keep BOTH rows, never drop the other round's line.
+- The reviewer-facing channel is the GitHub issue (findings,
+  decisions, questions for the owner) and the PR review (concrete
+  code comments) - the fragment is the private working state, and
+  keeping the two apart keeps both small.
 
 ## Agent skills
 
@@ -926,9 +966,9 @@ Enforced by `.golangci.yml` (strict, most linters enabled):
 ## Tree cleanliness discipline (keep the gate green)
 
 The full uncapped lint is **zero findings** since 2026-09-19 (the
-~200 finding debt of the ungated parallel week is paid; see
-`docs/agent_progress.md`). The gate only stays cheap if every
-commit keeps it at zero:
+~200 finding debt of the ungated parallel week is paid; see the
+frozen `docs/agent_progress_archive.md`). The gate only stays cheap
+if every commit keeps it at zero:
 
 - `run.max-issues-per-linter` and `run.max-same-issues` are `0` in
   `.golangci.yml`: nothing hides behind the default caps (the caps

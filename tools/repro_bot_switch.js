@@ -294,11 +294,12 @@ function runScenario(mapFile) {
         "a spot circle is still drawn");
     // The reset map paints no stale unit markers. The one legitimate
     // fill source of the gap frame is the surviving fleet kill mark:
-    // it draws as a two pass skull (the orange body fill and the dark
-    // face detail fill), so exactly those two fills may appear.
+    // it draws as the dead mob face (the gray corpse circle body
+    // fill), the X eyes ride as a stroke - so exactly one fill may
+    // appear.
     check(results, "the reset map paints no stale unit markers",
-        record.fills === 2, record.fills + " fills still drawn - want"
-        + " only the two fleet kill skull passes");
+        record.fills === 1, record.fills + " fills still drawn - want"
+        + " only the fleet kill mark body");
 
     // The first snapshot of the new bot repaints normally: with follow
     // on the camera centers on the new character, its own spot circle
