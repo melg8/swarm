@@ -70,3 +70,15 @@ and the live gate; the four kiting commits are content-unchanged.
 
 Linear on main, payload unchanged; next: the hunt suite + gates,
 force push, the fresh CI verdict.
+
+### 2026-09-22 10:50 UTC - the repair closes
+- 39e5de8: all 11 checks green, PR #15 mergeable clean, linear
+  history (zero merge commits), the rebase path open again.
+- The issue comment carries the fix report; the card is in Ready
+  for review, the claims are clean.
+
+## Status (final)
+
+In review: PR #15 head 39e5de8, linear, payload bit-identical to
+the previously verified tree. Future rounds on this branch: rebase
+or cherry-pick only, never merge main in.
