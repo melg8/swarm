@@ -65,6 +65,10 @@ func (s *sinkGame) LastHTMLDialog() (int32, string) {
     return 0, ""
 }
 
+func (s *sinkGame) LastHTMLDialogArrival() (int32, string, uint64) {
+    return 0, "", 0
+}
+
 // fleetBot mirrors the live session shape: the loop drives itself on
 // the production ticker (hunt.Loop.Run), the churn goroutine applies
 // the packet load the connection reader would (the knownlist

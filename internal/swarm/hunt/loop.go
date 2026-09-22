@@ -113,6 +113,15 @@ type GameAPI interface {
     // the bot reads the bypass buttons from). A zero npcObjID means
     // no dialog arrived yet.
     LastHTMLDialog() (npcObjID int32, html string)
+    // LastHTMLDialogArrival returns the last dialog page together
+    // with its arrival generation: the count of NpcHTMLMessage
+    // packets the connection received at the moment that page
+    // arrived. The dialog walker gates its page waits on the
+    // generation - a page left over from a previous conversation of
+    // the same npc (the recurring Newbie Guide stop) never
+    // satisfies the wait of a fresh talk, so the first bypass goes
+    // out only after the server opened the dialog it belongs to.
+    LastHTMLDialogArrival() (npcObjID int32, html string, gen uint64)
 }
 
 // Timing and threshold constants of the hunt loop.

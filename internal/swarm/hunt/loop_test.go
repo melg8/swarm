@@ -64,6 +64,7 @@ type fakeGame struct {
     htmlMu    sync.Mutex
     htmlNPC   int32
     htmlBody  string
+    htmlGen   uint64
     lastError error
 }
 
@@ -71,12 +72,14 @@ type fakeGame struct {
 // the production loop polls LastHTMLDialog from its own goroutine,
 // so the test writer and the poll reader share this mutex - the
 // direct field write from the simulated server goroutine would race
-// the poll.
+// the poll. Every delivery advances the arrival generation like the
+// connection layer does.
 func (f *fakeGame) setHTMLDialog(npc int32, body string) {
     f.htmlMu.Lock()
     defer f.htmlMu.Unlock()
     f.htmlNPC = npc
     f.htmlBody = body
+    f.htmlGen++
 }
 
 func (f *fakeGame) AttackTarget(objectID int32) error {
@@ -225,6 +228,13 @@ func (f *fakeGame) LastHTMLDialog() (int32, string) {
     defer f.htmlMu.Unlock()
 
     return f.htmlNPC, f.htmlBody
+}
+
+func (f *fakeGame) LastHTMLDialogArrival() (int32, string, uint64) {
+    f.htmlMu.Lock()
+    defer f.htmlMu.Unlock()
+
+    return f.htmlNPC, f.htmlBody, f.htmlGen
 }
 
 func (f *fakeGame) ClickObject(objectID int32) error {

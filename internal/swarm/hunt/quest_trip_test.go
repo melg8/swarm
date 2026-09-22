@@ -31,13 +31,16 @@ type questChainGame struct {
 
 // ClickObject serves the entry pages of the two conversations: the
 // script stub only serves the first interact click, the second
-// conversation needs its own page reset.
+// conversation needs its own page reset - a fresh arrival in the
+// store, the generation advances with it (the server re-sent the
+// trainer page).
 func (q *questChainGame) ClickObject(objectID int32) error {
     if err := q.scriptGame.ClickObject(objectID); err != nil {
         return err
     }
     if q.script.clicks == 4 {
         q.script.cur = 4
+        q.script.gen++
     }
 
     return nil
