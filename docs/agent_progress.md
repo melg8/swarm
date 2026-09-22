@@ -11,60 +11,92 @@ finished task entries and older progress streams move to
 root-cause history of every round lives in `docs/development_log.md`;
 check the archive when the recent context references an older task.
 
-## Active task (status: in progress): the full size contact markers - issue #7, the melee pair slides apart instead of shrinking (2026-09-21, branch feature/contact-touch-no-shrink)
+## Active task (status: in review): the dead mob icon round - the x eyes face lands in the live map (2026-09-21, branch feature/dead-mob-icon-research, issue #6)
 
-Started 2026-09-21 ~19:11 UTC (the kanban claim of melg8/swarm#7);
-the review round 2026-09-21 ~19:52 UTC (the owner feedback on the
-first implementation).
+Started 2026-09-21 ~18:52 UTC, review round ~19:23 UTC. The source
+is the GitHub project board issue melg8/swarm#6 ("Bad dead mobs icon
+style research"): the live map corpse marker - the dead threat circle
+with the look tick at 0.45 alpha - read as a faded alive mob.
 
-The owner ask: "Bot and npcs should not reduce their icon size even
-if they get close to each other. When bot fights and it is too
-close to enemy both icons should just touch facing each other, but
-should not change size." The review ask: a bot and a mob that meet
-too tight drifted apart SIDEWAYS (a north-south pair read west-east
-while both kept looking north-south) - the facing and the rendered
-positions must never mismatch.
+Round one (the research): a standalone comparison page with 31
+numbered corpse icon variants (0 the current baseline, 1..30 the new
+ideas in seven families) on one fixed hunting scene painted in the
+live map's exact visual language, with variant swapping, a
+side-by-side gallery, a kill skull toggle and a built-in self test
+(31/31 pass). The findings comment on the issue carries the catalog
+and the screenshots; the owner picked variant 26 (the x eyes face:
+the gray circle keeps its footprint, two small X eyes replace the
+look direction) and asked for the pr to carry the implementation
+only.
 
-Design (verified against the Round 124 contact pass):
+Round two (the implementation, the current pr diff):
 
-- The shrink is replaced by a slide: the contact pass computes per
-  frame screen-space OFFSETS (computeContactOffsets) instead of
-  radii factors - every overlapping pair keeps both radii and
-  pushes apart along the axis that connects the two centers, so
-  the circles touch face to face with a 0.5px hair (contactGap).
-- Two Gauss-Seidel rounds over the deterministic snapshot order
-  (self first, then the sorted objects) so the offsets never
-  flicker; a cheap axis-aligned early-out guards the pair loop;
-  the per unit drift is capped at 2x its radius so a dense crowd
-  stays anchored near its true spot.
-- One new resolver (unitScreenPos) feeds every marker-anchored
-  visual - the circle body, the look tick, the name band, the
-  target rings, the combat floats and swings, the cast plate, the
-  social links, the hover hit test - so the whole unit slides
-  together. The world-anchored layers (the aggro range circles,
-  the kill marks, the walk plans) keep the true positions: they
-  are world facts, not unit plates.
-- The review round fix: the separation axis of a tight pair comes
-  from the LOOK DIRECTION, not the connecting centers. Under the
-  new contactAxisEpsilon (3px screen) the center-to-center
-  direction of a pair is packet jitter, not geometry - the old
-  code split a stacked pair on a fixed west-east fallback and a
-  sub pixel residual could aim the slide sideways, which read as
-  the icons drifting perpendicular to the facing. contactAxis
-  rotates the slide axis into the heading line of the pair (the
-  same 65536-step circle the tick renders, so the axis lives in
-  exactly the space the tick draws in), blending by the gap
-  fraction so a pair wobbling around the epsilon does not pop: a
-  pair that faces each other separates along the shared facing
-  line with each unit backing away from what it looks at, two
-  units facing the same way line up nose to tail, and the units
-  without heading data (heading 0) keep the old horizontal split.
+- `drawUnitTick` of map.js gains the dead branch: a corpse draws no
+  look direction tick - the circle body (alpha 0.45 -> 0.55) carries
+  two small X eyes at +/-0.32r, 0.12r above the center (eye half
+  size max(0.7, 0.16r), width max(0.7, 0.7k), tick slate, round
+  caps) - so a corpse reads "killed here" instead of a faded alive
+  mob. The alive units keep the tick; nothing else of the marker
+  geometry changes.
+- The research page and its screenshots left the branch per the
+  review (git rm); the research record lives in the issue comments.
+- `tools/repro_map_render.js` gains the "dead face" scenario: the
+  gray circle body at the dead radius, the two eye X strokes at the
+  eye line, and the absence of the radial heading tick (the old
+  style) - three checks that pin the new style against drift.
+- `docs/webui.md` map rendering section updated (the dead units draw
+  no look direction, the X eyes face).
 
-Status: the review round implementation complete, all nine web UI
-harnesses green (repro_map_render grown with the facing contact
-and the facing near contact scenarios - both fail on the pre-fix
-map.js, pinning the reported drift), the change is web only, the
-branch pushed for the PR review.
+Verification: repro_map_render ALL PASS (with the new scenario),
+repro_movement, repro_bot_switch, repro_zone_hover, repro_fight_ui,
+repro_hud green, `go build ./...`, `go test
+./internal/swarm/webserver/` and `golangci-lint run --new` clean.
+
+Status: the pr (#8, "Fixes #6") carries the implementation diff
+only; the issue waits for the merge review.
+
+Round three (2026-09-21 ~20:35 UTC, the review feedback of 20:32 -
+"the kill markers come back for the whole map with the new icon, the
+retire round removed the wrong thing"):
+
+- The fleet kill ring returns to the map with the NEW icon: the
+  marks of /api/fleet/kills (every recent kill of every bot, the
+  layer that survives the bot switches) draw as the dead mob face -
+  the gray corpse circle body (mapColors.dead #80868b) with the two
+  X eyes in the look tick slate (mapColors.tick #39424e), the same
+  proportions the corpse marker uses. No orange anywhere.
+- The layer behavior restores as it was: the five minute melt (8
+  alpha buckets, one body fill + one eye stroke per bucket), the
+  show-kills toolbar toggle, the victim tooltip (name, level, the
+  ticking kill age) that wins over the dead unit tooltip while the
+  corpse sits on its own mark. The bot-switch gap frame keeps
+  painting the ring (repro_bot_switch pins the survive + the one
+  legitimate gap fill).
+- The zone kill centroid skulls stay retired: they were the observed
+  bot's per spot read (they did not survive the bot switches), the
+  fleet ring plus the corpse icon carry the death read now.
+- map.js: the killMarks state and the drawKillMarks / setKillMarks /
+  killMarkAt / showKillTooltip / refreshKillTooltipAge methods are
+  back with the new icon; the paint flow calls the layer in the gap
+  branch and after the hunt zones; the duplicate drawZone call the
+  retire round left in the gap branch is gone. app.js re-fetches the
+  ring with the bot list (404 tolerant); index.html regains the
+  kills checkbox.
+- Harnesses: repro_zone_hover regains the fleet kill marks scenario
+  (12 checks: the body + eyes geometry, the age fade, the TTL drop,
+  the pick, the tooltip flow, the corpse priority, the toggle
+  isolation - run before the corpse object joins the scene, the
+  corpse unit paints the same face by design); repro_bot_switch
+  carries the survive check and the gap fill count (1 body fill, the
+  eyes ride as a stroke).
+
+Verification: repro_zone_hover, repro_bot_switch, repro_map_render,
+repro_fight_ui, repro_hud, repro_buffs, repro_movement, repro_stats,
+repro_gear all exit 0; go build, go vet, go test
+./internal/swarm/webserver/ green.
+
+Status: round three pushed to the pr branch; the issue reports the
+restored layer and waits for the merge review.
 
 ## Active task (status: complete): the cast icon side round - the bow order shot, the quiet npc interact (2026-09-21, branch feature/improved-behaviour)
 

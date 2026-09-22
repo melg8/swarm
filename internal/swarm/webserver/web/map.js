@@ -20,7 +20,7 @@ const MapView = {
   canvas: null,
   ctx: null,
   tooltip: null,
-  // The hovered kill skull and the age line element the tooltip
+  // The hovered kill mark and the age line element the tooltip
   // refreshes (the age read ticks while the cursor rests on it).
   hoverMark: null,
   hoverAgeEl: null,
@@ -73,9 +73,9 @@ const MapView = {
   cursorWorld: null,
 
   // The fleet wide kill marks of /api/fleet/kills (every recent kill
-  // of every bot): drawn as the skulls of the whole deployment so
-  // they survive the bot switches of the view (the per zone kill
-  // centroid of the observed bot alone does not).
+  // of every bot): drawn as the dead mob faces of the whole
+  // deployment so they survive the bot switches of the view (the per
+  // zone kill centroid of the observed bot alone does not).
   killMarks: [],
 
   // The parsed clan masks of the current snapshot (objectId to
@@ -2118,8 +2118,6 @@ const MapView = {
     const demotedRects = [];
     const futureDots = [];
     const activeDots = [];
-    const futureSkulls = [];
-    const activeSkulls = [];
     const futureHeat = new Map();
     const activeHeat = new Map();
     for (const zone of zones) {
@@ -2133,13 +2131,6 @@ const MapView = {
         const active = zone.active;
         (active ? activeSpots : futureSpots).push([c.x, c.y, r]);
         (active ? activeDots : futureDots).push([c.x, c.y]);
-        // The kill centroid skull (where the kills actually happen).
-        if (zone.killX || zone.killY) {
-          const k = this.worldToScreen(zone.killX, zone.killY);
-          if (k.x > -6 && k.y > -6 && k.x < vw + 6 && k.y < vh + 6) {
-            (active ? activeSkulls : futureSkulls).push([k.x, k.y]);
-          }
-        }
         // The death heat fill: the warmer the ground, the redder. The
         // alpha bucket keeps the fills batchable (one bucket step is
         // invisible on a slowly fading heat).
@@ -2271,27 +2262,6 @@ const MapView = {
       ctx.stroke();
     }
     ctx.setLineDash([]);
-    // The kill centroid skulls of the spots with known kill points:
-    // the same two pass fill the fleet ring uses (the body in the
-    // marker orange, the face in the dark contrast), just larger -
-    // the centroid marks the ground, not a single corpse.
-    for (const [list, alpha] of [[futureSkulls, 0.75],
-      [activeSkulls, 0.95]]) {
-      if (list.length === 0) { continue; }
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = killMarkColor;
-      ctx.beginPath();
-      for (const k of list) {
-        traceKillSkull(ctx, k[0], k[1], 12.5, false);
-      }
-      ctx.fill();
-      ctx.fillStyle = killMarkDetailColor;
-      ctx.beginPath();
-      for (const k of list) {
-        traceKillSkull(ctx, k[0], k[1], 12.5, true);
-      }
-      ctx.fill();
-    }
     // The anchor dots of the spots.
     if (futureDots.length > 0) {
       ctx.globalAlpha = 0.75;
@@ -2468,15 +2438,17 @@ const MapView = {
     ctx.restore();
   },
 
-  // drawKillMarks paints the fleet wide kill skulls: every recent
-  // kill of every bot (the /api/fleet/kills ring) draws as a small
-  // orange skull that melts away with its age. The layer survives
-  // the bot switches of the view - the marks live in the map, not in
-  // the snapshot of the observed bot. The fade quantizes into
-  // buckets: every skull of one bucket shares a single fill call per
-  // pass, so a full ring of kills costs a handful of fills instead
-  // of one state round trip per skull (a bucket step of the alpha is
-  // invisible on a five minute melt).
+  // drawKillMarks paints the fleet wide kill marks: every recent
+  // kill of every bot (the /api/fleet/kills ring) draws as the dead
+  // mob face (the gray corpse circle with the X eyes - the same icon
+  // the corpse marker of the map carries, issue #6) that melts away
+  // with its age. The layer survives the bot switches of the view -
+  // the marks live in the map, not in the snapshot of the observed
+  // bot. The fade quantizes into buckets: every mark of one bucket
+  // shares a single fill call for the body and a single stroke call
+  // for the eyes, so a full ring of kills costs a handful of paint
+  // calls instead of one state round trip per mark (a bucket step of
+  // the alpha is invisible on a five minute melt).
   drawKillMarks(ctx, rect) {
     if (!this.layerChecked("show-kills")) { return; }
     if (!this.killMarks || this.killMarks.length === 0) { return; }
@@ -2492,8 +2464,8 @@ const MapView = {
       }
       // The fresh kills read full strength, the old ones melt toward
       // a quarter opacity and shrink before the ring drops them. The
-      // fresh skull reads at 2.5x of the old cross size - a bit
-      // smaller than the mob dots of the map.
+      // fresh face reads at the mob dot scale - a death spot reads a
+      // step above the living marker of the map.
       const bucket = Math.min(killFadeBuckets - 1,
         Math.floor(age / killMarkTTLms * killFadeBuckets));
       (buckets[bucket] = buckets[bucket] || []).push(p);
@@ -2505,26 +2477,38 @@ const MapView = {
       const fade = bucket / killFadeBuckets;
       ctx.globalAlpha = 0.95 - 0.7 * fade;
       const size = 10 - 3.75 * fade;
-      // The body pass: the head and jaw silhouette in the orange.
-      ctx.fillStyle = killMarkColor;
+      // The body pass: the corpse circle in the dead marker gray.
+      ctx.fillStyle = killMarkBodyColor;
       ctx.beginPath();
       for (const p of marks) {
-        traceKillSkull(ctx, p.x, p.y, size, false);
+        ctx.moveTo(p.x + size, p.y);
+        ctx.arc(p.x, p.y, size, 0, 2 * Math.PI);
       }
       ctx.fill();
-      // The face pass: the eyes and mouth slots in the dark contrast.
-      ctx.fillStyle = killMarkDetailColor;
+      // The face pass: the two X eyes in the dark contrast - the
+      // same proportions the dead unit face of drawUnitTick uses.
+      ctx.strokeStyle = killMarkFaceColor;
+      ctx.lineWidth = Math.max(0.8, 0.08 * size);
+      ctx.lineCap = "round";
       ctx.beginPath();
       for (const p of marks) {
-        traceKillSkull(ctx, p.x, p.y, size, true);
+        const eye = Math.max(0.7, size * 0.16);
+        const eyY = p.y - size * 0.12;
+        for (const eyeX of [p.x - size * 0.32, p.x + size * 0.32]) {
+          ctx.moveTo(eyeX - eye, eyY - eye);
+          ctx.lineTo(eyeX + eye, eyY + eye);
+          ctx.moveTo(eyeX + eye, eyY - eye);
+          ctx.lineTo(eyeX - eye, eyY + eye);
+        }
       }
-      ctx.fill();
+      ctx.stroke();
+      ctx.lineCap = "butt";
     }
     ctx.restore();
   },
 
   // setKillMarks ingests the fleet kill ring of /api/fleet/kills (the
-  // web app polls it with the bot list). The skulls draw on the next
+  // web app polls it with the bot list). The marks draw on the next
   // frame - the poll period paces the fade steps well enough.
   setKillMarks(marks) {
     this.killMarks = Array.isArray(marks) ? marks : [];
@@ -3270,9 +3254,9 @@ const MapView = {
     this.hoverWp = wp;
     this.cursorWorld = world;
     this.updateCursorChip();
-    // The kill skulls pick where no LIVING object does: the unit
+    // The kill marks pick where no LIVING object does: the unit
     // tooltips own their pixels, but a dead mob (the corpse) sits
-    // exactly on its own kill skull - the victim tooltip with the
+    // exactly on its own kill mark - the victim tooltip with the
     // kill age owns that spot until the corpse despawns.
     let mark = null;
     if (!best || best.dead) {
@@ -3294,7 +3278,7 @@ const MapView = {
       // waypoint hover the coordinate label.
       this.draw();
     } else if (mark) {
-      // The cursor rests on the same skull: keep the age read fresh.
+      // The cursor rests on the same mark: keep the age read fresh.
       this.refreshKillTooltipAge(mark);
     }
   },
@@ -3669,7 +3653,7 @@ const MapView = {
   },
 
   // hideTooltip closes the tooltip box and clears the whole hover
-  // state: the object, the kill skull and the age line reference.
+  // state: the object, the kill mark and the age line reference.
   hideTooltip() {
     this.tooltip.classList.add("hidden");
     this.hover = null;
@@ -3688,7 +3672,7 @@ const MapView = {
     this.tooltip.style.top = y + "px";
   },
 
-  // showKillTooltip shows the victim of a hovered kill skull: the
+  // showKillTooltip shows the victim of a hovered kill mark: the
   // name and level of the mob and how long ago it died (the raw
   // object data never shows, a vanished corpse falls back to the
   // plain mob read).
@@ -3707,7 +3691,7 @@ const MapView = {
     this.positionTooltip(mx, my);
   },
 
-  // refreshKillTooltipAge keeps the age read of the hovered skull
+  // refreshKillTooltipAge keeps the age read of the hovered mark
   // fresh while the cursor rests on it (a text write only when the
   // whole second stepped).
   refreshKillTooltipAge(mark) {
@@ -3719,9 +3703,9 @@ const MapView = {
     }
   },
 
-  // killMarkAt picks the kill skull under the cursor: the nearest
-  // fresh mark within the pick radius of the skull. Null when the
-  // layer is hidden or nothing sits close enough.
+  // killMarkAt picks the kill mark under the cursor: the nearest
+  // fresh mark within the pick radius. Null when the layer is
+  // hidden or nothing sits close enough.
   killMarkAt(mx, my) {
     if (!this.layerChecked("show-kills")) { return null; }
     if (!this.killMarks || this.killMarks.length === 0) { return null; }
@@ -4474,50 +4458,29 @@ const bgDevicePixels = 4096 * 2560;
 // canvas in the low tens of megabytes even on a 4K class viewport.
 const huntDevicePixels = 4096 * 1440;
 
-// killFadeBuckets is the quantization of the kill skull fade: every
-// skull of one bucket shares one fill call per pass (see
-// drawKillMarks).
+
+// killFadeBuckets is the quantization of the kill mark fade: every
+// mark of one bucket shares one body fill call and one eye stroke
+// call (see drawKillMarks).
 const killFadeBuckets = 8;
 
-// socialWindowMs is how long the social animation marker stays visible
-// (the tracker side window in state/chat.go).
-const socialWindowMs = 3000;
+// killMarkBodyColor is the fill of the fleet kill marks: the same
+// gray the dead unit marker carries (mapColors.dead), so the fleet
+// ring and the corpse marker read as one family - the kill marker
+// IS the dead mob icon of the map (issue #6).
+const killMarkBodyColor = "#80868b";
 
-// swingMs is the life of one attack animation: the windup swoosh,
-// the streak that shoots from the attacker to the hit target and
-// the impact starburst (the Mobius attack cadence is roughly one
-// zoneFutureColor is the stroke of the inactive hunting zones: a
-// bright soft blue that reads over the light map imagery and both
-// theme fills alike, clearly distinct from the amber active square
-// and the red demoted bands.
-const zoneFutureColor = "#5b9bd5";
+// killMarkFaceColor is the stroke of the mark's X eyes: the same
+// dark slate the unit look ticks use (mapColors.tick), readable
+// over the gray body on the light map imagery, theme independent
+// like the rest of the marker palette.
+const killMarkFaceColor = "#39424e";
 
-// zoneFutureFill is the faint fill of the inactive hunting zones: it
-// demonstrates the future grounds at the far zoom where a thin
-// outline alone melts into the map imagery.
-const zoneFutureFill = "rgba(91, 155, 213, 0.07)";
-
-// zoneHoverFill is the brighter fill of the hovered or listed zone:
-// the pointer (map hover) or the list focus marks the ground among
-// its neighbors at a glance.
-const zoneHoverFill = "rgba(91, 155, 213, 0.22)";
-
-// killMarkColor is the fill of the fleet kill skulls (the same
-// orange the per spot kill centroid skull uses, so every kill marker
-// on the map reads as one family).
-const killMarkColor = "#e37400";
-
-// killMarkDetailColor is the fixed dark contrast of the skull face
-// (the eye dots and the mouth slots): a dark brown that stays
-// readable over the orange fill on the light map imagery, theme
-// independent like the rest of the kill marker palette.
-const killMarkDetailColor = "#40230a";
-
-// killMarkPickRadius bounds the hover pick of a kill skull: a touch
-// wider than the fresh skull so the tooltip is easy to aim at.
+// killMarkPickRadius bounds the hover pick of a kill mark: a touch
+// wider than the fresh mark so the tooltip is easy to aim at.
 const killMarkPickRadius = 13;
 
-// killAgeText renders the age of a kill mark for the skull tooltip:
+// killAgeText renders the age of a kill mark for the mark tooltip:
 // a compact whole unit read (the map local helper - the HUD panels
 // use the formatAgeMs of app.js, the vm harness loads map.js alone).
 function killAgeText(ms) {
@@ -4531,10 +4494,28 @@ function killAgeText(ms) {
     + Math.floor((secs % 3600) / 60) + "m ago";
 }
 
-// killMarkTTLms bounds the life of a fleet kill skull: the fresh kill
+// killMarkTTLms bounds the life of a fleet kill mark: the fresh kill
 // reads full strength and melts away before the server ring drops
 // it (the hunt loop keeps five minutes of kills per bot).
 const killMarkTTLms = 5 * 60 * 1000;
+
+// socialWindowMs is how long the social animation marker stays visible
+// (the tracker side window in state/chat.go).
+const socialWindowMs = 3000;
+
+// zoneFutureColor is the calm blue of the inactive hunting zones
+// and the red demoted bands.
+const zoneFutureColor = "#5b9bd5";
+
+// zoneFutureFill is the faint fill of the inactive hunting zones: it
+// demonstrates the future grounds at the far zoom where a thin
+// outline alone melts into the map imagery.
+const zoneFutureFill = "rgba(91, 155, 213, 0.07)";
+
+// zoneHoverFill is the brighter fill of the hovered or listed zone:
+// the pointer (map hover) or the list focus marks the ground among
+// its neighbors at a glance.
+const zoneHoverFill = "rgba(91, 155, 213, 0.22)";
 
 // socialLinkColor connects the clan mates inside their clan help
 // range: a calm teal, distinct from every threat color of the units
@@ -4720,10 +4701,15 @@ function labelColor(threat) {
 // the tick length, the ring radii and the line widths shrink with it so
 // a zoomed out marker stays a small circle with a proportionally small
 // tick instead of a dot with a fixed length stick.
+// A dead unit (a corpse) draws no look direction - the circle carries
+// the dead face instead (two small X eyes, the variant 26 of the dead
+// mob icon research of issue #6): a corpse does not look anywhere, and
+// the X eyes read "killed here" on the gray body where the faded alive
+// marker used to blend into the crowd.
 function drawUnitTick(ctx, x, y, heading, radius, fill, tick, opts) {
   const k = opts.scale || 1;
   const angle = (heading / 65536) * 2 * Math.PI;
-  const alpha = opts.dead ? 0.45 : 1;
+  const alpha = opts.dead ? 0.55 : 1;
 
   // Combat pulse ring and self ring for emphasis.
   if (opts.combat || opts.self) {
@@ -4758,6 +4744,32 @@ function drawUnitTick(ctx, x, y, heading, radius, fill, tick, opts) {
     ctx.setLineDash([]);
   }
 
+  // The dead face: the corpse keeps the circle footprint but loses the
+  // look direction - two small X eyes sit where the eyes of the dead
+  // mob would be, slightly above the center. The eyes are the only
+  // addition to the body: no skull, no symbol, the circle and its face
+  // stay inside the marker footprint of the alive units.
+  if (opts.dead) {
+    const eye = Math.max(0.7, radius * 0.16);
+    const eyY = y - radius * 0.12;
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = tick;
+    ctx.lineWidth = Math.max(0.7, 0.7 * k);
+    ctx.lineCap = "round";
+    for (const eyeX of [x - radius * 0.32, x + radius * 0.32]) {
+      ctx.beginPath();
+      ctx.moveTo(eyeX - eye, eyY - eye);
+      ctx.lineTo(eyeX + eye, eyY + eye);
+      ctx.moveTo(eyeX + eye, eyY - eye);
+      ctx.lineTo(eyeX - eye, eyY + eye);
+      ctx.stroke();
+    }
+    ctx.lineCap = "butt";
+    ctx.globalAlpha = 1;
+
+    return;
+  }
+
   // The look direction tick, drawn only outside the circle: the circle
   // body is a solid color fill and the heading ray starts at the edge.
   const outer = radius + 4.5 * k;
@@ -4781,42 +4793,6 @@ function drawDiamond(ctx, x, y, size, color) {
   ctx.restore();
 }
 
-// traceKillSkull traces one stylized skull onto the current canvas
-// path, centered on (x, y) with the half size r. The body pass (face
-// false) adds the cranium circle and the jaw circle, the face pass
-// (face true) adds the two eye dots and the two mouth slots - the
-// caller fills the passes with killMarkColor and killMarkDetailColor
-// in two batched fill calls. Traced from primitives, never a font
-// glyph, so the face stays crisp at every device pixel ratio and
-// still reads as a skull at the ~8px melt of the oldest fade bucket.
-function traceKillSkull(ctx, x, y, r, face) {
-  if (!face) {
-    // The cranium: a wide circle over a smaller jaw circle - the
-    // silhouette alone reads skull from a distance.
-    ctx.moveTo(x + r * 0.75, y - r * 0.15);
-    ctx.arc(x, y - r * 0.15, r * 0.75, 0, Math.PI * 2);
-    ctx.moveTo(x + r * 0.45, y + r * 0.45);
-    ctx.arc(x, y + r * 0.45, r * 0.45, 0, Math.PI * 2);
-
-    return;
-  }
-  // The eye dots sit inside the cranium, above the jaw line.
-  ctx.moveTo(x - r * 0.13, y - r * 0.3);
-  ctx.arc(x - r * 0.33, y - r * 0.3, r * 0.22, 0, Math.PI * 2);
-  ctx.moveTo(x + r * 0.53, y - r * 0.3);
-  ctx.arc(x + r * 0.33, y - r * 0.3, r * 0.22, 0, Math.PI * 2);
-  // The mouth slots: the two dark teeth gaps of the jaw slab.
-  ctx.moveTo(x - r * 0.3, y + r * 0.15);
-  ctx.lineTo(x - r * 0.1, y + r * 0.15);
-  ctx.lineTo(x - r * 0.1, y + r * 0.55);
-  ctx.lineTo(x - r * 0.3, y + r * 0.55);
-  ctx.closePath();
-  ctx.moveTo(x + r * 0.1, y + r * 0.15);
-  ctx.lineTo(x + r * 0.3, y + r * 0.15);
-  ctx.lineTo(x + r * 0.3, y + r * 0.55);
-  ctx.lineTo(x + r * 0.1, y + r * 0.55);
-  ctx.closePath();
-}
 
 function cardinalOf(heading) {
   const deg = Math.round((heading / 65536) * 360);
