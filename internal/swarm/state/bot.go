@@ -111,8 +111,18 @@ type CharacterState struct {
     // guards, worth keep provoking).
     LastLandedHitAt     time.Time
     LastLandedHitTarget int32
-    CurrentLoad         int32
-    MaxLoad             int32
+    // LastSelfShotAt stamps the broadcast of the played character's
+    // own Attack packet - hit or miss. The Mobius server commits the
+    // bow shot the moment it builds the packet: the hit roll, the
+    // arrow consumption and the HitTask schedule all happen before
+    // the broadcast (Creature.doAttack -> doAttackHitByBow), and the
+    // damage task carries no attacker movement check, so the shot is
+    // final once the packet arrived. For the bow fight this is the
+    // release moment the kite retreat rides: everything after it is
+    // the cooldown the character may spend walking away (issue #60).
+    LastSelfShotAt time.Time
+    CurrentLoad    int32
+    MaxLoad        int32
 }
 
 // newCharacterState creates a zero valued character state.
@@ -157,6 +167,7 @@ func newCharacterState() CharacterState {
         LastHitAt:           time.Time{},
         LastLandedHitAt:     time.Time{},
         LastLandedHitTarget: 0,
+        LastSelfShotAt:      time.Time{},
         CurrentLoad:         0,
         MaxLoad:             0,
     }
@@ -750,6 +761,18 @@ func (b *Bot) SelfCombatActiveAt() time.Time {
     defer b.mu.RUnlock()
 
     return b.char.CombatActiveAt
+}
+
+// SelfLastShotAt returns when the last Attack broadcast of the played
+// character arrived (zero when none ever did): the shot commit moment
+// the Mobius server finalizes the bow shot at (see the
+// CharacterState.LastSelfShotAt comment). The hunt loop reads it as
+// the release trigger of the shot-paced kite retreat (issue #60).
+func (b *Bot) SelfLastShotAt() time.Time {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.char.LastSelfShotAt
 }
 
 // SelfWalking reports whether the character is moving right now: the
@@ -1972,6 +1995,7 @@ func (b *Bot) ApplyAttack(a Attack) {
             b.char.TargetID = a.TargetIDs[0]
             b.char.FightingTargetID = a.TargetIDs[0]
         }
+        b.char.LastSelfShotAt = now
         b.noteSelfCombatLocked(now)
         b.touch()
     } else if obj, cold := b.objectLocked(a.AttackerID); obj != nil {
