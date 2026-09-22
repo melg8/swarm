@@ -160,15 +160,17 @@ jobs:
             exit 1
           fi
           REGEX=""
+          COUNT=0
           for ((i = SHARD_INDEX; i < ${#TESTS[@]}; i += SHARD_COUNT)); do
             REGEX+="${TESTS[$i]}|"
+            COUNT=$((COUNT + 1))
           done
           REGEX="${REGEX%|}"
           if [ -z "$REGEX" ]; then
             echo "Shard $SHARD_INDEX carries no tests this round"
             exit 0
           fi
-          echo "Shard $SHARD_INDEX runs $(( ${#TESTS[@]} / SHARD_COUNT )) of ${#TESTS[@]} tests"
+          echo "Shard $SHARD_INDEX runs $COUNT of ${#TESTS[@]} tests"
           CGO_ENABLED=1 go test ./internal/swarm/pathfind/ -race -count=1 -timeout=10m -run "^(${REGEX})$"
 
   race-navbuild:
@@ -180,7 +182,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1]
+        shard: [0, 1, 2]
     steps:
       - uses: actions/checkout@v4
 
@@ -188,10 +190,10 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Race the navmesh builder (shard ${{ matrix.shard }} of 2)
+      - name: Race the navmesh builder (shard ${{ matrix.shard }} of 3)
         run: |
           set -euo pipefail
-          SHARD_COUNT=2
+          SHARD_COUNT=3
           SHARD_INDEX=${{ matrix.shard }}
           mapfile -t TESTS < <(go test -list '.*' ./internal/swarm/pathfind/navbuild/ 2>/dev/null | grep '^Test' | sort)
           if [ "${#TESTS[@]}" -eq 0 ]; then
@@ -199,15 +201,17 @@ jobs:
             exit 1
           fi
           REGEX=""
+          COUNT=0
           for ((i = SHARD_INDEX; i < ${#TESTS[@]}; i += SHARD_COUNT)); do
             REGEX+="${TESTS[$i]}|"
+            COUNT=$((COUNT + 1))
           done
           REGEX="${REGEX%|}"
           if [ -z "$REGEX" ]; then
             echo "Shard $SHARD_INDEX carries no tests this round"
             exit 0
           fi
-          echo "Shard $SHARD_INDEX runs $(( ${#TESTS[@]} / SHARD_COUNT )) of ${#TESTS[@]} tests"
+          echo "Shard $SHARD_INDEX runs $COUNT of ${#TESTS[@]} tests"
           CGO_ENABLED=1 go test ./internal/swarm/pathfind/navbuild/ -race -count=1 -timeout=10m -run "^(${REGEX})$"
 
   acceptance-list:
