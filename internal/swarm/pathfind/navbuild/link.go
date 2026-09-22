@@ -57,8 +57,14 @@ func (a *linkAccumulator) add(poly int32, side uint8, to int32,
 
 // emit turns the accumulated spans into links: per key the sorted
 // coordinates merge into maximal runs, every run is one portal. The
-// answer is sorted by (poly, side, t0) so the chain assembly is
-// deterministic.
+// answer is sorted by (poly, side, t0, t1, to) - a total order over
+// the emitted specs. The comparator must resolve every field: two
+// keys can tie on (poly, side, t0) with a different target (the
+// stacked layer columns pair one polygon with two neighbours on the
+// same span) and sort.Slice is unstable, so a partial key let the
+// map iteration order leak into the wire - two rebuilds of the same
+// region produced differently ordered link arrays and the corpus
+// replay jitters on the A* tie-breaking (issue #63).
 func (a *linkAccumulator) emit() []linkSpec {
     specs := make([]linkSpec, 0, len(a.spans))
     for key, coords := range a.spans {
@@ -92,8 +98,14 @@ func (a *linkAccumulator) emit() []linkSpec {
         if specs[i].side != specs[j].side {
             return specs[i].side < specs[j].side
         }
+        if specs[i].t0 != specs[j].t0 {
+            return specs[i].t0 < specs[j].t0
+        }
+        if specs[i].t1 != specs[j].t1 {
+            return specs[i].t1 < specs[j].t1
+        }
 
-        return specs[i].t0 < specs[j].t0
+        return specs[i].to < specs[j].to
     })
 
     return specs
