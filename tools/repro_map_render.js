@@ -49,6 +49,7 @@ const THEME = {
     "--text-bright": "#111722",
     "--text-dim": "#67707e",
     "--border": "#d5dbe3",
+    "--bg-map": "#e9edf2",
     "--grid": "rgba(21, 34, 50, 0.10)",
     "--grid-text": "rgba(60, 72, 90, 0.55)"
 };
@@ -1772,6 +1773,20 @@ function runScenarioBackgroundCache(mapFile) {
             ? "holding " + bgRecord.strokes.length + " grid strokes"
             : "missing"));
 
+    // The void base (issue #53): the cache raster answers OPAQUE - the
+    // first rect of every re-raster fills the whole cache with the
+    // --bg-map void, so the areas the tiles never cover (the bg
+    // toggle, the scroll past the tile pack, the pyramid holes) blit
+    // as a calm backdrop instead of the previous frame's stale
+    // pixels.
+    const voidRect = bgRecord.rects[0];
+    check(results, "the cache raster opens with the opaque void base",
+        !!voidRect && voidRect.style === "#e9edf2"
+        && voidRect.x === 0 && voidRect.y === 0
+        && voidRect.w === bg.cssW && voidRect.h === bg.cssH,
+        "the void rect is " + JSON.stringify(voidRect)
+        + " (cache " + bg.cssW + "x" + bg.cssH + ")");
+
     const strokesBefore = bgRecord.strokes.length;
     const blitsBefore = record.blits.length;
     const fillsBefore = record.fills.length;
@@ -1807,6 +1822,21 @@ function runScenarioBackgroundCache(mapFile) {
     check(results, "a zoom re-rasters the cache",
         bgRecord.strokes.length > strokesBefore,
         (bgRecord.strokes.length - strokesBefore) + " new strokes");
+
+    // The map bg toggle re-renders the cache too (the layer flag is
+    // in the key): the re-raster opens with the void base again - the
+    // no-tiles view stays a calm opaque backdrop, never the stale
+    // frame remnants (issue #53).
+    const rectsBefore = bgRecord.rects.length;
+    elements.get("show-map").checked = false;
+    MapView.draw();
+    const voidAfterToggle = bgRecord.rects[rectsBefore];
+    check(results, "the bg toggle re-renders the void base",
+        !!voidAfterToggle && voidAfterToggle.style === "#e9edf2"
+        && voidAfterToggle.w === bg.cssW && voidAfterToggle.h === bg.cssH,
+        "the re-render rect is " + JSON.stringify(voidAfterToggle));
+    elements.get("show-map").checked = true;
+    MapView.draw();
 
     return results;
 }

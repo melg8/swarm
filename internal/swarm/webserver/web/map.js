@@ -339,6 +339,7 @@ const MapView = {
     const style = getComputedStyle(document.documentElement);
     const read = (name) => style.getPropertyValue(name).trim();
     this.colors = {
+      void: read("--bg-map"),
       grid: read("--grid"),
       gridText: read("--grid-text"),
       text: read("--text"),
@@ -1466,6 +1467,16 @@ const MapView = {
     const ctx = bg.ctx;
     ctx.setTransform(cd, 0, 0, cd, 0, 0);
     ctx.clearRect(0, 0, cssW, cssH);
+    // The void base under the static layers (issue #53): the tiles
+    // never cover the whole world - the map bg toggle skips them, a
+    // scroll past the tile pack leaves them out, the pyramid holes
+    // show through. The cache raster must answer OPAQUE or every
+    // transparent hole the blit composites over the frame keeps the
+    // PREVIOUS frame's pixels visible - the glitchy smear of the
+    // missing background. --bg-map is the calm canvas void of the
+    // active theme.
+    ctx.fillStyle = this.colors.void || "#e9edf2";
+    ctx.fillRect(0, 0, cssW, cssH);
     const keepView = this.view;
     const keepX = this.camX;
     const keepY = this.camY;
