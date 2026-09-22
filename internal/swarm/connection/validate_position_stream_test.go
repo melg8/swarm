@@ -283,6 +283,9 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
 
     // The walking character: the tracker placement keeps stepping
     // while the session runs, the way the server echoes of a walk do.
+    // The walk caps at 800 units (the report envelope the assertions
+    // below pin) and then holds, so a longer session window changes
+    // how long the placement sits at the walk end, not the envelope.
     stopNudger := make(chan struct{})
     go func() {
         step := int32(0)
@@ -293,7 +296,9 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
             case <-stopNudger:
                 return
             case <-ticker.C:
-                step++
+                if step < 8 {
+                    step++
+                }
                 tracker.ApplyPlacement(state.Placement{
                     ObjectID: 100,
                     X:        45768 - step*100,
@@ -305,7 +310,13 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
     }()
     defer close(stopNudger)
 
-    ctx, cancel := context.WithTimeout(context.Background(), 2600*time.Millisecond)
+    // The window covers the handshake (the char-create drain alone
+    // waits up to charCreateOkWait) plus at least two fires of the
+    // one second validation ticker: under -race on a loaded CI
+    // runner the 2600 ms window starved the ticker (0-1 fires where
+    // 2 are asserted, issue #38) - five seconds leaves the ticker
+    // its margin without weakening the assertion.
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
     defer cancel()
     require.NoError(t, client.Run(ctx, "unittest1"))
 
@@ -315,7 +326,7 @@ func TestGameClientRunStreamsThePositionValidation(t *testing.T) {
     // stream that never reports fails for its own reason, not by
     // hanging the suite.
     reports := 0
-    pollDeadline := time.Now().Add(3 * time.Second)
+    pollDeadline := time.Now().Add(5 * time.Second)
     for time.Now().Before(pollDeadline) {
         select {
         case payload := <-validations:
