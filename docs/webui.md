@@ -1172,6 +1172,35 @@ no bundler, no network dependency; every dynamic text lands through
   take `?window=<seconds>` (the default day, 0 walks everything
   collected).
 
+## Build identity and the auto reload of the stale page (issue #48)
+
+The web UI lives inside the binary (`go:embed`), so a deployment that
+brings a new backend also brings a new interface - but a tab opened
+BEFORE the deployment keeps running the old assets over the new
+endpoints until the user notices and hard reloads. The build identity
+plumbing closes that gap:
+
+- The server hashes the embedded web content at startup (the hex
+  sha256 over the sorted file paths and bytes, `webBuildID`) - no
+  git, no ldflags, the embed itself is the source of truth, the id
+  changes exactly when the served UI changes.
+- The served index page carries the id in a
+  `<meta name="swarm-build">` tag the server injects (and answers
+  with `Cache-Control: no-cache`, so a reload always picks the
+  binary's own page); `/api/bots` names the id of the RUNNING binary
+  in the `X-Swarm-Build` response header.
+- The page compares its meta against the header on every two second
+  bot poll: a mismatch reloads the tab once (`location.reload`), and
+  a sessionStorage guard (`swarm.buildReload`) stops a reload loop if
+  the reload somehow lands on a page that still disagrees with the
+  server.
+- The scripts and style sheets answer `no-cache` too: the embedded
+  files carry no validator (a zero modtime), so a heuristic browser
+  cache could otherwise keep the old asset after the reload and the
+  page would still run stale code. The map tiles, the icons and the
+  meshes keep their default caching - they are content named and
+  caching them is what keeps the map fast.
+
 ## Snapshot encoding and the state tracker internals
 
 - Dump state diagnostics: the snapshot ends with a `diagnostics`

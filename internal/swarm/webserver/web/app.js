@@ -16,8 +16,56 @@ const App = {
   // The client proxy state (null when the process runs without -proxy):
   // the bot a connecting C1 game client attaches to is the selected
   // bot, and clicking a bot row in the sidebar switches it.
-  proxy: null
+  proxy: null,
+  // The build id of the page (the server injects it into index.html,
+  // issue #48): the /api/bots poll compares it against the header of
+  // the RUNNING binary and reloads the page on a mismatch, so a tab
+  // that outlived a deployment never drives the map with stale code.
+  buildId: null
 };
+
+// initBuildWatch reads the injected build meta of the page and clears
+// the reload guard the previous version left behind (the guard stores
+// the build a reload was triggered FOR - once the page actually runs
+// it, the guard must step aside for future deployments).
+function initBuildWatch() {
+  const meta = document.querySelector('meta[name="swarm-build"]');
+  App.buildId = (meta && meta.content) || null;
+  try {
+    const guarded = window.sessionStorage.getItem("swarm.buildReload");
+    if (guarded && guarded === App.buildId) {
+      window.sessionStorage.removeItem("swarm.buildReload");
+    }
+  } catch (err) {
+    // The storage can be unavailable (private mode) - the reload
+    // check degrades to "no loop guard, reload anyway" below.
+  }
+}
+
+// checkBuild compares the X-Swarm-Build header of a poll against the
+// build the page was served with: a mismatch means the binary moved
+// on and the tab runs the old assets - reload into the new version.
+// The sessionStorage guard stops a reload loop: the flag stores the
+// build a reload was already triggered for, so a stale page that
+// somehow survives its own reload reloads no more. Returns true when
+// a reload was triggered (the caller drops the poll result).
+function checkBuild(response) {
+  if (!App.buildId) { return false; }
+  const build = response.headers.get("X-Swarm-Build");
+  if (!build || build === App.buildId) { return false; }
+  try {
+    if (window.sessionStorage.getItem("swarm.buildReload") === build) {
+      return true;
+    }
+    window.sessionStorage.setItem("swarm.buildReload", build);
+  } catch (err) {
+    // No storage: reload without a guard (a loop is impossible while
+    // the page can read the new meta on the next load).
+  }
+  window.location.reload();
+
+  return true;
+}
 
 // Class and race names of the known C1 ids.
 const CLASS_NAMES = {
@@ -114,6 +162,10 @@ function initTheme() {
 async function refreshBots() {
   try {
     const response = await fetch("/api/bots");
+    // The stale page check (issue #48): the server names its build in
+    // the X-Swarm-Build header, a mismatch reloads the tab into the
+    // new version.
+    if (checkBuild(response)) { return; }
     App.bots = await response.json();
   } catch (err) {
     return;
