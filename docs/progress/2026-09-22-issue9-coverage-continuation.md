@@ -1,4 +1,4 @@
-# The coverage reporting continuation - four rounds: the merge refresh, the top-up, the journal and the smoke pass (status: in review)
+# The coverage reporting continuation - five rounds: the merge refresh, the top-up, the journal, the smoke pass and the botlog decoders (status: in review)
 
 Started 2026-09-22, branch feature/coverage-reporting, issue #9.
 
