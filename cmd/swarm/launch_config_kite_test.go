@@ -47,8 +47,8 @@ func TestLaunchConfigLoadsTheKiteSection(t *testing.T) {
 
     params := plan[0].Kite.toParams()
     require.True(t, params.Enabled)
-    require.Equal(t, 300.0, params.RetreatRadius)
-    require.Equal(t, 450.0, params.Step)
+    require.InDelta(t, 300.0, params.RetreatRadius, 0.001)
+    require.InDelta(t, 450.0, params.Step, 0.001)
     require.Equal(t, 4*time.Second, params.StepPeriod)
     require.Equal(t, 500*time.Millisecond, params.ReengageDelay)
 }
@@ -66,9 +66,9 @@ func TestLaunchConfigKiteSectionUnsetFieldsKeepTheDefaults(t *testing.T) {
     lc, err := loadLaunchConfig(path)
     require.NoError(t, err)
     params := lc.expand()[0].Kite.toParams()
-    require.Equal(t, 350.0, params.RetreatRadius,
+    require.InDelta(t, 350.0, params.RetreatRadius, 0.001,
         "the named knob overrides")
-    require.Equal(t, hunt.DefaultKiteParams().Step, params.Step,
+    require.InDelta(t, hunt.DefaultKiteParams().Step, params.Step, 0.001,
         "the omitted step keeps the shipped value")
     require.Equal(t, hunt.DefaultKiteParams().StepPeriod, params.StepPeriod,
         "the omitted period keeps the shipped value")
@@ -115,8 +115,8 @@ func TestLaunchConfigBaselineProfileDisablesTheKite(t *testing.T) {
     params := lc.expand()[0].Kite.toParams()
     require.False(t, params.Enabled,
         "the baseline profile runs the standing archer")
-    require.Equal(t, hunt.DefaultKiteParams().RetreatRadius,
-        params.RetreatRadius,
+    require.InDelta(t, hunt.DefaultKiteParams().RetreatRadius,
+        params.RetreatRadius, 0.001,
         "the numbers stay at the shipped values")
 }
 

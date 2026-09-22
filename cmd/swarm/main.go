@@ -229,6 +229,7 @@ func parseFlags() config {
         configPath:       "",
         botPlans:         nil,
         botType:          "",
+        kite:             nil,
         acceptanceRun:    "",
         sessionDir:       "",
         acceptanceLogDir: "",

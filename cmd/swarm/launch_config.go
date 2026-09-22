@@ -164,8 +164,8 @@ func defaultLaunchConfig() launchConfig {
         ProxyLog:   defaultProxyLogPath,
         SessionDir: "logs",
         Bots: []botSpec{
-            {Type: botTypeFighter, Count: 3},
-            {Type: botTypeArcher, Count: 3},
+            {Type: botTypeFighter, Count: 3, Kite: nil},
+            {Type: botTypeArcher, Count: 3, Kite: nil},
         },
     }
 }
@@ -421,6 +421,7 @@ func classicFleetPlan(base string, count int) []botPlan {
         plans = append(plans, botPlan{
             Type:    botTypeFighter,
             Account: fleetAccountName(base, i),
+            Kite:    nil,
         })
     }
 

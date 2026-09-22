@@ -87,7 +87,7 @@ func TestKiteParamsBrokenNumbersFallBackToTheShippedTuning(t *testing.T) {
         "the zero numbers must not disable the fight")
     require.Equal(t, int32(44600), game.walks[0][0],
         "the zero step length falls back to the shipped kiteStep")
-    require.Equal(t, kiteRetreatRadius, loop.kite.RetreatRadius,
+    require.InDelta(t, kiteRetreatRadius, loop.kite.RetreatRadius, 0.001,
         "the zero radius falls back to the shipped trigger")
     require.Equal(t, kiteStepPeriod, loop.kite.StepPeriod,
         "the zero period falls back to the shipped pacing")
