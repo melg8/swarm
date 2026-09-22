@@ -1,4 +1,4 @@
-# The coverage reporting continuation - the merge refresh and the top-up rounds (status: in review)
+# The coverage reporting continuation - the merge refresh, the top-up and the journal rounds (status: in review)
 
 Started 2026-09-22, branch feature/coverage-reporting, issue #9.
 
@@ -106,3 +106,17 @@ in the issue comment.
 
 The journal round is on the branch; next: push, the CI verdict,
 the issue comment and the board move.
+
+### 2026-09-22 10:00 UTC - round three closes
+- dc75e52: CI verify, coverage, acceptance-list all success;
+  PR #24 mergeable clean.
+- The issue comment carries the round report (connection 86.2, no
+  0% functions left); the card sits in Ready for review, the claims
+  are clean.
+
+## Status (round three, final)
+
+In review: PR #24 head dc75e52. The connection package is at 86.2
+with every dispatch path, sender and observer under test. The
+remaining #9 candidates: the live-stack packages (a design round),
+the cmd/swarm wiring, the probe tool smoke pass.
