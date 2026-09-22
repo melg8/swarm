@@ -1,4 +1,4 @@
-# The CI time budget round - the seven minute contract (status: in progress)
+# The CI time budget round - the seven minute contract (status: in review)
 
 Started 2026-09-22, branch feature/ci-time-budget, issue #40.
 
@@ -48,3 +48,19 @@ keep running. Splitting work across more runners is allowed.
 Branch work complete, all local gates green; next: push, the PR,
 and the PR's own CI run is the acceptance measurement (it must
 finish inside the 7 minute budget).
+
+### 2026-09-22 09:35 UTC - the acceptance runs
+- First cut (21d9a01, run 35709319245): 353 s, all green - but one
+  navbuild shard carried the heavy region-replay tests (348 s job)
+  and left only ~1 min of margin.
+- The refinement (f77bef9, run 35710067754): the third navbuild
+  shard and the exact shard-count log lines. **286 s wall (4 min
+  46 s), all 11 checks green** - the contract holds with two
+  minutes of margin. Shard evidence in the logs: 29+29+28 = 86 of
+  86 pathfind, 9+9+9 = 27 of 27 navbuild.
+- The issue comment carries the full report; PR #41 mergeable
+  clean. The round closes at in review.
+
+## Status (final)
+
+In review: PR #41 head f77bef9, wall 4 min 46 s, every gate green.
