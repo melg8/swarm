@@ -498,3 +498,125 @@ Open for the next round, ranked:
   different fail sets on the same code) argues for a repeated-round
   median-of-medians verdict in the audit before any single-round
   FAIL names a behavior unimplemented.
+
+## 2026-09-23, the round-14/15 always-run redesign (the owner
+## escalation: "the archer still does not run, eats damage, the
+## solution is location-tied, the fleet dress is super slow")
+
+The round started from the owner's four named failures and answered
+each; 88eebef6 (the redesign), d453419c (the pins), 2d93da71 (the
+live verdict fixes) all landed BEFORE the live rounds.
+
+- THE ALWAYS-RUN RULE (88eebef6): every "stand and fight it out"
+  fallback is GONE - the proximity streak limit (8), the pursuit
+  stall (2) and streak (12) stops now only NAME the unwinnable race
+  in the log (the once-per-crossing diagnostics) while the retreat
+  keeps running. The cornered pocket gained the SHOVE tier
+  (kiteShoveResolve): the gap ray itself (+-15/+-30 edges) at a 25
+  degree flank bound and a shorter 250 unit step - the seam the
+  breakout cone refuses by design.
+- THE LOCATION-GENERAL LEASH (88eebef6): the retreat leash and the
+  curve turn side read the FIGHT ANCHOR (the live self position at
+  the fight's first retreat resolution, kiteFightX/Y) instead of
+  the hunting-square registry - the zone.Contains read is gone, the
+  kite works on any map with or without a zone registry, the
+  elven/dion tables own the target economy alone. kiteRoamRadius
+  (1350) fences the drift around the anchor.
+- THE MOTION LEDGER (88eebef6, kite_ledger.go): every fight books
+  moving/windup/hold/idle seconds and prints the summary line with
+  the moving share and the health cost at the fight end - the
+  feedback the owner asked for, in the live log.
+- THE EQUIP DEFERRAL GUARD (88eebef6): the Mobius UseItem handler
+  DEFERS an equip landing inside the attack window to the attack
+  end (~1.5 s windup / ~3 s cycle); the old 600 ms same-item
+  re-send expiry re-sent INTO the deferral and the second packet
+  TOGGLED the piece back off (the equip/unequip war = the "super
+  slow" dress; a stuck quiver leaves the bow unable to shoot). The
+  same-item guard now outlives the deferral (4 s) and the burst
+  serializes one equip per tick (the PacketExecutor has no
+  same-client ordering - same-tick jewel pairs raced the paperdoll
+  placement read). The round-14 log measured the fix: the whole kit
+  lands in ~2.5 s, plan order, no toggles.
+- THE FLEET CROWD FIX (88eebef6): SetCellPin locks a hunt to one
+  named cell - each fleet slot farms its OWN ground (the rounds
+  12/13 crowd measured three bots converging onto the shared ripe
+  cells). The fleet audit gained the ALWAYS-RUN verdict
+  (checkFleetRuns): the avoidable standing share of the fight
+  samples (standing outside the 1.65 s windup window), ceiling 35
+  percent.
+- THE RANGED-DUEL STRAFE (2d93da71): the round-14 ledger measured a
+  49 s fight with 2.3 s of moving - a Kaboo SHOOTER held 474 units
+  (beyond the 450 pursue band) and traded arrows while the archer
+  stood 21 s of idle; the melee adds closed on the stationary
+  target. A LIVE ATTACKER beyond the band now keeps the rhythm
+  (kiteThreatBeyondThePursue) - the strafe rides the curving
+  retreat, capped at the train scan range.
+- THE PASS-THROUGH TIER (2d93da71): the round-14 surround holds
+  (the 3+ mob pack at 29-80 units) had NO ray inside the 25 degree
+  bound; the least-crowded terrain-passable ray now carries the
+  shove anyway - a glance blow on the way out beats the whole
+  pack's swings for as long as the fight stands. Only a pocket
+  walled on every side keeps the hold.
+
+The round-14 live verdict (runs/fleet-2026-09-23/round14.log): 21
+of 30 behaviors (the best round yet; round 13 measured 14 of 25).
+always-run 4/5, early-retreat 4/5, quick-reshot 4/5, curved 4/5,
+shoots 4/5; the fails: max-range 1/5 (the melee-collapse medians
+57-179 on the pack cells), temp20 a spent window (0 shots, the
+death-restart cycle on the shooter cell).
+
+The round-15 live verdict (runs/fleet-2026-09-23/round15.log,
+after 2d93da71): 22 of 30 - always-run 5/5 (THE OWNER'S HEADLINE
+ASK, first round ever), max-range 2/5 with the fixed cells at
+458/466 medians (was 1291/57), temp20 now fights (34 shots), the
+pass-through and the strafe both visible in the log. The remaining
+fails: temp21 a spent window (the starter death-restart cycle on
+the surround cell - a survivability question, not a kite behavior),
+temp23/24 max-range (134/141 medians) and temp23 quick-reshot.
+
+### The measured mechanism the next round owns (the P0)
+
+THE RACE-EQUIILIBRIUM: the walk window equals the shot cycle (the
+C1 disable ~2.97 s), so the walk ends exactly when the server's
+auto re-shot is ready - the character stops at the 400-unit
+endpoint, the auto-shot fires within ~400 ms, and the rhythm
+re-shoots at ~141 units EVERY CYCLE (temp24: 43 shots, 400 ms
+walk-end gaps, the median stuck at 141). Each cycle nets ~-20
+units: the 1.65 s windup standstill hands the chaser ~180 units
+back while the 1.3 s walk tail buys ~160. The pursuit continuation
+chain DOES break the equilibrium when the attack stance drops
+during the walk (temp23: 12.1 s walk-end-to-shot gaps - the honest
+race to the 480 floor), but the chain loses the race whenever the
+stance survives to the endpoint.
+
+THE FIX, DESIGNED AND DEFERRED (the round-15 attempt taught the
+shape): extending the walk WINDOW alone changes nothing - the walk
+ends at its ENDPOINT regardless, and the character stops there.
+The race needs a LEASH-AWARE RACE-LENGTH ENDPOINT: when the threat
+holds under kiteReshotFloor at the issue moment, the step length
+becomes min(kiteStep + (floor - dist) * raceFactor, raceStepMax,
+the remaining anchor-leash budget) - ONE long continuous walk (the
+moving character displaces the auto-shot the whole way) with the
+window scaled to the step (step/kiteStep x the walk window,
+kiteIssueWalk seam) and the re-click ladder keeping it alive
+through the silent drops. raceFactor ~6-8 approximates the elven
+parity margin (a 110 chaser on a 125 runner nets ~15/s - the raw
+opening must buy the chase back). The unit-scene cost: every
+endpoint-pinning test under the floor (mob at 200-260) sees the
+race length - budget the test rewrites before the code.
+
+The quick-reshot verdict ALSO needs the race re-scoping: the 1.5 s
+walk-end-to-shot gap ceiling reads the honest race (12 s of walking
+to the floor) as a fail - the metric should read "the re-shot
+lands at the max distance" (the post-walk distance >= the fight
+dist floor), the gap alone was the walk-ends-near-the-floor era's
+proxy.
+
+The round-15 erratum: the temp21 spent window is the STARTER DEATH
+CYCLE (the level 7 kit dies on the shooter/surround cells mid-dress
+or mid-duel, the village restart eats the window) - the fleet
+scenario's entry latch tolerates it by design (the evidence floors
+name it "no evidence"), but TWO consecutive rounds lost the same
+slot to it. The next round should either raise the fleet kit (the
+death is a survivability fact, not a kite fact) or drop a
+healing-potion cadence into the acceptance reset.

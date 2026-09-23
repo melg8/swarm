@@ -57,6 +57,14 @@ the documentation map below) and is read on demand, not upfront.
   sandbox; treat the limits as a hard owner directive, not a
   hypothesis (the registry below collects server facts, this is an
   operational rule).
+- The sandbox root filesystem is ~10 GB and fills silently: the Go
+  build cache alone grows past 4 GB across a session's verify loops
+  (plus playwright/puppeteer caches at ~2 GB). A full disk fails
+  every `go build` with "no space left on device" under `/tmp`.
+  When it happens: `rm -rf ~/.cache/go-build ~/.cache/ms-playwright
+  ~/.cache/puppeteer /tmp/go-build*` frees ~6 GB instantly; nothing
+  in the repo or the deployed stack depends on those caches
+  (measured 2026-09-23, the round-14 session).
 
 ## Long running subprocesses in the agent sandbox
 
