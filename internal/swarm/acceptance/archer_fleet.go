@@ -153,14 +153,33 @@ func archerFleetTimeout() time.Duration {
         archerFleetShutdownGrace
 }
 
+// The fleet vitals (measured on the live stack): the server
+// recomputes the level 7 elven fighter maxima at login (the class
+// formula answers 214 HP / 82 MP whatever the reset row says), and a
+// curHp below that lands as a WOUNDED start - the fleet round of
+// 2026-09-23 measured the cost (a slot entering at 167 of 214 spent
+// the window on potions, an emergency logout and a 60 second sit:
+// every kite check of the slot read as not passing with zero
+// evidence). The audit measures the five kite behaviors, not
+// wounded survival - the slots wake at the full server-computed
+// vitals so every check reads real behavior.
+const (
+    fleetLevel7MaxHP = 214
+    fleetLevel7MaxMP = 82
+)
+
 // archerFleetReset returns the start state of one fleet slot: the
-// proven archer kit of the archer scenario woken on the slot focus.
+// proven archer kit of the archer scenario woken on the slot focus
+// at the full level 7 vitals (the single-bot archer scenario keeps
+// its own gain-table start).
 func archerFleetReset(slot archerFleetSlotDesc, z int32,
 ) characterReset {
     reset := archerKiteReset(slot.Account)
     reset.X = slot.X
     reset.Y = slot.Y
     reset.Z = z
+    reset.MaxHP = fleetLevel7MaxHP
+    reset.MaxMP = fleetLevel7MaxMP
 
     return reset
 }

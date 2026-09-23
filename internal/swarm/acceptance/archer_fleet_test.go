@@ -58,6 +58,25 @@ func TestArcherFleetReset(t *testing.T) {
     require.NotEmpty(t, reset.Items)
 }
 
+// TestArcherFleetResetWakesAtFullVitals pins the wounded-start fix:
+// the fleet slots wake at the full server-computed level 7 vitals -
+// the round of 2026-09-23 measured a slot entering at 167 of 214 HP
+// (the gain-table start the server maxima outrank) spending the
+// window on potions, an emergency logout and a 60 second sit, every
+// kite check reading as not passing with zero evidence. The
+// single-bot archer scenario keeps its own gain-table start.
+func TestArcherFleetResetWakesAtFullVitals(t *testing.T) {
+    reset := archerFleetReset(archerFleetSlots[0], -3456)
+    require.Equal(t, int32(fleetLevel7MaxHP), reset.MaxHP,
+        "the fleet slots wake at the full server-computed HP")
+    require.Equal(t, int32(fleetLevel7MaxMP), reset.MaxMP,
+        "the fleet slots wake at the full server-computed MP")
+
+    single := archerKiteReset("probe")
+    require.Equal(t, int32(archerKiteStartHP), single.MaxHP,
+        "the single-bot archer scenario keeps its gain-table start")
+}
+
 // TestFleetSpawnZFallback pins the oracle fallback: a nil engine and
 // an out-of-band answer both fall back to the proven archer height.
 func TestFleetSpawnZFallback(t *testing.T) {
