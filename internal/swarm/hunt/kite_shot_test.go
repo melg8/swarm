@@ -19,6 +19,7 @@ package hunt
 import (
     "bytes"
     "log"
+    "math"
     "testing"
     "time"
 
@@ -267,8 +268,13 @@ func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
 func TestKiteShotPacedCorneredHoldsGround(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     nav := &fakeNavigator{}
+    // The sealed pocket: the away hemisphere walled, and the
+    // wall-face wedges past the hemisphere edge (the lone-chaser
+    // escape rays of the round-12 ladder) walled too - only the
+    // narrow eastern corridor of the fight line stays clear.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X > 45000, nil
+        return to.X > 45000 &&
+            math.Abs(float64(to.Y)-50000) < 100, nil
     }
     loop.SetNavigator(nav)
     loop.tick()

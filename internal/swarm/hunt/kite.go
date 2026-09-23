@@ -1847,26 +1847,31 @@ func (l *Loop) kiteLaneResolve(
 // opposite cone uncovered) - ordered by the escape preference: the
 // 135 degree weaves off the gap ray first, the straight anti-gap
 // ray last (it points into the train's middle, the clearance gate
-// usually refuses it). A train of one (or a tracker gap) names no
-// gap geometry: the cornered hold owns the cycle, exactly as
-// before. Reports the endpoint, the refusal reason (empty on
-// success) and whether a breakout lane exists.
+// usually refuses it). A train of one no longer dies on the missing
+// seam: the LONE-CHASER ladder (see the inline block) probes the
+// wall-face wedges past the hemisphere edge instead - the escape
+// past the chaser's flanks. No bearing at all (a tracker gap)
+// names no geometry: the cornered hold owns the cycle. Reports the
+// endpoint, the refusal reason (empty on success) and whether a
+// breakout lane exists.
 //
-// Bounds (the round-11 QA audit): the ladder is three DISCRETE rays,
-// not a cone sweep - the wedges between the hemisphere edge (~93
-// degrees off the away-ray) and the 135 degree weaves stay unswept,
-// so a pocket whose only lane sits at ~110 degrees refuses as
-// "walled" (the sweep density is a live-tuning knob, not a
-// correctness claim). The flank clearance is ANGULAR-only and
-// distance-blind: a chaser 700 units off on a candidate's bearing
-// vetoes it exactly like one at melee (kiteBreakoutFlankCos knows no
-// radius), and a deflection that bends the resolved lane inside the
-// flank bound reads as "walled" in the refusal reason even when the
-// pre-deflection ray cleared. The live rounds of the walled-pocket
-// session measured the observed pockets as LONE-CHASER terrain
-// corners anyway - this ladder (two bearings minimum) never ran
-// there, and its bounds stay unexercised until a real encircled
-// pocket appears.
+// Bounds (the round-11 QA audit): the ladders are DISCRETE ray
+// sets, not cone sweeps - the anti-gap ladder leaves the wedges
+// between the hemisphere edge (~93 degrees off the away-ray) and
+// its 135 degree weaves unswept, and the lone-chaser ladder steps
+// the same band at 105/120/135 (a pocket whose only lane sits at
+// ~110 degrees still slips between the rungs - the sweep density
+// is a live-tuning knob, not a correctness claim). The flank
+// clearance is ANGULAR-only and distance-blind: a chaser 700 units
+// off on a candidate's bearing vetoes it exactly like one at melee
+// (kiteBreakoutFlankCos knows no radius), and a deflection that
+// bends the resolved lane inside the flank bound reads as "walled"
+// in the refusal reason even when the pre-deflection ray cleared.
+// The live rounds of the walled-pocket session measured the
+// observed pockets as LONE-CHASER terrain corners: the anti-gap
+// ladder (two bearings minimum) never ran there, and the
+// lone-chaser ladder is the round-12 answer to exactly that
+// finding - its live verdict owns the next fleet round.
 func (l *Loop) kiteBreakoutResolve(
     selfX, selfY, selfZ int32, dead [][2]int32,
 ) (int32, int32, string, bool) {
@@ -1874,61 +1879,73 @@ func (l *Loop) kiteBreakoutResolve(
         selfX, selfY, selfZ, l.kiteBearings[:0])
     gapX, gapY, gap := kiteGapDirection(bearings)
     if !gap {
-        // A single chaser (or a tracker gap inside the broadcast
-        // window): no second hemisphere exists - the cornered hold
-        // owns the cycle.
-        return 0, 0, "no gap geometry (the lone chaser owns the " +
-            "corner)", false
+        if len(bearings) != 1 {
+            // No chaser bearing at all (the tracker gap inside the
+            // broadcast window): no cone exists to probe - the
+            // cornered hold owns the cycle.
+            return 0, 0, "no gap geometry (the tracker owns no " +
+                "bearing)", false
+        }
+        // THE LONE-CHASER TERRAIN CORNER (the round-11/12 live
+        // diagnostics named every observed pocket this): the
+        // hemisphere sweep died on the pocket walls, and no seam
+        // cone exists - a lone chaser has no seams to thread. The
+        // escape lives PAST the hemisphere edge, in the wall-face
+        // wedges the fan never sweeps (its 90 degree reach stops
+        // where these candidates start): the away ray rotated 105,
+        // 120 and 135 degrees on each side, the least fold first.
+        // The chaser entered through the pocket mouth, so the
+        // candidates run past its flanks - the same flank
+        // clearance the anti-gap ladder holds (every resolved lane
+        // keeps more than ~36 degrees off the chaser's own
+        // bearing), the same terrain battery (the deflection, the
+        // leash, the geodata wall, the water), the same dead-cell
+        // skip. The half-plane guard the normal fan answers to
+        // stays bypassed exactly as the anti-gap ladder bypasses
+        // it: the fold toward the chaser's flank IS the escape, the
+        // clearance keeps it off the melee; the pursuit ledger's
+        // stall gate owns the race the slower fold runs.
+        awayX := -math.Cos(bearings[0])
+        awayY := -math.Sin(bearings[0])
+        crowded, walled := 0, 0
+        for _, off := range [6]float64{
+            7 * math.Pi / 12, -7 * math.Pi / 12, // the 105s
+            2 * math.Pi / 3, -2 * math.Pi / 3, // the 120s
+            3 * math.Pi / 4, -3 * math.Pi / 4, // the 135s
+        } {
+            rayX, rayY := rotatePlanar(awayX, awayY, off)
+            laneX, laneY, status := l.kiteBreakoutCandidate(
+                selfX, selfY, selfZ, rayX, rayY, dead, bearings)
+            switch status {
+            case kiteBreakoutOpen:
+                return laneX, laneY, "", true
+            case kiteBreakoutCrowded:
+                crowded++
+            default:
+                walled++
+            }
+        }
+        reason := fmt.Sprintf("the lone-chaser cone refused (%d of "+
+            "%d rays crowded by the flanks, %d walled or dead)",
+            crowded, crowded+walled, walled)
+
+        return 0, 0, reason, false
     }
     crowded, walled := 0, 0
     for _, off := range [3]float64{
         3 * math.Pi / 4, -3 * math.Pi / 4, math.Pi,
     } {
         rayX, rayY := rotatePlanar(gapX, gapY, off)
-        if !kiteRayClearsTheFlanks(rayX, rayY, bearings) {
-            // The candidate runs onto a chaser's own ray: the melee
-            // the kite exists to avoid, refused before the terrain
-            // battery pays a raycast on it.
+        laneX, laneY, status := l.kiteBreakoutCandidate(
+            selfX, selfY, selfZ, rayX, rayY, dead, bearings)
+        switch status {
+        case kiteBreakoutOpen:
+            return laneX, laneY, "", true
+        case kiteBreakoutCrowded:
             crowded++
-            continue
-        }
-        endX := selfX + int32(math.Round(rayX*l.kite.Step))
-        endY := selfY + int32(math.Round(rayY*l.kite.Step))
-        laneX, laneY, ok := l.kiteTerrainLane(
-            selfX, selfY, selfZ, endX, endY)
-        if ok {
-            laneLen := math.Hypot(
-                float64(laneX-selfX), float64(laneY-selfY))
-            if laneLen < 1 || !kiteRayClearsTheFlanks(
-                float64(laneX-selfX)/laneLen,
-                float64(laneY-selfY)/laneLen, bearings) {
-                // The camp deflection bent the resolved lane onto a
-                // chaser's ray: the endpoint the walk would take
-                // fails the same clearance the candidate passed.
-                ok = false
-            }
-        }
-        if !ok {
+        default:
             walled++
-            continue
         }
-        refused := false
-        for _, cell := range dead {
-            if laneX == cell[0] && laneY == cell[1] {
-                refused = true
-
-                break
-            }
-        }
-        if refused {
-            // A cell the rotation already named dead (the server
-            // refused it or it stayed silent through the probe) -
-            // the next candidate serves the breakout instead.
-            walled++
-            continue
-        }
-
-        return laneX, laneY, "", true
     }
     // Every candidate of the anti-gap ladder refused: the reason
     // names the split so the next live round reads the pocket's
@@ -1940,6 +1957,66 @@ func (l *Loop) kiteBreakoutResolve(
         crowded, crowded+walled, walled)
 
     return 0, 0, reason, false
+}
+
+// The candidate verdicts of the breakout ladders: the lane stands
+// open, a chaser bearing crowds it, or the terrain battery (or the
+// dead-cell memory) walled it.
+const (
+    kiteBreakoutOpen = iota
+    kiteBreakoutCrowded
+    kiteBreakoutWalled
+)
+
+// kiteBreakoutCandidate evaluates one breakout ray under the
+// strict contract both ladders share: the flank clearance off every
+// chaser bearing (the raw candidate first, then the deflected lane
+// the terrain battery may return - the deflection can bend a clear
+// candidate back onto a chaser's ray), the full terrain battery
+// (the camp deflection, the leash, the geodata wall, the water) and
+// the dead-cell memory. The half-plane guard of the normal fan is
+// deliberately absent: the breakout exists to admit lanes the
+// hemisphere sweep forbids by design.
+func (l *Loop) kiteBreakoutCandidate(
+    selfX, selfY, selfZ int32,
+    rayX, rayY float64,
+    dead [][2]int32, bearings []float64,
+) (int32, int32, int) {
+    if !kiteRayClearsTheFlanks(rayX, rayY, bearings) {
+        // The candidate runs onto a chaser's own ray: the melee
+        // the kite exists to avoid, refused before the terrain
+        // battery pays a raycast on it.
+        return 0, 0, kiteBreakoutCrowded
+    }
+    endX := selfX + int32(math.Round(rayX*l.kite.Step))
+    endY := selfY + int32(math.Round(rayY*l.kite.Step))
+    laneX, laneY, ok := l.kiteTerrainLane(
+        selfX, selfY, selfZ, endX, endY)
+    if ok {
+        laneLen := math.Hypot(
+            float64(laneX-selfX), float64(laneY-selfY))
+        if laneLen < 1 || !kiteRayClearsTheFlanks(
+            float64(laneX-selfX)/laneLen,
+            float64(laneY-selfY)/laneLen, bearings) {
+            // The camp deflection bent the resolved lane onto a
+            // chaser's ray: the endpoint the walk would take
+            // fails the same clearance the candidate passed.
+            ok = false
+        }
+    }
+    if !ok {
+        return 0, 0, kiteBreakoutWalled
+    }
+    for _, cell := range dead {
+        if laneX == cell[0] && laneY == cell[1] {
+            // A cell the rotation already named dead (the server
+            // refused it or it stayed silent through the probe) -
+            // the next candidate serves the breakout instead.
+            return 0, 0, kiteBreakoutWalled
+        }
+    }
+
+    return laneX, laneY, kiteBreakoutOpen
 }
 
 // kiteRayClearsTheFlanks answers whether the planar unit ray keeps

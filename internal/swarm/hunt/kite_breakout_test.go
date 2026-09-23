@@ -169,3 +169,73 @@ func TestKiteRotationExhaustedBreaksOut(t *testing.T) {
     require.False(t, loop.kiteWalkUntil.IsZero(),
         "the breakout keeps the ladder alive")
 }
+
+// TestKiteLoneChaserCornerEscapesTheWallFace pins the lone-chaser
+// terrain corner of the round-11/12 live diagnostics (every observed
+// pocket refusal read "the lone chaser owns the corner"): the
+// hemisphere sweep died on the pocket walls, no seam cone exists (a
+// lone chaser has no seams) - the escape probes the wall-face wedges
+// PAST the hemisphere edge, the away ray folded 105, 120 and 135
+// degrees on each side. The pocket mouth sits at the chaser's
+// bearing (it entered through it), so the escape runs the chaser's
+// flanks under the same clearance the anti-gap ladder holds.
+func TestKiteLoneChaserCornerEscapesTheWallFace(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    mobHitsCharacterAt(bot, 7, 45200)
+    nav := &fakeNavigator{}
+    // The pocket: the whole away hemisphere (west through north and
+    // south, the fan's every candidate) answers walled; only the
+    // north wall-face wedge past the hemisphere edge - the away ray
+    // folded -105 degrees - stays open.
+    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
+        return to.X > 45000 && to.Y > 50300, nil
+    }
+    loop.SetNavigator(nav)
+    var logBuf bytes.Buffer
+    loop.SetLogger(log.New(&logBuf, "", 0))
+
+    tickPastTheWindup(loop)
+    require.Len(t, game.walks, 1,
+        "the lone-chaser corner must not hold the archer - the "+
+            "wall-face wedge past the hemisphere edge is the escape")
+    step := game.walks[0]
+    // The first open candidate of the ladder: the away ray (west)
+    // rotated -105 degrees - the northeast wall-face ray.
+    require.Equal(t, [3]int32{45104, 50386, -3500}, step,
+        "the lone-chaser escape takes the first open wall-face ray")
+    // The escape opens the distance to the lone chaser (the slower
+    // lateral fold still runs away from the melee).
+    toTarget := math.Hypot(
+        float64(step[0]-45200), float64(step[1]-50000))
+    require.Greater(t, toTarget, 200.0,
+        "the wall-face escape must open the distance to the chaser")
+    require.True(t, loop.kiteHeldAt.IsZero(),
+        "the escape is a step, not a hold")
+    require.Contains(t, logBuf.String(), "breaking out",
+        "the lone-chaser escape names itself in the event feed")
+}
+
+// TestKiteLoneChaserSealedPocketHolds pins the honest refusal: a
+// sealed pocket (every wall-face ray walled too) names the refusal
+// in the hold diagnostic - the feed must carry the WHY, exactly as
+// the anti-gap cone does, so the next live round reads the pocket's
+// shape straight from the hold line.
+func TestKiteLoneChaserSealedPocketHolds(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    mobHitsCharacterAt(bot, 7, 45200)
+    nav := &fakeNavigator{}
+    nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
+        return false, nil
+    }
+    loop.SetNavigator(nav)
+    var logBuf bytes.Buffer
+    loop.SetLogger(log.New(&logBuf, "", 0))
+
+    tickPastTheWindup(loop)
+    require.Empty(t, game.walks,
+        "a sealed pocket holds the ground - the bow shoots the way out")
+    require.Contains(t, logBuf.String(),
+        "the lone-chaser cone refused (0 of 6 rays crowded by the "+
+            "flanks, 6 walled or dead)",
+        "the sealed-pocket refusal names the cone and the counts")
+}

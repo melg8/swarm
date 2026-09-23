@@ -163,12 +163,16 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
 func TestKiteCorneredHoldKeepsShooting(t *testing.T) {
     _, game, loop := kiteEdgeBot(t)
     nav := &fakeNavigator{}
-    // The whole away hemisphere answers walled (every retreat
-    // candidate endpoint sits at or west of the character); the
-    // target line to the east stays clear (the fight itself is
-    // honest).
+    // The pocket is SEALED: the away hemisphere answers walled (the
+    // retreat candidates sit at or west of the character) and the
+    // wall-face wedges past the hemisphere edge - the lone-chaser
+    // escape rays of the round-12 ladder, 105-135 degrees off the
+    // away ray - sit outside the narrow eastern corridor the fight
+    // line keeps clear (the fight itself is honest, the pocket is
+    // not: the archer boxed itself in behind and to the sides).
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X > 45000, nil
+        return to.X > 45000 &&
+            math.Abs(float64(to.Y)-50000) < 100, nil
     }
     loop.SetNavigator(nav)
     var logBuf bytes.Buffer
