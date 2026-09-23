@@ -172,7 +172,6 @@ type probeRecorder struct {
     selfID  func() int32
     attacks []time.Time
     moves   []time.Time
-    stops   []time.Time
     claims  []time.Time
     fails   []time.Time
 }
@@ -204,10 +203,6 @@ func (r *probeRecorder) recv(payload []byte) {
     case probeOpMove:
         if r.selfID() != 0 && who == r.selfID() {
             r.moves = append(r.moves, now)
-        }
-    case probeOpStopMove:
-        if r.selfID() != 0 && who == r.selfID() {
-            r.stops = append(r.stops, now)
         }
     case probeOpValidate:
         if r.selfID() != 0 && who == r.selfID() {
@@ -786,8 +781,9 @@ func (s *kiteProbeSession) anchorShot(
             }
             time.Sleep(20 * time.Millisecond)
         }
-        // The flood gate needs the second of the pair spaced a full
-        // second apart (the PlayerAction protector).
+        // The attempts ride the PlayerAction flood protector (one
+        // request per second); the answer window already spaces the
+        // pair far past it, the nap covers the tail.
         time.Sleep(200 * time.Millisecond)
     }
 

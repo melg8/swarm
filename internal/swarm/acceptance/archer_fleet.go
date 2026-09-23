@@ -80,7 +80,7 @@ const (
     fleetReshotGapCeil    = 1500 * time.Millisecond
     fleetAnchorLeash      = 1500.0
     fleetMinShots         = 3
-    fleetMinRetreats      = 1
+    fleetMinRetreats      = 2
     fleetMinFightSamples  = 4
     fleetTurnAngle        = 40.0
     fleetMinTurns         = 2
@@ -211,7 +211,6 @@ type fleetWatch struct {
     fightDists  []float64
     maxAnchor   float64
     turns       int
-    minHP       float64
     // fold state
     lastShot     time.Time
     walkStarted  time.Time
@@ -227,19 +226,14 @@ type fleetWatch struct {
 // newFleetWatch arms the fold with the spawn anchor.
 func newFleetWatch(x, y int32) fleetWatch {
     return fleetWatch{
-        anchorX: x, anchorY: y, minHP: 100,
+        anchorX: x, anchorY: y,
     }
 }
 
 // fold latches one sample into the watch (the pure evaluation core).
 func (w fleetWatch) fold(s fleetSample) fleetWatch {
-    if s.hpPct >= 0 && s.hpPct < w.minHP {
-        w.minHP = s.hpPct
-    }
     if !s.shotAt.IsZero() && s.shotAt != w.lastShot {
-        if !w.lastShot.IsZero() {
-            w.shots++
-        }
+        w.shots++
         w.lastShot = s.shotAt
         if !w.walkEndedAt.IsZero() && s.shotAt.After(w.walkEndedAt) {
             gap := s.shotAt.Sub(w.walkEndedAt)
@@ -438,7 +432,7 @@ func archerFleetScenario(ctx context.Context, m *Manager, t *Test) error {
     defer cancelSession()
     bots := launchFleet(sessionCtx, m, test)
 
-    if err := waitFleetOnline(ctx, bots, test); err != nil {
+    if err := waitFleetOnline(ctx, bots); err != nil {
         cancelSession()
         joinFleet(bots)
 
@@ -447,12 +441,15 @@ func archerFleetScenario(ctx context.Context, m *Manager, t *Test) error {
     test.appendLog("fleet: all five archers are online, the audit" +
         " window is running")
 
-    deadline := time.Now().Add(archerFleetDuration())
+    window := archerFleetDuration()
+    deadline := time.Now().Add(window)
+    windowStart := time.Now()
     sampleFleet(ctx, bots, deadline)
+    ran := time.Since(windowStart)
     cancelSession()
     joinFleet(bots)
 
-    return fleetVerdict(test, bots)
+    return fleetVerdict(test, bots, window, ran)
 }
 
 // launchFleet starts the five supervised archer sessions with the
@@ -480,9 +477,7 @@ func launchFleet(
 
 // waitFleetOnline waits until every fleet tracker reports online or
 // the budget lapses.
-func waitFleetOnline(
-    ctx context.Context, bots []*fleetBotRun, test *Test,
-) error {
+func waitFleetOnline(ctx context.Context, bots []*fleetBotRun) error {
     deadline := time.Now().Add(onlineWait)
     for time.Now().Before(deadline) {
         if ctx.Err() != nil {
@@ -573,7 +568,17 @@ func joinFleet(bots []*fleetBotRun) {
 // the scenario answer: the per-bot table lands in the test log, the
 // checks carry the fleet-wide verdicts and the error names the
 // behaviors the fleet does not implement.
-func fleetVerdict(test *Test, bots []*fleetBotRun) error {
+func fleetVerdict(
+    test *Test, bots []*fleetBotRun, window, ran time.Duration,
+) error {
+    if ran < window*9/10 {
+        test.appendLog(fmt.Sprintf("fleet: the audit window truncated"+
+            " - %s of %s, the verdicts ride partial data",
+            ran.Round(time.Second), window.Round(time.Second)))
+
+        return fmt.Errorf("the audit window truncated at %s of %s",
+            ran.Round(time.Second), window.Round(time.Second))
+    }
     counts := map[string]int{}
     for _, bot := range bots {
         verdicts := bot.watch.verdicts()

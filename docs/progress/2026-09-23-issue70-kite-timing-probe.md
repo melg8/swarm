@@ -95,3 +95,36 @@ docs/kite_timing_findings.md.
   findings doc.
 - The cursor-key follow-up round: pin why the adopted claims produced
   no net movement (the deferred intention snap-back hypothesis).
+
+## The critique round (2026-09-23, session 1 end)
+
+The review subagent verdict: the probe half is sound (live-measured,
+defensible); the fleet half is untested live code with known
+weaknesses. Applied in the final pass: the first distinct shot counts
+(off-by-one), the retreat evidence floor rose to 2, the audit window
+truncation now fails loudly instead of issuing a verdict on partial
+data, the dead recorder/watch fields are gone, the findings doc no
+longer claims the fleet lag was observed (it is a prediction until
+the fleet runs live).
+
+Known open gaps for the next session (ranked):
+
+- P0: run `archer-fleet` live and rewrite the findings from its
+  measurements (the scenario, the folds and the thresholds are
+  unvalidated against the real five-bot behavior).
+- P1: the fleet fold attributes EVERY walk to the retreat medians
+  (loot pickups and approach walks pollute); gate the lags on walks
+  that move away from the fight target.
+- P1: the turn heuristic counts any 40 degree direction change (the
+  approach/loot turns rack up); count turns only during
+  retreat-flagged walks.
+- P1: the WASD round measured net gain only - log the per-claim self
+  positions to separate "never moved" from "moved and snapped back",
+  and stream past the disable end (the reload tail the task also
+  asked about).
+- P1: the ladder wants a 2800 ms rung (the 2.97 s re-shot boundary)
+  and repeated boundary rungs.
+- P1: the probe passes with red checks by design (the measured
+  values are data, not contracts) - the semantics deserve a cleaner
+  pass/fail split.
+- P2: the gofmt field alignment of the new files (run task fmt).

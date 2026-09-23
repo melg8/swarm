@@ -70,8 +70,11 @@ Attack broadcast (t=0). The server defers that click to 2.97 s, and
 the re-attack request (gated by `combatAvoidUntil`, sized to the full
 `kiteWalkWindow` = 2.97 s) fires at the same moment - the walk starts
 only to be cancelled by the next attack. The bot spends the whole
-reload standing still: the observed fleet retreat lag (the
-`archer-fleet` audit measures it) rides at ~3 s per cycle.
+reload standing still: the PREDICTED fleet retreat lag (from the
+measured deferral plus the code reading of the gate; the
+`archer-fleet` audit is the instrument that will confirm it live)
+rides at ~3 s per cycle. The fleet audit itself has not run live yet -
+its live round is the next step of the issue.
 
 The measured window says the retreat should click at the windup end:
 
