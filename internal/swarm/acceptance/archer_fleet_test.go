@@ -101,7 +101,7 @@ func fleetKiteCycles(
     mobX := px - fleetStreamTrail*math.Cos(heading)
     mobY := py - fleetStreamTrail*math.Sin(heading)
     var samples []fleetSample
-    for shot := 0; shot < cycles; shot++ {
+    for shot := range cycles {
         shotAt := base.Add(time.Duration(shot) * cycle)
         walkAt := shotAt.Add(retreatLag)
         fromX, fromY := px, py
