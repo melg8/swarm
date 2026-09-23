@@ -553,7 +553,6 @@ func (w fleetWatch) verdicts() fleetVerdicts {
         v.shootsD = fmt.Sprintf("%d shots in the window", w.shots)
     }
     if len(w.fightDists) >= fleetMinFightSamples {
-        v.maxRangeE = true
         median := medianFloat(w.fightDists)
         v.maxRange = median >= fleetFightDistFloor
         v.maxRangeD = fmt.Sprintf("median fight distance %.0f"+
@@ -573,6 +572,13 @@ func (w fleetWatch) verdicts() fleetVerdicts {
                 " slot never fought",
                 median, len(w.fightDists), w.shots)
         }
+        // The evidence floor arms on the shooting evidence too: the
+        // QA round of the walled-pocket session measured a slot with
+        // 69 fight samples and 1 shot reading as a max-range FAIL -
+        // the spent-the-window conflation the split exists to
+        // remove. A slot that never shot never fought a kite fight,
+        // whatever the attack stance sampled.
+        v.maxRangeE = w.shots >= fleetMinShots
     }
     if len(w.retreatLags) >= fleetMinRetreats {
         v.earlyE = true

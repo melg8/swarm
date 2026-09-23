@@ -340,3 +340,67 @@ Open for the next round, ranked:
   was calibrated for - the pocket cells push the retreat around).
 - P2: the max-range gear question (haste/kit) stays open on the mass
   cells.
+
+## 2026-09-23, the diagnostics round (round 11) and the QA close
+
+The round-11 live verdict (runs/fleet-2026-09-23/round11.log, the
+per-run log under logs/acceptance/archer-fleet-20260923-182224-*.log)
+- the diagnostics round the fragment above asked for, run BEFORE this
+section was written:
+
+- THE POCKET CELL RECOVERED: temp22 (hex-105) passes max-range (280
+  units), early-retreat (2.0 s median) and curved-retreat (1196
+  units, 4 same-side corners) - the cell that measured 15.2 s and
+  1698 units one round earlier. temp23 hits 496 units max-range.
+  The leading suspect is the 12 s pursuit context (d9e173b8): the
+  chains now survive the cornered hold episodes that the 6 s stamp
+  expired mid-fight. UNVERIFIED attribution - the round changed one
+  variable, the next round owns the confirmation.
+- THE BREAKOUT HYPOTHESIS IS REFUTED for the observed pockets: the
+  hold diagnostics answered "no gap geometry (the lone chaser owns
+  the corner)" on every logged refusal - the pocket holds are
+  LONE-CHASER terrain corners, not encircled trains. The breakout
+  ladder (needs 2+ bearings) cannot even run there and fired 0 times
+  across both rounds; its flank-clearance tier is live dead code
+  until a real encircled pocket appears. The honest count of the
+  round-10 "surround" holds is UNATTRIBUTABLE (the wording covered
+  both the encircled and the degenerate zero-bearing scene before
+  the diagnostics existed).
+- REGRESSIONS vs round 10 on the same code plus the context change:
+  early-retreat 1/5 (temp24 6.2 s vs 2.0 s, temp23 2.4 s vs 1.9 s),
+  quick-reshot 1/5 (was 3/5), temp21 max-range 49 units (was 511),
+  temp20 a spent window (1 shot, 69 samples - named "no evidence"
+  only on four behaviors; the max-range line misclassified it, fixed
+  below). The plausible mechanism (UNTESTED): with the context at
+  12 s a pursuit continuation can start a walk up to 12 s after the
+  last shot, and the fold's pendingLag has no ceiling - the
+  multi-second pursuit walks mint into the early-retreat medians;
+  the longer chains also starve quick-reshot of walk-end shots
+  (round 10: 42 continuation lines; round 11: 22).
+- The clean-context QA audit (Task ID 2, 10 findings) drove the
+  close: the max-range evidence split now arms on the shooting
+  evidence too (a slot with fight samples but no shots reads "no
+  evidence", not a behavior fail - the mixed case pinned in
+  TestFleetVerdictsNameTheSpentWindow), and this section records
+  the refuted hypothesis the pushed tree was missing.
+
+Open for the next round, ranked:
+
+- P0: attribute the round-11 regressions - cap the fold's
+  pendingLag or gate the pursuit-continuation walks out of the
+  early-retreat metric, decide 6 s vs 12 s context on the evidence,
+  re-run the fleet.
+- P1: the pocket re-scope - the lone-chaser terrain corner needs a
+  terrain-aware escape (a perpendicular sweep along the wall face)
+  or an explicit decision to accept the hold-and-shoot answer; the
+  anti-gap breakout waits for a real encircled pocket.
+- P1: the max-range levers the "gear question" framing dismissed:
+  the re-shot floor (410) sits ~100 units under the measured passing
+  band (496-511), and the flat streak limit (8) measurably lowers
+  the medians (the round-9 never-resetting streak measured 322).
+  Try the floor toward the band and a leash-aware streak budget
+  live before resting the claim on gear.
+- P2: the pursuit-context expiry (12 s) has no unit test - pin the
+  13 s backdated stamp refusing the continuation; the breakout
+  bounds (the 93-135 degree wedges unswept, the angular-only flank
+  clearance) belong in the doc comment.

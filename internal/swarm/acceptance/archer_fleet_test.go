@@ -285,6 +285,23 @@ func TestFleetVerdictsNameTheSpentWindow(t *testing.T) {
         "the stream's retreats armed the retreat evidence")
     require.False(t, fought.maxRange,
         "the melee stream must fail the max-range behavior")
+
+    // The mixed window the QA round measured: the fight samples
+    // armed (69 of them on the live slot) but the shooting never
+    // did (1 shot) - the slot never fought a kite fight, and the
+    // max-range verdict must read NO EVIDENCE, not a behavior fail.
+    mixed := newFleetWatch()
+    samples, _ := fleetKiteCycles(time.Now().Add(-time.Minute),
+        3*time.Second, 1600*time.Millisecond, 380.0, 1,
+        [2]int32{36000, 50229}, math.Pi, 0, 1)
+    for _, sample := range samples {
+        mixed = mixed.fold(sample)
+    }
+    mixedVerdicts := mixed.verdicts()
+    require.False(t, mixedVerdicts.maxRangeE,
+        "a slot that never shot never armed the max-range evidence")
+    require.False(t, mixedVerdicts.maxRange,
+        "the never-fought slot holds no verdict either way")
 }
 
 // TestMedianDuration pins the median helpers on even and odd slices.
