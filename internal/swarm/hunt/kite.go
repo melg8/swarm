@@ -245,6 +245,15 @@ const (
     // character moves, and a 110 chaser cannot hit what it cannot
     // catch).
     kiteReshotFloor = 410.0
+    // kitePursuitContext bounds the freshness of the pursuit
+    // context (kitePursuitFor/kitePursuitAt): the continuation
+    // chain re-stamps every walk (the ~1.5 s window cadence), so
+    // anything older than a few windows belongs to another fight -
+    // the killed mob respawns under the SAME object id on the
+    // Mobius ground (Spawn.respawnNpc keeps the id), and a stale
+    // context must never answer the approach of the respawned mob
+    // with a retreat.
+    kitePursuitContext = 6 * time.Second
     // kiteHoldLogPeriod paces the cornered hold diagnostic: the hold
     // itself re-probes at the kite pacing, the log line lands once
     // per period - a cornered fight is a standing fight, the line is
@@ -948,6 +957,7 @@ func (l *Loop) kiteIssueWalk(
     l.kiteWalkIssuedAt = now
     l.kiteWalkUntil = until
     l.kitePursuitFor = l.target
+    l.kitePursuitAt = now
     l.combatAvoidUntil = until
     // The curving circle advances on the issued walk alone: the
     // opening straight retreat of the fight is spent, every later
@@ -1111,13 +1121,26 @@ func (l *Loop) kitePursuitHold(
     if !l.kiteLayerGates(now) {
         return false
     }
-    if l.kitePursuitFor != l.target {
-        // No kite retreat of THIS fight stands behind the moment
-        // (the approach phase, a chase without a shot): the
-        // continuation belongs to a lapsed retreat alone - the
-        // engage keeps its attack request (the live fleet round
-        // measured the approach slot walking its cell empty).
+    if l.kitePursuitFor != l.target ||
+        now.Sub(l.kitePursuitAt) > kitePursuitContext {
+        // No FRESH kite retreat of THIS fight stands behind the
+        // moment (the approach phase, a chase without a shot, or a
+        // stale context of a previous fight against the SAME mob id
+        // - the Mobius respawn keeps the object id, the stamp
+        // expires the history): the continuation belongs to a live
+        // retreat chain alone - the engage keeps its attack request
+        // (the live fleet round measured the approach slot walking
+        // its cell empty).
         return false
+    }
+    if l.kiteFor != l.target {
+        // A fresh fight behind a fresh context: the streak of the
+        // previous one is history (the same reset the proximity
+        // admission runs - the distance race of one mob is not the
+        // race of the next, and a fight following a streak-exhausted
+        // one must not inherit its dead budget).
+        l.kiteFor = l.target
+        l.kiteStreak = 0
     }
     if l.kiteStreak >= kiteStreakLimit {
         // The distance race is unwinnable (the leash or the terrain

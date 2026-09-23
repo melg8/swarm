@@ -58,6 +58,16 @@ func TestArcherFleetReset(t *testing.T) {
     require.NotEmpty(t, reset.Items)
 }
 
+// TestArcherFleetTimeoutStaysUnderTheAsk pins the scenario bound: the
+// three minute window plus the fleet's own launch budget and the
+// teardown grace must stay under the five minute ask (the arithmetic
+// lives in the constants - the pin keeps a future window bump from
+// silently breaking the contract).
+func TestArcherFleetTimeoutStaysUnderTheAsk(t *testing.T) {
+    require.LessOrEqual(t, archerFleetTimeout(), 5*time.Minute,
+        "the whole fleet scenario stays under the five minute ask")
+}
+
 // TestArcherFleetResetWakesAtFullVitals pins the wounded-start fix:
 // the fleet slots wake at the full server-computed level 7 vitals -
 // the round of 2026-09-23 measured a slot entering at 167 of 214 HP

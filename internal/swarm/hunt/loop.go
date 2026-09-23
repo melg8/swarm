@@ -805,15 +805,23 @@ type Loop struct {
     // re-click would only fight the re-engage for the movement. The
     // zero value disarms the ladder.
     kiteWalkUntil time.Time
-    // kitePursuitFor names the fight the last kite retreat served:
-    // the pursuit hold of the engage tail (see kite.go) continues a
-    // walk only behind a lapsed RETREAT of the same fight - a close
-    // hostile of the approach phase (no shot, no retreat behind it)
-    // must never trigger the continuation, the engage requests the
-    // attack instead (the live fleet round of 2026-09-23 measured
-    // the approach slot walking away from its cell without a single
-    // shot until the window ran out).
+    // kitePursuitFor names the fight the last kite retreat served
+    // and kitePursuitAt stamps the walk that served it: the pursuit
+    // hold of the engage tail (see kite.go) continues a walk only
+    // behind a FRESH retreat of the same fight - a close hostile of
+    // the approach phase (no shot, no retreat behind it) must never
+    // trigger the continuation, the engage requests the attack
+    // instead (the live fleet round of 2026-09-23 measured the
+    // approach slot walking away from its cell without a single
+    // shot until the window ran out). The stamp expires the
+    // context: the Mobius respawn re-uses the object id (the killed
+    // mob returns under the same id), so the ownership alone would
+    // let a stale context of the PREVIOUS fight answer the approach
+    // of the respawned one - the continuation chain re-stamps every
+    // walk (~1.5 s cadence), anything older is another fight's
+    // history.
     kitePursuitFor int32
+    kitePursuitAt  time.Time
     // kiteWalkBaseX/Y is the cell the kite walk was issued from -
     // the ladder's dead-click oracle: a character still standing on
     // this cell past the probe pace never moved whatever the

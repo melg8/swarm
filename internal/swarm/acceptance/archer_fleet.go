@@ -547,6 +547,21 @@ func (w fleetWatch) verdicts() fleetVerdicts {
         v.maxRange = median >= fleetFightDistFloor
         v.maxRangeD = fmt.Sprintf("median fight distance %.0f"+
             " units over %d samples", median, len(w.fightDists))
+        if v.maxRange && w.shots < fleetMinShots {
+            // The distance evidence without the shots is not a kite
+            // held at range but a slot that never fought (the
+            // approach stretches of the pursuit-hold round measured
+            // a walking slot's 1434 unit 'fight' medians over 62
+            // samples with zero shots - the attack stance lingered
+            // while the character circled its cell). The max-range
+            // verdict rides the shooting evidence the same way the
+            // distance evidence rides the samples.
+            v.maxRange = false
+            v.maxRangeD = fmt.Sprintf("median fight distance %.0f"+
+                " units over %d samples, but only %d shots - the"+
+                " slot never fought",
+                median, len(w.fightDists), w.shots)
+        }
     }
     if len(w.retreatLags) >= fleetMinRetreats {
         median := medianDuration(w.retreatLags)

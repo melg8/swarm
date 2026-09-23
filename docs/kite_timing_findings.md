@@ -187,6 +187,18 @@ slots:
   the kit cannot hold the 250-450 band at speed parity; the mixed
   Dryad slot held a 496 median. Holding the band needs a speed edge
   (haste, buffs, a faster kit) - a gear question, not a kite bug.
+  **[CORRECTED 2026-09-23, the continuation round: the parity claim
+  was WRONG.** The Mobius NPC tables (dist/game/data/stats/npcs)
+  give every elven-ground chaser - Kaboo Orc, Kaboo Orc Grunt,
+  Kaboo Orc Archer, Kaboo Orc Fighter, Green Dryad, Spore Fungus,
+  Gray Wolf - a run speed of 110 against the character's 125: the
+  fight loses the distance on the WINDUP DEBT alone (the ~1.45 s
+  movement standstill costs ~160 units a cycle, the reload-tail
+  walk banks back only ~22 at the 15 unit edge). The fix is not
+  gear: the pursuit hold (the re-shot gated on the 410 unit floor)
+  keeps the walk running until the distance is regained - the
+  guarded round measured the medians rising 3-6x (322/188 against
+  68/49) on the slots that fought.]
 - **curved-retreat failed on four slots** (the anchor leash broke at
   1644-2367 units): the retreat lane machinery walks the away-ray
   with lane skipping and camp deflection, but nothing rotates the
