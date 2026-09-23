@@ -203,3 +203,76 @@ Open for the next round, ranked:
 - P1: the fleet's per-slot evidence floors could name the
   spent-the-window-recovering slots in the fleet verdict line (the
   per-bot lines already do).
+
+## 2026-09-23, the fix-and-acceptance continuation round (the third session)
+
+The task: continue fixes, upload BEFORE the tests, run the acceptance
+live rounds, fix the remaining issues. Six commits pushed (all unit-
+gated, all live-measured where the clock allowed):
+
+- 96c1c56 (pushed by the prior context): the per-fight leash metric
+  (the P0 of the open ladder) - the drift anchors on the mob's stand
+  at each fight's start, only confirmed-retreat fights feed it, the
+  curve rides the signed corner between consecutive retreats of ONE
+  fight.
+- c19bc59: the intrange lint fix on top.
+- c1ebecb: THE GAP RETREAT - the fleet round 6 measured the standing
+  encircled answer as a death trap (temp21 stood 26 s shooting one
+  spot while the train grew to three chasers): the encircled train
+  now takes the widest-gap bisector (the perpendicular break of a
+  two-mob line opens distance from BOTH chasers), the lane battery
+  keeps the terrain authority, the hold survives for the walled gap
+  alone (kiteChaserBearings feeds both the centroid and the gap).
+- a64d492: THE FULL-HP START - the reset wrote the gain-table 167 HP
+  but the server recomputes the level 7 maxima at login (214/82
+  measured), so the slots entered wounded (temp20: 167 of 214, the
+  window spent on potions, an emergency logout and a 60 s sit): the
+  fleet reset now overrides the vitals with the measured values.
+- 568f7f8: the window 2.5 -> 3.0 minutes on the fleet's own measured
+  launch budget (40 s; the entry latch keeps a late slot harmless) -
+  the corner evidence of the curving verdict needed the fights.
+- d46eccd + c5d845b: THE PURSUIT HOLD - the Mobius tables settled
+  the speeds (every elven-ground chaser runs 110, the elven fighter
+  125 - the old 'speed parity' verdict was WRONG): the re-shot at
+  the walk-window end restarted the windup and handed ~160 units
+  back every cycle (the max-range medians 13-227). The hold gates
+  the re-request on the re-shot floor (the windup debt + the retreat
+  radius, 410): a lapsed window whose hostile holds inside the floor
+  continues the retreat (the streak counts it), the affordable shot
+  answers the moment the floor clears. The second commit added the
+  retreat-context guard (the approach phase never retreats - the
+  round 9 live measurement: a slot walking its cell empty, 0 shots).
+
+The live ladder (all rounds in runs/fleet-2026-09-23/, the per-run
+logs under logs/acceptance/):
+
+- Round 6 (the per-fight leash): shoots 4/5, early-retreat 3/5,
+  quick-reshot 4/5, max-range 2/5, curved 2/5 - the audit wiring
+  finally measured real behavior (the entry/registry/fold fixes of
+  the prior sessions hold).
+- Round 7 (the gap retreat + the full HP): shoots 5/5, early-retreat
+  4/5 (temp21's 3.1 s lag GONE - the gap escape works), temp23 5/5.
+- Round 8 (the 3-minute window): shoots 5/5, early-retreat 5/5
+  (1.7-2.0 s on every slot), quick-reshot 5/5 (0 s medians),
+  curved-retreat 4/5 (temp21 1597 against the 1500 leash), max-range
+  0/5 - the longer exposure settled the honest verdict: the windup
+  debt collapses every fight to melee without the hold.
+- Round 9 (the pursuit hold, pre-guard): temp24 5/5 (the max-range
+  median 322 against 68, the re-shot gap 100 ms), temp23 4/5 (188
+  against 49), the medians rose 3-6x on the fighting slots - but the
+  approach-phase regression (the missing context guard) spent three
+  slots walking instead of fighting; the guard landed as c5d845b.
+
+Open for the next round, ranked:
+
+- P0: re-run the fleet live with c5d845b (the guard was unit-pinned
+  but not live-measured - the approach slots must fight again while
+  the pursuit medians hold).
+- P1: temp22's 8.5 s retreat lag (4 retreats, the walled pocket of
+  elven-hex-105 - the cornered holds still eat the windows; the
+  dead-cell rotation may need the gap ray in its sweep).
+- P1: the fleet verdict line could name the spent-the-window slots
+  separately from the true fails (the per-bot lines already do).
+- P2: the max-range floor of the audit (250) sits below the pursuit
+  equilibrium (~320): consider raising it to the measured band once
+  the guarded round confirms.
