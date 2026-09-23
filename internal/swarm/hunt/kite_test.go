@@ -135,28 +135,42 @@ func TestKiteWindowHoldsTheReRequests(t *testing.T) {
         "the pacing period bounds the steps to one per window")
 }
 
-// TestKiteResumesTheAttackAfterTheStep pins the cycle end: once the
-// step window closed and the fighting stance lapsed (the real
-// timeline of a walk that outlives the stance freshness), the engage
-// re-requests the forced attack - the archer shoots again from the
-// opened distance (the fake keeps the character at its spot, the 200
-// unit target sits inside the bow engage radius of 450). The
-// mid-window hold itself is the shared movement gate the
-// impending-add step owns and TestFightStepHoldsTheAttackRequests
-// pins for both callers.
-func TestKiteResumesTheAttackAfterTheStep(t *testing.T) {
-    _, game, loop := kiteBowBot(t, 45200)
+// TestKiteReshotWaitsForTheRegainedDistance pins the pursuit hold
+// of the cycle end (issue #70, the max-range behavior): the walk
+// window closed on a hostile still inside the re-shot floor (the
+// 410 line - the next windup would drag a 110-speed chaser down to
+// melee from there), and the engage continues the retreat instead
+// of re-requesting the shot. A hostile beyond the floor answers the
+// affordable shot at once - the re-shot waits for the distance,
+// never starves.
+func TestKiteReshotWaitsForTheRegainedDistance(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The walk outlives the fighting stance freshness (3s from the
     // last swing): sleep past it so the tick lands in the honest
-    // post-walk state - stance lapsed, step window long closed.
+    // post-walk state - stance lapsed, step window long closed, the
+    // target still at 200 units (inside the 410 floor).
+    time.Sleep(3200 * time.Millisecond)
+    loop.lastHit = time.Now().Add(-2 * time.Second)
+    loop.tick()
+    require.Empty(t, game.forces,
+        "the re-shot waits for the regained distance")
+    require.Len(t, game.walks, 2,
+        "the pursuit continues the retreat at the window end")
+
+    // The hostile opens past the floor: the affordable shot answers
+    // at the window end (the forces resume).
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 45420, Y: 50000, Name: "Keltir",
+    })
     time.Sleep(3200 * time.Millisecond)
     loop.lastHit = time.Now().Add(-2 * time.Second)
     loop.tick()
     require.Equal(t, []int32{7}, game.forces,
-        "the kite must resume the attack after the step window")
+        "the affordable shot resumes once the distance is back")
 }
 
 // TestKiteRespectsTheLeash pins the cornered case of the issue: a

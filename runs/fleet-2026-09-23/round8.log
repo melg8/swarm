@@ -1,0 +1,1990 @@
+2026/09/23 17:05:02 Starting swarm acceptance CLI
+2026/09/23 17:05:02 Build: branch feature/improved-kite, commit 568f7f8f33735a26e8d248a3349ce0f8e84c373a (dirty), built 2026-09-23T17:04:38Z
+2026/09/23 17:05:02 Icon pack ready: data/icons
+2026/09/23 17:05:02 Web interface listening on http://127.0.0.1:8080
+2026/09/23 17:05:02 Acceptance: running scenario archer-fleet
+2026/09/23 17:05:02 Acceptance: the run log of archer-fleet writes logs/acceptance/archer-fleet-20260923-170502-14177-1.log
+2026/09/23 17:05:02 Received init packet with session id 6551057c
+2026/09/23 17:05:02 Sent auth login for account temp20
+2026/09/23 17:05:02 Authenticated on login server
+2026/09/23 17:05:02 Received server list with 1 servers
+2026/09/23 17:05:02 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:02 Sent protocol version 419
+2026/09/23 17:05:02 Game server 2 accepted the protocol
+2026/09/23 17:05:02 Sent game auth login for account temp20
+2026/09/23 17:05:02 Received character list with 1 characters
+2026/09/23 17:05:05 Received init packet with session id 1bde9390
+2026/09/23 17:05:05 Sent auth login for account temp21
+2026/09/23 17:05:05 Authenticated on login server
+2026/09/23 17:05:05 Received server list with 1 servers
+2026/09/23 17:05:05 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:05 Sent protocol version 419
+2026/09/23 17:05:05 Game server 2 accepted the protocol
+2026/09/23 17:05:05 Sent game auth login for account temp21
+2026/09/23 17:05:05 Received character list with 1 characters
+2026/09/23 17:05:07 Received init packet with session id eef95653
+2026/09/23 17:05:07 Sent auth login for account temp22
+2026/09/23 17:05:07 Authenticated on login server
+2026/09/23 17:05:07 Received server list with 1 servers
+2026/09/23 17:05:07 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:07 Sent protocol version 419
+2026/09/23 17:05:07 Game server 2 accepted the protocol
+2026/09/23 17:05:07 Sent game auth login for account temp22
+2026/09/23 17:05:07 Received character list with 1 characters
+2026/09/23 17:05:09 Received init packet with session id 8c05b810
+2026/09/23 17:05:09 Sent auth login for account temp23
+2026/09/23 17:05:09 Authenticated on login server
+2026/09/23 17:05:09 Received server list with 1 servers
+2026/09/23 17:05:09 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:09 Sent protocol version 419
+2026/09/23 17:05:09 Game server 2 accepted the protocol
+2026/09/23 17:05:09 Sent game auth login for account temp23
+2026/09/23 17:05:09 Received character list with 1 characters
+2026/09/23 17:05:11 Received init packet with session id 819a1ff7
+2026/09/23 17:05:11 Sent auth login for account temp24
+2026/09/23 17:05:11 Authenticated on login server
+2026/09/23 17:05:11 Received server list with 1 servers
+2026/09/23 17:05:11 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:11 Sent protocol version 419
+2026/09/23 17:05:11 Game server 2 accepted the protocol
+2026/09/23 17:05:11 Sent game auth login for account temp24
+2026/09/23 17:05:11 Received character list with 1 characters
+2026/09/23 17:05:15 Received init packet with session id 07a18dc1
+2026/09/23 17:05:15 Sent auth login for account temp20
+2026/09/23 17:05:15 Authenticated on login server
+2026/09/23 17:05:15 Received server list with 1 servers
+2026/09/23 17:05:15 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:15 Sent protocol version 419
+2026/09/23 17:05:15 Game server 2 accepted the protocol
+2026/09/23 17:05:15 Sent game auth login for account temp20
+2026/09/23 17:05:15 Received character list with 1 characters
+2026/09/23 17:05:15 Selected character temp20
+2026/09/23 17:05:15 Sent enter world request
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 Inventory listed with 13 items
+2026/09/23 17:05:15 Received packet id 0x57 with 5 bytes
+2026/09/23 17:05:15 Quest journal with 0 quests, 0 quest items
+2026/09/23 17:05:15 NPC  spawned at 35995 50429 -3456 heading 33863
+2026/09/23 17:05:15 NPC  spawned at 35650 49863 -3572 heading 51941
+2026/09/23 17:05:15 NPC  spawned at 33258 50435 -3567 heading 7259
+2026/09/23 17:05:15 NPC  spawned at 33261 53055 -3590 heading 45970
+2026/09/23 17:05:15 NPC  spawned at 34727 52352 -3567 heading 18162
+2026/09/23 17:05:15 NPC  spawned at 33316 53132 -3590 heading 38844
+2026/09/23 17:05:15 NPC  spawned at 33691 51303 -3567 heading 63020
+2026/09/23 17:05:15 NPC  spawned at 34017 51326 -3572 heading 37800
+2026/09/23 17:05:15 NPC  spawned at 33754 51339 -3567 heading 19514
+2026/09/23 17:05:15 NPC  spawned at 35393 48408 -3639 heading 14436
+2026/09/23 17:05:15 NPC  spawned at 35018 47735 -3639 heading 30515
+2026/09/23 17:05:15 NPC  spawned at 35937 52312 -3567 heading 18431
+2026/09/23 17:05:15 NPC  spawned at 36370 52378 -3520 heading 47819
+2026/09/23 17:05:15 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:15 NPC  spawned at 35214 51554 -3567 heading 41124
+2026/09/23 17:05:15 NPC  spawned at 35429 52251 -3567 heading 53840
+2026/09/23 17:05:15 NPC  spawned at 35688 52704 -3567 heading 60610
+2026/09/23 17:05:15 NPC  spawned at 37411 48903 -3543 heading 59307
+2026/09/23 17:05:15 NPC  spawned at 37454 48372 -3592 heading 0
+2026/09/23 17:05:15 NPC  spawned at 37608 51164 -3543 heading 2935
+2026/09/23 17:05:15 NPC  spawned at 38495 52830 -3409 heading 27863
+2026/09/23 17:05:15 NPC  spawned at 37075 51366 -3548 heading 22552
+2026/09/23 17:05:15 NPC  spawned at 38321 52632 -3548 heading 21990
+2026/09/23 17:05:15 NPC  spawned at 37179 51820 -3548 heading 22049
+2026/09/23 17:05:15 NPC  spawned at 38423 52620 -3409 heading 6149
+2026/09/23 17:05:15 NPC  spawned at 38045 52465 -3543 heading 57892
+2026/09/23 17:05:15 Received packet id 0x65 with 1 bytes
+2026/09/23 17:05:15 Received packet id 0xda with 5 bytes
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 Action failed
+2026/09/23 17:05:15 Hunt: gear: swapping to the two hand Short Bow (4688)
+2026/09/23 17:05:15 Hunt: gear: equipping Wooden Breastplate (47) into the empty chest slot
+2026/09/23 17:05:15 Hunt: gear: equipping Bone Gaiters (32) into the empty legs slot
+2026/09/23 17:05:15 Hunt: gear: equipping Leather Helmet (23) into the empty head slot
+2026/09/23 17:05:15 Hunt: gear: equipping Necklace of Anguish (21) into the empty neck slot
+2026/09/23 17:05:15 Hunt: gear: equipping Earring of Strength (16) into the empty right ear slot
+2026/09/23 17:05:15 Hunt: gear: equipping Earring of Wisdom (16) into the empty left ear slot
+2026/09/23 17:05:15 Hunt: gear: equipping Leather Gloves (15) into the empty gloves slot
+2026/09/23 17:05:15 Hunt: gear: equipping Ring of Anguish (11) into the empty right finger slot
+2026/09/23 17:05:15 Hunt: gear: equipping Apprentice's Shoes (8) into the empty feet slot
+2026/09/23 17:05:15 Hunt: level 7: resuming the cell Kaboo Orc Grunt SW-5 - the login landed on its ground
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 Action failed
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:15 Skill list with 1 skills
+2026/09/23 17:05:16 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:16 Hunt: shot released on 268450361, hostile 268450361 holds 200 units, the retreat clicks at the windup end
+2026/09/23 17:05:17 Received init packet with session id a535b488
+2026/09/23 17:05:17 Sent auth login for account temp21
+2026/09/23 17:05:17 Authenticated on login server
+2026/09/23 17:05:17 Received server list with 1 servers
+2026/09/23 17:05:17 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:17 Sent protocol version 419
+2026/09/23 17:05:17 Game server 2 accepted the protocol
+2026/09/23 17:05:17 Sent game auth login for account temp21
+2026/09/23 17:05:17 Received character list with 1 characters
+2026/09/23 17:05:17 Selected character temp21
+2026/09/23 17:05:17 Sent enter world request
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 Inventory listed with 13 items
+2026/09/23 17:05:17 Received packet id 0x57 with 5 bytes
+2026/09/23 17:05:17 Quest journal with 0 quests, 0 quest items
+2026/09/23 17:05:17 Player temp21 appeared at 36000 51962 -3536 speed 125
+2026/09/23 17:05:17 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:17 NPC  spawned at 35937 52312 -3567 heading 18431
+2026/09/23 17:05:17 NPC  spawned at 36370 52378 -3520 heading 47819
+2026/09/23 17:05:17 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:17 NPC  spawned at 35214 51554 -3567 heading 41124
+2026/09/23 17:05:17 NPC  spawned at 35429 52251 -3567 heading 53840
+2026/09/23 17:05:17 NPC  spawned at 35688 52704 -3567 heading 60610
+2026/09/23 17:05:17 NPC  spawned at 33258 50435 -3567 heading 7259
+2026/09/23 17:05:17 NPC  spawned at 33261 53055 -3590 heading 45970
+2026/09/23 17:05:17 NPC  spawned at 34762 52362 -3567 heading 2989
+2026/09/23 17:05:17 NPC  spawned at 33316 53132 -3590 heading 38844
+2026/09/23 17:05:17 NPC  spawned at 33691 51303 -3567 heading 63020
+2026/09/23 17:05:17 NPC  spawned at 34017 51326 -3572 heading 37800
+2026/09/23 17:05:17 NPC  spawned at 33754 51339 -3567 heading 19514
+2026/09/23 17:05:17 NPC  spawned at 32943 54510 -3590 heading 21173
+2026/09/23 17:05:17 NPC  spawned at 34579 54158 -3585 heading 29997
+2026/09/23 17:05:17 NPC  spawned at 33307 54822 -3590 heading 40528
+2026/09/23 17:05:17 NPC  spawned at 35995 50429 -3456 heading 33863
+2026/09/23 17:05:17 NPC  spawned at 35650 49863 -3572 heading 51941
+2026/09/23 17:05:17 Player temp20 appeared at 36000 50229 -3456 speed 125
+2026/09/23 17:05:17 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:17 NPC  spawned at 36590 53269 -3572 heading 0
+2026/09/23 17:05:17 NPC  spawned at 37608 51164 -3543 heading 2935
+2026/09/23 17:05:17 NPC  spawned at 38495 52830 -3409 heading 27863
+2026/09/23 17:05:17 NPC  spawned at 37122 51295 -3548 heading 48457
+2026/09/23 17:05:17 NPC  spawned at 38321 52632 -3548 heading 21990
+2026/09/23 17:05:17 NPC  spawned at 37179 51820 -3548 heading 22049
+2026/09/23 17:05:17 NPC  spawned at 38423 52620 -3409 heading 6149
+2026/09/23 17:05:17 NPC  spawned at 38030 52479 -3543 heading 24316
+2026/09/23 17:05:17 NPC  spawned at 37535 53334 -3409 heading 32592
+2026/09/23 17:05:17 Received packet id 0x65 with 1 bytes
+2026/09/23 17:05:17 Received packet id 0xda with 5 bytes
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 Action failed
+2026/09/23 17:05:17 Player temp21 appeared at 36000 51962 -3536 speed 125
+2026/09/23 17:05:17 Hunt: gear: swapping to the two hand Short Bow (4688)
+2026/09/23 17:05:17 Hunt: gear: equipping Wooden Breastplate (47) into the empty chest slot
+2026/09/23 17:05:17 Hunt: gear: equipping Bone Gaiters (32) into the empty legs slot
+2026/09/23 17:05:17 Hunt: gear: equipping Leather Helmet (23) into the empty head slot
+2026/09/23 17:05:17 Hunt: gear: equipping Necklace of Anguish (21) into the empty neck slot
+2026/09/23 17:05:17 Hunt: gear: equipping Earring of Strength (16) into the empty right ear slot
+2026/09/23 17:05:17 Hunt: gear: equipping Earring of Wisdom (16) into the empty left ear slot
+2026/09/23 17:05:17 Hunt: gear: equipping Leather Gloves (15) into the empty gloves slot
+2026/09/23 17:05:17 Hunt: gear: equipping Ring of Anguish (11) into the empty right finger slot
+2026/09/23 17:05:17 Hunt: gear: equipping Apprentice's Shoes (8) into the empty feet slot
+2026/09/23 17:05:17 Hunt: level 7: resuming the cell Kaboo Orc Grunt SW-6 - the login landed on its ground
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 Action failed
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:17 Skill list with 1 skills
+2026/09/23 17:05:17 Player temp21 appeared at 36000 51962 -3536 speed 125
+2026/09/23 17:05:17 Hunt: dropping the target 268450392: the ground rotation owns the way
+2026/09/23 17:05:17 Hunt: the fight crossed into Green Dryad SW-6 (was Kaboo Orc Grunt SW-6), following the ground
+2026/09/23 17:05:17 Action failed
+2026/09/23 17:05:17 NPC  spawned at 35937 52312 -3567 heading 18431
+2026/09/23 17:05:17 NPC  spawned at 35937 52312 -3567 heading 18431
+2026/09/23 17:05:18 Hunt: the windup on 268450361 ended (hostile 268450361 at 200 units), kiting the reload tail
+2026/09/23 17:05:18 Action failed
+2026/09/23 17:05:19 Received init packet with session id 13958d59
+2026/09/23 17:05:19 Sent auth login for account temp22
+2026/09/23 17:05:19 Authenticated on login server
+2026/09/23 17:05:19 Received server list with 1 servers
+2026/09/23 17:05:19 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:19 Sent protocol version 419
+2026/09/23 17:05:19 Game server 2 accepted the protocol
+2026/09/23 17:05:19 Sent game auth login for account temp22
+2026/09/23 17:05:19 Received character list with 1 characters
+2026/09/23 17:05:19 Selected character temp22
+2026/09/23 17:05:19 Sent enter world request
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 Inventory listed with 13 items
+2026/09/23 17:05:19 Received packet id 0x57 with 5 bytes
+2026/09/23 17:05:19 Quest journal with 0 quests, 0 quest items
+2026/09/23 17:05:19 NPC  spawned at 33258 50435 -3567 heading 7259
+2026/09/23 17:05:19 Player temp22 appeared at 34500 49363 -3496 speed 125
+2026/09/23 17:05:19 Player temp22 appeared at 34500 49363 -3496 speed 125
+2026/09/23 17:05:19 NPC  spawned at 31351 48616 -3670 heading 25075
+2026/09/23 17:05:19 NPC  spawned at 32191 48599 -3670 heading 22004
+2026/09/23 17:05:19 NPC  spawned at 31753 51532 -3670 heading 0
+2026/09/23 17:05:19 NPC  spawned at 33261 53055 -3590 heading 45970
+2026/09/23 17:05:19 NPC  spawned at 33316 53132 -3590 heading 38844
+2026/09/23 17:05:19 NPC  spawned at 33691 51303 -3567 heading 63020
+2026/09/23 17:05:19 NPC  spawned at 34017 51326 -3572 heading 37800
+2026/09/23 17:05:19 NPC  spawned at 33754 51339 -3567 heading 19514
+2026/09/23 17:05:19 NPC  spawned at 35260 48570 -3639 heading 23533
+2026/09/23 17:05:19 NPC  spawned at 35018 47735 -3639 heading 30515
+2026/09/23 17:05:19 NPC  spawned at 36008 50300 -3456 heading 52663
+2026/09/23 17:05:19 NPC  spawned at 35650 49863 -3572 heading 51941
+2026/09/23 17:05:19 Player temp20 appeared at 36106 50127 -3456 speed 125
+2026/09/23 17:05:19 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:19 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:19 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:19 NPC  spawned at 35943 52275 -3564 heading 51009
+2026/09/23 17:05:19 NPC  spawned at 36370 52378 -3520 heading 47819
+2026/09/23 17:05:19 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:19 NPC  spawned at 34822 52380 -3567 heading 2989
+2026/09/23 17:05:19 Player temp21 appeared at 36025 51947 -3536 speed 125
+2026/09/23 17:05:19 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:19 NPC  spawned at 35214 51554 -3567 heading 41124
+2026/09/23 17:05:19 NPC  spawned at 35429 52251 -3567 heading 53840
+2026/09/23 17:05:19 NPC  spawned at 35688 52704 -3567 heading 60610
+2026/09/23 17:05:19 Received packet id 0x65 with 1 bytes
+2026/09/23 17:05:19 Received packet id 0xda with 5 bytes
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 Action failed
+2026/09/23 17:05:19 Player temp22 appeared at 34500 49363 -3496 speed 125
+2026/09/23 17:05:19 Player temp22 appeared at 34500 49363 -3496 speed 125
+2026/09/23 17:05:19 Hunt: Kaboo Orc Fighter stalks the fight 511 units out, stepping clear
+2026/09/23 17:05:19 Hunt: gear: swapping to the two hand Short Bow (4688)
+2026/09/23 17:05:19 Hunt: gear: equipping Wooden Breastplate (47) into the empty chest slot
+2026/09/23 17:05:19 Hunt: gear: equipping Bone Gaiters (32) into the empty legs slot
+2026/09/23 17:05:19 Hunt: gear: equipping Leather Helmet (23) into the empty head slot
+2026/09/23 17:05:19 Hunt: gear: equipping Necklace of Anguish (21) into the empty neck slot
+2026/09/23 17:05:19 Hunt: gear: equipping Earring of Strength (16) into the empty right ear slot
+2026/09/23 17:05:19 Hunt: gear: equipping Earring of Wisdom (16) into the empty left ear slot
+2026/09/23 17:05:19 Hunt: gear: equipping Leather Gloves (15) into the empty gloves slot
+2026/09/23 17:05:19 Hunt: gear: equipping Ring of Anguish (11) into the empty right finger slot
+2026/09/23 17:05:19 Hunt: gear: equipping Apprentice's Shoes (8) into the empty feet slot
+2026/09/23 17:05:19 Hunt: level 7: resuming the cell Kaboo Orc Grunt SW-3 - the login landed on its ground
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:19 Skill list with 1 skills
+2026/09/23 17:05:19 Player temp22 appeared at 34500 49363 -3496 speed 125
+2026/09/23 17:05:19 Player temp22 appeared at 34500 49363 -3496 speed 125
+2026/09/23 17:05:21 Received init packet with session id b24f69fb
+2026/09/23 17:05:21 Sent auth login for account temp23
+2026/09/23 17:05:21 Authenticated on login server
+2026/09/23 17:05:21 Received server list with 1 servers
+2026/09/23 17:05:21 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:21 Sent protocol version 419
+2026/09/23 17:05:21 Game server 2 accepted the protocol
+2026/09/23 17:05:21 Sent game auth login for account temp23
+2026/09/23 17:05:21 Received character list with 1 characters
+2026/09/23 17:05:21 Selected character temp23
+2026/09/23 17:05:21 Sent enter world request
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 Inventory listed with 13 items
+2026/09/23 17:05:21 Received packet id 0x57 with 5 bytes
+2026/09/23 17:05:21 Quest journal with 0 quests, 0 quest items
+2026/09/23 17:05:21 NPC  spawned at 39527 50943 -3543 heading 43451
+2026/09/23 17:05:21 NPC  spawned at 39167 50242 -3548 heading 40282
+2026/09/23 17:05:21 NPC  spawned at 40040 50803 -3543 heading 30632
+2026/09/23 17:05:21 NPC  spawned at 39045 49469 -3543 heading 43854
+2026/09/23 17:05:21 NPC  spawned at 39720 49605 -3543 heading 24480
+2026/09/23 17:05:21 NPC  spawned at 37411 48903 -3543 heading 59307
+2026/09/23 17:05:21 NPC  spawned at 37454 48372 -3592 heading 0
+2026/09/23 17:05:21 NPC  spawned at 37115 51190 -3548 heading 48457
+2026/09/23 17:05:21 NPC  spawned at 37608 51164 -3543 heading 2935
+2026/09/23 17:05:21 NPC  spawned at 38495 52830 -3409 heading 27863
+2026/09/23 17:05:21 NPC  spawned at 38321 52632 -3548 heading 21990
+2026/09/23 17:05:21 NPC  spawned at 37179 51820 -3548 heading 22049
+2026/09/23 17:05:21 NPC  spawned at 38423 52620 -3409 heading 6149
+2026/09/23 17:05:21 NPC  spawned at 37892 52625 -3543 heading 24316
+2026/09/23 17:05:21 NPC  spawned at 39917 48962 -3543 heading 25862
+2026/09/23 17:05:21 NPC  spawned at 39591 52384 -3409 heading 59551
+2026/09/23 17:05:21 NPC  spawned at 39992 51202 -3548 heading 0
+2026/09/23 17:05:21 NPC  spawned at 39537 52301 -3414 heading 14399
+2026/09/23 17:05:21 NPC  spawned at 40023 51902 -3409 heading 13796
+2026/09/23 17:05:21 NPC  spawned at 42978 49115 -2992 heading 0
+2026/09/23 17:05:21 NPC  spawned at 42812 51138 -2992 heading 16384
+2026/09/23 17:05:21 NPC  spawned at 42700 50057 -2984 heading 14500
+2026/09/23 17:05:21 NPC  spawned at 42766 50037 -2984 heading 11500
+2026/09/23 17:05:21 NPC  spawned at 42971 51372 -2992 heading 32768
+2026/09/23 17:05:21 Received packet id 0x65 with 1 bytes
+2026/09/23 17:05:21 Received packet id 0xda with 5 bytes
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 Action failed
+2026/09/23 17:05:21 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:21 Hunt: gear: swapping to the two hand Short Bow (4688)
+2026/09/23 17:05:21 Hunt: gear: equipping Wooden Breastplate (47) into the empty chest slot
+2026/09/23 17:05:21 Hunt: gear: equipping Bone Gaiters (32) into the empty legs slot
+2026/09/23 17:05:21 Hunt: gear: equipping Leather Helmet (23) into the empty head slot
+2026/09/23 17:05:21 Hunt: gear: equipping Necklace of Anguish (21) into the empty neck slot
+2026/09/23 17:05:21 Hunt: gear: equipping Earring of Strength (16) into the empty right ear slot
+2026/09/23 17:05:21 Hunt: gear: equipping Earring of Wisdom (16) into the empty left ear slot
+2026/09/23 17:05:21 Hunt: gear: equipping Leather Gloves (15) into the empty gloves slot
+2026/09/23 17:05:21 Hunt: gear: equipping Ring of Anguish (11) into the empty right finger slot
+2026/09/23 17:05:21 Hunt: gear: equipping Apprentice's Shoes (8) into the empty feet slot
+2026/09/23 17:05:21 Hunt: level 7: resuming the cell Green Dryad SW-9 - the login landed on its ground
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 Action failed
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:21 Skill list with 1 skills
+2026/09/23 17:05:21 Hunt: shot released on 268450361, hostile 268450361 holds 157 units, the retreat clicks at the windup end
+2026/09/23 17:05:22 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:22 Action failed
+2026/09/23 17:05:23 Hunt: shot released on 268450382, hostile 268450382 holds 168 units, the retreat clicks at the windup end
+2026/09/23 17:05:23 Received init packet with session id e2679b03
+2026/09/23 17:05:23 Sent auth login for account temp24
+2026/09/23 17:05:23 Authenticated on login server
+2026/09/23 17:05:23 Received server list with 1 servers
+2026/09/23 17:05:23 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:23 Sent protocol version 419
+2026/09/23 17:05:23 Game server 2 accepted the protocol
+2026/09/23 17:05:23 Sent game auth login for account temp24
+2026/09/23 17:05:23 Received character list with 1 characters
+2026/09/23 17:05:23 Hunt: the windup on 268450361 ended (hostile 268450361 at 13 units), kiting the reload tail
+2026/09/23 17:05:23 Selected character temp24
+2026/09/23 17:05:23 Sent enter world request
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 Inventory listed with 13 items
+2026/09/23 17:05:23 Received packet id 0x57 with 5 bytes
+2026/09/23 17:05:23 Quest journal with 0 quests, 0 quest items
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:23 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:23 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:23 NPC  spawned at 37087 51133 -3548 heading 44446
+2026/09/23 17:05:23 NPC  spawned at 37608 51164 -3543 heading 2935
+2026/09/23 17:05:23 NPC  spawned at 35218 48622 -3639 heading 23533
+2026/09/23 17:05:23 NPC  spawned at 35018 47735 -3639 heading 30515
+2026/09/23 17:05:23 NPC  spawned at 36281 50352 -3456 heading 10472
+2026/09/23 17:05:23 NPC  spawned at 35581 50055 -3572 heading 19945
+2026/09/23 17:05:23 Player temp20 appeared at 36288 50363 -3456 speed 125
+2026/09/23 17:05:23 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:23 NPC  spawned at 36197 51898 -3544 heading 58641
+2026/09/23 17:05:23 NPC  spawned at 36370 52378 -3520 heading 47819
+2026/09/23 17:05:23 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:23 NPC  spawned at 34822 52380 -3567 heading 2989
+2026/09/23 17:05:23 Player temp21 appeared at 36527 51655 -3536 speed 125
+2026/09/23 17:05:23 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:23 NPC  spawned at 35214 51554 -3567 heading 41124
+2026/09/23 17:05:23 NPC  spawned at 35429 52251 -3567 heading 53840
+2026/09/23 17:05:23 NPC  spawned at 35688 52704 -3567 heading 60610
+2026/09/23 17:05:23 NPC  spawned at 37411 48903 -3543 heading 59307
+2026/09/23 17:05:23 NPC  spawned at 37454 48372 -3592 heading 0
+2026/09/23 17:05:23 NPC  spawned at 38495 52830 -3409 heading 27863
+2026/09/23 17:05:23 NPC  spawned at 38321 52632 -3548 heading 21990
+2026/09/23 17:05:23 NPC  spawned at 37179 51820 -3548 heading 22049
+2026/09/23 17:05:23 NPC  spawned at 38423 52620 -3409 heading 6149
+2026/09/23 17:05:23 NPC  spawned at 37848 52703 -3543 heading 7365
+2026/09/23 17:05:23 NPC  spawned at 39917 48962 -3543 heading 25862
+2026/09/23 17:05:23 Player temp23 appeared at 39000 50229 -3496 speed 125
+2026/09/23 17:05:23 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:23 NPC  spawned at 39527 50943 -3543 heading 43451
+2026/09/23 17:05:23 NPC  spawned at 39167 50242 -3548 heading 40282
+2026/09/23 17:05:23 NPC  spawned at 40040 50803 -3543 heading 30632
+2026/09/23 17:05:23 NPC  spawned at 39045 49469 -3543 heading 43854
+2026/09/23 17:05:23 NPC  spawned at 39720 49605 -3543 heading 24480
+2026/09/23 17:05:23 NPC  spawned at 39591 52384 -3409 heading 59551
+2026/09/23 17:05:23 NPC  spawned at 39992 51202 -3548 heading 0
+2026/09/23 17:05:23 NPC  spawned at 39537 52301 -3414 heading 14399
+2026/09/23 17:05:23 NPC  spawned at 40023 51902 -3409 heading 13796
+2026/09/23 17:05:23 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:23 Received packet id 0x65 with 1 bytes
+2026/09/23 17:05:23 Received packet id 0xda with 5 bytes
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 Action failed
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:23 Hunt: gear: swapping to the two hand Short Bow (4688)
+2026/09/23 17:05:23 Hunt: gear: equipping Wooden Breastplate (47) into the empty chest slot
+2026/09/23 17:05:23 Hunt: gear: equipping Bone Gaiters (32) into the empty legs slot
+2026/09/23 17:05:23 Hunt: gear: equipping Leather Helmet (23) into the empty head slot
+2026/09/23 17:05:23 Hunt: gear: equipping Necklace of Anguish (21) into the empty neck slot
+2026/09/23 17:05:23 Hunt: gear: equipping Earring of Strength (16) into the empty right ear slot
+2026/09/23 17:05:23 Hunt: gear: equipping Earring of Wisdom (16) into the empty left ear slot
+2026/09/23 17:05:23 Hunt: gear: equipping Leather Gloves (15) into the empty gloves slot
+2026/09/23 17:05:23 Hunt: gear: equipping Ring of Anguish (11) into the empty right finger slot
+2026/09/23 17:05:23 Hunt: gear: equipping Apprentice's Shoes (8) into the empty feet slot
+2026/09/23 17:05:23 Hunt: level 7: resuming the cell Green Dryad SW-5 - the login landed on its ground
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 Action failed
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 User info: temp24 level 7 hp 214/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:23 Skill list with 1 skills
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:23 Player temp24 appeared at 37500 49363 -3520 speed 125
+2026/09/23 17:05:24 Hunt: the windup on 268450382 ended (hostile 268450382 at 168 units), kiting the reload tail
+2026/09/23 17:05:24 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:24 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:24 Action failed
+2026/09/23 17:05:25 Hunt: shot released on 268450361, hostile 268450361 holds 187 units, the retreat clicks at the windup end
+2026/09/23 17:05:25 Player temp23 appeared at 38897 50221 -3496 speed 125
+2026/09/23 17:05:25 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:25 Player temp23 appeared at 38897 50221 -3496 speed 125
+2026/09/23 17:05:25 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:25 NPC  spawned at 35218 48622 -3639 heading 23533
+2026/09/23 17:05:25 NPC  spawned at 35018 47735 -3639 heading 30515
+2026/09/23 17:05:25 NPC  spawned at 36236 50416 -3456 heading 22671
+2026/09/23 17:05:25 NPC  spawned at 35580 50060 -3572 heading 19945
+2026/09/23 17:05:25 Player temp20 appeared at 36153 50538 -3456 speed 125
+2026/09/23 17:05:25 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:25 NPC  spawned at 36366 51768 -3544 heading 58800
+2026/09/23 17:05:25 NPC  spawned at 36370 52378 -3520 heading 47819
+2026/09/23 17:05:25 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:25 NPC  spawned at 34822 52380 -3567 heading 2989
+2026/09/23 17:05:25 Player temp21 appeared at 36745 51485 -3536 speed 125
+2026/09/23 17:05:25 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:25 NPC  spawned at 35214 51554 -3567 heading 41124
+2026/09/23 17:05:25 NPC  spawned at 35429 52251 -3567 heading 53840
+2026/09/23 17:05:25 NPC  spawned at 35688 52704 -3567 heading 60610
+2026/09/23 17:05:25 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:26 Hunt: shot released on 268450382, hostile 268450382 holds 344 units, the retreat clicks at the windup end
+2026/09/23 17:05:26 NPC  spawned at 39527 50943 -3543 heading 43451
+2026/09/23 17:05:26 NPC  spawned at 39167 50242 -3548 heading 40282
+2026/09/23 17:05:26 NPC  spawned at 40040 50803 -3543 heading 30632
+2026/09/23 17:05:26 NPC  spawned at 39045 49469 -3543 heading 43854
+2026/09/23 17:05:26 NPC  spawned at 39755 49548 -3543 heading 54971
+2026/09/23 17:05:26 NPC  spawned at 39591 52384 -3409 heading 59551
+2026/09/23 17:05:26 NPC  spawned at 39992 51202 -3548 heading 0
+2026/09/23 17:05:26 NPC  spawned at 39537 52301 -3414 heading 14399
+2026/09/23 17:05:26 NPC  spawned at 40009 51902 -3409 heading 32690
+2026/09/23 17:05:26 NPC  spawned at 39702 53865 -3496 heading 58982
+2026/09/23 17:05:26 Hunt: the windup on 268450361 ended (hostile 268450361 at 12 units), kiting the reload tail
+2026/09/23 17:05:27 NPC  spawned at 39167 50242 -3548 heading 40282
+2026/09/23 17:05:27 NPC  spawned at 39167 50242 -3548 heading 40282
+2026/09/23 17:05:27 NPC  spawned at 39167 50242 -3548 heading 40282
+2026/09/23 17:05:27 Hunt: the windup on 268450382 ended (hostile 268450382 at 344 units), kiting the reload tail
+2026/09/23 17:05:27 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:28 Action failed
+2026/09/23 17:05:28 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:28 Hunt: shot released on 268450361, hostile 268450361 holds 230 units, the retreat clicks at the windup end
+2026/09/23 17:05:28 NPC  spawned at 35218 48622 -3639 heading 23533
+2026/09/23 17:05:28 NPC  spawned at 35018 47735 -3639 heading 30515
+2026/09/23 17:05:28 NPC  spawned at 37411 48903 -3543 heading 59307
+2026/09/23 17:05:28 NPC  spawned at 37454 48372 -3592 heading 0
+2026/09/23 17:05:28 NPC  spawned at 39917 48962 -3543 heading 25862
+2026/09/23 17:05:29 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:29 NPC  spawned at 37411 48903 -3543 heading 59307
+2026/09/23 17:05:29 NPC  spawned at 37411 48903 -3543 heading 59307
+2026/09/23 17:05:29 NPC  spawned at 37411 48903 -3543 heading 59307
+2026/09/23 17:05:29 NPC  spawned at 37411 48903 -3543 heading 59307
+2026/09/23 17:05:29 Hunt: shot released on 268450382, hostile 268450382 holds 318 units, the retreat clicks at the windup end
+2026/09/23 17:05:29 Hunt: the windup on 268450361 ended (hostile 268450361 at 13 units), kiting the reload tail
+2026/09/23 17:05:29 NPC  spawned at 38907 50147 -3507 heading 39747
+2026/09/23 17:05:30 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:30 Hunt: the windup on 268450382 ended (hostile 268450382 at 204 units), kiting the reload tail
+2026/09/23 17:05:30 Hunt: shot released on 268450379, hostile 268450379 holds 408 units, the retreat clicks at the windup end
+2026/09/23 17:05:31 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:31 Hunt: shot released on 268450361, hostile 268450361 holds 234 units, the retreat clicks at the windup end
+2026/09/23 17:05:32 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:32 Hunt: shot released on 268450382, hostile 268450382 holds 267 units, the retreat clicks at the windup end
+2026/09/23 17:05:32 Hunt: the windup on 268450379 ended (hostile 268450379 at 98 units), kiting the reload tail
+2026/09/23 17:05:33 Hunt: no walkable retreat lane on target 268450361 (cornered), holding ground and shooting the bow
+2026/09/23 17:05:33 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:34 Hunt: the chasers surround the bow fight on target 268450382, holding ground and shooting through the train
+2026/09/23 17:05:34 Hunt: shot released on 268450379, hostile 268450379 holds 229 units, the retreat clicks at the windup end
+2026/09/23 17:05:34 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:34 Action failed
+2026/09/23 17:05:35 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:35 Hunt: the chasers surround the bow fight on target 268450379, holding ground and shooting through the train
+2026/09/23 17:05:36 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:36 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:37 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:37 Hunt: hostile 268450382 closed to 49 units of the fight on 268450382, kiting clear (step 1 of 8)
+2026/09/23 17:05:37 NPC  spawned at 33430 50343 -3567 heading 60429
+2026/09/23 17:05:37 NPC  spawned at 33430 50343 -3567 heading 60429
+2026/09/23 17:05:37 NPC  spawned at 42978 49115 -2992 heading 0
+2026/09/23 17:05:37 NPC  spawned at 42812 51138 -2992 heading 16384
+2026/09/23 17:05:37 NPC  spawned at 42700 50057 -2984 heading 14500
+2026/09/23 17:05:37 NPC  spawned at 42766 50037 -2984 heading 11500
+2026/09/23 17:05:37 NPC  spawned at 42971 51372 -2992 heading 32768
+2026/09/23 17:05:38 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:38 Action failed
+2026/09/23 17:05:38 Hunt: shot released on 268450382, hostile 268450382 holds 169 units, the retreat clicks at the windup end
+2026/09/23 17:05:39 Hunt: hostile 268450362 closed to 187 units of the fight on 268450362, kiting clear (step 1 of 8)
+2026/09/23 17:05:39 Hunt: fleeing for 20s without shaking the chase, resetting the aggro via logout
+2026/09/23 17:05:39 Hunt: death at the cell Green Dryad SW-6 (heat 1.0)
+2026/09/23 17:05:39 Hunt: dropping the target 0: the ground rotation owns the way
+2026/09/23 17:05:39 Hunt: regressing from Green Dryad SW-6 to Gray Wolf SW-3 after the death
+2026/09/23 17:05:39 Hunt: HP 94% under attack, emergency logout for 2s
+2026/09/23 17:05:39 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:39 Hunt: shot released on 268450362, hostile 268450362 holds 216 units, the retreat clicks at the windup end
+2026/09/23 17:05:39 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:40 Hunt: the windup on 268450382 ended (hostile 268450382 at 89 units), kiting the reload tail
+2026/09/23 17:05:40 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:41 Hunt: the windup on 268450362 ended (hostile 268450362 at 13 units), kiting the reload tail
+2026/09/23 17:05:41 Received init packet with session id 1a0265fd
+2026/09/23 17:05:41 Sent auth login for account temp21
+2026/09/23 17:05:41 Authenticated on login server
+2026/09/23 17:05:41 Received server list with 1 servers
+2026/09/23 17:05:41 Selected game server 2 at 127.0.0.1:7777
+2026/09/23 17:05:41 Sent protocol version 419
+2026/09/23 17:05:41 Game server 2 accepted the protocol
+2026/09/23 17:05:41 Sent game auth login for account temp21
+2026/09/23 17:05:41 Received character list with 1 characters
+2026/09/23 17:05:41 NPC  spawned at 37688 51203 -3536 heading 5457
+2026/09/23 17:05:41 NPC  spawned at 37688 51203 -3536 heading 5457
+2026/09/23 17:05:41 NPC  spawned at 37688 51203 -3536 heading 5457
+2026/09/23 17:05:41 Selected character temp21
+2026/09/23 17:05:41 Sent enter world request
+2026/09/23 17:05:41 User info: temp21 level 7 hp 201/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:41 Inventory listed with 12 items
+2026/09/23 17:05:41 Received packet id 0x57 with 5 bytes
+2026/09/23 17:05:41 Quest journal with 0 quests, 0 quest items
+2026/09/23 17:05:41 Player temp21 appeared at 37739 51233 -3536 speed 125
+2026/09/23 17:05:41 Player temp21 appeared at 37739 51233 -3536 speed 125
+2026/09/23 17:05:41 Player temp21 appeared at 37739 51233 -3536 speed 125
+2026/09/23 17:05:41 NPC  spawned at 37688 51203 -3536 heading 26879
+2026/09/23 17:05:41 NPC  spawned at 38495 52830 -3409 heading 27863
+2026/09/23 17:05:41 NPC  spawned at 38321 52632 -3548 heading 21990
+2026/09/23 17:05:41 NPC  spawned at 37343 51817 -3548 heading 22032
+2026/09/23 17:05:41 NPC  spawned at 38400 52644 -3409 heading 24073
+2026/09/23 17:05:41 NPC  spawned at 37899 52747 -3543 heading 7365
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 NPC  spawned at 35449 50240 -3572 heading 22946
+2026/09/23 17:05:41 Player temp20 appeared at 35747 50702 -3456 speed 125
+2026/09/23 17:05:41 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:41 NPC  spawned at 36370 52378 -3520 heading 47819
+2026/09/23 17:05:41 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:41 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:41 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:41 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:41 NPC  spawned at 34822 52380 -3567 heading 2989
+2026/09/23 17:05:41 NPC  spawned at 35383 51714 -3567 heading 23852
+2026/09/23 17:05:41 NPC  spawned at 35429 52251 -3567 heading 53840
+2026/09/23 17:05:41 NPC  spawned at 35688 52704 -3567 heading 60610
+2026/09/23 17:05:41 NPC  spawned at 36590 53269 -3572 heading 0
+2026/09/23 17:05:41 NPC  spawned at 36990 50932 -3548 heading 44446
+2026/09/23 17:05:41 NPC  spawned at 37608 51164 -3543 heading 2935
+2026/09/23 17:05:41 NPC  spawned at 37524 49488 -3520 heading 13776
+2026/09/23 17:05:41 Player temp24 appeared at 37536 49535 -3520 speed 125
+2026/09/23 17:05:41 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:41 NPC  spawned at 37690 53261 -3409 heading 59524
+2026/09/23 17:05:41 Player temp23 appeared at 39097 49862 -3496 speed 125
+2026/09/23 17:05:41 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:05:41 NPC  spawned at 39527 50943 -3543 heading 43451
+2026/09/23 17:05:41 NPC  spawned at 38976 49818 -3496 heading 3637
+2026/09/23 17:05:41 NPC  spawned at 40030 50897 -3543 heading 17489
+2026/09/23 17:05:41 NPC  spawned at 39045 49469 -3543 heading 43854
+2026/09/23 17:05:41 NPC  spawned at 39884 49375 -3543 heading 56398
+2026/09/23 17:05:41 NPC  spawned at 39591 52384 -3409 heading 59551
+2026/09/23 17:05:41 NPC  spawned at 39992 51202 -3548 heading 0
+2026/09/23 17:05:41 NPC  spawned at 39537 52301 -3414 heading 14399
+2026/09/23 17:05:41 NPC  spawned at 39594 51921 -3409 heading 31793
+2026/09/23 17:05:41 NPC  spawned at 39886 53711 -3496 heading 58289
+2026/09/23 17:05:41 Received packet id 0x65 with 1 bytes
+2026/09/23 17:05:41 Received packet id 0xda with 5 bytes
+2026/09/23 17:05:41 User info: temp21 level 7 hp 201/214 mp 82/82 speed 125 x 15435
+2026/09/23 17:05:41 Action failed
+2026/09/23 17:05:41 Player temp21 appeared at 37739 51233 -3536 speed 125
+2026/09/23 17:05:41 Player temp21 appeared at 37739 51233 -3536 speed 125
+2026/09/23 17:05:41 Player temp21 appeared at 37739 51233 -3536 speed 125
+2026/09/23 17:05:41 Hunt: level 7: resuming the cell Green Dryad SW-6 - the login landed on its ground
+2026/09/23 17:05:41 Action failed
+2026/09/23 17:05:41 Skill list with 1 skills
+2026/09/23 17:05:41 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:41 Hunt: hostile 268450379 closed to 49 units of the fight on 268450379, kiting clear (step 1 of 8)
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 Received packet id 0x0b with 29 bytes
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 Received packet id 0x0b with 29 bytes
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 Received packet id 0x0b with 29 bytes
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 User info: temp20 level 7 hp 172/214 mp 82/82 speed 125 x 15387
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 Received packet id 0x0b with 29 bytes
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 NPC  spawned at 35758 50695 -3456 heading 26856
+2026/09/23 17:05:41 Hunt: target 268450361 died, looting
+2026/09/23 17:05:41 Action failed
+2026/09/23 17:05:41 Hunt: shot released on 268450382, hostile 268450382 holds 121 units, the retreat clicks at the windup end
+2026/09/23 17:05:42 NPC  spawned at 37714 53246 -3409 heading 59524
+2026/09/23 17:05:42 NPC  spawned at 37714 53246 -3409 heading 59524
+2026/09/23 17:05:42 NPC  spawned at 37714 53246 -3409 heading 59524
+2026/09/23 17:05:42 Inventory listed with 13 items
+2026/09/23 17:05:42 Action failed
+2026/09/23 17:05:42 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:42 Hunt: Kaboo Orc Fighter stalks the fight 114 units out, stepping clear
+2026/09/23 17:05:42 Hunt: dropping the target 268450392: the ground rotation owns the way
+2026/09/23 17:05:42 Hunt: the fight crossed into Green Dryad SW-6 (was Kaboo Orc Grunt SW-5), following the ground
+2026/09/23 17:05:42 Hunt: shot released on 268450362, hostile 268450362 holds 218 units, the retreat clicks at the windup end
+2026/09/23 17:05:42 Action failed
+2026/09/23 17:05:42 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:42 Action failed
+2026/09/23 17:05:43 Hunt: shot released on 268450379, hostile 268450379 holds 198 units, the retreat clicks at the windup end
+2026/09/23 17:05:43 Hunt: the chasers surround the bow fight on target 268450382, holding ground and shooting through the train
+2026/09/23 17:05:43 Action failed
+2026/09/23 17:05:44 Hunt: the windup on 268450362 ended (hostile 268450362 at 13 units), kiting the reload tail
+2026/09/23 17:05:44 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:44 Hunt: the windup on 268450379 ended (hostile 268450379 at 49 units), kiting the reload tail
+2026/09/23 17:05:45 Hunt: HP 67% in the fight, drinking a healing potion
+2026/09/23 17:05:45 Received packet id 0x8e with 21 bytes
+2026/09/23 17:05:45 Received packet id 0x8e with 21 bytes
+2026/09/23 17:05:45 Received packet id 0x8e with 21 bytes
+2026/09/23 17:05:45 User info: temp24 level 7 hp 144/214 mp 82/82 speed 125 x 15393
+2026/09/23 17:05:45 Received packet id 0x8e with 21 bytes
+2026/09/23 17:05:45 Player temp24 appeared at 37254 49577 -3520 speed 125
+2026/09/23 17:05:45 Player temp24 appeared at 37254 49577 -3520 speed 125
+2026/09/23 17:05:45 Player temp24 appeared at 37254 49577 -3520 speed 125
+2026/09/23 17:05:45 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:46 Hunt: shot released on 268450362, hostile 268450362 holds 151 units, the retreat clicks at the windup end
+2026/09/23 17:05:46 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:46 Hunt: hostile 268450382 closed to 49 units of the fight on 268450382, kiting clear (step 2 of 8)
+2026/09/23 17:05:46 Hunt: shot released on 268450379, hostile 268450379 holds 228 units, the retreat clicks at the windup end
+2026/09/23 17:05:47 Hunt: the windup on 268450362 ended (hostile 268450362 at 13 units), kiting the reload tail
+2026/09/23 17:05:47 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:47 Action failed
+2026/09/23 17:05:47 Hunt: shot released on 268450382, hostile 268450382 holds 198 units, the retreat clicks at the windup end
+2026/09/23 17:05:47 Hunt: the chasers surround the bow fight on target 268450379, holding ground and shooting through the train
+2026/09/23 17:05:48 Hunt: Kaboo Orc Fighter stalks the fight 417 units out, stepping clear
+2026/09/23 17:05:48 NPC  spawned at 34820 53962 -3585 heading 59105
+2026/09/23 17:05:49 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:49 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:49 Hunt: shot released on 268450362, hostile 268450362 holds 179 units, the retreat clicks at the windup end
+2026/09/23 17:05:49 Hunt: the chasers surround the bow fight on target 268450382, holding ground and shooting through the train
+2026/09/23 17:05:50 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:50 Hunt: the windup on 268450362 ended (hostile 268450362 at 28 units), kiting the reload tail
+2026/09/23 17:05:51 Hunt: HP 67% in the fight, drinking a healing potion
+2026/09/23 17:05:51 Received packet id 0x8e with 21 bytes
+2026/09/23 17:05:51 Received packet id 0x8e with 21 bytes
+2026/09/23 17:05:51 Received packet id 0x8e with 21 bytes
+2026/09/23 17:05:51 User info: temp23 level 7 hp 144/214 mp 80/82 speed 125 x 15370
+2026/09/23 17:05:51 Player temp23 appeared at 39104 50084 -3496 speed 125
+2026/09/23 17:05:51 Player temp23 appeared at 39104 50084 -3496 speed 125
+2026/09/23 17:05:52 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:52 Action failed
+2026/09/23 17:05:52 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:52 Hunt: shot released on 268450362, hostile 268450362 holds 103 units, the retreat clicks at the windup end
+2026/09/23 17:05:52 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:53 Hunt: dropping the target 268450389: the ground rotation owns the way
+2026/09/23 17:05:53 Hunt: the fight crossed into Kaboo Orc Grunt SW-7 (was Green Dryad SW-6), following the ground
+2026/09/23 17:05:53 Action failed
+2026/09/23 17:05:53 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:54 Hunt: the windup on 268450362 ended (hostile 268450362 at 12 units), kiting the reload tail
+2026/09/23 17:05:54 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:54 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:54 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:54 NPC  spawned at 36750 51276 -3543 heading 5807
+2026/09/23 17:05:54 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:54 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:54 Action failed
+2026/09/23 17:05:55 Hunt: shot released on 268450389, hostile 268450389 holds 385 units, the retreat clicks at the windup end
+2026/09/23 17:05:55 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:55 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:55 Hunt: shot released on 268450362, hostile 268450362 holds 101 units, the retreat clicks at the windup end
+2026/09/23 17:05:55 Hunt: shot released on 268450392, hostile 268450392 holds 402 units, the retreat clicks at the windup end
+2026/09/23 17:05:55 NPC  spawned at 37971 53247 -3409 heading 59656
+2026/09/23 17:05:55 NPC  spawned at 37971 53247 -3409 heading 59656
+2026/09/23 17:05:55 NPC  spawned at 37971 53247 -3409 heading 59656
+2026/09/23 17:05:56 Hunt: no walkable retreat lane on target 268450389 (cornered), holding ground and shooting the bow
+2026/09/23 17:05:56 NPC  spawned at 37275 52055 -3548 heading 19286
+2026/09/23 17:05:56 NPC  spawned at 37275 52055 -3548 heading 19286
+2026/09/23 17:05:56 NPC  spawned at 37275 52055 -3548 heading 19286
+2026/09/23 17:05:56 NPC  spawned at 37275 52055 -3548 heading 19286
+2026/09/23 17:05:56 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:56 Action failed
+2026/09/23 17:05:57 Hunt: dropping the target 268450392: the ground rotation owns the way
+2026/09/23 17:05:57 Hunt: the fight crossed into Kaboo Orc Grunt SW-6 (was Green Dryad SW-6), following the ground
+2026/09/23 17:05:57 Action failed
+2026/09/23 17:05:57 Hunt: the windup on 268450362 ended (hostile 268450362 at 12 units), kiting the reload tail
+2026/09/23 17:05:57 Hunt: the chasers surround the bow fight on target 268450392, holding ground and shooting through the train
+2026/09/23 17:05:57 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:57 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:58 NPC  spawned at 32387 45887 -3670 heading 57548
+2026/09/23 17:05:58 NPC  spawned at 30802 46472 -3670 heading 0
+2026/09/23 17:05:58 NPC  spawned at 33353 45486 -3644 heading 55090
+2026/09/23 17:05:58 NPC  spawned at 34767 46876 -3639 heading 10114
+2026/09/23 17:05:58 NPC  spawned at 36023 45819 -3644 heading 24719
+2026/09/23 17:05:58 NPC  spawned at 35474 46503 -3699 heading 59266
+2026/09/23 17:05:58 NPC  spawned at 36605 45125 -3644 heading 36351
+2026/09/23 17:05:58 NPC  spawned at 36681 45770 -3644 heading 0
+2026/09/23 17:05:58 NPC  spawned at 35899 46501 -3704 heading 29218
+2026/09/23 17:05:58 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:58 Received packet id 0x85 with 13 bytes
+2026/09/23 17:05:59 Hunt: shot released on 268450362, hostile 268450362 holds 132 units, the retreat clicks at the windup end
+2026/09/23 17:05:59 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:00 Hunt: the windup on 268450362 ended (hostile 268450362 at 12 units), kiting the reload tail
+2026/09/23 17:06:00 User info: temp24 level 7 hp 214/214 mp 81/82 speed 125 x 15358
+2026/09/23 17:06:00 Player temp24 appeared at 37199 49555 -3520 speed 125
+2026/09/23 17:06:00 Player temp24 appeared at 37199 49555 -3520 speed 125
+2026/09/23 17:06:00 Player temp24 appeared at 37199 49555 -3520 speed 125
+2026/09/23 17:06:00 Hunt: hostile 268450392 closed to 13 units of the fight on 268450392, kiting clear (step 1 of 8)
+2026/09/23 17:06:00 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:00 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:00 Hunt: HP 70% in the fight, drinking a healing potion
+2026/09/23 17:06:00 User info: temp22 level 7 hp 149/214 mp 81/82 speed 125 x 15382
+2026/09/23 17:06:00 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:00 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:00 User info: temp23 level 7 hp 175/214 mp 81/82 speed 125 x 15352
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 NPC  spawned at 39106 50036 -3496 heading 16818
+2026/09/23 17:06:00 Player temp22 appeared at 34096 49021 -3567 speed 125
+2026/09/23 17:06:01 Hunt: target 268450382 died, looting
+2026/09/23 17:06:01 Action failed
+2026/09/23 17:06:01 Action failed
+2026/09/23 17:06:02 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:02 NPC  spawned at 32943 54510 -3590 heading 21173
+2026/09/23 17:06:02 NPC  spawned at 33307 54822 -3590 heading 40528
+2026/09/23 17:06:02 NPC  spawned at 34899 53904 -3585 heading 30709
+2026/09/23 17:06:02 NPC  spawned at 36590 53269 -3572 heading 0
+2026/09/23 17:06:02 Hunt: shot released on 268450362, hostile 268450362 holds 163 units, the retreat clicks at the windup end
+2026/09/23 17:06:03 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:03 Action failed
+2026/09/23 17:06:03 Hunt: shot released on 268450392, hostile 268450392 holds 61 units, the retreat clicks at the windup end
+2026/09/23 17:06:03 User info: temp22 level 7 hp 168/214 mp 81/82 speed 125 x 15376
+2026/09/23 17:06:03 NPC  spawned at 34002 48905 -3567 heading 42114
+2026/09/23 17:06:03 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:03 NPC  spawned at 34002 48905 -3567 heading 42114
+2026/09/23 17:06:03 NPC  spawned at 34002 48905 -3567 heading 42114
+2026/09/23 17:06:03 Hunt: target 268450362 died, looting
+2026/09/23 17:06:03 Hunt: dropping the target 268450389: the ground rotation owns the way
+2026/09/23 17:06:03 Hunt: the fight crossed into Green Dryad SW-6 (was Kaboo Orc Grunt SW-7), following the ground
+2026/09/23 17:06:03 Action failed
+2026/09/23 17:06:03 Action failed
+2026/09/23 17:06:03 Action failed
+2026/09/23 17:06:03 NPC  spawned at 34002 48905 -3567 heading 42114
+2026/09/23 17:06:03 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:03 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:03 Action failed
+2026/09/23 17:06:04 NPC  spawned at 34737 51011 -3572 heading 0
+2026/09/23 17:06:04 NPC  spawned at 34737 51011 -3572 heading 0
+2026/09/23 17:06:04 NPC  spawned at 34737 51011 -3572 heading 0
+2026/09/23 17:06:04 NPC  spawned at 34737 51011 -3572 heading 0
+2026/09/23 17:06:04 NPC  spawned at 34737 51011 -3572 heading 0
+2026/09/23 17:06:04 NPC  spawned at 34737 51011 -3572 heading 0
+2026/09/23 17:06:04 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:04 Action failed
+2026/09/23 17:06:04 Action failed
+2026/09/23 17:06:04 Action failed
+2026/09/23 17:06:04 Hunt: the windup on 268450392 ended (hostile 268450392 at 13 units), kiting the reload tail
+2026/09/23 17:06:05 Hunt: hostile 268450389 closed to 13 units of the fight on 268450389, kiting clear (step 1 of 8)
+2026/09/23 17:06:06 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:06 Action failed
+2026/09/23 17:06:06 Hunt: shot released on 268450392, hostile 268450392 holds 58 units, the retreat clicks at the windup end
+2026/09/23 17:06:06 User info: temp23 level 7 hp 214/214 mp 82/82 speed 125 x 15346
+2026/09/23 17:06:06 Player temp23 appeared at 39128 49842 -3543 speed 125
+2026/09/23 17:06:06 Player temp23 appeared at 39128 49842 -3543 speed 125
+2026/09/23 17:06:06 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:06 Action failed
+2026/09/23 17:06:07 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:07 Action failed
+2026/09/23 17:06:08 Hunt: the windup on 268450392 ended (hostile 268450392 at 13 units), kiting the reload tail
+2026/09/23 17:06:08 Action failed
+2026/09/23 17:06:08 NPC  spawned at 33894 51198 -3567 heading 61394
+2026/09/23 17:06:09 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:09 Hunt: shot released on 268450389, hostile 268450389 holds 13 units, the retreat clicks at the windup end
+2026/09/23 17:06:09 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:09 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:09 Action failed
+2026/09/23 17:06:09 Hunt: shot released on 268450392, hostile 268450392 holds 72 units, the retreat clicks at the windup end
+2026/09/23 17:06:09 Hunt: shot released on 268450379, hostile 268450379 holds 49 units, the retreat clicks at the windup end
+2026/09/23 17:06:10 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:10 Hunt: the windup on 268450389 ended (hostile 268450389 at 13 units), kiting the reload tail
+2026/09/23 17:06:10 Action failed
+2026/09/23 17:06:10 Hunt: the kite walk click on target 268450389 was refused by the server (standing on 37878 51553), rotating the retreat lane at the probe age
+2026/09/23 17:06:10 Hunt: HP 66% in the fight, drinking a healing potion
+2026/09/23 17:06:10 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:10 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:10 User info: temp20 level 7 hp 143/214 mp 81/82 speed 125 x 15351
+2026/09/23 17:06:10 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:10 Player temp20 appeared at 36384 51688 -3543 speed 125
+2026/09/23 17:06:10 Player temp20 appeared at 36384 51688 -3543 speed 125
+2026/09/23 17:06:11 Hunt: the windup on 268450392 ended (hostile 268450392 at 23 units), kiting the reload tail
+2026/09/23 17:06:11 NPC  spawned at 39180 49371 -3543 heading 58986
+2026/09/23 17:06:11 NPC  spawned at 39180 49371 -3543 heading 58986
+2026/09/23 17:06:11 NPC  spawned at 39180 49371 -3543 heading 58986
+2026/09/23 17:06:12 Hunt: HP 69% in the fight, drinking a healing potion
+2026/09/23 17:06:12 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:12 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:12 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:12 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:12 User info: temp24 level 7 hp 147/214 mp 82/82 speed 125 x 15329
+2026/09/23 17:06:12 Player temp24 appeared at 37199 49555 -3520 speed 125
+2026/09/23 17:06:12 Player temp24 appeared at 37199 49555 -3520 speed 125
+2026/09/23 17:06:12 Player temp24 appeared at 37199 49555 -3520 speed 125
+2026/09/23 17:06:12 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:12 Hunt: shot released on 268450389, hostile 268450389 holds 13 units, the retreat clicks at the windup end
+2026/09/23 17:06:12 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:12 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:13 Hunt: shot released on 268450392, hostile 268450392 holds 29 units, the retreat clicks at the windup end
+2026/09/23 17:06:13 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:13 Hunt: shot released on 268450386, hostile 268450386 holds 326 units, the retreat clicks at the windup end
+2026/09/23 17:06:13 Hunt: the windup on 268450389 ended (hostile 268450389 at 13 units), kiting the reload tail
+2026/09/23 17:06:13 Action failed
+2026/09/23 17:06:13 Hunt: the fight crossed into Spore Fungus SW-6 (was Kaboo Orc Grunt SW-3), following the ground
+2026/09/23 17:06:13 NPC  spawned at 34824 54071 -3585 heading 486
+2026/09/23 17:06:13 Hunt: the kite walk click on target 268450389 was refused by the server (standing on 38008 51338), rotating the retreat lane at the probe age
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 User info: temp24 level 7 hp 155/214 mp 82/82 speed 125 x 15323
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 NPC  spawned at 37247 49565 -3520 heading 34910
+2026/09/23 17:06:14 Hunt: target 268450379 died, looting
+2026/09/23 17:06:14 Hunt: the chasers surround the bow fight on target 268450392, holding ground and shooting through the train
+2026/09/23 17:06:14 Action failed
+2026/09/23 17:06:14 NPC  spawned at 35134 48501 -3639 heading 42822
+2026/09/23 17:06:14 NPC  spawned at 37454 48372 -3592 heading 0
+2026/09/23 17:06:14 NPC  spawned at 39647 48975 -3543 heading 32266
+2026/09/23 17:06:14 Hunt: the windup on 268450386 ended (hostile 268450386 at 200 units), kiting the reload tail
+2026/09/23 17:06:15 Action failed
+2026/09/23 17:06:15 Action failed
+2026/09/23 17:06:15 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:15 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:15 Action failed
+2026/09/23 17:06:15 User info: temp22 level 7 hp 214/214 mp 82/82 speed 125 x 15376
+2026/09/23 17:06:15 Hunt: shot released on 268450389, hostile 268450389 holds 57 units, the retreat clicks at the windup end
+2026/09/23 17:06:16 Action failed
+2026/09/23 17:06:16 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:16 Hunt: dropping the target 268450381: the ground rotation owns the way
+2026/09/23 17:06:16 Hunt: the fight crossed into Green Dryad SW-6 (was Green Dryad SW-5), following the ground
+2026/09/23 17:06:16 Action failed
+2026/09/23 17:06:16 Hunt: shot released on 268450386, hostile 268450386 holds 56 units, the retreat clicks at the windup end
+2026/09/23 17:06:16 Hunt: the windup on 268450389 ended (hostile 268450389 at 12 units), kiting the reload tail
+2026/09/23 17:06:16 Action failed
+2026/09/23 17:06:17 Hunt: the kite walk click on target 268450389 was refused by the server (standing on 38061 51092), rotating the retreat lane at the probe age
+2026/09/23 17:06:17 Action failed
+2026/09/23 17:06:18 Hunt: the windup on 268450386 ended (hostile 268450386 at 12 units), kiting the reload tail
+2026/09/23 17:06:18 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:18 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:19 Hunt: shot released on 268450389, hostile 268450389 holds 122 units, the retreat clicks at the windup end
+2026/09/23 17:06:19 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:19 Hunt: shot released on 268450386, hostile 268450386 holds 58 units, the retreat clicks at the windup end
+2026/09/23 17:06:20 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:20 Hunt: shot released on 268450430, hostile 268450430 holds 440 units, the retreat clicks at the windup end
+2026/09/23 17:06:20 Hunt: the windup on 268450389 ended (hostile 268450389 at 12 units), kiting the reload tail
+2026/09/23 17:06:20 Action failed
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 User info: temp21 level 7 hp 168/214 mp 81/82 speed 125 x 15387
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 NPC  spawned at 38036 50854 -3548 heading 47429
+2026/09/23 17:06:20 Hunt: target 268450389 died, looting
+2026/09/23 17:06:20 Action failed
+2026/09/23 17:06:21 Hunt: the windup on 268450386 ended (hostile 268450386 at 13 units), kiting the reload tail
+2026/09/23 17:06:21 NPC  spawned at 32357 48444 -3670 heading 49229
+2026/09/23 17:06:21 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:22 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:22 Action failed
+2026/09/23 17:06:22 Hunt: shot released on 268450386, hostile 268450386 holds 43 units, the retreat clicks at the windup end
+2026/09/23 17:06:22 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 NPC  spawned at 37975 52551 -3548 heading 0
+2026/09/23 17:06:23 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:24 Action failed
+2026/09/23 17:06:24 Action failed
+2026/09/23 17:06:24 Hunt: hostile 268450430 closed to 120 units of the fight on 268450430 inside the windup, the retreat waits the windup end
+2026/09/23 17:06:24 Hunt: the windup on 268450386 ended (hostile 268450386 at 13 units), kiting the reload tail
+2026/09/23 17:06:24 Action failed
+2026/09/23 17:06:24 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:24 Hunt: the windup on 268450430 ended (hostile 268450430 at 58 units), kiting the reload tail
+2026/09/23 17:06:25 NPC  spawned at 37025 50822 -3548 heading 19967
+2026/09/23 17:06:25 NPC  spawned at 37025 50822 -3548 heading 19967
+2026/09/23 17:06:25 NPC  spawned at 37025 50822 -3548 heading 19967
+2026/09/23 17:06:25 NPC  spawned at 37025 50822 -3548 heading 19967
+2026/09/23 17:06:25 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:25 User info: temp20 level 7 hp 208/214 mp 81/82 speed 125 x 15316
+2026/09/23 17:06:25 Hunt: shot released on 268450386, hostile 268450386 holds 13 units, the retreat clicks at the windup end
+2026/09/23 17:06:25 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:25 Player temp20 appeared at 36384 51909 -3543 speed 125
+2026/09/23 17:06:25 Player temp20 appeared at 36384 51909 -3543 speed 125
+2026/09/23 17:06:26 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:26 Hunt: shot released on 268450383, hostile 268450383 holds 227 units, the retreat clicks at the windup end
+2026/09/23 17:06:26 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:26 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:26 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:26 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:26 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:26 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:26 User info: temp20 level 7 hp 208/214 mp 81/82 speed 125 x 15316
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 Hunt: target 268450392 died, looting
+2026/09/23 17:06:26 Hunt: shot released on 268450430, hostile 268450430 holds 234 units, the retreat clicks at the windup end
+2026/09/23 17:06:26 Action failed
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 NPC  spawned at 36383 51897 -3543 heading 15516
+2026/09/23 17:06:26 Hunt: dropping the target 268450362: the ground rotation owns the way
+2026/09/23 17:06:26 Hunt: the fight crossed into Kaboo Orc Grunt SW-7 (was Kaboo Orc Grunt SW-6), following the ground
+2026/09/23 17:06:26 Action failed
+2026/09/23 17:06:26 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:27 Hunt: shot released on 268450381, hostile 268450381 holds 300 units, the retreat clicks at the windup end
+2026/09/23 17:06:27 User info: temp24 level 7 hp 214/214 mp 81/82 speed 125 x 15311
+2026/09/23 17:06:27 Hunt: the chasers surround the bow fight on target 268450383, holding ground and shooting through the train
+2026/09/23 17:06:27 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:27 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:27 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:27 Hunt: the windup on 268450386 ended (hostile 268450386 at 13 units), kiting the reload tail
+2026/09/23 17:06:27 NPC  spawned at 37598 51041 -3543 heading 48305
+2026/09/23 17:06:27 NPC  spawned at 37598 51041 -3543 heading 48305
+2026/09/23 17:06:27 NPC  spawned at 37598 51041 -3543 heading 48305
+2026/09/23 17:06:27 NPC  spawned at 37598 51041 -3543 heading 48305
+2026/09/23 17:06:27 Action failed
+2026/09/23 17:06:27 Hunt: the windup on 268450430 ended (hostile 268450430 at 58 units), kiting the reload tail
+2026/09/23 17:06:28 Hunt: no walkable retreat lane on target 268450381 (cornered), holding ground and shooting the bow
+2026/09/23 17:06:28 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:28 Action failed
+2026/09/23 17:06:28 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:29 Hunt: shot released on 268450386, hostile 268450386 holds 12 units, the retreat clicks at the windup end
+2026/09/23 17:06:29 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:29 Hunt: shot released on 268450430, hostile 268450430 holds 247 units, the retreat clicks at the windup end
+2026/09/23 17:06:29 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:29 Action failed
+2026/09/23 17:06:30 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:30 Hunt: the chasers surround the bow fight on target 268450386, holding ground and shooting through the train
+2026/09/23 17:06:31 Hunt: the windup on 268450430 ended (hostile 268450430 at 58 units), kiting the reload tail
+2026/09/23 17:06:31 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:31 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:31 NPC  spawned at 36682 52559 -3572 heading 0
+2026/09/23 17:06:31 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:31 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:32 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:32 Hunt: shot released on 268450430, hostile 268450430 holds 219 units, the retreat clicks at the windup end
+2026/09/23 17:06:32 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:32 Action failed
+2026/09/23 17:06:32 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:33 Hunt: shot released on 268450362, hostile 268450362 holds 309 units, the retreat clicks at the windup end
+2026/09/23 17:06:34 Hunt: the windup on 268450430 ended (hostile 268450430 at 57 units), kiting the reload tail
+2026/09/23 17:06:34 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:34 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:34 Hunt: no walkable retreat lane on target 268450362 (cornered), holding ground and shooting the bow
+2026/09/23 17:06:35 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:35 Action failed
+2026/09/23 17:06:35 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:35 Action failed
+2026/09/23 17:06:35 Hunt: shot released on 268450430, hostile 268450430 holds 204 units, the retreat clicks at the windup end
+2026/09/23 17:06:35 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:37 Hunt: dropping the target 268450362: the ground rotation owns the way
+2026/09/23 17:06:37 Hunt: the fight crossed into Kaboo Orc Grunt SW-6 (was Kaboo Orc Grunt SW-7), following the ground
+2026/09/23 17:06:37 Action failed
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:37 Hunt: the windup on 268450430 ended (hostile 268450430 at 100 units), kiting the reload tail
+2026/09/23 17:06:37 Hunt: HP 62% in the fight, drinking a healing potion
+2026/09/23 17:06:37 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:37 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:37 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:37 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:37 User info: temp21 level 7 hp 134/214 mp 82/82 speed 125 x 15358
+2026/09/23 17:06:37 Player temp21 appeared at 37606 50814 -3500 speed 125
+2026/09/23 17:06:37 Player temp21 appeared at 37606 50814 -3500 speed 125
+2026/09/23 17:06:37 Player temp21 appeared at 37606 50814 -3500 speed 125
+2026/09/23 17:06:37 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:37 Action failed
+2026/09/23 17:06:37 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:37 Action failed
+2026/09/23 17:06:37 Hunt: hostile 268450362 closed to 13 units of the fight on 268450362, kiting clear (step 1 of 8)
+2026/09/23 17:06:38 NPC  spawned at 30643 46827 -3670 heading 28868
+2026/09/23 17:06:38 NPC  spawned at 29730 48073 -3670 heading 0
+2026/09/23 17:06:38 NPC  spawned at 30709 48534 -3670 heading 38964
+2026/09/23 17:06:38 NPC  spawned at 30644 49029 -3670 heading 28477
+2026/09/23 17:06:38 NPC  spawned at 30009 50694 -3670 heading 0
+2026/09/23 17:06:38 NPC  spawned at 30599 50120 -3670 heading 37604
+2026/09/23 17:06:38 NPC  spawned at 29354 49831 -3670 heading 0
+2026/09/23 17:06:38 NPC  spawned at 30587 50114 -3670 heading 39805
+2026/09/23 17:06:38 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:38 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:38 Action failed
+2026/09/23 17:06:39 Hunt: shot released on 268450430, hostile 268450430 holds 244 units, the retreat clicks at the windup end
+2026/09/23 17:06:39 Action failed
+2026/09/23 17:06:40 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:40 Hunt: shot released on 268450362, hostile 268450362 holds 220 units, the retreat clicks at the windup end
+2026/09/23 17:06:40 Hunt: the windup on 268450430 ended (hostile 268450430 at 120 units), kiting the reload tail
+2026/09/23 17:06:40 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:40 Action failed
+2026/09/23 17:06:40 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:40 Hunt: HP 67% in the fight, drinking a healing potion
+2026/09/23 17:06:40 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:40 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:40 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:40 User info: temp23 level 7 hp 144/214 mp 81/82 speed 125 x 15274
+2026/09/23 17:06:40 Player temp23 appeared at 39166 49845 -3543 speed 125
+2026/09/23 17:06:40 Player temp23 appeared at 39166 49845 -3543 speed 125
+2026/09/23 17:06:41 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:41 Action failed
+2026/09/23 17:06:41 Hunt: HP 66% in the fight, drinking a healing potion
+2026/09/23 17:06:41 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:41 User info: temp22 level 7 hp 142/214 mp 81/82 speed 125 x 15334
+2026/09/23 17:06:42 Hunt: the windup on 268450362 ended (hostile 268450362 at 13 units), kiting the reload tail
+2026/09/23 17:06:42 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:42 Hunt: shot released on 268450430, hostile 268450430 holds 246 units, the retreat clicks at the windup end
+2026/09/23 17:06:42 Hunt: HP 67% in the fight, drinking a healing potion
+2026/09/23 17:06:42 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:42 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:42 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:42 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:42 User info: temp24 level 7 hp 144/214 mp 82/82 speed 125 x 15281
+2026/09/23 17:06:42 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:42 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:42 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:42 Skill list with 1 skills
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:06:43 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:43 Action failed
+2026/09/23 17:06:43 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:43 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:43 Hunt: shot released on 268450362, hostile 268450362 holds 226 units, the retreat clicks at the windup end
+2026/09/23 17:06:43 Hunt: the chasers surround the bow fight on target 268450430, holding ground and shooting through the train
+2026/09/23 17:06:44 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:45 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:45 User info: temp23 level 7 hp 159/214 mp 81/82 speed 125 x 15263
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 NPC  spawned at 39178 49846 -3543 heading 33635
+2026/09/23 17:06:45 Hunt: no walkable retreat lane on target 268450362 (cornered), holding ground and shooting the bow
+2026/09/23 17:06:45 Hunt: target 268450386 died, looting
+2026/09/23 17:06:45 Action failed
+2026/09/23 17:06:46 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:46 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:47 Hunt: hostile 268450430 closed to 58 units of the fight on 268450430, kiting clear (step 1 of 8)
+2026/09/23 17:06:47 NPC  spawned at 35906 45948 -3644 heading 24971
+2026/09/23 17:06:47 NPC  spawned at 35474 46503 -3699 heading 59266
+2026/09/23 17:06:47 NPC  spawned at 36605 45125 -3644 heading 36351
+2026/09/23 17:06:47 NPC  spawned at 36681 45770 -3644 heading 0
+2026/09/23 17:06:47 NPC  spawned at 35899 46501 -3704 heading 29218
+2026/09/23 17:06:47 NPC  spawned at 35243 48191 -3639 heading 54178
+2026/09/23 17:06:47 NPC  spawned at 35175 50672 -3572 heading 5920
+2026/09/23 17:06:47 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:06:47 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:48 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:48 Hunt: shot released on 268450430, hostile 268450430 holds 115 units, the retreat clicks at the windup end
+2026/09/23 17:06:48 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:49 NPC  spawned at 38064 51859 -3548 heading 0
+2026/09/23 17:06:49 NPC  spawned at 38064 51859 -3548 heading 0
+2026/09/23 17:06:49 NPC  spawned at 38064 51859 -3548 heading 0
+2026/09/23 17:06:49 NPC  spawned at 38064 51859 -3548 heading 0
+2026/09/23 17:06:49 NPC  spawned at 38064 51859 -3548 heading 0
+2026/09/23 17:06:49 NPC  spawned at 38064 51859 -3548 heading 0
+2026/09/23 17:06:49 NPC  spawned at 38064 51859 -3548 heading 0
+2026/09/23 17:06:49 NPC  spawned at 38064 51859 -3548 heading 0
+2026/09/23 17:06:49 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:49 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:49 Hunt: the windup on 268450430 ended (hostile 268450430 at 115 units), kiting the reload tail
+2026/09/23 17:06:50 NPC  spawned at 39517 50485 -3543 heading 57707
+2026/09/23 17:06:50 NPC  spawned at 39517 50485 -3543 heading 57707
+2026/09/23 17:06:50 NPC  spawned at 39517 50485 -3543 heading 57707
+2026/09/23 17:06:50 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:51 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:51 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:51 Hunt: shot released on 268450430, hostile 268450430 holds 244 units, the retreat clicks at the windup end
+2026/09/23 17:06:51 Hunt: shot released on 268450380, hostile 268450380 holds 396 units, the retreat clicks at the windup end
+2026/09/23 17:06:51 NPC  spawned at 36760 45061 -3644 heading 16942
+2026/09/23 17:06:52 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:52 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:52 User info: temp21 level 7 hp 209/214 mp 81/82 speed 125 x 15322
+2026/09/23 17:06:52 Player temp21 appeared at 37606 50814 -3500 speed 125
+2026/09/23 17:06:52 Player temp21 appeared at 37606 50814 -3500 speed 125
+2026/09/23 17:06:52 Player temp21 appeared at 37606 50814 -3500 speed 125
+2026/09/23 17:06:53 Hunt: the windup on 268450430 ended (hostile 268450430 at 58 units), kiting the reload tail
+2026/09/23 17:06:53 Hunt: the chasers surround the bow fight on target 268450380, holding ground and shooting through the train
+2026/09/23 17:06:53 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:53 NPC  spawned at 30726 46822 -3670 heading 64920
+2026/09/23 17:06:53 Hunt: shot released on 268450381, hostile 268450381 holds 48 units, the retreat clicks at the windup end
+2026/09/23 17:06:54 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:54 Action failed
+2026/09/23 17:06:54 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:54 Action failed
+2026/09/23 17:06:54 Hunt: shot released on 268450430, hostile 268450430 holds 247 units, the retreat clicks at the windup end
+2026/09/23 17:06:55 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:55 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:55 User info: temp23 level 7 hp 214/214 mp 81/82 speed 125 x 15245
+2026/09/23 17:06:55 Player temp23 appeared at 39278 50051 -3543 speed 125
+2026/09/23 17:06:55 Player temp23 appeared at 39278 50051 -3543 speed 125
+2026/09/23 17:06:56 Hunt: the windup on 268450430 ended (hostile 268450430 at 57 units), kiting the reload tail
+2026/09/23 17:06:56 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:56 User info: temp22 level 7 hp 184/214 mp 82/82 speed 125 x 15299
+2026/09/23 17:06:57 User info: temp24 level 7 hp 202/214 mp 81/82 speed 125 x 15246
+2026/09/23 17:06:57 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:57 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:57 Player temp24 appeared at 37118 50345 -3548 speed 125
+2026/09/23 17:06:57 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:57 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:58 Hunt: HP 68% in the fight, drinking a healing potion
+2026/09/23 17:06:58 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:58 User info: temp20 level 7 hp 146/214 mp 82/82 speed 125 x 15257
+2026/09/23 17:06:58 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:58 Received packet id 0x8e with 21 bytes
+2026/09/23 17:06:58 Hunt: shot released on 268450430, hostile 268450430 holds 205 units, the retreat clicks at the windup end
+2026/09/23 17:06:58 Player temp20 appeared at 36443 51621 -3572 speed 125
+2026/09/23 17:06:58 Player temp20 appeared at 36443 51621 -3572 speed 125
+2026/09/23 17:06:58 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:58 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:58 Hunt: shot released on 268450383, hostile 268450383 holds 227 units, the retreat clicks at the windup end
+2026/09/23 17:06:59 User info: temp22 level 7 hp 187/214 mp 82/82 speed 125 x 15293
+2026/09/23 17:06:59 NPC  spawned at 32955 48366 -3670 heading 43268
+2026/09/23 17:06:59 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:59 NPC  spawned at 32955 48366 -3670 heading 43268
+2026/09/23 17:06:59 NPC  spawned at 32955 48366 -3670 heading 43268
+2026/09/23 17:06:59 Hunt: target 268450430 died, looting
+2026/09/23 17:06:59 Received packet id 0x85 with 13 bytes
+2026/09/23 17:06:59 NPC  spawned at 33871 51197 -3572 heading 40326
+2026/09/23 17:06:59 NPC  spawned at 32955 48366 -3670 heading 43268
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:59 User info: temp20 level 7 hp 146/214 mp 81/82 speed 125 x 15251
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 NPC  spawned at 36434 51630 -3572 heading 57343
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 User info: temp21 level 7 hp 163/214 mp 81/82 speed 125 x 15310
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 Received packet id 0x0b with 29 bytes
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:06:59 NPC  spawned at 37598 51041 -3543 heading 49519
+2026/09/23 17:07:00 Hunt: target 268450362 died, looting
+2026/09/23 17:07:00 Hunt: target 268450383 died, looting
+2026/09/23 17:07:00 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 User info: temp24 level 7 hp 183/214 mp 81/82 speed 125 x 15240
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:00 NPC  spawned at 37108 50392 -3548 heading 51338
+2026/09/23 17:07:01 Hunt: target 268450381 died, looting
+2026/09/23 17:07:01 Action failed
+2026/09/23 17:07:01 Action failed
+2026/09/23 17:07:01 Action failed
+2026/09/23 17:07:01 Action failed
+2026/09/23 17:07:01 Action failed
+2026/09/23 17:07:02 Hunt: dropping the target 268450379: the ground rotation owns the way
+2026/09/23 17:07:02 Hunt: the fight crossed into Kaboo Orc Grunt SW-5 (was Green Dryad SW-6), following the ground
+2026/09/23 17:07:02 Action failed
+2026/09/23 17:07:02 Action failed
+2026/09/23 17:07:03 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:03 Action failed
+2026/09/23 17:07:05 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:06 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:06 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:07:06 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:07:06 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:07:06 NPC  spawned at 38355 51070 -3548 heading 0
+2026/09/23 17:07:06 NPC  spawned at 29730 48073 -3670 heading 0
+2026/09/23 17:07:06 NPC  spawned at 30709 48534 -3670 heading 38964
+2026/09/23 17:07:06 NPC  spawned at 30689 49023 -3670 heading 59190
+2026/09/23 17:07:06 NPC  spawned at 30009 50694 -3670 heading 0
+2026/09/23 17:07:06 NPC  spawned at 30330 50387 -3670 heading 32767
+2026/09/23 17:07:06 NPC  spawned at 29354 49831 -3670 heading 0
+2026/09/23 17:07:06 NPC  spawned at 30367 50069 -3670 heading 26482
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:07 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:07 Action failed
+2026/09/23 17:07:08 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:08 Action failed
+2026/09/23 17:07:08 Hunt: shot released on 268450389, hostile 268450389 holds 322 units, the retreat clicks at the windup end
+2026/09/23 17:07:08 Hunt: dropping the target 268450429: the ground rotation owns the way
+2026/09/23 17:07:08 Hunt: the fight crossed into Kaboo Orc Fighter SW-10 (was Spore Fungus SW-6), following the ground
+2026/09/23 17:07:08 Action failed
+2026/09/23 17:07:08 Action failed
+2026/09/23 17:07:09 Hunt: dropping the target 268450392: the ground rotation owns the way
+2026/09/23 17:07:09 Hunt: the fight crossed into Green Dryad SW-6 (was Kaboo Orc Grunt SW-6), following the ground
+2026/09/23 17:07:09 Hunt: HP 69% in the fight, drinking a healing potion
+2026/09/23 17:07:09 Action failed
+2026/09/23 17:07:09 Received packet id 0x8e with 21 bytes
+2026/09/23 17:07:09 Received packet id 0x8e with 21 bytes
+2026/09/23 17:07:09 User info: temp23 level 7 hp 148/214 mp 82/82 speed 125 x 15221
+2026/09/23 17:07:09 Received packet id 0x8e with 21 bytes
+2026/09/23 17:07:09 Player temp23 appeared at 39278 50051 -3543 speed 125
+2026/09/23 17:07:09 Player temp23 appeared at 39278 50051 -3543 speed 125
+2026/09/23 17:07:09 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:09 Hunt: shot released on 268450380, hostile 268450380 holds 49 units, the retreat clicks at the windup end
+2026/09/23 17:07:09 Hunt: the chasers surround the bow fight on target 268450389, holding ground and shooting through the train
+2026/09/23 17:07:09 Player temp20 appeared at 36865 51719 -3572 speed 125
+2026/09/23 17:07:09 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:07:09 Player temp23 appeared at 39278 50051 -3543 speed 125
+2026/09/23 17:07:09 Received packet id 0xe7 with 21 bytes
+2026/09/23 17:07:09 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:09 NPC  spawned at 40196 50865 -3543 heading 20473
+2026/09/23 17:07:09 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:09 NPC  spawned at 39784 49457 -3543 heading 35894
+2026/09/23 17:07:09 NPC  spawned at 39591 52384 -3409 heading 59551
+2026/09/23 17:07:09 NPC  spawned at 39992 51202 -3548 heading 0
+2026/09/23 17:07:09 NPC  spawned at 39537 52301 -3414 heading 14399
+2026/09/23 17:07:09 NPC  spawned at 39808 51832 -3409 heading 61425
+2026/09/23 17:07:09 NPC  spawned at 40330 53879 -3496 heading 10880
+2026/09/23 17:07:09 Skill list with 1 skills
+2026/09/23 17:07:09 Action failed
+2026/09/23 17:07:10 Action failed
+2026/09/23 17:07:10 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:11 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:11 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:07:11 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:07:11 NPC  spawned at 36861 50000 -3548 heading 0
+2026/09/23 17:07:12 NPC  spawned at 36868 50009 -3548 heading 9815
+2026/09/23 17:07:12 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:13 User info: temp20 level 7 hp 214/214 mp 82/82 speed 125 x 15251
+2026/09/23 17:07:13 Hunt: dropping the target 268450379: the ground rotation owns the way
+2026/09/23 17:07:13 Hunt: the fight crossed into Green Dryad SW-5 (was Kaboo Orc Grunt SW-5), following the ground
+2026/09/23 17:07:13 Action failed
+2026/09/23 17:07:13 Player temp20 appeared at 37252 51794 -3561 speed 125
+2026/09/23 17:07:13 Player temp20 appeared at 37252 51794 -3561 speed 125
+2026/09/23 17:07:13 Player temp20 appeared at 37252 51794 -3561 speed 125
+2026/09/23 17:07:13 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:13 Hunt: shot released on 268450379, hostile 268450379 holds 369 units, the retreat clicks at the windup end
+2026/09/23 17:07:13 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:14 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:14 NPC  spawned at 31331 48556 -3670 heading 31204
+2026/09/23 17:07:15 Hunt: no walkable retreat lane on target 268450379 (cornered), holding ground and shooting the bow
+2026/09/23 17:07:15 Hunt: HP 68% in the fight, drinking a healing potion
+2026/09/23 17:07:15 Received packet id 0x8e with 21 bytes
+2026/09/23 17:07:15 Received packet id 0x8e with 21 bytes
+2026/09/23 17:07:15 Received packet id 0x8e with 21 bytes
+2026/09/23 17:07:15 User info: temp21 level 7 hp 147/214 mp 81/82 speed 125 x 15286
+2026/09/23 17:07:15 Received packet id 0x8e with 21 bytes
+2026/09/23 17:07:15 Player temp21 appeared at 37885 51023 -3548 speed 125
+2026/09/23 17:07:15 Player temp21 appeared at 37885 51023 -3548 speed 125
+2026/09/23 17:07:15 Player temp21 appeared at 37885 51023 -3548 speed 125
+2026/09/23 17:07:15 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:15 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:16 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:16 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:16 Action failed
+2026/09/23 17:07:16 Hunt: shot released on 268450429, hostile 268450429 holds 396 units, the retreat clicks at the windup end
+2026/09/23 17:07:17 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:17 NPC  spawned at 38123 51895 -3548 heading 61421
+2026/09/23 17:07:17 NPC  spawned at 38123 51895 -3548 heading 61421
+2026/09/23 17:07:17 NPC  spawned at 38123 51895 -3548 heading 61421
+2026/09/23 17:07:17 NPC  spawned at 38123 51895 -3548 heading 61421
+2026/09/23 17:07:18 Hunt: the windup on 268450429 ended (hostile 268450429 at 148 units), kiting the reload tail
+2026/09/23 17:07:18 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:18 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:19 Hunt: shot released on 268450392, hostile 268450392 holds 342 units, the retreat clicks at the windup end
+2026/09/23 17:07:19 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:19 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 User info: temp23 level 7 hp 184/214 mp 82/82 speed 125 x 15192
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 NPC  spawned at 39302 50094 -3543 heading 43842
+2026/09/23 17:07:19 Hunt: shot released on 268450429, hostile 268450429 holds 186 units, the retreat clicks at the windup end
+2026/09/23 17:07:19 Hunt: target 268450380 died, looting
+2026/09/23 17:07:20 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:20 Hunt: the windup on 268450392 ended (hostile 268450392 at 228 units), kiting the reload tail
+2026/09/23 17:07:21 Action failed
+2026/09/23 17:07:21 Action failed
+2026/09/23 17:07:21 Hunt: the chasers surround the bow fight on target 268450429, holding ground and shooting through the train
+2026/09/23 17:07:21 Action failed
+2026/09/23 17:07:22 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:22 Action failed
+2026/09/23 17:07:22 NPC  spawned at 32143 50532 -3670 heading 0
+2026/09/23 17:07:22 NPC  spawned at 32143 50532 -3670 heading 0
+2026/09/23 17:07:22 NPC  spawned at 34248 49323 -3572 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 34248 49323 -3572 heading 0
+2026/09/23 17:07:22 NPC  spawned at 34248 49323 -3572 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 NPC  spawned at 39870 51024 -3548 heading 0
+2026/09/23 17:07:22 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:22 Hunt: shot released on 268450392, hostile 268450392 holds 190 units, the retreat clicks at the windup end
+2026/09/23 17:07:22 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:22 Action failed
+2026/09/23 17:07:22 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:22 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:23 Hunt: dropping the target 268450379: the ground rotation owns the way
+2026/09/23 17:07:23 Hunt: the fight crossed into Green Dryad SW-6 (was Green Dryad SW-5), following the ground
+2026/09/23 17:07:23 Action failed
+2026/09/23 17:07:23 Action failed
+2026/09/23 17:07:23 Action failed
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 NPC  spawned at 37085 49797 -3548 heading 0
+2026/09/23 17:07:23 Hunt: the windup on 268450392 ended (hostile 268450392 at 13 units), kiting the reload tail
+2026/09/23 17:07:24 User info: temp23 level 7 hp 214/214 mp 81/82 speed 125 x 15186
+2026/09/23 17:07:24 Player temp23 appeared at 39326 50144 -3523 speed 125
+2026/09/23 17:07:24 Player temp23 appeared at 39326 50144 -3523 speed 125
+2026/09/23 17:07:24 Player temp23 appeared at 39326 50144 -3523 speed 125
+2026/09/23 17:07:24 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:24 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:24 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:24 NPC  spawned at 39018 50532 -3548 heading 0
+2026/09/23 17:07:24 Hunt: hostile 268450429 closed to 58 units of the fight on 268450429, kiting clear (step 1 of 8)
+2026/09/23 17:07:24 Hunt: hostile 268450379 closed to 49 units of the fight on 268450379, kiting clear (step 1 of 8)
+2026/09/23 17:07:25 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:25 Action failed
+2026/09/23 17:07:25 Action failed
+2026/09/23 17:07:25 Hunt: shot released on 268450392, hostile 268450392 holds 225 units, the retreat clicks at the windup end
+2026/09/23 17:07:25 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:25 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:25 Action failed
+2026/09/23 17:07:25 Hunt: shot released on 268450429, hostile 268450429 holds 218 units, the retreat clicks at the windup end
+2026/09/23 17:07:25 Hunt: shot released on 268450386, hostile 268450386 holds 433 units, the retreat clicks at the windup end
+2026/09/23 17:07:25 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:26 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:26 Action failed
+2026/09/23 17:07:26 Hunt: shot released on 268450379, hostile 268450379 holds 363 units, the retreat clicks at the windup end
+2026/09/23 17:07:27 Hunt: the windup on 268450392 ended (hostile 268450392 at 13 units), kiting the reload tail
+2026/09/23 17:07:27 Hunt: the windup on 268450429 ended (hostile 268450429 at 116 units), kiting the reload tail
+2026/09/23 17:07:27 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15257
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 NPC  spawned at 37897 51025 -3548 heading 34490
+2026/09/23 17:07:27 Hunt: the chasers surround the bow fight on target 268450386, holding ground and shooting through the train
+2026/09/23 17:07:27 Hunt: target 268450389 died, looting
+2026/09/23 17:07:27 Action failed
+2026/09/23 17:07:28 Hunt: the chasers surround the bow fight on target 268450379, holding ground and shooting through the train
+2026/09/23 17:07:28 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:28 Action failed
+2026/09/23 17:07:28 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:28 Action failed
+2026/09/23 17:07:28 Hunt: shot released on 268450392, hostile 268450392 holds 225 units, the retreat clicks at the windup end
+2026/09/23 17:07:28 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:28 Action failed
+2026/09/23 17:07:28 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:28 Action failed
+2026/09/23 17:07:28 Action failed
+2026/09/23 17:07:29 Hunt: shot released on 268450429, hostile 268450429 holds 174 units, the retreat clicks at the windup end
+2026/09/23 17:07:29 Action failed
+2026/09/23 17:07:29 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:30 User info: temp21 level 7 hp 214/214 mp 81/82 speed 125 x 15251
+2026/09/23 17:07:30 Player temp21 appeared at 37885 51023 -3548 speed 125
+2026/09/23 17:07:30 Player temp21 appeared at 37885 51023 -3548 speed 125
+2026/09/23 17:07:30 Player temp21 appeared at 37885 51023 -3548 speed 125
+2026/09/23 17:07:30 Hunt: no walkable retreat lane on target 268450392 (cornered), holding ground and shooting the bow
+2026/09/23 17:07:30 Hunt: the windup on 268450429 ended (hostile 268450429 at 58 units), kiting the reload tail
+2026/09/23 17:07:30 Hunt: hostile 268450386 closed to 13 units of the fight on 268450386, kiting clear (step 1 of 8)
+2026/09/23 17:07:31 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:31 Hunt: hostile 268450379 closed to 49 units of the fight on 268450379, kiting clear (step 2 of 8)
+2026/09/23 17:07:31 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:31 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:31 Action failed
+2026/09/23 17:07:32 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:32 Action failed
+2026/09/23 17:07:32 Hunt: shot released on 268450386, hostile 268450386 holds 182 units, the retreat clicks at the windup end
+2026/09/23 17:07:32 Hunt: shot released on 268450429, hostile 268450429 holds 164 units, the retreat clicks at the windup end
+2026/09/23 17:07:32 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:32 Hunt: shot released on 268450379, hostile 268450379 holds 169 units, the retreat clicks at the windup end
+2026/09/23 17:07:33 Hunt: the windup on 268450386 ended (hostile 268450386 at 13 units), kiting the reload tail
+2026/09/23 17:07:33 Hunt: the chasers surround the bow fight on target 268450429, holding ground and shooting through the train
+2026/09/23 17:07:34 Hunt: the windup on 268450379 ended (hostile 268450379 at 77 units), kiting the reload tail
+2026/09/23 17:07:34 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:34 Action failed
+2026/09/23 17:07:34 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:35 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:35 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:35 Hunt: shot released on 268450386, hostile 268450386 holds 226 units, the retreat clicks at the windup end
+2026/09/23 17:07:35 Hunt: HP 58% in the fight, drinking a healing potion
+2026/09/23 17:07:35 Received packet id 0x8e with 21 bytes
+2026/09/23 17:07:35 User info: temp22 level 7 hp 124/214 mp 81/82 speed 125 x 15245
+2026/09/23 17:07:35 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:36 Hunt: shot released on 268450379, hostile 268450379 holds 282 units, the retreat clicks at the windup end
+2026/09/23 17:07:36 Skill list with 1 skills
+2026/09/23 17:07:36 Hunt: the chasers surround the bow fight on target 268450386, holding ground and shooting through the train
+2026/09/23 17:07:37 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:37 Hunt: the chasers surround the bow fight on target 268450379, holding ground and shooting through the train
+2026/09/23 17:07:37 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:38 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:38 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:38 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 User info: temp24 level 7 hp 129/214 mp 81/82 speed 125 x 16234
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 NPC  spawned at 37650 50677 -3548 heading 2607
+2026/09/23 17:07:40 Hunt: target 268450379 died, looting
+2026/09/23 17:07:40 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:40 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:40 Action failed
+2026/09/23 17:07:40 NPC  spawned at 34818 50810 -3572 heading 55967
+2026/09/23 17:07:40 NPC  spawned at 34818 50810 -3572 heading 55967
+2026/09/23 17:07:40 NPC  spawned at 34818 50810 -3572 heading 55967
+2026/09/23 17:07:40 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:41 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:41 Action failed
+2026/09/23 17:07:41 Action failed
+2026/09/23 17:07:42 Action failed
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:42 NPC  spawned at 39691 50642 -3548 heading 0
+2026/09/23 17:07:43 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:43 Action failed
+2026/09/23 17:07:43 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:43 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:43 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 User info: temp20 level 7 hp 154/214 mp 81/82 speed 125 x 15191
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 User info: temp21 level 7 hp 214/214 mp 82/82 speed 125 x 15221
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 NPC  spawned at 37816 51504 -3548 heading 1722
+2026/09/23 17:07:45 Hunt: target 268450392 died, looting
+2026/09/23 17:07:45 Action failed
+2026/09/23 17:07:45 Hunt: target 268450392 died, looting
+2026/09/23 17:07:45 Hunt: target 268450392 died, looting
+2026/09/23 17:07:46 Action failed
+2026/09/23 17:07:46 Action failed
+2026/09/23 17:07:46 Action failed
+2026/09/23 17:07:46 Hunt: dropping the target 268450387: the ground rotation owns the way
+2026/09/23 17:07:46 Hunt: the fight crossed into Kaboo Orc Grunt SW-7 (was Green Dryad SW-6), following the ground
+2026/09/23 17:07:46 Action failed
+2026/09/23 17:07:46 Hunt: dropping the target 268450381: the ground rotation owns the way
+2026/09/23 17:07:46 Hunt: the fight crossed into Green Dryad SW-5 (was Green Dryad SW-6), following the ground
+2026/09/23 17:07:46 Action failed
+2026/09/23 17:07:46 Hunt: dropping the target 268450381: the ground rotation owns the way
+2026/09/23 17:07:46 Hunt: the fight crossed into Green Dryad SW-5 (was Green Dryad SW-6), following the ground
+2026/09/23 17:07:46 Action failed
+2026/09/23 17:07:46 NPC  spawned at 36590 53269 -3572 heading 0
+2026/09/23 17:07:46 NPC  spawned at 40052 53950 -3496 heading 30159
+2026/09/23 17:07:46 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:46 Action failed
+2026/09/23 17:07:46 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:47 Action failed
+2026/09/23 17:07:47 Action failed
+2026/09/23 17:07:47 Action failed
+2026/09/23 17:07:48 NPC  spawned at 36590 53269 -3572 heading 0
+2026/09/23 17:07:48 NPC  spawned at 40052 53950 -3496 heading 30159
+2026/09/23 17:07:48 NPC  spawned at 35609 48160 -3639 heading 1566
+2026/09/23 17:07:48 NPC  spawned at 37454 48372 -3592 heading 0
+2026/09/23 17:07:48 NPC  spawned at 39857 48964 -3543 heading 63142
+2026/09/23 17:07:49 NPC  spawned at 36590 53269 -3572 heading 0
+2026/09/23 17:07:49 NPC  spawned at 40052 53950 -3496 heading 30159
+2026/09/23 17:07:49 NPC  spawned at 35609 48160 -3639 heading 1566
+2026/09/23 17:07:49 NPC  spawned at 37454 48372 -3592 heading 0
+2026/09/23 17:07:49 NPC  spawned at 39857 48964 -3543 heading 63142
+2026/09/23 17:07:49 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:49 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:49 Action failed
+2026/09/23 17:07:50 NPC  spawned at 39904 49065 -3548 heading 0
+2026/09/23 17:07:50 NPC  spawned at 39904 49065 -3548 heading 0
+2026/09/23 17:07:50 NPC  spawned at 39904 49065 -3548 heading 0
+2026/09/23 17:07:50 NPC  spawned at 39904 49065 -3548 heading 0
+2026/09/23 17:07:50 NPC  spawned at 39904 49065 -3548 heading 0
+2026/09/23 17:07:50 NPC  spawned at 39904 49065 -3548 heading 0
+2026/09/23 17:07:50 NPC  spawned at 35609 48160 -3639 heading 1566
+2026/09/23 17:07:50 NPC  spawned at 37454 48372 -3592 heading 0
+2026/09/23 17:07:50 NPC  spawned at 39904 49065 -3548 heading 0
+2026/09/23 17:07:50 NPC  spawned at 39857 48964 -3543 heading 63142
+2026/09/23 17:07:50 User info: temp22 level 7 hp 146/214 mp 82/82 speed 125 x 15210
+2026/09/23 17:07:51 User info: temp22 level 7 hp 146/214 mp 82/82 speed 125 x 15210
+2026/09/23 17:07:51 NPC  spawned at 31338 48905 -3670 heading 31045
+2026/09/23 17:07:51 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:51 NPC  spawned at 31338 48905 -3670 heading 31045
+2026/09/23 17:07:51 NPC  spawned at 31338 48905 -3670 heading 31045
+2026/09/23 17:07:51 Hunt: target 268450429 died, looting
+2026/09/23 17:07:51 Action failed
+2026/09/23 17:07:52 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:52 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:53 Hunt: shot released on 268450427, hostile 268450427 holds 362 units, the retreat clicks at the windup end
+2026/09/23 17:07:54 NPC  spawned at 30941 48917 -3670 heading 58237
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 User info: temp23 level 7 hp 157/214 mp 81/82 speed 125 x 15126
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 Received packet id 0x0b with 29 bytes
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 NPC  spawned at 39027 50024 -3523 heading 31045
+2026/09/23 17:07:54 Hunt: the chasers surround the bow fight on target 268450427, holding ground and shooting through the train
+2026/09/23 17:07:54 Hunt: target 268450386 died, looting
+2026/09/23 17:07:55 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:55 Action failed
+2026/09/23 17:07:55 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:55 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:57 NPC  spawned at 37065 50053 -3548 heading 26108
+2026/09/23 17:07:57 NPC  spawned at 37065 50053 -3548 heading 26108
+2026/09/23 17:07:57 NPC  spawned at 37065 50053 -3548 heading 26108
+2026/09/23 17:07:57 NPC  spawned at 37065 50053 -3548 heading 26108
+2026/09/23 17:07:57 Hunt: hostile 268450427 closed to 119 units of the fight on 268450427, kiting clear (step 1 of 8)
+2026/09/23 17:07:58 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:58 Action failed
+2026/09/23 17:07:58 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:58 Received packet id 0x85 with 13 bytes
+2026/09/23 17:07:59 Hunt: shot released on 268450427, hostile 268450427 holds 232 units, the retreat clicks at the windup end
+2026/09/23 17:07:59 Hunt: shot released on 268450381, hostile 268450381 holds 301 units, the retreat clicks at the windup end
+2026/09/23 17:07:59 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:00 Hunt: dropping the target 268450381: the ground rotation owns the way
+2026/09/23 17:08:00 Hunt: the fight crossed into Green Dryad SW-6 (was Green Dryad SW-5), following the ground
+2026/09/23 17:08:00 Hunt: shot released on 268450381, hostile 268450381 holds 411 units, the retreat clicks at the windup end
+2026/09/23 17:08:00 Action failed
+2026/09/23 17:08:00 Hunt: dropping the target 268450381: the ground rotation owns the way
+2026/09/23 17:08:00 Hunt: the fight crossed into Green Dryad SW-6 (was Green Dryad SW-5), following the ground
+2026/09/23 17:08:00 Hunt: the windup on 268450381 ended (hostile 268450381 at 175 units), kiting the reload tail
+2026/09/23 17:08:00 Action failed
+2026/09/23 17:08:00 Action failed
+2026/09/23 17:08:00 Hunt: the kite walk click on target 268450381 was refused by the server (standing on 37321 50451), rotating the retreat lane at the probe age
+2026/09/23 17:08:00 Action failed
+2026/09/23 17:08:00 Hunt: the chasers surround the bow fight on target 268450427, holding ground and shooting through the train
+2026/09/23 17:08:01 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:01 Action failed
+2026/09/23 17:08:01 Hunt: the windup on 268450381 ended (hostile 268450381 at 285 units), kiting the reload tail
+2026/09/23 17:08:01 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:01 NPC  spawned at 35609 48160 -3639 heading 1566
+2026/09/23 17:08:01 NPC  spawned at 34952 50636 -3572 heading 55967
+2026/09/23 17:08:01 NPC  spawned at 35052 50943 -3572 heading 22282
+2026/09/23 17:08:01 NPC  spawned at 35563 52930 -3572 heading 18328
+2026/09/23 17:08:01 NPC  spawned at 36370 52378 -3520 heading 47819
+2026/09/23 17:08:01 NPC  spawned at 35641 51835 -3567 heading 3130
+2026/09/23 17:08:01 NPC  spawned at 35224 52356 -3567 heading 28559
+2026/09/23 17:08:01 NPC  spawned at 35612 52683 -3567 heading 21673
+2026/09/23 17:08:02 Action failed
+2026/09/23 17:08:02 Action failed
+2026/09/23 17:08:03 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 NPC  spawned at 40011 50815 -3548 heading 0
+2026/09/23 17:08:03 Hunt: shot released on 268450381, hostile 268450381 holds 385 units, the retreat clicks at the windup end
+2026/09/23 17:08:03 Hunt: hostile 268450427 closed to 57 units of the fight on 268450427, kiting clear (step 2 of 8)
+2026/09/23 17:08:04 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:04 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:04 Action failed
+2026/09/23 17:08:04 Hunt: the windup on 268450381 ended (hostile 268450381 at 260 units), kiting the reload tail
+2026/09/23 17:08:04 Action failed
+2026/09/23 17:08:04 Hunt: dropping the target 268450381: the ground rotation owns the way
+2026/09/23 17:08:04 Hunt: the fight crossed into Green Dryad SW-6 (was Green Dryad SW-9), following the ground
+2026/09/23 17:08:04 Action failed
+2026/09/23 17:08:04 Hunt: the kite walk click on target 268450381 was refused by the server (standing on 37516 50753), rotating the retreat lane at the probe age
+2026/09/23 17:08:04 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:05 Hunt: shot released on 268450427, hostile 268450427 holds 114 units, the retreat clicks at the windup end
+2026/09/23 17:08:05 Action failed
+2026/09/23 17:08:05 NPC  spawned at 37743 52929 -3543 heading 23775
+2026/09/23 17:08:05 NPC  spawned at 37743 52929 -3543 heading 23775
+2026/09/23 17:08:05 NPC  spawned at 37743 52929 -3543 heading 23775
+2026/09/23 17:08:05 NPC  spawned at 37743 52929 -3543 heading 23775
+2026/09/23 17:08:06 Hunt: the chasers surround the bow fight on target 268450381, holding ground and shooting through the train
+2026/09/23 17:08:06 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:06 Hunt: the windup on 268450427 ended (hostile 268450427 at 114 units), kiting the reload tail
+2026/09/23 17:08:06 Hunt: shot released on 268450381, hostile 268450381 holds 175 units, the retreat clicks at the windup end
+2026/09/23 17:08:07 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:07 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:07 Hunt: shot released on 268450387, hostile 268450387 holds 335 units, the retreat clicks at the windup end
+2026/09/23 17:08:07 NPC  spawned at 31753 51532 -3670 heading 0
+2026/09/23 17:08:07 NPC  spawned at 33164 53244 -3590 heading 33465
+2026/09/23 17:08:07 NPC  spawned at 34742 51723 -3567 heading 50363
+2026/09/23 17:08:07 NPC  spawned at 33642 51339 -3567 heading 31307
+2026/09/23 17:08:07 NPC  spawned at 33360 51218 -3572 heading 25821
+2026/09/23 17:08:07 NPC  spawned at 33390 51726 -3567 heading 3631
+2026/09/23 17:08:07 Hunt: the chasers surround the bow fight on target 268450381, holding ground and shooting through the train
+2026/09/23 17:08:08 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 NPC  spawned at 38939 49791 -3548 heading 0
+2026/09/23 17:08:08 Hunt: shot released on 268450427, hostile 268450427 holds 244 units, the retreat clicks at the windup end
+2026/09/23 17:08:08 Hunt: the windup on 268450387 ended (hostile 268450387 at 208 units), kiting the reload tail
+2026/09/23 17:08:09 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:09 Action failed
+2026/09/23 17:08:09 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:09 Hunt: shot released on 268450381, hostile 268450381 holds 384 units, the retreat clicks at the windup end
+2026/09/23 17:08:09 Hunt: the chasers surround the bow fight on target 268450427, holding ground and shooting through the train
+2026/09/23 17:08:10 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:10 Action failed
+2026/09/23 17:08:10 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:10 Action failed
+2026/09/23 17:08:10 Hunt: shot released on 268450381, hostile 268450381 holds 256 units, the retreat clicks at the windup end
+2026/09/23 17:08:10 Hunt: shot released on 268450387, hostile 268450387 holds 59 units, the retreat clicks at the windup end
+2026/09/23 17:08:10 Hunt: no walkable retreat lane on target 268450381 (cornered), holding ground and shooting the bow
+2026/09/23 17:08:10 Hunt: hostile 268450381 closed to 49 units of the fight on 268450381, kiting clear (step 1 of 8)
+2026/09/23 17:08:11 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:11 Hunt: the chasers surround the bow fight on target 268450387, holding ground and shooting through the train
+2026/09/23 17:08:11 Hunt: the windup on 268450381 ended (hostile 268450381 at 256 units), kiting the reload tail
+2026/09/23 17:08:12 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:12 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:12 Hunt: shot released on 268450381, hostile 268450381 holds 266 units, the retreat clicks at the windup end
+2026/09/23 17:08:13 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:13 Hunt: hostile 268450427 closed to 58 units of the fight on 268450427, kiting clear (step 3 of 8)
+2026/09/23 17:08:13 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:13 NPC  spawned at 34820 47657 -3639 heading 61107
+2026/09/23 17:08:13 NPC  spawned at 34820 47657 -3639 heading 61107
+2026/09/23 17:08:13 NPC  spawned at 34820 47657 -3639 heading 61107
+2026/09/23 17:08:13 Hunt: shot released on 268450381, hostile 268450381 holds 381 units, the retreat clicks at the windup end
+2026/09/23 17:08:13 Hunt: the chasers surround the bow fight on target 268450381, holding ground and shooting through the train
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 Received packet id 0x0b with 29 bytes
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 User info: temp24 level 7 hp 155/214 mp 81/82 speed 125 x 16204
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 Received packet id 0x0b with 29 bytes
+2026/09/23 17:08:13 User info: temp23 level 7 hp 175/214 mp 82/82 speed 125 x 15114
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 Received packet id 0x0b with 29 bytes
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 User info: temp21 level 7 hp 176/214 mp 81/82 speed 125 x 15185
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 Received packet id 0x0b with 29 bytes
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 NPC  spawned at 37878 50607 -3548 heading 60057
+2026/09/23 17:08:13 Hunt: target 268450381 died, looting
+2026/09/23 17:08:14 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:14 Hunt: target 268450381 died, looting
+2026/09/23 17:08:14 Hunt: target 268450381 died, looting
+2026/09/23 17:08:14 Action failed
+2026/09/23 17:08:14 NPC  spawned at 29507 50132 -3670 heading 0
+2026/09/23 17:08:14 NPC  spawned at 29507 50132 -3670 heading 0
+2026/09/23 17:08:14 NPC  spawned at 29507 50132 -3670 heading 0
+2026/09/23 17:08:14 Hunt: shot released on 268450427, hostile 268450427 holds 126 units, the retreat clicks at the windup end
+2026/09/23 17:08:14 Action failed
+2026/09/23 17:08:15 Action failed
+2026/09/23 17:08:15 Action failed
+2026/09/23 17:08:15 Action failed
+2026/09/23 17:08:15 Action failed
+2026/09/23 17:08:15 Action failed
+2026/09/23 17:08:15 Hunt: the windup on 268450427 ended (hostile 268450427 at 126 units), kiting the reload tail
+2026/09/23 17:08:15 Hunt: dropping the target 268450392: the ground rotation owns the way
+2026/09/23 17:08:15 Hunt: the fight crossed into Green Dryad SW-9 (was Green Dryad SW-6), following the ground
+2026/09/23 17:08:15 Action failed
+2026/09/23 17:08:15 Hunt: dropping the target 268450387: the ground rotation owns the way
+2026/09/23 17:08:15 Hunt: the fight crossed into Kaboo Orc Grunt SW-7 (was Green Dryad SW-6), following the ground
+2026/09/23 17:08:15 Action failed
+2026/09/23 17:08:15 Hunt: dropping the target 268450392: the ground rotation owns the way
+2026/09/23 17:08:15 Hunt: the fight crossed into Green Dryad SW-9 (was Green Dryad SW-6), following the ground
+2026/09/23 17:08:15 Action failed
+2026/09/23 17:08:16 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:16 Action failed
+2026/09/23 17:08:16 Action failed
+2026/09/23 17:08:16 Hunt: HP 67% in the fight, drinking a healing potion
+2026/09/23 17:08:16 Received packet id 0x8e with 21 bytes
+2026/09/23 17:08:16 Received packet id 0x8e with 21 bytes
+2026/09/23 17:08:16 User info: temp20 level 7 hp 143/214 mp 81/82 speed 125 x 15143
+2026/09/23 17:08:16 Received packet id 0x8e with 21 bytes
+2026/09/23 17:08:16 Received packet id 0x8e with 21 bytes
+2026/09/23 17:08:16 Action failed
+2026/09/23 17:08:16 Player temp20 appeared at 37580 52438 -3543 speed 125
+2026/09/23 17:08:16 Player temp20 appeared at 37580 52438 -3543 speed 125
+2026/09/23 17:08:16 Player temp20 appeared at 37580 52438 -3543 speed 125
+2026/09/23 17:08:17 Skill list with 1 skills
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 NPC  spawned at 39371 48064 -3548 heading 0
+2026/09/23 17:08:17 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:17 Hunt: shot released on 268450427, hostile 268450427 holds 282 units, the retreat clicks at the windup end
+2026/09/23 17:08:18 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:19 Hunt: the windup on 268450427 ended (hostile 268450427 at 104 units), kiting the reload tail
+2026/09/23 17:08:19 NPC  spawned at 36590 53269 -3572 heading 0
+2026/09/23 17:08:19 NPC  spawned at 40194 53958 -3496 heading 587
+2026/09/23 17:08:19 User info: temp22 level 7 hp 57/214 mp 81/82 speed 125 x 15156
+2026/09/23 17:08:20 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:20 Action failed
+2026/09/23 17:08:20 Hunt: shot released on 268450427, hostile 268450427 holds 320 units, the retreat clicks at the windup end
+2026/09/23 17:08:21 NPC  spawned at 34812 50565 -3572 heading 21993
+2026/09/23 17:08:21 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:21 Action failed
+2026/09/23 17:08:22 Hunt: no walkable retreat lane on target 268450427 (cornered), holding ground and shooting the bow
+2026/09/23 17:08:23 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:24 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:24 Action failed
+2026/09/23 17:08:24 NPC  spawned at 33243 53247 -3590 heading 59754
+2026/09/23 17:08:24 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:24 Received packet id 0x85 with 13 bytes
+2026/09/23 17:08:25 User info: temp22 level 7 hp 49/214 mp 81/82 speed 125 x 15144
+2026/09/23 17:08:25 NPC  spawned at 31036 49580 -3670 heading 24067
+2026/09/23 17:08:25 Received packet id 0x0b with 29 bytes
+2026/09/23 17:08:25 NPC  spawned at 31036 49580 -3670 heading 24067
+2026/09/23 17:08:25 NPC  spawned at 31036 49580 -3670 heading 24067
+2026/09/23 17:08:25 Hunt: target 268450427 died, looting
+2026/09/23 17:08:25 Leaving the game world with temp23
+2026/09/23 17:08:25 Leaving the game world with temp21
+2026/09/23 17:08:25 Leaving the game world with temp24
+2026/09/23 17:08:25 Leaving the game world with temp20
+2026/09/23 17:08:25 Leaving the game world with temp22
+2026/09/23 17:08:26 Acceptance: FAIL test "archer-fleet" failed: the fleet kite audit found unimplemented behaviors: max-range (0 of 5 bots (not passing: temp20, temp21, temp22, temp23, temp24)); curved-retreat (4 of 5 bots (not passing: temp21))

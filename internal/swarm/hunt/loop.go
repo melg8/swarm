@@ -2369,6 +2369,18 @@ func (l *Loop) engage() {
     if l.lureArmed() && l.lureTick(now) {
         return
     }
+    // The pursuit hold of the kite (see kite.go, issue #70): a
+    // lapsed retreat window whose hostile still holds inside the
+    // re-shot floor continues the retreat instead of re-requesting
+    // the shot the windup standstill would pay for - the re-shot
+    // waits for the regained distance (the max-range behavior of
+    // the issue). A non-kite fight never enters: the hold's own
+    // gates carry the profile, the bow and the floor checks, and
+    // the lure stays first-authoritative for its moment.
+    if selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition(); selfOK &&
+        l.kitePursuitHold(now, selfX, selfY, selfZ) {
+        return
+    }
     if err := l.game.AttackTarget(l.target); err != nil {
         l.logf("Hunt: attack failed: %v", err)
 
