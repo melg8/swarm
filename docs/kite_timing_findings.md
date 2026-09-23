@@ -198,3 +198,36 @@ The open ladder after this round: the direction-gated re-measure of
 quick-reshot (one more live round), the curved retreat
 implementation (a rotating retreat direction preference around the
 cell anchor), and the kit speed question for max-range.
+
+## The final round (2026-09-23, the curve live)
+
+The curving retreat (commit 3a30513) ran its first live round: the
+fight's own circle (the opening straight retreat, then the fixed 70
+degree tangential bearing on the turn side picked toward the zone
+center), the window-lapse guard of the deferred click and the fold
+reject-path test from the QA round all landed first. The verdicts:
+
+- **quick-reshot holds on the fighting slots** (median walk-end-to-
+  shot gap 0 s over 11-18 walks each): the re-shot interrupts its
+  own retreat walk - the shoot, run the tail, re-shoot rhythm the
+  issue asks for, measured.
+- **max-range rose to 3 of 5** (276, 442 and the non-fighting
+  slot): the tangential circle keeps the mob near the band edge
+  better than the straight march; the two failing slots are the
+  speed-parity Kaboo cells of the previous round (the gear
+  question).
+- **early-retreat holds where the fight ran** (1.9-2.0 s medians);
+  the slot that spent the window at melee (4 shots) reports no
+  evidence - the floors name it.
+- **curved-retreat still fails on the fighting slots - now a
+  METRIC question, not a code gap**: the anchor leash (1500 units
+  from the SPAWN point) measures the total displacement including
+  the hunt machinery's own cell rotation ("the fight crossed into
+  Green Dryad SW-5, following the ground" - the legitimate cell
+  drift of the farm cluster), and the leash sits below the natural
+  cell-cluster span. The curve itself is unit-pinned (the opening
+  straight step, the 70 degree bearing, the fresh-target reset, the
+  zone-centered turn side) and bounds the retreat-attributable
+  drift; the honest next step is the same attribution fix the
+  reshot gap got - measure the leash on the retreat displacement,
+  not the spawn anchor.
