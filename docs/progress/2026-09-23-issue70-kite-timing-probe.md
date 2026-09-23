@@ -171,3 +171,35 @@ Next steps, ranked:
   issue; the straight away-ray drifts off the farm point).
 - P1: the max-range speed parity - evaluate a haste/buff path or a
   faster kit for the level 7 window.
+
+## 2026-09-23, the QA round and the curve (the session close)
+
+The clean-context QA sub-agent verdict (12 findings: the unexecuted
+gated re-measure, the unimplemented curve, the untested fold reject
+path, the window-lapse race, plus polish) drove the closing round:
+
+- The gated re-measure ran (two live rounds): quick-reshot PASSES
+  on the fighting slots at a 0 s median - the re-shot interrupts
+  its own walk. Measured, not predicted.
+- 3a30513: the CURVING RETREAT implemented (the fifth behavior):
+  the opening straight retreat, then the fixed 70 degree tangential
+  bearing on the fight's own turn side (toward the zone center),
+  the constant contract pinned (cos(step) >= the half-plane slack),
+  the rotation ladder stays away-centered, the window-lapse guard
+  and the fold reject-path test landed with it.
+- 8174d8b: the final live round documented - max-range 3 of 5 (the
+  two fails are the speed-parity cells, a gear question), the
+  curved-retreat leash metric named as the remaining attribution
+  gap (it measures the spawn-anchor displacement including the
+  hunt's own cell rotation).
+
+Open for the next round, ranked:
+
+- P0: the leash metric attribution - measure the curved-retreat
+  leash on the retreat displacement (the same fix the reshot gap
+  got), or anchor it to the live cell focus instead of the spawn.
+- P1: the max-range speed parity on the Kaboo cells (haste/buffs/
+  a faster kit for the level 7 window).
+- P1: the fleet's per-slot evidence floors could name the
+  spent-the-window-recovering slots in the fleet verdict line (the
+  per-bot lines already do).
