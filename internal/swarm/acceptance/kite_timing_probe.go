@@ -270,12 +270,12 @@ func (r *probeRecorder) claimCountAfter(mark time.Time) int {
 // anchor shot, the click and the first movement broadcast, the
 // refusal count before the movement and the classified verdict.
 type probeRound struct {
-    delay     time.Duration
-    shotAt    time.Time
-    walkSent  time.Time
-    movedAt   time.Time
-    refusals  int
-    verdict   string
+    delay       time.Duration
+    shotAt      time.Time
+    walkSent    time.Time
+    movedAt     time.Time
+    refusals    int
+    verdict     string
     lagFromShot time.Duration
 }
 
@@ -418,13 +418,13 @@ func summarizeAndMarkLadder(test *Test, rounds []probeRound) {
 // claim adoptions the server broadcast and whether the target lost
 // health while the character moved (the arrow landed).
 type probeWASDResult struct {
-    anchor       time.Time
+    anchor            time.Time
     movedDuringWindup bool
-    gainUnits    float64
-    adoptions    int
-    hpBefore     float64
-    hpAfter      float64
-    damageLanded bool
+    gainUnits         float64
+    adoptions         int
+    hpBefore          float64
+    hpAfter           float64
+    damageLanded      bool
 }
 
 // markWASD writes the cursor key round into the checks and the log.
@@ -898,7 +898,7 @@ func (s *kiteProbeSession) cursorKeyRound() probeWASDResult {
     result.hpBefore = s.tracker.ObjectHealthPercent(target)
     windup := kiteProbeWindupFall
     if pAtkSpd := s.tracker.SelfPAtkSpd(); pAtkSpd > 0 {
-        windup = time.Duration(500000 / pAtkSpd) * time.Millisecond
+        windup = time.Duration(500000/pAtkSpd) * time.Millisecond
     }
     gain := s.streamClaims(anchor, windup, selfZ,
         float64(selfX), float64(selfY), float64(endX), float64(endY))

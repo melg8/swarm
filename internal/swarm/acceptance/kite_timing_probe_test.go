@@ -59,8 +59,8 @@ func TestClassifyProbeRound(t *testing.T) {
     anchor := time.Now()
     click := anchor.Add(600 * time.Millisecond)
     cases := []struct {
-        name   string
-        round  probeRound
+        name    string
+        round   probeRound
         verdict string
     }{
         {

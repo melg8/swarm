@@ -72,19 +72,19 @@ func archerFleetPassword(account string) string {
 // "maximum distance" behavior, the retreat lag ceiling of the "regain
 // the distance early" behavior (the server defers a click inside the
 // windup to the cycle end, so a lag under the ceiling means the click
-// rode the accepted window), the re-shot gap ceiling, the anchor
-// leash of the farm point and the evidence floors.
+// rode the accepted window), the re-shot gap ceiling, the per-fight
+// drift leash of the curving retreat and the evidence floors.
 const (
-    fleetFightDistFloor   = 250.0
-    fleetRetreatLagCeil   = 2200 * time.Millisecond
-    fleetReshotGapCeil    = 1500 * time.Millisecond
-    fleetAnchorLeash      = 1500.0
-    fleetMinShots         = 3
-    fleetMinRetreats      = 2
-    fleetMinFightSamples  = 4
-    fleetTurnAngle        = 40.0
-    fleetMinTurns         = 2
-    fleetSamplePeriod     = 250 * time.Millisecond
+    fleetFightDistFloor  = 250.0
+    fleetRetreatLagCeil  = 2200 * time.Millisecond
+    fleetReshotGapCeil   = 1500 * time.Millisecond
+    fleetFightDriftLeash = 1500.0
+    fleetMinShots        = 3
+    fleetMinRetreats     = 2
+    fleetMinFightSamples = 4
+    fleetTurnAngle       = 40.0
+    fleetMinTurns        = 2
+    fleetSamplePeriod    = 250 * time.Millisecond
 )
 
 // The fleet check ids: one per audited kite behavior plus the online
@@ -194,6 +194,7 @@ type fleetSample struct {
     hasPos    bool
     x, y      int32
     fighting  bool
+    targetID  int32
     fightDist float64
     hasTarget bool
     tx, ty    int32
@@ -203,51 +204,66 @@ type fleetSample struct {
 // fleetWatch folds one bot's samples into the behavior evidence: the
 // shot count, the retreat lags (the movement start after a shot), the
 // re-shot gaps (the shot after a retreat walk ends), the fight
-// distance distribution, the anchor leash and the walk direction
-// turns. The retreat metrics ride the DIRECTION gate: only a walk
-// that moved away from the fight target it started in counts as a
-// kite retreat - the loot pickups, the cell-rotation approaches and
-// the chase-stall walks toward the target polluted the plain
-// walk population of the first live round (a 3.1 s walk-end-to-shot
-// median measured on walks the kite never issued).
+// distance distribution, the per-fight drift of the curving retreat
+// and the retreat walk corners. The retreat metrics ride the
+// DIRECTION gate: only a walk that moved away from the fight target
+// it started in counts as a kite retreat - the loot pickups, the
+// cell-rotation approaches and the chase-stall walks toward the
+// target polluted the plain walk population of the first live round
+// (a 3.1 s walk-end-to-shot median measured on walks the kite never
+// issued).
 type fleetWatch struct {
-    anchorX     int32
-    anchorY     int32
     shots       int
     retreatLags []time.Duration
     reshotGaps  []time.Duration
     fightDists  []float64
-    maxAnchor   float64
-    turns       int
+    // The per-fight curve attribution (the leash fix of the curve
+    // round: the spawn-anchor displacement measured the hunt's own
+    // cell rotation into the leash). The drift anchor is the fight
+    // target's stand at the fight start - the farm point the circle
+    // must hold - and only the fights with a confirmed retreat feed
+    // the leash, so the approach walks and the cell hops between
+    // the fights never reach the metric.
+    fightTarget   int32
+    fightAnchorX  int32
+    fightAnchorY  int32
+    fightMaxDrift float64
+    fightRetreats int
+    fightDrifts   []float64
+    // The corner evidence of the curve: the signed angle between the
+    // displacement vectors of two CONSECUTIVE confirmed retreats of
+    // one fight. A server walk is a straight segment, so the curve
+    // is exactly this polyline corner - the straight-line runaway
+    // repeats its heading (a zero corner), the curving circle bends
+    // every corner one way (the hunt's 70 degree bearing).
+    lastRetreatVecX  float64
+    lastRetreatVecY  float64
+    lastRetreatFight int32
+    haveLastRetreat  bool
+    cornersCW        int
+    cornersCCW       int
     // fold state
-    lastShot     time.Time
-    walkStarted  time.Time
-    walkEndedAt  time.Time
-    lastWalkVecX float64
-    lastWalkVecY float64
-    haveWalkVec  bool
-    lastX        int32
-    lastY        int32
-    haveLast     bool
+    lastShot    time.Time
+    walkStarted time.Time
+    walkEndedAt time.Time
     // the pending retreat candidate of the running walk: armed at
     // the walk start (the lag from the last shot), confirmed or
     // dropped at the walk end by the away-direction check.
-    pendingLag      time.Duration
-    havePendingLag  bool
-    walkFighting    bool
-    haveWalkFrom    bool
-    walkFromX       int32
-    walkFromY       int32
-    walkTargetX     int32
-    walkTargetY     int32
-    walkShotAt      time.Time
+    pendingLag     time.Duration
+    havePendingLag bool
+    walkFighting   bool
+    walkTargetID   int32
+    haveWalkFrom   bool
+    walkFromX      int32
+    walkFromY      int32
+    walkTargetX    int32
+    walkTargetY    int32
+    walkShotAt     time.Time
 }
 
-// newFleetWatch arms the fold with the spawn anchor.
-func newFleetWatch(x, y int32) fleetWatch {
-    return fleetWatch{
-        anchorX: x, anchorY: y,
-    }
+// newFleetWatch arms the fold.
+func newFleetWatch() fleetWatch {
+    return fleetWatch{}
 }
 
 // fold latches one sample into the watch (the pure evaluation core).
@@ -270,6 +286,7 @@ func (w fleetWatch) fold(s fleetSample) fleetWatch {
         // walk toward the target starts in a live fight too.
         w.walkStarted = s.at
         w.walkFighting = s.fighting
+        w.walkTargetID = s.targetID
         w.haveWalkFrom = s.hasPos
         w.walkFromX, w.walkFromY = s.x, s.y
         w.walkTargetX, w.walkTargetY = s.tx, s.ty
@@ -306,46 +323,129 @@ func (w fleetWatch) fold(s fleetSample) fleetWatch {
                 } else {
                     w.walkEndedAt = s.at
                 }
+                w = w.foldRetreat(dx, dy)
             }
         }
         w.walkStarted = time.Time{}
         w.havePendingLag = false
         w.walkFighting = false
+        w.walkTargetID = 0
         w.haveWalkFrom = false
     }
     if s.fighting && s.fightDist >= 0 {
         w.fightDists = append(w.fightDists, s.fightDist)
     }
-    if s.hasPos {
-        anchorDist := math.Hypot(float64(s.x-w.anchorX),
-            float64(s.y-w.anchorY))
-        if anchorDist > w.maxAnchor {
-            w.maxAnchor = anchorDist
-        }
-        if w.haveLast {
-            vecX := float64(s.x - w.lastX)
-            vecY := float64(s.y - w.lastY)
-            stepLen := math.Hypot(vecX, vecY)
-            if stepLen >= 20 {
-                if w.haveWalkVec {
-                    dot := vecX*w.lastWalkVecX + vecY*w.lastWalkVecY
-                    cross := vecX*w.lastWalkVecY - vecY*w.lastWalkVecX
-                    angle := math.Abs(math.Atan2(cross, dot) * 180 /
-                        math.Pi)
-                    if angle >= fleetTurnAngle {
-                        w.turns++
-                    }
-                }
-                w.lastWalkVecX = vecX / stepLen
-                w.lastWalkVecY = vecY / stepLen
-                w.haveWalkVec = true
-            }
-        }
-        w.lastX, w.lastY = s.x, s.y
-        w.haveLast = true
+    if s.fighting && s.hasTarget && s.targetID != 0 {
+        w = w.foldFight(s)
     }
 
     return w
+}
+
+// foldRetreat books one confirmed retreat walk (the away-direction
+// gate already passed): the walk's fight gains its retreat count, and
+// the walk's unit displacement extends the corner chain of THAT
+// fight - two consecutive confirmed retreats of one fight measure
+// the polyline corner between their straight segments, the exact
+// geometry of the curving retreat (a fixed-side bearing bends every
+// corner one way; a straight-line runaway repeats its heading).
+func (w fleetWatch) foldRetreat(dx, dy float64) fleetWatch {
+    if w.walkTargetID != 0 {
+        if w.walkTargetID == w.fightTarget {
+            w.fightRetreats++
+        }
+        length := math.Hypot(dx, dy)
+        if length >= 1 {
+            unitX, unitY := dx/length, dy/length
+            if w.haveLastRetreat &&
+                w.lastRetreatFight == w.walkTargetID {
+                // The signed rotation from the previous retreat
+                // heading to this one: positive bends
+                // counterclockwise, negative clockwise.
+                dot := unitX*w.lastRetreatVecX +
+                    unitY*w.lastRetreatVecY
+                cross := w.lastRetreatVecX*unitY -
+                    w.lastRetreatVecY*unitX
+                angle := math.Atan2(cross, dot) * 180 / math.Pi
+                if angle >= fleetTurnAngle {
+                    w.cornersCCW++
+                } else if angle <= -fleetTurnAngle {
+                    w.cornersCW++
+                }
+            }
+            w.lastRetreatVecX, w.lastRetreatVecY = unitX, unitY
+            w.lastRetreatFight = w.walkTargetID
+            w.haveLastRetreat = true
+        }
+    }
+
+    return w
+}
+
+// foldFight tracks the per-fight drift of the curving retreat: the
+// first fighting sample of a target latches the anchor on the MOB'S
+// STAND (the farm point the fight opened on - not the spawn, whose
+// displacement carries the hunt's own cell rotation), and every
+// fighting sample of the same fight measures the character's
+// distance from it. A fight switch (a new target id) closes the
+// tracked fight, recording its max drift when the kite really
+// retreated in it - the fights without a retreat (a one-shot kill,
+// a chase the engage never opened the range on) carry no curve
+// evidence and stay out of the leash.
+func (w fleetWatch) foldFight(s fleetSample) fleetWatch {
+    if w.fightTarget == 0 || s.targetID != w.fightTarget {
+        w = w.closeFight()
+        w.fightTarget = s.targetID
+        w.fightAnchorX, w.fightAnchorY = s.tx, s.ty
+        w.fightMaxDrift = 0
+        w.fightRetreats = 0
+    }
+    if !s.hasPos {
+        return w
+    }
+    drift := math.Hypot(float64(s.x-w.fightAnchorX),
+        float64(s.y-w.fightAnchorY))
+    if drift > w.fightMaxDrift {
+        w.fightMaxDrift = drift
+    }
+
+    return w
+}
+
+// closeFight records the tracked fight's max drift when the kite
+// retreated in it (the leash measures fights, not the whole window).
+func (w fleetWatch) closeFight() fleetWatch {
+    if w.fightTarget != 0 && w.fightRetreats > 0 {
+        w.fightDrifts = append(w.fightDrifts, w.fightMaxDrift)
+    }
+    w.fightTarget = 0
+    w.fightRetreats = 0
+    w.fightMaxDrift = 0
+
+    return w
+}
+
+// kiteFightDrifts answers the drifts of every kited fight, the
+// closed ones plus the fight still open at the window's end.
+func (w fleetWatch) kiteFightDrifts() []float64 {
+    drifts := append([]float64{}, w.fightDrifts...)
+    if w.fightTarget != 0 && w.fightRetreats > 0 {
+        drifts = append(drifts, w.fightMaxDrift)
+    }
+
+    return drifts
+}
+
+// curveCorners answers the big corners that agree on one turn side:
+// the curving retreat bends every corner the same way, so the
+// majority side carries the evidence (a wall-bounce zigzag racks
+// both sides and stays evidence).
+func (w fleetWatch) curveCorners() int {
+    if w.cornersCW > w.cornersCCW {
+        return w.cornersCW
+    }
+
+    return w.cornersCCW
 }
 
 // medianDuration answers the median of a duration slice.
@@ -376,16 +476,16 @@ func medianFloat(values []float64) float64 {
 
 // fleetVerdicts is the per-behavior outcome of one bot's watch.
 type fleetVerdicts struct {
-    maxRange     bool
-    maxRangeD    string
-    shoots       bool
-    shootsD      string
-    early        bool
-    earlyD       string
-    reshot       bool
-    reshotD      string
-    curve        bool
-    curveD       string
+    maxRange  bool
+    maxRangeD string
+    shoots    bool
+    shootsD   string
+    early     bool
+    earlyD    string
+    reshot    bool
+    reshotD   string
+    curve     bool
+    curveD    string
 }
 
 // verdicts reads the folded evidence into the behavior outcomes: each
@@ -395,12 +495,12 @@ func (w fleetWatch) verdicts() fleetVerdicts {
     v := fleetVerdicts{
         maxRangeD: "no fight samples yet",
         shootsD:   fmt.Sprintf("%d shots observed", w.shots),
-        earlyD:    fmt.Sprintf("%d retreats observed",
+        earlyD: fmt.Sprintf("%d retreats observed",
             len(w.retreatLags)),
-        reshotD:   fmt.Sprintf("%d walk-end re-shots observed",
+        reshotD: fmt.Sprintf("%d walk-end re-shots observed",
             len(w.reshotGaps)),
-        curveD: fmt.Sprintf("max anchor distance %.0f units, %d"+
-            " walk turns", w.maxAnchor, w.turns),
+        curveD: fmt.Sprintf("%d kite fights, %d retreat corners"+
+            " observed", len(w.fightDrifts), w.curveCorners()),
     }
     if w.shots >= fleetMinShots {
         v.shoots = true
@@ -426,15 +526,31 @@ func (w fleetWatch) verdicts() fleetVerdicts {
             " over %d walks", median.Round(100*time.Millisecond),
             len(w.reshotGaps))
     }
-    leashed := w.maxAnchor <= fleetAnchorLeash
-    curved := w.turns >= fleetMinTurns
-    v.curve = leashed && curved
-    if !leashed {
-        v.curveD = fmt.Sprintf("the anchor leash broke at %.0f"+
-            " units", w.maxAnchor)
-    } else if !curved {
-        v.curveD = fmt.Sprintf("leashed at %.0f units but only %d"+
-            " walk turns", w.maxAnchor, w.turns)
+    // The curving retreat holds on two attributions the leash fix of
+    // the curve round pinned: the per-fight drift (the median max
+    // displacement from the mob's stand across the kited fights -
+    // the cell rotation between the fights never reaches it) and
+    // the same-side polyline corners between the consecutive
+    // confirmed retreats of one fight.
+    drifts := w.kiteFightDrifts()
+    corners := w.curveCorners()
+    if len(drifts) > 0 && corners >= fleetMinTurns {
+        median := medianFloat(drifts)
+        leashed := median <= fleetFightDriftLeash
+        v.curve = leashed
+        if leashed {
+            v.curveD = fmt.Sprintf("median fight drift %.0f units"+
+                " over %d kite fights, %d same-side corners",
+                median, len(drifts), corners)
+        } else {
+            v.curveD = fmt.Sprintf("the fight drift broke at %.0f"+
+                " units (median over %d kite fights)",
+                median, len(drifts))
+        }
+    } else {
+        v.curveD = fmt.Sprintf("%d kite fights and %d same-side"+
+            " retreat corners observed (need %d corners)",
+            len(drifts), corners, fleetMinTurns)
     }
 
     return v
@@ -522,7 +638,7 @@ func launchFleet(
             slot:    slot,
             manager: m,
             log:     newArcherKiteLog(test.appendLog),
-            watch:   newFleetWatch(slot.X, slot.Y),
+            watch:   newFleetWatch(),
         }
         bots = append(bots, bot)
         go m.runSessionSupervised(ctx, slot.Account,
@@ -636,6 +752,7 @@ func (b *fleetBotRun) foldSample() {
         if x, y, _, ok := tracker.SelfPosition(); ok {
             if tx, ty, _, tok := tracker.ObjectPosition(target); tok {
                 sample.fighting = true
+                sample.targetID = target
                 sample.hasTarget = true
                 sample.tx, sample.ty = tx, ty
                 sample.fightDist = math.Hypot(float64(tx-x),
@@ -682,6 +799,7 @@ func fleetVerdict(
             ran.Round(time.Second), window.Round(time.Second))
     }
     counts := map[string]int{}
+    behind := map[string][]string{}
     for _, bot := range bots {
         verdicts := bot.watch.verdicts()
         test.appendLog(fmt.Sprintf("fleet: %s on %s - max-range %t"+
@@ -702,6 +820,13 @@ func fleetVerdict(
         } {
             if ok {
                 counts[id]++
+            } else {
+                // The fleet line names the slots the behavior did
+                // not hold on - a true fail and a slot that spent
+                // the window recovering (the evidence floors never
+                // armed) both belong here: the per-bot line above
+                // says which of the two it was.
+                behind[id] = append(behind[id], bot.slot.Account)
             }
         }
     }
@@ -711,6 +836,10 @@ func fleetVerdict(
         checkFleetShoots, checkFleetEarly, checkFleetReshot,
         checkFleetCurve} {
         detail := fmt.Sprintf("%d of %d bots", counts[id], total)
+        if len(behind[id]) > 0 {
+            detail += " (not passing: " + strings.Join(behind[id],
+                ", ") + ")"
+        }
         test.updateCheck(id, counts[id] == total, detail)
         if counts[id] < total {
             broken = append(broken, id+" ("+detail+")")
