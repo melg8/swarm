@@ -118,6 +118,56 @@ const fullDressTimeout = 5 * time.Minute
 func Definitions() []TestDef {
     return []TestDef{
         {
+            ID:      kiteProbeScenarioID,
+            Title:   "kite timing probe · the retreat window measurement",
+            Account: kiteProbeAccount,
+            Timeout: kiteProbeTimeout,
+            Description: "Start: the elven fighter temp19 resets onto " +
+                "the Kaboo Orc Grunt SW-5 cell focus (36000 50229 " +
+                "-3456) as the level 7 archer with the bow kit and " +
+                "the potion belt. Flow: a raw wire session (no hunt " +
+                "loop) dresses the kit, forces bow attacks on the " +
+                "cell mobs and walks a ten step retreat delay ladder " +
+                "(0 ms to 3000 ms after the own Attack broadcast): " +
+                "every round sends one mouse-mode MoveToLocation at " +
+                "the ladder delay and watches whether the movement " +
+                "starts immediately, is deferred to the bow cycle " +
+                "end or never runs, plus a cursor key (WASD) round " +
+                "that arms the keyboard movement right after the " +
+                "shot and streams the claimed positions through the " +
+                "windup while watching the target health (does the " +
+                "arrow land while the character moves). Pass: every " +
+                "measurement landed - the values themselves are the " +
+                "data the improved kite retreat pacing builds on " +
+                "(issue #70, the applied experiment half).",
+            Scenario: kiteProbeScenario,
+        },
+        {
+            ID:      archerFleetScenarioID,
+            Title:   "archer fleet · the five cell kite audit",
+            Account: archerFleetSlots[0].Account,
+            Timeout: archerFleetTimeout(),
+            Description: "Start: five elven fighters (temp20 through " +
+                "temp24) reset onto five different Kaboo Orc cells of " +
+                "the south-west elven ground (elven-hex-104, 106, " +
+                "105, 086 and 087) as the level 7 archers with the " +
+                "bow kit. Flow: the five archer sessions launch " +
+                "staggered and farm the audit window " +
+                "(SWARM_ARCHER_FLEET_MINUTES, default 2.5 minutes, " +
+                "the whole scenario under five minutes) while the " +
+                "monitor samples every bot at the quarter-second " +
+                "cadence and folds the evidence of the five kite " +
+                "behaviors: holding the maximum bow distance, " +
+                "shooting, regaining the distance before the reload " +
+                "ends, re-shooting once the distance is back and " +
+                "retreating on a curve that stays near the farm " +
+                "point. Pass: every behavior holds for every bot - " +
+                "the failure list names exactly which behaviors the " +
+                "fleet does not implement today (issue #70, the " +
+                "mass acceptance half).",
+            Scenario: archerFleetScenario,
+        },
+        {
             ID:      archerKiteScenarioID,
             Title:   "archer kite · the ranged farm contract",
             Account: archerKiteAccount,

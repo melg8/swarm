@@ -159,6 +159,23 @@ linters:
         - .*acceptance\.archerKiteWatch$
         - .*acceptance\.archerKiteVerdicts$
         - .*acceptance\.archerKiteSample$
+        # The kite timing probe and the archer fleet aggregates: the
+        # recorder, the rounds, the ladder summary, the WASD result, the
+        # raw session handle, the fleet samples, watches and verdicts
+        # all carry documented zero starts (the empty event slices, the
+        # not-yet anchors, the -1 sentinels) - the sites set the non
+        # zero starts next to the literal (see kite_timing_probe.go and
+        # archer_fleet.go of internal/swarm/acceptance).
+        - .*acceptance\.probeRecorder$
+        - .*acceptance\.probeRound$
+        - .*acceptance\.probeLadderSummary$
+        - .*acceptance\.probeWASDResult$
+        - .*acceptance\.kiteProbeSession$
+        - .*acceptance\.fleetSample$
+        - .*acceptance\.fleetWatch$
+        - .*acceptance\.fleetVerdicts$
+        - .*acceptance\.fleetBotRun$
+        - .*acceptance\.archerFleetSlotDesc$
         # The option and stat aggregates.
         # The dialog route steps: LinkText is the identity of the
         # step, the answer flags (AnswerIsEffect) are rare opt-ins
