@@ -173,6 +173,26 @@ func TestKiteReshotWaitsForTheRegainedDistance(t *testing.T) {
         "the affordable shot resumes once the distance is back")
 }
 
+// TestKitePursuitHoldNeedsTheRetreatContext pins the approach guard
+// of the pursuit hold: a close hostile with no kite retreat behind
+// the moment (the approach phase of a fresh fight - no shot, no
+// walk) never triggers the continuation, the engage requests the
+// attack instead (the live fleet round of 2026-09-23 measured the
+// approach slot walking its cell empty without a single shot).
+func TestKitePursuitHoldNeedsTheRetreatContext(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45200)
+    // The stance freshness lapses (no fresh swings, the sleep carries
+    // the scene past it), the mob holds at 200 units - inside the
+    // re-shot floor, but no retreat of this fight ever ran.
+    time.Sleep(3200 * time.Millisecond)
+    loop.lastHit = time.Now().Add(-2 * time.Second)
+    loop.tick()
+    require.Equal(t, []int32{7}, game.forces,
+        "the approach requests the attack")
+    require.Empty(t, game.walks,
+        "no pursuit continuation without a kite retreat behind it")
+}
+
 // TestKiteRespectsTheLeash pins the cornered case of the issue: a
 // retreat that would leave the hunting square is skipped - the
 // leash outranks the kite, the archer stands and shoots instead of

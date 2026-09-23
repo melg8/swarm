@@ -805,6 +805,15 @@ type Loop struct {
     // re-click would only fight the re-engage for the movement. The
     // zero value disarms the ladder.
     kiteWalkUntil time.Time
+    // kitePursuitFor names the fight the last kite retreat served:
+    // the pursuit hold of the engage tail (see kite.go) continues a
+    // walk only behind a lapsed RETREAT of the same fight - a close
+    // hostile of the approach phase (no shot, no retreat behind it)
+    // must never trigger the continuation, the engage requests the
+    // attack instead (the live fleet round of 2026-09-23 measured
+    // the approach slot walking away from its cell without a single
+    // shot until the window ran out).
+    kitePursuitFor int32
     // kiteWalkBaseX/Y is the cell the kite walk was issued from -
     // the ladder's dead-click oracle: a character still standing on
     // this cell past the probe pace never moved whatever the

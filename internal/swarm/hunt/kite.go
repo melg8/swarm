@@ -947,6 +947,7 @@ func (l *Loop) kiteIssueWalk(
     l.kiteWalkBaseX, l.kiteWalkBaseY = selfX, selfY
     l.kiteWalkIssuedAt = now
     l.kiteWalkUntil = until
+    l.kitePursuitFor = l.target
     l.combatAvoidUntil = until
     // The curving circle advances on the issued walk alone: the
     // opening straight retreat of the fight is spent, every later
@@ -1108,6 +1109,14 @@ func (l *Loop) kitePursuitHold(
     now time.Time, selfX, selfY, selfZ int32,
 ) bool {
     if !l.kiteLayerGates(now) {
+        return false
+    }
+    if l.kitePursuitFor != l.target {
+        // No kite retreat of THIS fight stands behind the moment
+        // (the approach phase, a chase without a shot): the
+        // continuation belongs to a lapsed retreat alone - the
+        // engage keeps its attack request (the live fleet round
+        // measured the approach slot walking its cell empty).
         return false
     }
     if l.kiteStreak >= kiteStreakLimit {
