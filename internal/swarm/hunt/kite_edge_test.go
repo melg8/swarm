@@ -98,13 +98,16 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
         "the step must open the distance to the train member")
 }
 
-// TestKiteSurroundedTrainHoldsGround pins the too-wide train rule: a
-// chaser on every side cancels the away vectors, the train is too
-// wide to outrun - the archer holds ground and shoots through it (no
-// step, no flee answer: a winnable encircled train is a standing
-// fight), and the hold paces its own probe so the fight never
-// stutters on the failed geometry.
-func TestKiteSurroundedTrainHoldsGround(t *testing.T) {
+// TestKiteEncircledTrainBreaksThroughTheGap pins the encircled
+// escape rule the live fleet round of issue #70 forced: a chaser on
+// every side cancels the centroid, and the step takes the widest
+// gap instead - the perpendicular bisector of a two-mob line opens
+// the distance to BOTH chasers at once. The standing answer of the
+// earlier rounds let the train grow unchecked on the mass cells
+// (a 26 second stand measured); the hold ground rule survives only
+// for a gap the whole lane battery refuses (the walled pocket -
+// kite_shot_test.go pins that half).
+func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
     bot, game, loop := kiteEdgeBot(t)
     // The target closed from the east, the train member stands 200
     // units west: away(target) + away(member) = 0 - the encircled
@@ -114,22 +117,38 @@ func TestKiteSurroundedTrainHoldsGround(t *testing.T) {
     mobHitsCharacterAt(bot, 7, 45200)
 
     tickPastTheWindup(loop)
-    require.Empty(t, game.walks,
-        "a surrounding train has no away direction - no step")
-    require.Equal(t, int32(7), loop.kiteHeldFor,
-        "the hold belongs to the current target")
-    require.False(t, loop.kiteHeldAt.IsZero(),
-        "the hold must be armed")
+    require.Len(t, game.walks, 1,
+        "an encircled train still leaves the widest gap - one step")
+    step := game.walks[0]
+    // The widest gap of the east-west chaser line (bearing 0 to the
+    // target, pi to the member) spans the northern half-plane and
+    // its bisector is the perpendicular ray - the deterministic
+    // first-widest answer, no coin flip between the two halves.
+    require.InDelta(t, 45000.0, float64(step[0]), 1.0,
+        "the gap bisector runs perpendicular to the chaser line")
+    require.InDelta(t, 50000+kiteStep, float64(step[1]), 1.0,
+        "the gap bisector runs perpendicular to the chaser line")
+    // The perpendicular escape opens the distance to BOTH chasers.
+    toTarget := math.Hypot(
+        float64(step[0]-45200), float64(step[1]-50000))
+    toMember := math.Hypot(
+        float64(step[0]-44800), float64(step[1]-50000))
+    require.Greater(t, toTarget, 200.0,
+        "the perpendicular escape opens the distance to the target")
+    require.Greater(t, toMember, 200.0,
+        "the perpendicular escape opens the distance to the member")
+    require.True(t, loop.kiteHeldAt.IsZero(),
+        "the gap answer is a step, not a hold")
     require.Zero(t, game.sits,
         "the surrounded archer does not sit into the blows")
     require.Zero(t, game.logouts,
-        "a winnable encircled train is a standing fight, not a flee")
+        "a winnable encircled train is a fight, not a flee")
 
-    // The immediate re-tick stays quiet: the hold owns the pacing
-    // between probes, the fight never stutters.
+    // The immediate re-tick stays quiet: the walk window owns the
+    // pacing, the fight never stutters.
     loop.tick()
-    require.Empty(t, game.walks,
-        "the hold owns the pacing between probes")
+    require.Len(t, game.walks, 1,
+        "the walk window owns the pacing between probes")
 }
 
 // TestKiteCorneredHoldKeepsShooting pins the walled corner rule: a
@@ -275,6 +294,51 @@ func TestKiteHalfPlaneGuardRejectsTheFoldBack(t *testing.T) {
     _, _, straight := loop.kiteLaneResolve(
         45000, 50000, -3500, 44600, 50000, -1, 0)
     require.True(t, straight, "the away lane itself is a legal lane")
+}
+
+// TestKiteGapDirectionPicksTheWidestGap pins the gap geometry of the
+// encircled escape (the pure half of the rule - the behavior halves
+// live in TestKiteEncircledTrainBreaksThroughTheGap and the
+// kite_shot_test.go pins): two opposite chasers leave two tied 180
+// degree gaps and the deterministic answer takes the first - the
+// same perpendicular ray every call, no coin flip; a one-sided
+// cluster leaves the wraparound gap and its bisector points away
+// from the whole cluster; a single bearing pins no escape geometry.
+func TestKiteGapDirectionPicksTheWidestGap(t *testing.T) {
+    // Two opposite chasers (bearings 0 and pi): the first widest
+    // gap spans 0 to pi, its bisector is the northern perpendicular.
+    x, y, ok := kiteGapDirection([]float64{0, math.Pi})
+    require.True(t, ok, "two bearings leave a gap")
+    require.InDelta(t, 0.0, x, 1e-9,
+        "the tied gaps resolve deterministically to the perpendicular")
+    require.InDelta(t, 1.0, y, 1e-9,
+        "the tied gaps resolve deterministically to the perpendicular")
+
+    // The one-sided cluster (bearings 0, 45 and 90 degrees): the
+    // wraparound gap spans 270 degrees and its bisector points at
+    // 225 degrees - straight away from the cluster.
+    x, y, ok = kiteGapDirection([]float64{0, math.Pi / 4, math.Pi / 2})
+    require.True(t, ok, "the cluster leaves the wraparound gap")
+    require.InDelta(t, math.Cos(5*math.Pi/4), x, 1e-9,
+        "the wraparound bisector points away from the cluster")
+    require.InDelta(t, math.Sin(5*math.Pi/4), y, 1e-9,
+        "the wraparound bisector points away from the cluster")
+
+    // The unsorted input answers the same as the sorted one (the
+    // gap search sorts its own copy).
+    x2, y2, ok2 := kiteGapDirection([]float64{math.Pi, 0})
+    require.True(t, ok2, "the order never changes the answer")
+    require.InDelta(t, 0.0, x2, 1e-9,
+        "the order never changes the answer")
+    require.InDelta(t, 1.0, y2, 1e-9,
+        "the order never changes the answer")
+
+    // A single bearing (or none) pins no escape geometry - the
+    // caller holds ground on a degenerate scene.
+    _, _, ok = kiteGapDirection([]float64{0})
+    require.False(t, ok, "a single bearing leaves no gap")
+    _, _, ok = kiteGapDirection(nil)
+    require.False(t, ok, "no bearings leave no gap")
 }
 
 // TestKiteCampDeflectsTheRetreatLane pins the camp rule: a retreat

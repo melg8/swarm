@@ -124,6 +124,7 @@ package hunt
 
 import (
     "math"
+    "sort"
     "time"
 
     "github.com/melg8/swarm/internal/swarm/pathfind"
@@ -184,11 +185,20 @@ const (
     // kiteEncircleShare is the encirclement threshold of the train:
     // when the summed away vectors of the chasers shrink under this
     // share of their count (the unit vectors cancel - chasers stand
-    // on every side), the train is too wide to outrun and the archer
-    // holds ground and shoots through it. A single chaser always sums
-    // to a full unit (share 1.0); two chasers on opposite sides sum
-    // to ~0.
+    // on every side), the centroid names no retreat direction and
+    // the widest-gap bisector takes the step over (kiteGapDirection
+    // - the live fleet round of issue #70 measured the standing
+    // encircled fight as a death trap on the mass cells). A single
+    // chaser always sums to a full unit (share 1.0); two chasers on
+    // opposite sides sum to ~0.
     kiteEncircleShare = 0.3
+    // kiteMaxTrainMembers caps the bearing scratch of the retreat
+    // direction (kiteBearings): the gap geometry of a wider train
+    // reads its nearest members alone - a train that wide outranks
+    // the kite (the flee machinery's logout case), and the scratch
+    // must stay a fixed array to keep the resolution allocation
+    // free.
+    kiteMaxTrainMembers = 16
     // kiteFanStep is the rotation increment of the retreat lane fan:
     // the straight away-ray first, then the candidates at its
     // multiples - a wall or a camp blocking the straight lane leaves
@@ -644,12 +654,10 @@ func (l *Loop) kiteResolveAndClick(
     now, until time.Time, selfX, selfY, selfZ int32,
 ) bool {
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
-    if encircled {
-        // The train surrounds the character - the away vectors
-        // cancel, every step direction walks INTO a chaser. Too wide
-        // to outrun: hold ground and shoot through the train (the
-        // losing fight and the pile up machinery still own a train
-        // that outdamages the standing fight).
+    if encircled && dirX == 0 && dirY == 0 {
+        // The degenerate no-chaser scene (a tracker gap inside the
+        // broadcast window): no ray to guard, the hold keeps the
+        // pacing until the next probe.
         l.kiteHoldGround(now, true)
 
         return false
@@ -659,17 +667,25 @@ func (l *Loop) kiteResolveAndClick(
     // later one leans the fixed tangential bearing on the fight's
     // turn side - the circle. The RAW away vector stays the
     // half-plane reference of the lane battery (the curve may bend
-    // the preferred ray, never the guard).
-    prefX, prefY := l.kiteCurveDirection(dirX, dirY, selfX, selfY)
+    // the preferred ray, never the guard). An encircled train
+    // KEEPS its raw ray as the preference: the gap bisector already
+    // encodes the escape geometry, and a tangential lean on top of
+    // it would fold the step back onto a flanker.
+    prefX, prefY := dirX, dirY
+    if !encircled {
+        prefX, prefY = l.kiteCurveDirection(dirX, dirY, selfX, selfY)
+    }
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
         selfX, selfY, selfZ, prefX, prefY, dirX, dirY,
         l.kiteDeadCellsFor())
     if !found {
-        // Cornered: no walkable lane in the whole away hemisphere.
-        // The hold ground answer is the archetype rule - the bow is
-        // the always-weapon, the cornered archer never switches to a
-        // melee trade, it stands and shoots the way out.
-        l.kiteHoldGround(now, false)
+        // Cornered: no walkable lane in the whole guarded
+        // hemisphere (the raw away-ray of a normal train, the gap
+        // ray of an encircled one). The hold ground answer is the
+        // archetype rule - the bow is the always-weapon, the
+        // cornered archer never switches to a melee trade, it
+        // stands and shoots the way out.
+        l.kiteHoldGround(now, encircled)
 
         return false
     }
@@ -1029,14 +1045,16 @@ func (l *Loop) kiteRotateDeadEndpoint(
         l.kiteWalkDeadCount++
     }
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
-    if encircled {
+    if encircled && dirX == 0 && dirY == 0 {
         return false
     }
-    // The rotation stays AWAY-CENTERED (the raw away-ray the
-    // half-plane guards): the dead-endpoint recovery is a coverage
-    // sweep of the whole hemisphere, the circle owns the fresh
-    // retreat preference alone - a rotation that clung to the curved
-    // ray would sweep only the three candidates left of its fan.
+    // The rotation stays DIRECTION-CENTERED (the raw ray the
+    // half-plane guards - the centroid of a normal train, the gap
+    // bisector of an encircled one): the dead-endpoint recovery is
+    // a coverage sweep of the whole hemisphere, the circle owns
+    // the fresh retreat preference alone - a rotation that clung
+    // to the curved ray would sweep only the three candidates left
+    // of its fan.
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
         selfX, selfY, selfZ, dirX, dirY, dirX, dirY,
         l.kiteWalkDeadCells[:l.kiteWalkDeadCount])
@@ -1249,33 +1267,27 @@ func (l *Loop) kiteWalkClear() {
     l.kiteWalkDead = false
 }
 
-// kiteTrainDirection resolves the retreat DIRECTION of one kite
-// step: the centroid away-vector of the chaser train - the fight
-// target's own away unit vector plus every SelfAttackers member
-// within the scan range and on a reachable deck. Each chaser weighs
-// one unit - the centroid semantics the issue names; the nearest
-// mob drags the direction hardest only through the trigger radius it
-// already crossed (the armed threat of kiteThreat). A train whose
-// away vectors cancel under the encirclement share has no direction
-// at all - the caller holds ground and shoots through it. The
-// positions are the raw last-known packet ones (the projected scan
-// only serves the nearest chaser); the trigger margin absorbs the
-// broadcast lag. Reports the unit direction and whether the train
-// encircles the character.
-func (l *Loop) kiteTrainDirection(
-    selfX, selfY, selfZ int32,
-) (dirX, dirY float64, encircled bool) {
-    var sumX, sumY float64
-    count := 0.0
+// kiteChaserBearings appends the planar bearing (self to chaser,
+// the atan2 convention) of every chaser the retreat direction
+// weighs to out and returns the filled slice: the fight target
+// first, then every SelfAttackers member within the scan range on a
+// reachable deck. The enumeration is the single source of the train
+// geometry - the centroid sum of kiteTrainDirection and the gap
+// search of kiteGapDirection read the same members, so the two
+// answers can never disagree about the train's shape. The output
+// caps at the capacity of out (the kiteBearings scratch): a wider
+// train is the flee machinery's case, not a kite shape.
+func (l *Loop) kiteChaserBearings(
+    selfX, selfY, selfZ int32, out []float64,
+) []float64 {
     // The fight target weighs first: it chases the retreat step
     // wherever it lands, its away vector always counts.
     if tx, ty, _, tok := l.tracker.ObjectPosition(l.target); tok {
         dx := float64(selfX) - float64(tx)
         dy := float64(selfY) - float64(ty)
-        if dist := math.Hypot(dx, dy); dist >= 1 {
-            sumX += dx / dist
-            sumY += dy / dist
-            count++
+        if math.Hypot(dx, dy) >= 1 {
+            out = append(out, math.Atan2(
+                float64(ty-selfY), float64(tx-selfX)))
         }
     }
     for _, chaser := range l.tracker.SelfAttackers() {
@@ -1298,14 +1310,98 @@ func (l *Loop) kiteTrainDirection(
             // standing on the character itself (no away direction).
             continue
         }
-        sumX += dx / dist
-        sumY += dy / dist
-        count++
+        out = append(out, math.Atan2(
+            float64(chaser.Y-selfY), float64(chaser.X-selfX)))
+        if len(out) == cap(out) {
+            // The scratch is full: the gap geometry of a wider
+            // train reads its nearest members alone (see
+            // kiteMaxTrainMembers).
+            break
+        }
     }
+
+    return out
+}
+
+// kiteGapDirection resolves the escape ray of an encircled train:
+// the bisector of the WIDEST angular gap between the chaser
+// bearings - the direction that stays farthest from every flanker
+// at once. The live fleet round of issue #70 measured what the
+// standing encircled answer costs on the mass cells (a 26 second
+// stand with the train growing to three chasers, the potions and
+// the emergency logout of the wounded slots): the archer that keeps
+// stepping through the widest gap breaks the pile-up before it
+// forms, the one that stands invites it. The perpendicular break of
+// a two-mob line is the classic case - the bisector of the two 180
+// degree gaps opens the distance to BOTH chasers at once. Reports
+// the unit direction and whether the bearings leave a gap at all (a
+// single bearing or none pins no escape geometry).
+func kiteGapDirection(bearings []float64) (float64, float64, bool) {
+    if len(bearings) < 2 {
+        return 0, 0, false
+    }
+    sorted := make([]float64, len(bearings))
+    copy(sorted, bearings)
+    sort.Float64s(sorted)
+    // The widest gap between consecutive bearings, the wraparound
+    // included: the first widest gap wins the ties (a deterministic
+    // answer for the symmetric trains - two opposite chasers name
+    // the same perpendicular ray every call).
+    bestSpan := 0.0
+    bestAt := sorted[0]
+    for i := 1; i < len(sorted); i++ {
+        if span := sorted[i] - sorted[i-1]; span > bestSpan {
+            bestSpan, bestAt = span, sorted[i-1]
+        }
+    }
+    if span := sorted[0] + 2*math.Pi - sorted[len(sorted)-1]; span > bestSpan {
+        bestSpan, bestAt = span, sorted[len(sorted)-1]
+    }
+    bisector := bestAt + bestSpan/2
+
+    return math.Cos(bisector), math.Sin(bisector), true
+}
+
+// kiteTrainDirection resolves the retreat DIRECTION of one kite
+// step: the centroid away-vector of the chaser train - the fight
+// target's own away unit vector plus every SelfAttackers member
+// within the scan range and on a reachable deck. Each chaser weighs
+// one unit - the centroid semantics the issue names; the nearest
+// mob drags the direction hardest only through the trigger radius it
+// already crossed (the armed threat of kiteThreat). A train whose
+// away vectors cancel under the encirclement share names no
+// centroid - the WIDEST-GAP bisector takes the step over (the live
+// fleet round of issue #70 measured the standing encircled answer
+// as a death trap on the mass cells: the train only grows while the
+// archer stands - the gap ray keeps the movement contract of the
+// kite, the lane battery still owns the terrain, and the hold
+// ground answer survives for the gap that is walled or dead). The
+// positions are the raw last-known packet ones (the projected scan
+// only serves the nearest chaser); the trigger margin absorbs the
+// broadcast lag. Reports the unit direction (the centroid ray of a
+// normal train, the gap bisector of an encircled one, the zero of
+// the degenerate no-chaser scene) and whether the train encircles
+// the character.
+func (l *Loop) kiteTrainDirection(
+    selfX, selfY, selfZ int32,
+) (dirX, dirY float64, encircled bool) {
+    bearings := l.kiteChaserBearings(
+        selfX, selfY, selfZ, l.kiteBearings[:0])
+    var sumX, sumY float64
+    for _, bearing := range bearings {
+        sumX += -math.Cos(bearing)
+        sumY += -math.Sin(bearing)
+    }
+    count := float64(len(bearings))
     sumLen := math.Hypot(sumX, sumY)
     if sumLen < kiteEncircleShare*count || sumLen < 1 {
-        // The encircled sum (or the degenerate zero): no retreat
-        // direction exists.
+        // The encircled sum (or the degenerate zero): the centroid
+        // names no direction - the widest-gap bisector serves the
+        // step when the bearings leave one.
+        if gapX, gapY, gap := kiteGapDirection(bearings); gap {
+            return gapX, gapY, true
+        }
+
         return 0, 0, true
     }
 
@@ -1516,7 +1612,8 @@ func (l *Loop) kiteDeflectFromCamps(
 // never stutters the tick loop, and logs its reason once per hold
 // episode - a standing fight that names itself stays diagnosable in
 // the event feed. The surrounded flag picks the diagnostic wording
-// (the encircled train against the walled corner).
+// (the encircled train whose gap ray found no lane against the
+// walled corner).
 func (l *Loop) kiteHoldGround(now time.Time, surrounded bool) {
     fresh := l.kiteHeldFor != l.target ||
         l.kiteHeldAt.IsZero() ||

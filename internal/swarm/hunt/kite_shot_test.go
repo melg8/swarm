@@ -197,12 +197,12 @@ func TestKiteShotPacedWindowGuardsTheDoubleStep(t *testing.T) {
         "the deferred click fires exactly once")
 }
 
-// TestKiteShotPacedEncircledTrainHoldsGround pins the shared hold
-// answer: a surrounding train cancels the away vectors, and the
-// deferred click resolves to the hold ground rule at its fire moment
-// - a fresh shot never walks the character INTO a chaser, however
-// late the click lands.
-func TestKiteShotPacedEncircledTrainHoldsGround(t *testing.T) {
+// TestKiteShotPacedEncircledTrainBreaksThroughTheGap pins the
+// deferred click's encircled answer: a surrounding train cancels the
+// centroid, and the click resolves to the widest-gap ray at its fire
+// moment - the perpendicular break of a two-mob line, never a step
+// into a flanker.
+func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     trainMember(bot, 44800, 50000)
     mobHitsCharacterAt(bot, 7, 45200)
@@ -211,12 +211,43 @@ func TestKiteShotPacedEncircledTrainHoldsGround(t *testing.T) {
         "the broadcast tick arms the schedule, not a walk")
     ageKiteClick(loop)
     loop.tick()
+    require.Len(t, game.walks, 1,
+        "the encircled train leaves the widest gap - the click takes it")
+    step := game.walks[0]
+    require.InDelta(t, 45000.0, float64(step[0]), 1.0,
+        "the gap bisector runs perpendicular to the chaser line")
+    require.InDelta(t, 50000+kiteStep, float64(step[1]), 1.0,
+        "the gap bisector runs perpendicular to the chaser line")
+    require.True(t, loop.kiteHeldAt.IsZero(),
+        "the gap answer is a step, not a hold")
+}
+
+// TestKiteShotPacedEncircledGapBlockedHoldsGround pins the encircled
+// hold of the gap-blocked pocket: the widest-gap ray and its whole
+// fan stand walled (the closed corner of the mass cells), and the
+// deferred click resolves to the hold ground rule - the encircled
+// archer stands and shoots the way out only when the gap itself is
+// closed.
+func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    trainMember(bot, 44800, 50000)
+    mobHitsCharacterAt(bot, 7, 45200)
+    nav := &fakeNavigator{}
+    // The whole gap hemisphere (north of the chaser line) answers
+    // walled: every gap fan candidate lands there.
+    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
+        return to.Y < 50000, nil
+    }
+    loop.SetNavigator(nav)
+    loop.tick()
     require.Empty(t, game.walks,
-        "a surrounding train has no away direction - no step")
+        "the broadcast tick arms the schedule, not a walk")
+    ageKiteClick(loop)
+    loop.tick()
+    require.Empty(t, game.walks,
+        "an encircled archer with a walled gap stops retreating")
     require.Equal(t, int32(7), loop.kiteHeldFor,
-        "the hold belongs to the current target")
-    require.False(t, loop.kiteHeldAt.IsZero(),
-        "the hold must be armed")
+        "the encircled hold is armed for the target")
 }
 
 // TestKiteShotPacedCorneredHoldsGround pins the corner answer of the

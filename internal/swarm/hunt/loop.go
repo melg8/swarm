@@ -847,6 +847,14 @@ type Loop struct {
     // the probe tax on the same dead straight cell every cycle) and
     // resets on the target change.
     kiteDeadFor int32
+    // kiteBearings is the scratch of the retreat direction: the
+    // planar bearings of the chaser train the last resolution
+    // collected (kiteTrainDirection fills it every call - the
+    // centroid sum and the encircled gap read the same enumeration).
+    // A train wider than the array keeps its farthest members out of
+    // the gap geometry only (the sum stays whole) - a train that
+    // wide is the flee machinery's logout case, not a kite shape.
+    kiteBearings [kiteMaxTrainMembers]float64
     // kite carries the tunable block of the kite fight (see
     // kite.go): the loop starts at DefaultKiteParams - the shipped
     // tuning the acceptance scenario pins - and the launch config
