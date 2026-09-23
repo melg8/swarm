@@ -566,10 +566,20 @@ shoots 4/5; the fails: max-range 1/5 (the melee-collapse medians
 death-restart cycle on the shooter cell).
 
 The round-15 live verdict (runs/fleet-2026-09-23/round15.log,
-after 2d93da71): 22 of 30 - always-run 5/5 (THE OWNER'S HEADLINE
-ASK, first round ever), max-range 2/5 with the fixed cells at
+after 2d93da71): 22 of 30 - always-run 5/5 (the owner's
+headline ask; ERRATUM from the QA audit: the temp21 pass was
+VACUOUS - 0 shots, 109 samples, 12 percent avoidable standing - a
+slot that never fought read as a pass; the honest count is 4/5
+plus one no-evidence, and the verdict's evidence floor now rides
+the shooting evidence), max-range 2/5 with the fixed cells at
 458/466 medians (was 1291/57), temp20 now fights (34 shots), the
-pass-through and the strafe both visible in the log. The remaining
+STRAFE visible in the log (the "holds 475 units, the retreat
+clicks at the windup end" lines). ERRATUM (the clean-context QA
+audit of the round caught it): the PASS-THROUGH tier NEVER FIRED
+live - zero "shoving through" lines across rounds 14 and 15 while
+19 surround holds remained in round 15 - the tier is unit-pinned
+(kite_breakout_test.go) but live-unvalidated; the 21->22 gain rode
+the strafe alone (temp20/22). The remaining
 fails: temp21 a spent window (the starter death-restart cycle on
 the surround cell - a survivability question, not a kite behavior),
 temp23/24 max-range (134/141 medians) and temp23 quick-reshot.
@@ -620,3 +630,36 @@ name it "no evidence"), but TWO consecutive rounds lost the same
 slot to it. The next round should either raise the fleet kit (the
 death is a survivability fact, not a kite fact) or drop a
 healing-potion cadence into the acceptance reset.
+
+## The clean-context QA round (the standing owner rule)
+
+The QA sub-agent audited the session against the original owner
+prompt on a clean context and scored it 74/100 with five
+must-fixes; all five landed in the QA follow-up commit:
+
+1. THE DOC MISREPRESENTATION: "the pass-through visible in the
+   log" was half false (see the erratum above) - corrected here.
+2. THE PHANTOM TEST: equip_test.go cited
+   TestInventoryResendOutlivesTheAttackDeferral without the test
+   existing - the test now exists and pins the 4 s same-item guard
+   against the 600 ms slot-overlap release.
+3. THE STALE COMMENTS: the file header, the curve doc and the
+   kiteStreak field doc still described the removed "fight it out"
+   and the zone-center curve - all three rewritten to the
+   always-run contract (a future agent reading them would have
+   re-introduced the standing behavior).
+4. THE VACUOUS ALWAYS-RUN PASS: the verdict's evidence floor now
+   requires the shooting evidence (fleetMinShots) - a slot that
+   never fought reads "no evidence", not a pass.
+5. THE SHOVE'S POST-DEFLECTION FLANK READ: the camp deflection can
+   bend the shove's endpoint onto a chaser ray - the clearance
+   verdicts now read the RESOLVED lane's direction (the same
+   double read the breakout tier runs), and the ledger tick moved
+   to the top of the fight tick (the placement bias: samples
+   skipped behind the ladder returns under-counted the idle
+   bucket).
+
+The QA verdict also named the god-file growth (kite.go 2154 ->
+2375 against the 500-line owner rule) - the honest debt the next
+refactor round owns: the escape ladder family (the fan, the
+breakout, the shove) is a clean split candidate.

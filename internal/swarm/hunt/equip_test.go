@@ -6,6 +6,7 @@ package hunt
 
 import (
     "testing"
+    "time"
 
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
@@ -288,4 +289,48 @@ func uniqueInt32(values []int32) []int32 {
     }
 
     return unique
+}
+
+// TestInventoryResendOutlivesTheAttackDeferral pins the round-14
+// fleet dress fix: the Mobius UseItem handler defers an equip that
+// lands inside the attack window to the attack end (~1.5 s bow
+// windup, ~3 s cycle - the measured kite timing findings), so the
+// SAME ITEM stays gated for the whole deferral (the 4 s
+// inventoryResendTimeout) - the old shared 600 ms expiry re-sent
+// the item into the window and the second packet toggled the piece
+// right back off. A DIFFERENT item's slot overlap releases at the
+// old 600 ms pace (the refused-request rescue).
+func TestInventoryResendOutlivesTheAttackDeferral(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    bot.ApplyItemList([]state.InventoryItem{
+        {ObjectID: 555, ItemID: shortSwordItemID, Count: 1},
+        {ObjectID: 556, ItemID: 23, Count: 1},
+    })
+
+    // The first equip goes out and stays unconfirmed (the server
+    // holds it through the attack window).
+    loop.tick()
+    require.Len(t, game.uses, 1)
+    marked := game.uses[0]
+
+    // 700 ms past the click - the OLD expiry line, deep inside the
+    // server's attack-window deferral: the same item is STILL
+    // gated...
+    time.Sleep(700 * time.Millisecond)
+    require.False(t, loop.inventoryItemAllowed(marked, nil),
+        "the same item stays gated through the attack deferral")
+
+    // ...while the OTHER item's slot overlap released long ago (it
+    // equips on the very next tick).
+    loop.tick()
+    require.Len(t, game.uses, 2,
+        "a different item rides the 600 ms slot-overlap release")
+
+    // The deferral outlived: past the 4 s same-item window the
+    // refused request finally retries.
+    time.Sleep(3400 * time.Millisecond)
+    require.True(t, loop.inventoryItemAllowed(marked, nil),
+        "the same-item guard lapses at the resend timeout")
 }

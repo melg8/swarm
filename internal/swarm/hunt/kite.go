@@ -72,9 +72,12 @@ package hunt
 //     surfaces through the ordinary move-start watchdog machinery,
 //     not through the kite - the kite re-probes on its pacing and
 //     picks the next fan candidate then.
-//   - the streak limit of the core stays: a chaser at least as fast
-//     as the character never falls behind, and past the limit the
-//     archer stops shuffling and fights it out.
+//   - the streak limit of the core is a DIAGNOSTIC since the
+//     round-14 always-run redesign: a chaser at least as fast as
+//     the character never falls behind, the counter names the
+//     unwinnable race in the log, and the retreat keeps running on
+//     the fight's own circle - the standing "fight it out" answer
+//     is gone (it was the melee damage the kite exists to avoid).
 //   - attack animation/travel time: the bow arrow flies ~500ms; the
 //     step window pauses the re-requests but the server keeps the
 //     already flying shots - a shot fired a moment before the step
@@ -676,7 +679,8 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     }
     l.kiteStreak++
     l.logger.Printf("Hunt: hostile %d closed to %d units of the "+
-        "fight on %d, kiting clear (step %d of %d)",
+        "fight on %d, kiting clear (step %d, the unwinnable-race "+
+        "diagnostic bound %d)",
         threatID, int(math.Round(dist)), l.target,
         l.kiteStreak, kiteStreakLimit)
 
@@ -1079,7 +1083,8 @@ func (l *Loop) kiteShotPhase(
 // circles the fight instead of marching one ray, so the drift away
 // from the farm point stays bounded by the circle. The turn side
 // is the fight's own constant (kiteCurveSide picks it once: toward
-// the hunting zone center when the leash knows one, a fixed side
+// the FIGHT ANCHOR when the first retreat anchored the fight, a
+// fixed side
 // otherwise). The step itself stays under the half-plane bound
 // (cos(kiteCurveStep) >= kiteHalfPlaneSlack, pinned by a unit
 // test), so the bent ray never folds back into the train whatever
@@ -2212,13 +2217,6 @@ func (l *Loop) kiteShoveResolve(
     worstOK := false
     for _, off := range candidates {
         rayX, rayY := rotatePlanar(gapX, gapY, off)
-        worst := -2.0
-        for _, bearing := range bearings {
-            if c := rayX*math.Cos(bearing) +
-                rayY*math.Sin(bearing); c > worst {
-                worst = c
-            }
-        }
         endX := selfX + int32(math.Round(rayX*kiteShoveStep))
         endY := selfY + int32(math.Round(rayY*kiteShoveStep))
         laneX, laneY, ok := l.kiteTerrainLane(
@@ -2226,13 +2224,34 @@ func (l *Loop) kiteShoveResolve(
         if !ok || deadLane(laneX, laneY, dead) {
             continue
         }
+        // The post-deflection flank read (the QA audit of the
+        // round caught the gap): the terrain battery may deflect
+        // the endpoint around a camp, and the deflected lane - not
+        // the raw candidate ray - is the walk the character takes.
+        // The clearance verdicts (the clean-seam test and the
+        // least-crowded book) read the RESOLVED lane's direction,
+        // the same double read the breakout tier runs.
+        laneLen := math.Hypot(float64(laneX-selfX),
+            float64(laneY-selfY))
+        if laneLen < 1 {
+            continue
+        }
+        laneRX, laneRY := float64(laneX-selfX)/laneLen,
+            float64(laneY-selfY)/laneLen
+        worst := -2.0
+        for _, bearing := range bearings {
+            if c := laneRX*math.Cos(bearing) +
+                laneRY*math.Sin(bearing); c > worst {
+                worst = c
+            }
+        }
         if worst < kiteShoveFlankCos {
-            // The clean seam: the first candidate that clears every
-            // flank and the terrain serves the shove.
+            // The clean seam: the first candidate whose RESOLVED
+            // lane clears every flank serves the shove.
             return laneX, laneY, true
         }
         if worst < worstFlank {
-            // The least-crowded terrain-passable ray so far (the
+            // The least-crowded terrain-passable lane so far (the
             // pass-through tier's book).
             worstFlank, worstX, worstY, worstOK =
                 worst, laneX, laneY, true

@@ -775,9 +775,11 @@ type Loop struct {
     // the steps of the running fight.
     kiteFor int32
     // kiteStreak counts the consecutive kite steps of the kiteFor
-    // target: past kiteStreakLimit the distance race is unwinnable
-    // (a chaser at least as fast as the character) and the archer
-    // fights it out instead of shuffling forever.
+    // target: crossing kiteStreakLimit names the unwinnable race
+    // (a chaser at least as fast as the character) in the log - a
+    // DIAGNOSTIC since the round-14 always-run redesign, the
+    // retreat keeps running on the fight's own circle (the
+    // standing "fight it out" answer is gone).
     kiteStreak int
     // kiteHeldFor is the target the cornered hold belongs to (see
     // kite.go): the hold of one target never paces another.
@@ -2289,6 +2291,15 @@ func (l *Loop) engage() {
             l.maybeBeginLure(now)
         }
     }
+    // The kite motion ledger (see kite_ledger.go, the round-14
+    // feedback ask): the per-fight standing/moving accounting runs
+    // at the TOP of the fight tick - before the ladder and the
+    // deferred click that may spend and return the tick - so every
+    // tick of the fight books its second, whatever the tick
+    // machinery below does with the moment (the QA audit of the
+    // round caught the placement bias: samples skipped behind the
+    // ladder returns systematically under-counted the idle bucket).
+    l.kiteLedgerTick(now)
     // The re-click ladder of the kite walk (see kite.go, issue #60,
     // the second round): the retreat click of the kite proved
     // fragile three ways (the stance transition swallow, the
@@ -2321,13 +2332,6 @@ func (l *Loop) engage() {
     if l.kiteClickWalk(now) {
         return
     }
-    // The kite motion ledger (see kite_ledger.go, the round-14
-    // feedback ask): the per-fight standing/moving accounting runs
-    // on every tick, fight or not - a cleared target closes the
-    // ledger with the summary line, a fresh one opens its own, and
-    // the ticks between book the seconds the fight spends moving,
-    // winding up, holding or standing idle.
-    l.kiteLedgerTick(now)
     if l.tracker.SelfFighting(l.target) {
         if l.lureArmed() && l.lureTick(now) {
             return

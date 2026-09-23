@@ -651,9 +651,16 @@ type fleetVerdicts struct {
 func (w fleetWatch) runsVerdict() (ok bool, detail string,
     evidenced bool,
 ) {
-    if w.fightSamplesN < fleetMinFightSamples {
-        return false, fmt.Sprintf("%d fight samples observed",
-            w.fightSamplesN), false
+    if w.fightSamplesN < fleetMinFightSamples ||
+        w.shots < fleetMinShots {
+        // The evidence floor rides the SHOOTING evidence too (the
+        // QA audit of the round caught the vacuous pass: a slot
+        // that spent the window walking its cell - 109 samples, 0
+        // shots, 12 percent avoidable standing - read as an
+        // always-run PASS without ever fighting). A slot that
+        // never shot never fought a kite fight.
+        return false, fmt.Sprintf("%d fight samples, %d shots "+
+            "observed", w.fightSamplesN, w.shots), false
     }
     share := float64(w.fightStanding) / float64(w.fightSamplesN)
 
