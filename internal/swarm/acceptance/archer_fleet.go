@@ -740,15 +740,6 @@ func (w fleetWatch) curveVerdict() (ok bool, detail string,
 func (w fleetWatch) reshotVerdict(v *fleetVerdicts) {
     v.reshotE = true
     medianGap := medianDuration(w.reshotGaps)
-    // The re-scoped quick-reshot verdict: the redesigned kite
-    // runs long race legs (10-13 s of walking) before the single
-    // re-shot, so the behavior is the DISTANCE the re-shot lands
-    // at - the safe shooting distance regained - not the
-    // walk-end-to-shot gap: a collapsed-range arrival shot books
-    // a ~zero gap and sailed through the old gap ceiling. The
-    // KNOWN distances alone feed the median; a window that lost
-    // them all falls back to the gap ceiling so the verdict
-    // never reads vacuous.
     dists := make([]float64, 0, len(w.reshotDists))
     for _, dist := range w.reshotDists {
         if dist >= 0 {

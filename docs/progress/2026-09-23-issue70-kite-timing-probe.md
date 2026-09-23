@@ -692,3 +692,102 @@ meter change in between) re-confirms the rounds 12-13 P2: no
 single-round FAIL should name a behavior unimplemented - the
 repeated-round median-of-medians verdict owns the next audit
 round, alongside the race-length endpoint (the P0 design above).
+
+## 2026-09-23, the round-17/18 race-leg redesign (the owner ask:
+## "two shots instead of one, the retreat too short, compute the
+## safe distance, run, shoot once, then the equidistant circle")
+
+The owner's named failures answered by the redesign (9ae0539f, then
+the live-verdict fix 109b630e, both pushed BEFORE their live rounds):
+
+- THE TWO SHOTS PER CYCLE: the fixed 400-unit leg ended the walk
+  exactly when the server's re-shot was ready, and the armed stance
+  fired it at the collapsed range - the second shot, its windup
+  standstill handing the chaser the melee. THE RACE LEG
+  (kiteStepLength): the step = kiteStep + (floor - dist) *
+  kiteRaceFactor (8, the parity exchange rate: ~12 percent of every
+  walked unit opens distance vs the 110-speed elven chasers), capped
+  at kiteRaceStepMax (1700) and the leash budget (minus a 50-unit
+  rounding guard after round 17 measured the fence-edge rotation
+  cascade). The leg ARRIVES back at the 480 floor, so the arrival
+  shot (or the window-end re-request) is the ONE shot of the cycle,
+  from the safe distance.
+- THE TOO-SHORT RETREAT: the deficit-scaled leg buys the whole
+  distance back in ONE continuous walk; the window scales with the
+  leg (kiteIssueWalk), the re-click ladder lives for the whole leg
+  (the mid-route drop re-bases and re-clicks, the arrival within
+  kiteArrivalEpsilon 100 completes it), and the chase-stall
+  watchdog respects the kite window (a mid-leg drop at dist > 450
+  used to walk the character INTO the mob).
+- THE EQUIDISTANT CIRCLE: the curved legs aim the CHORD of the
+  fight's anchor circle (kiteCurveDirection) - the endpoint lands
+  exactly radiusTarget from the anchor on the fight's turn side,
+  the radius growing only as the leg needs, capped by
+  kiteCircleLeashShare (0.92 -> 0.72 after round 17).
+- THE FLEET VERDICT RE-SCOPE: quick-reshot now measures the re-shot
+  DISTANCE (median >= 400, fleetReshotDistFloor) - the honest
+  metric for the race-leg kite (the walk-end gap measured the
+  window-sized-leg era).
+- THE QA SPLIT DEBT: kite.go (1963 lines) + kite_lane.go (the train
+  geometry, the lane battery) + kite_escape.go (the breakout, the
+  shove).
+
+The round-17 live verdict (runs/fleet-2026-09-23/round17.log): the
+race legs WORK - temp20 max-range 728 (the death-cycle slot of
+round 15), the re-shots measured at 495/496/439 units (the
+one-shot-at-safe-distance cycle, live), always-run 5/5, shoots 5/5,
+early-retreat 4/5, max-range 3/5. The fails: curved-retreat 0/5
+(the drift 1591-1712 against the 1500 leash) and the pack cells'
+holds (temp24 107 median, the point-blank re-shots 91-177).
+
+The round-18 live verdict (after 109b630e - the 0.72 share and the
+rounding guard): temp23 (hex-086) FIXED - max-range 495, quick-reshot
+496 over 6 re-shots; temp21 (hex-106) fixed - max-range 361, the
+re-shots at 518; temp22 a spent window (0 shots, the round-15
+starter-death pattern); temp20 regressed to 166/173 over 25 shots
+(the round-to-round variance the round-15 P2 named: r17 pass ->
+r18 fail and r17 fail -> r18 pass on near-identical code); temp24
+(hex-087) still the hold cell (107/200). Curved-retreat still 0/5
+(the drift 1537-1940).
+
+THE QA AUDIT (Task 3-qa, score 64/100) ATTRIBUTED THE REMAINING
+FAILURES - the next session's design:
+
+- P0 THE DRIFT BREACH IS THE OPENING STRAIGHT LEG, NOT THE CIRCLE:
+  the audit drift anchors on the MOB'S STAND at the fight start;
+  the hunt's leash anchors on the CHARACTER'S first-retreat
+  position (up to ~450 apart). The opening straight leg runs the
+  full fresh-anchor budget 1300 - the worst case 1300 + the engage
+  offset = 1550-1800 > the 1500 drift leash. The chord itself HOLDS
+  the ring (equidistance unit-pinned; the QA scratch scene verified
+  the endpoints) - the circle never governs a fight whose opening
+  leg parks it at the fence. THE FIX: budget the opening leg from
+  the MOB'S STAND (or re-anchor on the mob), not the self position.
+- P0 THE FENCE-EDGE POCKET: from the leash edge the ordinary
+  battery has NO LEGAL LANE back onto the ring - the chord
+  preference points inward (the QA scratch scene: the away-ray dot
+  -0.824 vs the -0.05 half-plane slack, refused), the fan at the
+  250 floor crosses the leash. Only the breakout/shove ladders
+  remain, and the pack cells' holds answer instead (temp24). THE
+  FIX: a legal inward lane past the half-plane guard when the fight
+  stands at the fence (the leash-aware guard relaxation, mirroring
+  the turn side).
+- P1 THE CAPPED-LEG SHORTFALL: a deficit with dist < ~324 caps the
+  opening leg at 1300 -> the arrival ~430 < the 480 floor - each
+  250-floor leg then gains ~30/cycle against the ~160 windup debt
+  and decays into the pack (temp20's r18 166/173). The verdict
+  floor 400 sits 80 under the kite's own 480 gate.
+- P1 THE SHOVE TIER: still ZERO live fires across rounds 14-18
+  while the surround holds grew 14 -> 21 - at the fence edge the
+  pocket is walled by the LEASH, not terrain. The fence-edge inward
+  lane (the P0 above) feeds it.
+- P2 the QA nits: the split scrambled five doc comments (the
+  kiteChaserBearings/kiteBreakout*/kiteHoldGround/kiteDeflectFromCamps
+  docs sit on the wrong decls); the kite.go header still says the
+  "600ms pace" (250ms since round 3); the reshotVerdict doc is
+  duplicated in the body; the quick-reshot evidence floor gates the
+  gaps (>= 2) not the known distances (a single known-distance
+  sample passes - r17's temp20 "1 re-shots"); the chord endpoint
+  pins ride kiteWantChord (a near-twin of the implementation - the
+  equidistant invariants and the turn side carry the independent
+  weight); no pin asserts the arrival >= 480 under the parity model.

@@ -108,7 +108,7 @@ package hunt
 // ("clicking behind the character runs 2 seconds no problem") is
 // the recovery the ladder replicates: while the movement window
 // runs and the character stands still on the issue cell, the click
-// goes out again at the 600ms pace - the same endpoint first, then
+// goes out again at the 250ms pace - the same endpoint first, then
 // (once the probe names the endpoint click dead at the second
 // re-click) the next fan candidate, then the rotated endpoint once
 // more. The three candidate mechanisms the ladder answers: the
