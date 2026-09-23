@@ -68,3 +68,30 @@ the fleet does not implement today.
 - Run `archer-fleet` and record which behaviors fail today.
 - Write the fix proposals (see the findings doc skeleton in the
   report of this branch).
+
+## Results (2026-09-23, session 1, live run 14:06-14:08)
+
+The probe PASSED - all ten ladder rounds plus the cursor key round:
+
+- The mouse-mode retreat click is deferred inside the windup: rounds
+  at 0/300/600/900/1200 ms all moved at 2.97 s after the shot.
+- The earliest immediate retreat: 1500 ms after the shot (the windup
+  end, (timeAtk+reuse)/2 at pAtkSpd 337) - rounds at 1500/1800/2200/
+  2600 ms all moved at delay + RTT.
+- The 3000 ms round raced the auto re-shot (2.97 s) and deferred into
+  the NEXT cycle (5.93 s).
+- The cursor key round: 7 claim adoptions echoed, 0 net units moved,
+  the damage landed anyway (HP 89% -> 76%) - the WASD stream never
+  spoiled the shot.
+
+The full analysis and the fix proposals live in
+docs/kite_timing_findings.md.
+
+## Next steps
+
+- Run `archer-fleet` on the live stack (the code is registered and
+  unit-tested; the session clock ended before its live round).
+- Implement the windup-end retreat click in hunt/kite.go per the
+  findings doc.
+- The cursor-key follow-up round: pin why the adopted claims produced
+  no net movement (the deferred intention snap-back hypothesis).

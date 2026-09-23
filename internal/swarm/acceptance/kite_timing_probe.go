@@ -72,14 +72,15 @@ var kiteProbeLadder = []time.Duration{
 // The probe observation constants: the window one round watches for
 // the own movement broadcast after the retreat click, the round trip
 // the anchor wait allows for the own Attack broadcast after a forced
-// attack request, and the retreat click length (the hunt kite step).
+// attack request (the AI engage walks the bow range first when the
+// target sits near the outer band, so the window tolerates the walk),
+// and the retreat click length (the hunt kite step).
 const (
     kiteProbeObserveWindow = 5 * time.Second
-    kiteProbeAnswerWindow  = 1400 * time.Millisecond
+    kiteProbeAnswerWindow  = 3500 * time.Millisecond
     kiteProbeRetreatStep   = 400.0
     kiteProbeImmediateCap  = 500 * time.Millisecond
-    kiteProbeTargetMaxDist = 600.0
-    kiteProbeTargetMinDist = 60.0
+    kiteProbeTargetMaxDist = 800.0
     kiteProbeMaxMobLevel   = 12
 )
 
@@ -635,23 +636,26 @@ func (s *kiteProbeSession) findTarget() (int32, error) {
     return 0, errors.New("no attackable mob inside the band in 30 s")
 }
 
-// nearestMob scans the known objects for the closest live attackable
-// mob inside the bow band, skipping the guards (the level cap) and
-// the melee-range bodies (the retreat needs room).
+// nearestMob scans the known objects for the preferred target: the
+// weakest live attackable mob inside the approach band (the level
+// order keeps the probe away from the level 10 Kaboo Orc Fighter
+// when the level 7 Grunts are around), skipping the guards (the
+// level cap).
 func (s *kiteProbeSession) nearestMob() (int32, bool) {
     selfX, selfY, _, ok := s.tracker.SelfPosition()
     if !ok {
         return 0, false
     }
     best := int32(0)
+    bestLevel := int32(kiteProbeMaxMobLevel + 1)
     bestDist := kiteProbeTargetMaxDist
     for _, id := range s.tracker.KnownObjectIDs() {
         if !s.tracker.ObjectAttackable(id) ||
             !s.tracker.ObjectAlive(id) {
             continue
         }
-        if level, ok := s.tracker.ObjectLevel(id); ok &&
-            level > kiteProbeMaxMobLevel {
+        level, hasLevel := s.tracker.ObjectLevel(id)
+        if hasLevel && level > kiteProbeMaxMobLevel {
             continue
         }
         mobX, mobY, _, ok := s.tracker.ObjectPosition(id)
@@ -659,8 +663,16 @@ func (s *kiteProbeSession) nearestMob() (int32, bool) {
             continue
         }
         dist := math.Hypot(float64(mobX-selfX), float64(mobY-selfY))
-        if dist < bestDist && dist >= kiteProbeTargetMinDist {
+        if dist > bestDist {
+            continue
+        }
+        if !hasLevel {
+            level = kiteProbeMaxMobLevel
+        }
+        if level < bestLevel ||
+            (level == bestLevel && dist < bestDist) {
             best = id
+            bestLevel = level
             bestDist = dist
         }
     }
@@ -668,20 +680,34 @@ func (s *kiteProbeSession) nearestMob() (int32, bool) {
     return best, best != 0
 }
 
+// kiteProbeLadderBudget bounds the ladder wall time: the rounds
+// pause for the cell respawns when the auto attack chain spent the
+// in-band mobs, so the budget keeps the whole probe inside its
+// timeout no matter how the respawns pace.
+const kiteProbeLadderBudget = 150 * time.Second
+
+// kiteProbeTargetWait bounds the respawn wait of one round: the cell
+// respawns its mobs every 15-20 s, so a round whose band emptied
+// waits one respawn window before it skips.
+const kiteProbeTargetWait = 25 * time.Second
+
 // walkLadder walks the delay ladder: every round anchors on the next
 // own Attack broadcast of a forced attack, sleeps the round delay and
 // sends the retreat click, then observes the movement answer. The
 // rounds that lose the anchor (the mob died, the flood gate ate the
-// request) are skipped, not measured.
+// request) are skipped, not measured; the ladder stops at its wall
+// budget whatever rounds landed.
 func (s *kiteProbeSession) walkLadder() []probeRound {
     var rounds []probeRound
+    started := time.Now()
     for _, delay := range kiteProbeLadder {
-        if s.ctx.Err() != nil {
+        if s.ctx.Err() != nil ||
+            time.Since(started) > kiteProbeLadderBudget {
             break
         }
         s.settle()
         s.drinkIfNeeded()
-        target, ok := s.nearestMob()
+        target, ok := s.waitForTarget()
         if !ok {
             continue
         }
@@ -692,9 +718,29 @@ func (s *kiteProbeSession) walkLadder() []probeRound {
         round := s.retreatClickRound(anchor, target, delay)
         rounds = append(rounds, round)
         s.stopWalk()
+        // The attack stance keeps shooting (and spending) the cell
+        // between the rounds - the cancel keeps the mobs alive for
+        // the rounds that follow.
+        _ = s.game.ClearTarget()
     }
 
     return rounds
+}
+
+// waitForTarget waits one respawn window for a live target in band
+// (the auto attack chain of the earlier rounds may have spent the
+// in-band mobs).
+func (s *kiteProbeSession) waitForTarget() (int32, bool) {
+    deadline := time.Now().Add(kiteProbeTargetWait)
+    for {
+        if id, ok := s.nearestMob(); ok {
+            return id, true
+        }
+        if time.Now().After(deadline) || s.ctx.Err() != nil {
+            return 0, false
+        }
+        time.Sleep(2 * time.Second)
+    }
 }
 
 // settle waits for the character to stand still (the previous round
@@ -722,8 +768,9 @@ func (s *kiteProbeSession) drinkIfNeeded() {
 
 // anchorShot forces the attack on the target and waits for the own
 // Attack broadcast (the server commit of the shot): the first request
-// may only select the target, so the wait re-requests inside the
-// flood gate until the broadcast lands or the attempts run out.
+// may only select the target and the AI may walk the bow range before
+// the first swing, so the wait re-requests inside the flood gate until
+// the broadcast lands or the attempts run out.
 func (s *kiteProbeSession) anchorShot(
     target int32,
 ) (time.Time, bool) {
@@ -739,6 +786,9 @@ func (s *kiteProbeSession) anchorShot(
             }
             time.Sleep(20 * time.Millisecond)
         }
+        // The flood gate needs the second of the pair spaced a full
+        // second apart (the PlayerAction protector).
+        time.Sleep(200 * time.Millisecond)
     }
 
     return time.Time{}, false
@@ -831,7 +881,7 @@ func (s *kiteProbeSession) cursorKeyRound() probeWASDResult {
     result := probeWASDResult{hpBefore: -1, hpAfter: -1}
     s.settle()
     s.drinkIfNeeded()
-    target, ok := s.nearestMob()
+    target, ok := s.waitForTarget()
     if !ok {
         return result
     }
