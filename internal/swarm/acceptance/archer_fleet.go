@@ -459,6 +459,7 @@ func launchFleet(
 ) []*fleetBotRun {
     bots := make([]*fleetBotRun, 0, len(archerFleetSlots))
     for _, slot := range archerFleetSlots {
+        m.ensureFleetTracker(slot.Account)
         bot := &fleetBotRun{
             slot:    slot,
             manager: m,
@@ -473,6 +474,31 @@ func launchFleet(
     }
 
     return bots
+}
+
+// ensureFleetTracker registers the slot's tracker in the bot registry
+// BEFORE the session launches. NewManager registers one tracker per
+// scenario definition (the single-account scenarios), but the fleet
+// runs five accounts under one definition - without the registration
+// every registryTracker resolution of a slot account mints a fresh
+// offline twin (the session updates its own private copy, the entry
+// wait and the sampler poll another, the web UI shows neither) and
+// the audit cannot see its own bots: the first live rounds measured
+// a full entry-budget lapse on five bots that were all in the world
+// and fighting. The registration mirrors the NewManager seeding (the
+// acceptance kind, the offline stance until the first login) so the
+// fleet slots appear in the web UI bot list like every scenario
+// tracker.
+func (m *Manager) ensureFleetTracker(account string) *state.Bot {
+    if bot, ok := m.registry.Get(account); ok {
+        return bot
+    }
+    bot := state.NewBot(account)
+    bot.SetKind(state.KindAcceptance)
+    bot.SetOffline()
+    m.registry.Add(bot)
+
+    return bot
 }
 
 // waitFleetOnline waits until every fleet tracker has entered the
