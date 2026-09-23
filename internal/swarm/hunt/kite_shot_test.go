@@ -17,6 +17,8 @@ package hunt
 // exemption and the shared hold answers of the rhythm.
 
 import (
+    "bytes"
+    "log"
     "testing"
     "time"
 
@@ -242,6 +244,8 @@ func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
         return false, nil
     }
     loop.SetNavigator(nav)
+    var logBuf bytes.Buffer
+    loop.SetLogger(log.New(&logBuf, "", 0))
     loop.tick()
     require.Empty(t, game.walks,
         "the broadcast tick arms the schedule, not a walk")
@@ -251,6 +255,9 @@ func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
         "an encircled archer in a sealed pocket stops retreating")
     require.Equal(t, int32(7), loop.kiteHeldFor,
         "the encircled hold is armed for the target")
+    require.Contains(t, logBuf.String(), "the pocket breakout: the "+
+        "cone refused",
+        "the hold diagnostic names the breakout refusal")
 }
 
 // TestKiteShotPacedCorneredHoldsGround pins the corner answer of the

@@ -123,6 +123,7 @@ package hunt
 // kites its fights.
 
 import (
+    "fmt"
     "math"
     "sort"
     "time"
@@ -264,8 +265,14 @@ const (
     // the killed mob respawns under the SAME object id on the
     // Mobius ground (Spawn.respawnNpc keeps the id), and a stale
     // context must never answer the approach of the respawned mob
-    // with a retreat.
-    kitePursuitContext = 6 * time.Second
+    // with a retreat. The bound sits under the fastest respawn of
+    // the elven ground (RespawnMin 15 s) while surviving a LIVE
+    // chain that pauses through a cornered hold episode: the fleet
+    // round of the walled-pocket fix measured the holds stacking
+    // between the walk windows (a 3 s hold block plus a windup
+    // pushes a healthy chain past the earlier 6 s stamp - the fight
+    // never ended, the continuation still belonged to it).
+    kitePursuitContext = 12 * time.Second
     // kiteHoldLogPeriod paces the cornered hold diagnostic: the hold
     // itself re-probes at the kite pacing, the log line lands once
     // per period - a cornered fight is a standing fight, the line is
@@ -696,7 +703,7 @@ func (l *Loop) kiteResolveAndClick(
         // The degenerate no-chaser scene (a tracker gap inside the
         // broadcast window): no ray to guard, the hold keeps the
         // pacing until the next probe.
-        l.kiteHoldGround(now, true)
+        l.kiteHoldGround(now, true, "")
 
         return false
     }
@@ -725,9 +732,13 @@ func (l *Loop) kiteResolveAndClick(
         // the fleet measured the standing answer eating whole
         // windows, an 8.5 s median shot-to-retreat lag on the
         // pocket cell, while a lane through the train's own seams
-        // stood open south of the chaser line).
-        if endX, endY, broke := l.kiteBreakoutResolve(
-            selfX, selfY, selfZ, l.kiteDeadCellsFor()); broke {
+        // stood open south of the chaser line). The refusal reason
+        // rides the hold diagnostic - a breakout that never fires
+        // must name WHY it refused, or the pocket stays invisible
+        // in the event feed.
+        endX, endY, why, broke := l.kiteBreakoutResolve(
+            selfX, selfY, selfZ, l.kiteDeadCellsFor())
+        if broke {
             l.kiteHeldAt = time.Time{}
             l.kiteAt = now
             l.kiteIssueWalk(now, until, selfX, selfY, selfZ,
@@ -740,11 +751,11 @@ func (l *Loop) kiteResolveAndClick(
         }
         // Cornered: no walkable lane in the whole guarded
         // hemisphere (the raw away-ray of a normal train, the gap
-        // ray of an encircled one). The hold ground answer is the
-        // archetype rule - the bow is the always-weapon, the
-        // cornered archer never switches to a melee trade, it
-        // stands and shoots the way out.
-        l.kiteHoldGround(now, encircled)
+        // ray of an encircled one) and the breakout cone refused.
+        // The hold ground answer is the archetype rule - the bow is
+        // the always-weapon, the cornered archer never switches to
+        // a melee trade, it stands and shoots the way out.
+        l.kiteHoldGround(now, encircled, why)
 
         return false
     }
@@ -1125,9 +1136,10 @@ func (l *Loop) kiteRotateDeadEndpoint(
         // SAME dead set - a refused or silent anti-gap lane lands in
         // the memory like any other, the next probe starts on what
         // the battery has left.
-        if endX, endY, broke := l.kiteBreakoutResolve(
+        endX, endY, _, broke := l.kiteBreakoutResolve(
             selfX, selfY, selfZ,
-            l.kiteWalkDeadCells[:l.kiteWalkDeadCount]); broke {
+            l.kiteWalkDeadCells[:l.kiteWalkDeadCount])
+        if broke {
             l.logger.Printf("Hunt: rotating the kite retreat of "+
                 "target %d onto the breakout lane %d %d (the "+
                 "hemisphere exhausted, the endpoint %d %d refused "+
@@ -1738,10 +1750,11 @@ func (l *Loop) kiteLaneResolve(
 // ray last (it points into the train's middle, the clearance gate
 // usually refuses it). A train of one (or a tracker gap) names no
 // gap geometry: the cornered hold owns the cycle, exactly as
-// before. Reports the endpoint and whether a breakout lane exists.
+// before. Reports the endpoint, the refusal reason (empty on
+// success) and whether a breakout lane exists.
 func (l *Loop) kiteBreakoutResolve(
     selfX, selfY, selfZ int32, dead [][2]int32,
-) (int32, int32, bool) {
+) (int32, int32, string, bool) {
     bearings := l.kiteChaserBearings(
         selfX, selfY, selfZ, l.kiteBearings[:0])
     gapX, gapY, gap := kiteGapDirection(bearings)
@@ -1749,8 +1762,10 @@ func (l *Loop) kiteBreakoutResolve(
         // A single chaser (or a tracker gap inside the broadcast
         // window): no second hemisphere exists - the cornered hold
         // owns the cycle.
-        return 0, 0, false
+        return 0, 0, "no gap geometry (the lone chaser owns the " +
+            "corner)", false
     }
+    crowded, walled := 0, 0
     for _, off := range [3]float64{
         3 * math.Pi / 4, -3 * math.Pi / 4, math.Pi,
     } {
@@ -1759,23 +1774,27 @@ func (l *Loop) kiteBreakoutResolve(
             // The candidate runs onto a chaser's own ray: the melee
             // the kite exists to avoid, refused before the terrain
             // battery pays a raycast on it.
+            crowded++
             continue
         }
         endX := selfX + int32(math.Round(rayX*l.kite.Step))
         endY := selfY + int32(math.Round(rayY*l.kite.Step))
         laneX, laneY, ok := l.kiteTerrainLane(
             selfX, selfY, selfZ, endX, endY)
-        if !ok {
-            continue
+        if ok {
+            laneLen := math.Hypot(
+                float64(laneX-selfX), float64(laneY-selfY))
+            if laneLen < 1 || !kiteRayClearsTheFlanks(
+                float64(laneX-selfX)/laneLen,
+                float64(laneY-selfY)/laneLen, bearings) {
+                // The camp deflection bent the resolved lane onto a
+                // chaser's ray: the endpoint the walk would take
+                // fails the same clearance the candidate passed.
+                ok = false
+            }
         }
-        laneLen := math.Hypot(
-            float64(laneX-selfX), float64(laneY-selfY))
-        if laneLen < 1 || !kiteRayClearsTheFlanks(
-            float64(laneX-selfX)/laneLen,
-            float64(laneY-selfY)/laneLen, bearings) {
-            // The camp deflection bent the resolved lane onto a
-            // chaser's ray: the endpoint the walk would take fails
-            // the same clearance the candidate passed.
+        if !ok {
+            walled++
             continue
         }
         refused := false
@@ -1790,13 +1809,22 @@ func (l *Loop) kiteBreakoutResolve(
             // A cell the rotation already named dead (the server
             // refused it or it stayed silent through the probe) -
             // the next candidate serves the breakout instead.
+            walled++
             continue
         }
 
-        return laneX, laneY, true
+        return laneX, laneY, "", true
     }
+    // Every candidate of the anti-gap ladder refused: the reason
+    // names the split so the next live round reads the pocket's
+    // shape straight from the hold diagnostic (the fleet round of
+    // the breakout measured fourteen silent refusals - the event
+    // feed must carry the why, not just the hold).
+    reason := fmt.Sprintf("the cone refused (%d of %d rays crowded "+
+        "by the flanks, %d walled or dead)",
+        crowded, crowded+walled, walled)
 
-    return 0, 0, false
+    return 0, 0, reason, false
 }
 
 // kiteRayClearsTheFlanks answers whether the planar unit ray keeps
@@ -1897,20 +1925,28 @@ func (l *Loop) kiteDeflectFromCamps(
 // episode - a standing fight that names itself stays diagnosable in
 // the event feed. The surrounded flag picks the diagnostic wording
 // (the encircled train whose gap ray found no lane against the
-// walled corner).
-func (l *Loop) kiteHoldGround(now time.Time, surrounded bool) {
+// walled corner), the breakout string names why the pocket breakout
+// refused the cone (the crowd, the terrain, the missing gap
+// geometry - empty when the breakout never applied).
+func (l *Loop) kiteHoldGround(now time.Time, surrounded bool,
+    breakout string,
+) {
     fresh := l.kiteHeldFor != l.target ||
         l.kiteHeldAt.IsZero() ||
         now.Sub(l.kiteHeldAt) >= kiteHoldLogPeriod
     if fresh {
+        suffix := ""
+        if breakout != "" {
+            suffix = " - the pocket breakout: " + breakout
+        }
         if surrounded {
             l.logger.Printf("Hunt: the chasers surround the bow "+
                 "fight on target %d, holding ground and shooting "+
-                "through the train", l.target)
+                "through the train%s", l.target, suffix)
         } else {
             l.logger.Printf("Hunt: no walkable retreat lane on "+
                 "target %d (cornered), holding ground and shooting "+
-                "the bow", l.target)
+                "the bow%s", l.target, suffix)
         }
     }
     l.kiteHeldFor = l.target

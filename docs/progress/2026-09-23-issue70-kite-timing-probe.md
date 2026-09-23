@@ -276,3 +276,67 @@ Open for the next round, ranked:
 - P2: the max-range floor of the audit (250) sits below the pursuit
   equilibrium (~320): consider raising it to the measured band once
   the guarded round confirms.
+
+## 2026-09-23, the walled-pocket round (the fourth session)
+
+The task: continue fixes, upload BEFORE the tests, run the acceptance
+live rounds, fix the remaining issues. Pushed 1773892a BEFORE the
+live round, then measured:
+
+- 1773892a: THE CORNERED-POCKET BREAKOUT - the round-9/10 fleet
+  measured the standing holds eating whole windows on the pocket
+  cells (temp22: an 8.5 s then a 15.2 s median shot-to-retreat lag,
+  23 holds in the round-10 window alone). When the whole retreat
+  hemisphere answers walled, the anti-gap ladder now probes the cone
+  the sweep never covered - the two 135 degree weaves off the gap
+  ray, then the straight anti-gap ray - under the flank clearance
+  (every candidate keeps more than ~36 degrees off EVERY chaser
+  bearing), the full terrain battery, and the dead-cell skip. The
+  terrain core (kiteTerrainLane) factored out of kiteLaneResolve;
+  both call sites wired (the opening/deferred resolution and the
+  dead-endpoint rotation).
+- 1773892a: the fleet verdict line splits "not passing" (the
+  evidence armed and fell short) from "no evidence" (the slot spent
+  the window recovering) - the fleet round rendered it live:
+  "quick-reshot (3 of 5 bots (no evidence: temp21, temp22))".
+
+The round-10 live verdict (runs/fleet-2026-09-23/round10.log, the
+log under logs/acceptance/archer-fleet-20260923-181200-*.log):
+
+- shoots 5/5 (36/36/9/34/34 shots - the c5d845b approach guard
+  confirmed live: the round-9 walkers fight again), early-retreat
+  3/5 (temp23 1.9 s, temp24 2.0 s), quick-reshot 3/5 (100 ms and
+  0 s medians), curved-retreat 2/5 (temp23 1029 units, temp24 765).
+- The breakout fired 0 times across 14 encircled holds - the
+  round-10 log could not say WHY (the refusal was silent). The
+  diagnostics landed after the round: the hold line now names the
+  refusal (no gap geometry / the flanks crowd the cone / the terrain
+  walls the cone, with the counts).
+- temp21 (hex-106) 8.8 s / temp22 (hex-105) 15.2 s retreat lags:
+  both pocket cells hold the archer through multi-cycle pockets -
+  the breakout diagnostics of the next round name the refusing gate.
+- max-range 1/5 (temp21 511): the honest physics - the fresh-target
+  streak reset (e2537f7) lets every pursuit chain run its full 8
+  steps, and the windup debt (~160 units per cycle) exceeds the walk
+  gain (~48 units per window at 125 vs 110 speed), so the crowded
+  cells collapse to 62-220 medians no matter the chain depth. The
+  round-9 322 median was the never-resetting streak capping the
+  chains at ~4 steps - the re-shot fired from the higher distance.
+  The quiet cell (temp21) holds 511: the kite works where the fight
+  starts at range and the train stays thin. A gear question (haste)
+  on the mass cells, not a kite bug - the audit floor stays 250.
+- kitePursuitContext 6 -> 12 s: the live chains pause through
+  cornered hold episodes (a 3 s hold block + a windup) that never
+  ended the fight - the 12 s bound still expires under the fastest
+  same-id respawn (RespawnMin 15 s).
+
+Open for the next round, ranked:
+
+- P0: the diagnostics live round - the hold lines must name which
+  gate refuses the breakout cone on the pocket cells (the crowd or
+  the terrain); the fix follows the reason.
+- P1: the curved drift 1604/1698 against the 1500 leash on temp20/
+  temp22 (the pursuit chains run farther per fight than the leash
+  was calibrated for - the pocket cells push the retreat around).
+- P2: the max-range gear question (haste/kit) stays open on the mass
+  cells.
