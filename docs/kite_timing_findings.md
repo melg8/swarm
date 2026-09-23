@@ -156,3 +156,45 @@ The recommendations 1, 2 and 4 landed on `feature/improved-kite`
   longer exists, so the ladder's refusal attribution never sees the
   deferral answer. Recommendation 5 (the WASD retreat lane through
   the windup) stays open - it needs the follow-up probe round.
+
+## The live fleet audit (2026-09-23, the third round - the measured verdicts)
+
+The archer-fleet audit ran to its first COMPLETE live verdict (three
+rounds, three infrastructure fixes: the entry latch for the
+launch-minute death of a starter archer, the registry wiring that
+left the audit blind to its own five bots, the fold direction gate
+below). The window: 2m54s, five slots, 163 kite steps and 12 holds
+across the fleet. The per-behavior verdicts of the four fighting
+slots:
+
+- **The deferred retreat works live**: every shot logged the arm
+  ("the retreat clicks at the windup end") and the fire ("kiting the
+  reload tail") ~1.6 s later; the median shot-to-retreat lag
+  measured 1.8-2.0 s - inside the 2200 ms ceiling of the accepted
+  window (the click lands, the movement broadcast follows). The
+  early-retreat behavior PASSES on all four fighting slots.
+- **quick-reshot measured 0 of 5 on the raw fold** - a measurement
+  artifact, not a behavior gap: the plain walk population fed the
+  median loot pickups and cell-rotation approaches (a 3.0-3.2 s
+  walk-end-to-shot median on walks the kite never issued). The fold
+  now gates on the away direction (commit 169e8fa); the honest
+  re-measure rides the next live round.
+- **max-range failed on the three Kaboo cells** (median fight
+  distance 145-160 units): the level 7 starter kit runs at speed 125
+  - the same ground speed as the Kaboo Orcs - so the 1.47 s walk
+  tail gains nothing the 1.5 s windup standstill does not give back.
+  The retreat rhythm keeps firing (the behavior is implemented), but
+  the kit cannot hold the 250-450 band at speed parity; the mixed
+  Dryad slot held a 496 median. Holding the band needs a speed edge
+  (haste, buffs, a faster kit) - a gear question, not a kite bug.
+- **curved-retreat failed on four slots** (the anchor leash broke at
+  1644-2367 units): the retreat lane machinery walks the away-ray
+  with lane skipping and camp deflection, but nothing rotates the
+  retreat direction around the farm point - the fifth behavior of
+  the issue (the curving circle that stays near the farm point) is
+  genuinely NOT implemented. The audit names it precisely now.
+
+The open ladder after this round: the direction-gated re-measure of
+quick-reshot (one more live round), the curved retreat
+implementation (a rotating retreat direction preference around the
+cell anchor), and the kit speed question for max-range.
