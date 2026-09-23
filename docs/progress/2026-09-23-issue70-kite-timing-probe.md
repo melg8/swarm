@@ -128,3 +128,46 @@ Known open gaps for the next session (ranked):
   values are data, not contracts) - the semantics deserve a cleaner
   pass/fail split.
 - P2: the gofmt field alignment of the new files (run task fmt).
+
+## 2026-09-23, the fix-and-acceptance round (the second session of the day)
+
+Pushed (all on feature/improved-kite):
+
+- 34ee42e: the DEFERRED RETREAT itself - kiteArmClick/kiteClickWalk/
+  kiteShotPhase (the windup-end click with the 150 ms lead, the
+  window ending at the shot disable end, the ownership disarm that
+  releases only the arming's own movement hold), the shared
+  kiteResolveAndClick seam, the avoidImpendingAdd window gate, the
+  state.Bot.ApplyAttackAt timestamped seam, and the whole kite suite
+  re-pinned to the deferred-click contract (the tickPastTheWindup
+  dance; the honest target-switch scene through the server
+  selection).
+- 39b232c: the fleet entry latch (a bot that died mid-launch still
+  entered).
+- c543a43: THE REGISTRY WIRING - the fleet slots' trackers were
+  never in the bot registry (NewManager seeds one tracker per
+  scenario definition), so the audit polled throwaway offline twins;
+  ensureFleetTracker registers the five slots before the launch.
+- 169e8fa: the fold direction gate - only walks that move away from
+  the fight target feed the retreat medians (the raw round measured
+  a 3.1 s reshot median on loot/approach walks).
+- b17d712: the findings doc carries the measured live verdicts.
+
+The live verdicts (the first COMPLETE fleet round): early-retreat
+PASSES on the four fighting slots (median shot-to-retreat 1.8-2.0 s
+- the deferred click works live); quick-reshot needs the gated
+re-measure; max-range fails at speed parity (the starter runs 125,
+the Kaboo runs ~125 - the walk tail cannot outpace the windup
+standstill; a gear question, not a kite bug); curved-retreat is
+genuinely unimplemented (the anchor leash broke at 1644-2367 units
+on four slots - nothing rotates the retreat around the farm point).
+
+Next steps, ranked:
+
+- P0: rerun the fleet with the direction-gated fold (the honest
+  quick-reshot number).
+- P1: implement the curved retreat - a rotating retreat direction
+  preference around the cell anchor (the fifth behavior of the
+  issue; the straight away-ray drifts off the farm point).
+- P1: the max-range speed parity - evaluate a haste/buff path or a
+  faster kit for the level 7 window.
