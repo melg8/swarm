@@ -111,14 +111,17 @@ func TestAutoEquipRacesOnlyOnSharedState(t *testing.T) {
         "the confirmed flip releases the deferred manual toggle")
 }
 
-// TestAutoEquipBurstsTheWholeBagInOneTick pins the acceleration limit
-// of the sequential equip chain: the deployed build disables the
-// UseItem flood protector (FloodProtectorUseItemInterval = 0) and the
-// independent equips never share server state, so the whole starting
-// outfit goes out in ONE tick - one request per piece, no pacing
-// pause between them, and not a single re-request while the flips are
-// still in flight.
-func TestAutoEquipBurstsTheWholeBagInOneTick(t *testing.T) {
+// TestAutoEquipDressesTheBagOnePerTick pins the serialized equip
+// chain (the round-14 fleet dress fix): the Mobius PacketExecutor
+// runs one shared pool with NO same-client ordering, so a same-tick
+// burst races itself server-side (two jewel packets can race the
+// paperdoll placement read and bounce a member). The chain sends
+// ONE request per tick in plan order - four ticks dress the four
+// piece outfit - and never re-requests a piece while its flip is
+// in flight (the same-item re-send guard outlives the server's
+// attack-window equip deferral, see TestInventoryResendOutlivesThe
+// AttackDeferral).
+func TestAutoEquipDressesTheBagOnePerTick(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
@@ -133,18 +136,22 @@ func TestAutoEquipBurstsTheWholeBagInOneTick(t *testing.T) {
         {ObjectID: 558, ItemID: 37, Count: 1},
     })
 
-    // One tick dresses the whole bag: four requests, one per piece.
+    // One tick, ONE request: the chain serializes itself.
     loop.tick()
-    require.Len(t, game.uses, 4,
-        "the whole bag rides one burst - the server paces nothing")
-    require.ElementsMatch(t, []int32{555, 556, 557, 558}, game.uses)
+    require.Len(t, game.uses, 1,
+        "one equip per tick - the burst cannot race itself")
 
-    // The flips are still in flight: the next ticks never re-request
-    // a piece (a second request would toggle it back off).
+    // The piece is still unconfirmed (in flight): the next ticks
+    // send the REST of the plan, one per tick, never re-requesting
+    // an in-flight piece (a second request would toggle it back
+    // off).
+    loop.tick()
     loop.tick()
     loop.tick()
     require.Len(t, game.uses, 4,
-        "no piece is requested twice while unconfirmed")
+        "four ticks dress the four piece outfit, one per tick")
+    require.Len(t, uniqueInt32(game.uses), 4,
+        "an in flight piece is never re-requested")
 
     // The server applies everything: the next tick plans nothing.
     bot.ApplyInventoryUpdate([]state.InventoryItem{
@@ -267,4 +274,18 @@ func paperdollPair(
     ids[second] = secondID
 
     return ids
+}
+
+// uniqueInt32 answers the distinct values of the slice in order.
+func uniqueInt32(values []int32) []int32 {
+    seen := make(map[int32]bool, len(values))
+    unique := make([]int32, 0, len(values))
+    for _, value := range values {
+        if !seen[value] {
+            seen[value] = true
+            unique = append(unique, value)
+        }
+    }
+
+    return unique
 }

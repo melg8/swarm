@@ -15,6 +15,7 @@ import (
     "strings"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/hunt"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
 )
@@ -100,6 +101,23 @@ const (
     fleetTurnAngle       = 40.0
     fleetMinTurns        = 2
     fleetSamplePeriod    = 250 * time.Millisecond
+    // fleetWindupWindow mirrors the hunt kite's accepted-move
+    // boundary (the measured (timeAtk+reuse)/2 windup end plus the
+    // kiteWindupLead safety margin, ~1.65 s at the fleet's pAtkSpd
+    // 337 - docs/kite_timing_findings.md): a standing sample inside
+    // it is the server-forced shot windup, the ONE standing the
+    // kite spec allows. The always-run verdict splits the standing
+    // samples of a fight into this allowed bucket and the
+    // AVOIDABLE bucket (the hold verdicts, the unanswered engages,
+    // the idle gaps) the round-14 redesign exists to shrink.
+    fleetWindupWindow = 1650 * time.Millisecond
+    // fleetStandShareCeil bounds the avoidable standing share of a
+    // fight: the healthy shoot-run rhythm books ~half the fight
+    // walking and ~half in the windup (near-zero avoidable), a pure
+    // pursuit chain books ~90% walking - anything above the ceiling
+    // is a standing fight (the cornered hold, the streak stop, the
+    // recovery pause) and fails the always-run behavior.
+    fleetStandShareCeil = 0.35
 )
 
 // The fleet check ids: one per audited kite behavior plus the online
@@ -110,6 +128,7 @@ const (
     checkFleetEarly    = "early-retreat"
     checkFleetReshot   = "quick-reshot"
     checkFleetCurve    = "curved-retreat"
+    checkFleetRuns     = "always-run"
 )
 
 // archerFleetChecks is the initial check list of the fleet scenario.
@@ -142,6 +161,11 @@ func archerFleetChecks() []Check {
         {
             ID:    checkFleetCurve,
             Label: "retreats on a curve, stays near the farm point",
+            Done:  false, Detail: "",
+        },
+        {
+            ID:    checkFleetRuns,
+            Label: "runs through the fight, stands only the windup",
             Done:  false, Detail: "",
         },
     }
@@ -270,6 +294,15 @@ type fleetWatch struct {
     fightMaxDrift float64
     fightRetreats int
     fightDrifts   []float64
+    // The always-run motion book of the fight samples (the round-14
+    // feedback ask): every fighting sample books into exactly one
+    // bucket - walking, the server-forced windup standing (inside
+    // fleetWindupWindow of the own shot), or the AVOIDABLE standing
+    // the always-run verdict bounds.
+    fightMoving   int
+    fightWindup   int
+    fightStanding int
+    fightSamplesN int
     // The corner evidence of the curve: the signed angle between the
     // displacement vectors of two CONSECUTIVE confirmed retreats of
     // one fight. A server walk is a straight segment, so the curve
@@ -320,80 +353,127 @@ func newFleetWatch() fleetWatch {
     return fleetWatch{}
 }
 
+// foldMotion books one fighting sample into the always-run
+// buckets (see the struct fields): walking, the server-forced
+// windup standing (inside fleetWindupWindow of the own shot), or
+// the AVOIDABLE standing the runsVerdict bounds.
+func (w fleetWatch) foldMotion(s fleetSample) fleetWatch {
+    w.fightSamplesN++
+    switch {
+    case s.walking:
+        w.fightMoving++
+    case !s.shotAt.IsZero() &&
+        s.at.Sub(s.shotAt) < fleetWindupWindow:
+        w.fightWindup++
+    default:
+        w.fightStanding++
+    }
+
+    return w
+}
+
+// foldWalkEnd settles the walk candidate at its end sample: the
+// away-direction verdict gates the pending retreat metrics (a walk
+// whose displacement leans away from the target it started against
+// is the kite retreat; anything else - a loot pickup, an approach
+// of the next pick, a chase walk toward the target - is fleet
+// noise), the first confirmed retreat of its owning shot books the
+// early-retreat lag, and the walk state clears whole.
+func (w fleetWatch) foldWalkEnd(s fleetSample) fleetWatch {
+    if w.walkFighting && w.haveWalkFrom && s.hasPos {
+        dx := float64(s.x - w.walkFromX)
+        dy := float64(s.y - w.walkFromY)
+        awayX := float64(w.walkFromX - w.walkTargetX)
+        awayY := float64(w.walkFromY - w.walkTargetY)
+        if dx*awayX+dy*awayY > 0 {
+            if w.havePendingLag &&
+                w.walkShotAt != w.lastRetreatShotAt {
+                // The first confirmed retreat of its owning shot
+                // (the continuation walks of the same cycle pair
+                // to the same shot and never re-feed the median
+                // - see lastRetreatShotAt).
+                w.retreatLags = append(w.retreatLags, w.pendingLag)
+                w.lastRetreatShotAt = w.walkShotAt
+            }
+            if !s.shotAt.IsZero() && !w.walkShotAt.IsZero() &&
+                s.shotAt != w.walkShotAt {
+                // The re-shot itself ended the walk (the server
+                // stops the movement on the attack): the gap is
+                // the walk end to the interrupt shot, ~zero. The
+                // walkShotAt guard keeps a mid-walk attach (the
+                // fold never saw the owning shot) from minting a
+                // fake zero.
+                w.reshotGaps = append(w.reshotGaps, 0)
+            } else {
+                w.walkEndedAt = s.at
+            }
+            w = w.foldRetreat(dx, dy)
+        }
+    }
+    w.walkStarted = time.Time{}
+    w.havePendingLag = false
+    w.walkFighting = false
+    w.walkTargetID = 0
+    w.haveWalkFrom = false
+
+    return w
+}
+
+// foldWalkStart arms the walk candidate at its start sample: the
+// walk starts inside a live fight (the deferred click of the shot
+// cycle), the lag stays pending until the walk end confirms the
+// direction - a chase-stall walk toward the target starts in a
+// live fight too.
+func (w fleetWatch) foldWalkStart(s fleetSample) fleetWatch {
+    w.walkStarted = s.at
+    w.walkFighting = s.fighting
+    w.walkTargetID = s.targetID
+    w.haveWalkFrom = s.hasPos
+    w.walkFromX, w.walkFromY = s.x, s.y
+    w.walkTargetX, w.walkTargetY = s.tx, s.ty
+    w.walkShotAt = w.lastShot
+    if !w.lastShot.IsZero() && s.at.After(w.lastShot) {
+        w.pendingLag = s.at.Sub(w.lastShot)
+        w.havePendingLag = true
+    }
+
+    return w
+}
+
+// foldShot latches a fresh own-shot sample: the shot counts, and
+// a walk that already ended before it closes the walk-end to
+// re-shot gap the quick-reshot verdict reads.
+func (w fleetWatch) foldShot(s fleetSample) fleetWatch {
+    w.shots++
+    w.lastShot = s.shotAt
+    if !w.walkEndedAt.IsZero() && s.shotAt.After(w.walkEndedAt) {
+        if gap := s.shotAt.Sub(w.walkEndedAt); gap >= 0 {
+            w.reshotGaps = append(w.reshotGaps, gap)
+        }
+        w.walkEndedAt = time.Time{}
+    }
+
+    return w
+}
+
 // fold latches one sample into the watch (the pure evaluation core).
 func (w fleetWatch) fold(s fleetSample) fleetWatch {
     if !s.shotAt.IsZero() && s.shotAt != w.lastShot {
-        w.shots++
-        w.lastShot = s.shotAt
-        if !w.walkEndedAt.IsZero() && s.shotAt.After(w.walkEndedAt) {
-            gap := s.shotAt.Sub(w.walkEndedAt)
-            if gap >= 0 {
-                w.reshotGaps = append(w.reshotGaps, gap)
-            }
-            w.walkEndedAt = time.Time{}
-        }
+        w = w.foldShot(s)
     }
     if s.walking && w.walkStarted.IsZero() {
-        // The retreat candidate: the walk starts inside a live fight
-        // (the deferred click of the shot cycle). The lag is pending
-        // until the walk end confirms the direction - a chase-stall
-        // walk toward the target starts in a live fight too.
-        w.walkStarted = s.at
-        w.walkFighting = s.fighting
-        w.walkTargetID = s.targetID
-        w.haveWalkFrom = s.hasPos
-        w.walkFromX, w.walkFromY = s.x, s.y
-        w.walkTargetX, w.walkTargetY = s.tx, s.ty
-        w.walkShotAt = w.lastShot
-        if !w.lastShot.IsZero() && s.at.After(w.lastShot) {
-            w.pendingLag = s.at.Sub(w.lastShot)
-            w.havePendingLag = true
-        }
+        w = w.foldWalkStart(s)
     }
     if !s.walking && !w.walkStarted.IsZero() {
-        // The walk ended: the away-direction verdict gates the
-        // pending retreat metrics. A walk whose displacement leans
-        // away from the target it started against is the kite
-        // retreat; anything else (a loot pickup, an approach of the
-        // next pick, a chase walk toward the target) is fleet noise.
-        if w.walkFighting && w.haveWalkFrom && s.hasPos {
-            dx := float64(s.x - w.walkFromX)
-            dy := float64(s.y - w.walkFromY)
-            awayX := float64(w.walkFromX - w.walkTargetX)
-            awayY := float64(w.walkFromY - w.walkTargetY)
-            if dx*awayX+dy*awayY > 0 {
-                if w.havePendingLag &&
-                    w.walkShotAt != w.lastRetreatShotAt {
-                    // The first confirmed retreat of its owning shot
-                    // (the continuation walks of the same cycle pair
-                    // to the same shot and never re-feed the median
-                    // - see lastRetreatShotAt).
-                    w.retreatLags = append(w.retreatLags, w.pendingLag)
-                    w.lastRetreatShotAt = w.walkShotAt
-                }
-                if !s.shotAt.IsZero() && !w.walkShotAt.IsZero() &&
-                    s.shotAt != w.walkShotAt {
-                    // The re-shot itself ended the walk (the server
-                    // stops the movement on the attack): the gap is
-                    // the walk end to the interrupt shot, ~zero. The
-                    // walkShotAt guard keeps a mid-walk attach (the
-                    // fold never saw the owning shot) from minting a
-                    // fake zero.
-                    w.reshotGaps = append(w.reshotGaps, 0)
-                } else {
-                    w.walkEndedAt = s.at
-                }
-                w = w.foldRetreat(dx, dy)
-            }
-        }
-        w.walkStarted = time.Time{}
-        w.havePendingLag = false
-        w.walkFighting = false
-        w.walkTargetID = 0
-        w.haveWalkFrom = false
+        // The walk ended: the away-direction verdict settles the
+        // candidate (see foldWalkEnd).
+        w = w.foldWalkEnd(s)
     }
     if s.fighting && s.fightDist >= 0 {
         w.fightDists = append(w.fightDists, s.fightDist)
+    }
+    if s.fighting {
+        w = w.foldMotion(s)
     }
     if s.fighting && s.hasTarget && s.targetID != 0 {
         w = w.foldFight(s)
@@ -555,6 +635,62 @@ type fleetVerdicts struct {
     curve     bool
     curveD    string
     curveE    bool
+    runs      bool
+    runsD     string
+    runsE     bool
+}
+
+// runsVerdict reads the folded motion book into the always-run
+// outcome: the avoidable standing share of the fight samples -
+// everything the character stood in a fight OUTSIDE the
+// server-forced windup of its own shot. The healthy rhythm books
+// near zero; the ceiling (fleetStandShareCeil) tolerates the honest
+// edges (the walk-end to re-shot gap, a stance tear-down) while
+// naming the standing fights (the hold verdicts, the streak stops
+// the redesign removed, the recovery pauses).
+func (w fleetWatch) runsVerdict() (ok bool, detail string,
+    evidenced bool,
+) {
+    if w.fightSamplesN < fleetMinFightSamples {
+        return false, fmt.Sprintf("%d fight samples observed",
+            w.fightSamplesN), false
+    }
+    share := float64(w.fightStanding) / float64(w.fightSamplesN)
+
+    return share <= fleetStandShareCeil,
+        fmt.Sprintf("standing %d of %d fight samples"+
+            " (%.0f%% avoidable, %d%% in the windup)",
+            w.fightStanding, w.fightSamplesN, share*100,
+            100*w.fightWindup/w.fightSamplesN), true
+}
+
+// curveVerdict reads the folded drifts and corners into the
+// curving-retreat outcome. The curving retreat holds on two
+// attributions the leash fix of the curve round pinned: the
+// per-fight drift (the median max displacement from the mob's
+// stand across the kited fights - the cell rotation between the
+// fights never reaches it) and the same-side polyline corners
+// between the consecutive confirmed retreats of one fight.
+func (w fleetWatch) curveVerdict() (ok bool, detail string,
+    evidenced bool,
+) {
+    drifts := w.kiteFightDrifts()
+    corners := w.curveCorners()
+    if len(drifts) == 0 || corners < fleetMinTurns {
+        return false, fmt.Sprintf("%d kite fights and %d same-side"+
+            " retreat corners observed (need %d corners)",
+            len(drifts), corners, fleetMinTurns), false
+    }
+    median := medianFloat(drifts)
+    if median > fleetFightDriftLeash {
+        return false, fmt.Sprintf("the fight drift broke at %.0f"+
+            " units (median over %d kite fights)",
+            median, len(drifts)), true
+    }
+
+    return true, fmt.Sprintf("median fight drift %.0f units over"+
+        " %d kite fights, %d same-side corners",
+        median, len(drifts), corners), true
 }
 
 // verdicts reads the folded evidence into the behavior outcomes: each
@@ -571,6 +707,7 @@ func (w fleetWatch) verdicts() fleetVerdicts {
         curveD: fmt.Sprintf("%d kite fights, %d retreat corners"+
             " observed", len(w.fightDrifts), w.curveCorners()),
     }
+    v.runs, v.runsD, v.runsE = w.runsVerdict()
     if w.shots >= fleetMinShots {
         v.shoots = true
         v.shootsE = true
@@ -620,33 +757,7 @@ func (w fleetWatch) verdicts() fleetVerdicts {
             " over %d walks", median.Round(100*time.Millisecond),
             len(w.reshotGaps))
     }
-    // The curving retreat holds on two attributions the leash fix of
-    // the curve round pinned: the per-fight drift (the median max
-    // displacement from the mob's stand across the kited fights -
-    // the cell rotation between the fights never reaches it) and
-    // the same-side polyline corners between the consecutive
-    // confirmed retreats of one fight.
-    drifts := w.kiteFightDrifts()
-    corners := w.curveCorners()
-    if len(drifts) > 0 && corners >= fleetMinTurns {
-        v.curveE = true
-        median := medianFloat(drifts)
-        leashed := median <= fleetFightDriftLeash
-        v.curve = leashed
-        if leashed {
-            v.curveD = fmt.Sprintf("median fight drift %.0f units"+
-                " over %d kite fights, %d same-side corners",
-                median, len(drifts), corners)
-        } else {
-            v.curveD = fmt.Sprintf("the fight drift broke at %.0f"+
-                " units (median over %d kite fights)",
-                median, len(drifts))
-        }
-    } else {
-        v.curveD = fmt.Sprintf("%d kite fights and %d same-side"+
-            " retreat corners observed (need %d corners)",
-            len(drifts), corners, fleetMinTurns)
-    }
+    v.curve, v.curveD, v.curveE = w.curveVerdict()
 
     return v
 }
@@ -736,9 +847,21 @@ func launchFleet(
             watch:   newFleetWatch(),
         }
         bots = append(bots, bot)
+        // The per-slot ground lock (the round-14 crowd fix): the
+        // slot pins its OWN cell (SetCellPin) so the five archers
+        // farm five different map points - the rounds 12/13 crowd
+        // measured three bots converging onto the shared ripe cells,
+        // the mob contest swinging the medians run-to-run and the
+        // encirclement geometry of foreign trains miring the kite.
+        // The pin rides the type hook (the profile wiring) of the
+        // session.
+        hook := func(loop *hunt.Loop) {
+            archerKiteTypeHook(loop)
+            loop.SetCellPin(slot.Cell)
+        }
         go m.runSessionSupervised(ctx, slot.Account,
             archerFleetPassword(slot.Account), slot.Account, m.proxy,
-            bot.log.line, archerKiteTypeHook)
+            bot.log.line, hook)
         time.Sleep(2 * time.Second)
     }
 
@@ -878,6 +1001,55 @@ func joinFleet(bots []*fleetBotRun) {
     }
 }
 
+// fleetCheckFold books one bot's verdicts into the fleet counters:
+// a passing check counts, a failed-but-evidenced check names the
+// slot behind, an unevidenced one names the slot under "no
+// evidence" (a slot that spent the window recovering - the launch
+// lag, the potion round, the empty-cell walk - never armed the
+// floors; a missing verdict, not a broken behavior).
+func fleetCheckFold(
+    counts map[string]int,
+    behind, unevidenced map[string][]string,
+    bot *fleetBotRun, verdicts fleetVerdicts,
+) {
+    for id, verdict := range map[string]struct {
+        ok        bool
+        evidenced bool
+    }{
+        checkFleetMaxRange: {verdicts.maxRange, verdicts.maxRangeE},
+        checkFleetShoots:   {verdicts.shoots, verdicts.shootsE},
+        checkFleetEarly:    {verdicts.early, verdicts.earlyE},
+        checkFleetReshot:   {verdicts.reshot, verdicts.reshotE},
+        checkFleetCurve:    {verdicts.curve, verdicts.curveE},
+        checkFleetRuns:     {verdicts.runs, verdicts.runsE},
+    } {
+        switch {
+        case verdict.ok:
+            counts[id]++
+        case verdict.evidenced:
+            behind[id] = append(behind[id], bot.slot.Account)
+        default:
+            unevidenced[id] = append(unevidenced[id],
+                bot.slot.Account)
+        }
+    }
+}
+
+// fleetBotLine prints the per-bot verdict table row.
+func fleetBotLine(test *Test, bot *fleetBotRun, v fleetVerdicts) {
+    test.appendLog(fmt.Sprintf("fleet: %s on %s - max-range %t"+
+        " (%s), shoots %t (%s), early-retreat %t (%s),"+
+        " quick-reshot %t (%s), curved-retreat %t (%s),"+
+        " always-run %t (%s)",
+        bot.slot.Account, bot.slot.Cell,
+        v.maxRange, v.maxRangeD,
+        v.shoots, v.shootsD,
+        v.early, v.earlyD,
+        v.reshot, v.reshotD,
+        v.curve, v.curveD,
+        v.runs, v.runsD))
+}
+
 // fleetVerdict folds the fleet watches into the behavior matrix and
 // the scenario answer: the per-bot table lands in the test log, the
 // checks carry the fleet-wide verdicts and the error names the
@@ -898,51 +1070,14 @@ func fleetVerdict(
     unevidenced := map[string][]string{}
     for _, bot := range bots {
         verdicts := bot.watch.verdicts()
-        test.appendLog(fmt.Sprintf("fleet: %s on %s - max-range %t"+
-            " (%s), shoots %t (%s), early-retreat %t (%s),"+
-            " quick-reshot %t (%s), curved-retreat %t (%s)",
-            bot.slot.Account, bot.slot.Cell,
-            verdicts.maxRange, verdicts.maxRangeD,
-            verdicts.shoots, verdicts.shootsD,
-            verdicts.early, verdicts.earlyD,
-            verdicts.reshot, verdicts.reshotD,
-            verdicts.curve, verdicts.curveD))
-        for id, verdict := range map[string]struct {
-            ok        bool
-            evidenced bool
-        }{
-            checkFleetMaxRange: {verdicts.maxRange, verdicts.maxRangeE},
-            checkFleetShoots:   {verdicts.shoots, verdicts.shootsE},
-            checkFleetEarly:    {verdicts.early, verdicts.earlyE},
-            checkFleetReshot:   {verdicts.reshot, verdicts.reshotE},
-            checkFleetCurve:    {verdicts.curve, verdicts.curveE},
-        } {
-            switch {
-            case verdict.ok:
-                counts[id]++
-            case verdict.evidenced:
-                // The slot gathered the evidence and fell short of
-                // the bar: a true behavior fail, named as such.
-                behind[id] = append(behind[id], bot.slot.Account)
-            default:
-                // A slot that spent the window recovering (the
-                // launch lag, the potion round, the empty-cell
-                // walk): the evidence floors never armed - a
-                // missing verdict, not a broken behavior. The
-                // per-bot line above says which of the two it was;
-                // the fleet line names the split so a single
-                // launch-lagged slot stops reading as a kite
-                // regression.
-                unevidenced[id] = append(unevidenced[id],
-                    bot.slot.Account)
-            }
-        }
+        fleetBotLine(test, bot, verdicts)
+        fleetCheckFold(counts, behind, unevidenced, bot, verdicts)
     }
     total := len(bots)
     var broken []string
     for _, id := range []string{checkFleetMaxRange,
         checkFleetShoots, checkFleetEarly, checkFleetReshot,
-        checkFleetCurve} {
+        checkFleetCurve, checkFleetRuns} {
         detail := fmt.Sprintf("%d of %d bots", counts[id], total)
         if len(behind[id]) > 0 {
             detail += " (not passing: " + strings.Join(behind[id],

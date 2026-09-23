@@ -237,18 +237,23 @@ func (l *Loop) maybeArmQuiver() {
 }
 
 // maybeEquipGear executes the auto equipment burst: every
-// independent upgrade the burst planner offers goes out in this tick
-// (the whole starting bag on an empty paperdoll dresses in one
-// burst), the steps that would race an in flight request wait for its
-// confirmation behind the per item gate. It defers to the manual
-// inventory command queue (in flight or deferred commands own the
-// item action budget) and arms the confirmation gate for every
-// request it sends. The deployed build disables the UseItem flood
-// protector, so no fixed pause limits the chain and a full starting
-// outfit lands within one tick of the world entry. Called on every
-// tick of the autonomous hunting phases; after every inventory
-// changing event (loot, buy, sell) the next call re-plans and keeps
-// the paperdoll up to date while the bot works.
+// independent upgrade the burst planner offers goes out ONE PER TICK
+// (the tick cadence serializes the packets: the Mobius PacketExecutor
+// runs one shared pool with no same-client ordering, and two jewel
+// packets of one burst can race the paperdoll placement read
+// server-side - a bounced member re-rides the next tick), the steps
+// that would race an in flight request wait for its confirmation
+// behind the per item gate. A full starting bag on an empty paperdoll
+// dresses in plan order across a handful of ticks (the 250 ms
+// cadence, ~2.5 s for the whole kit) instead of one racing burst. It
+// defers to the manual inventory command queue (in flight or
+// deferred commands own the item action budget) and arms the
+// confirmation gate for every request it sends. The deployed build
+// disables the UseItem flood protector, so no fixed pause limits the
+// chain. Called on every tick of the autonomous hunting phases;
+// after every inventory changing event (loot, buy, sell) the next
+// call re-plans and keeps the paperdoll up to date while the bot
+// works.
 func (l *Loop) maybeEquipGear() {
     manager := l.equip
     if manager == nil || l.game == nil {
@@ -297,6 +302,11 @@ func (l *Loop) maybeEquipGear() {
         }
         manager.lastActionAt = now
         l.logf("Hunt: gear: %s", action.Reason)
+
+        // ONE equip per tick (see the function comment): the next
+        // planned action rides the next tick behind the confirmation
+        // gate - the serialized chain cannot race itself server-side.
+        return
     }
 }
 

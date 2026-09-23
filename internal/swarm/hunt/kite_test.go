@@ -193,34 +193,53 @@ func TestKitePursuitHoldNeedsTheRetreatContext(t *testing.T) {
         "no pursuit continuation without a kite retreat behind it")
 }
 
-// TestKiteRespectsTheLeash pins the cornered case of the issue: a
-// retreat that would leave the hunting square is skipped - the
-// leash outranks the kite, the archer stands and shoots instead of
-// dragging the fight out of its ground.
-func TestKiteRespectsTheLeash(t *testing.T) {
-    _, game, loop := kiteBowBot(t, 45200)
-    // The hunting square ends 200 units west of the character: the
-    // 400 unit retreat to the west would leave it.
-    loop.SetHuntingZone(45000, 50000, 200)
-    loop.tick()
-    require.Empty(t, game.walks,
-        "a kite step that would leave the hunting square is skipped")
+// TestKiteLeashReadsTheFightAnchor pins the location-general leash
+// of the round-14 redesign: the retreat endpoint must stay inside
+// the fight's own roam radius around the FIGHT ANCHOR - the
+// live-observed position where the fight's first retreat resolved
+// - never the generated hunting-square registry (the zone read is
+// gone: the kite works on any ground, mapped or not, and a square
+// that would cover the endpoint no longer rescues it).
+func TestKiteLeashReadsTheFightAnchor(t *testing.T) {
+    loop := NewLoop(&fakeGame{}, newTestBot())
+    loop.target = 7
+    loop.kiteFightFor = 7
+    loop.kiteFightX, loop.kiteFightY = 45000, 50000
+
+    // The endpoint inside the roam radius: a legal lane.
+    _, _, inside := loop.kiteTerrainLane(
+        45000, 50000, -3500,
+        45000+int32(kiteRoamRadius)-100, 50000)
+    require.True(t, inside,
+        "the endpoint inside the roam radius walks")
+
+    // The endpoint beyond the roam radius: the leash refuses it
+    // even with a hunting square that covers it - the fight's own
+    // ground is the only fence.
+    loop.SetHuntingZone(45000, 50000, 60000)
+    _, _, outside := loop.kiteTerrainLane(
+        45000, 50000, -3500,
+        45000+int32(kiteRoamRadius)+100, 50000)
+    require.False(t, outside,
+        "the roam radius fences the step even inside a hunting square")
 }
 
-// TestKiteStreakLimitStopsTheShuffle pins the degenerate case bound:
-// a chaser at least as fast as the character never falls behind, and
-// the endless kite shuffle would starve the fight of every swing.
-// Past the streak limit the proximity path stops stepping and fights
-// it out. The fight freshness rides the chase step (no shot
-// committed): the shot-paced rhythm is the one layer the bound does
-// not own (kite_shot_test.go pins the exemption).
-func TestKiteStreakLimitStopsTheShuffle(t *testing.T) {
+// TestKiteStreakLimitNeverStopsTheShuffle pins the round-14
+// always-run rule: the streak limit is a DIAGNOSTIC, not a stop - a
+// chaser at least as fast as the character never falls behind, but
+// the answer is the running circle (the melee damage the kite
+// exists to avoid), never the standing "fight it out" trade. Past
+// the limit the proximity path keeps stepping. The fight freshness
+// rides the chase step (no shot committed): the shot-paced rhythm
+// owns its own layer (kite_shot_test.go pins the exemption).
+func TestKiteStreakLimitNeverStopsTheShuffle(t *testing.T) {
     _, game, loop := kiteBowBotChaseFresh(t, 45200)
     loop.kiteFor = 7
     loop.kiteStreak = kiteStreakLimit
     loop.tick()
-    require.Empty(t, game.walks,
-        "a target past the streak limit must be fought, not kited")
+    require.NotEmpty(t, game.walks,
+        "a target past the streak limit must keep running - the "+
+            "standing trade is the melee damage the kite avoids")
 }
 
 // TestKiteStreakResetsForAFreshTarget pins the streak bookkeeping:

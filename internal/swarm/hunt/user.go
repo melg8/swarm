@@ -44,17 +44,33 @@ const (
     // the water below.
     userApproachRadius = 150.0
     // inventoryConfirmTimeout bounds how long one inventory action
-    // waits for its server confirmation before the next command fires
-    // anyway. The gate normally releases as soon as the tracker
-    // observed the effect of the previous action (the equipped flag
-    // flipped, the count changed, the item vanished), so a swap pair
-    // continues at the speed the server actually processes it; the
-    // timeout only rescues a refused request from blocking the queue.
-    // The UseItem flood protector of this server build is disabled
+    // blocks a DIFFERENT item whose slots it writes: the gate
+    // normally releases as soon as the tracker observed the effect
+    // of the previous action (the equipped flag flipped, the count
+    // changed, the item vanished), so a swap pair continues at the
+    // speed the server actually processes it; the timeout only
+    // rescues a refused request from blocking the queue. The UseItem
+    // flood protector of this server build is disabled
     // (FloodProtectorUseItemInterval = 0, retail matching), so once
     // the packet race is serialized nothing on the server side rate
     // limits the pair.
     inventoryConfirmTimeout = 600 * time.Millisecond
+    // inventoryResendTimeout bounds how long the SAME item stays
+    // gated against a re-send (issue #70, the fleet dress audit):
+    // the Mobius UseItem handler DEFERS an equip that lands inside
+    // the attack window to the attack end (UseItem.java schedules
+    // useEquippableItem at attackEndTime - the ~1.5 s bow windup,
+    // the ~3 s cycle of the measured kite timing findings), so a
+    // fresh bot attacked mid-dress holds its confirmation for up to
+    // a whole cycle. The old shared 600 ms expiry re-sent the item
+    // INTO that deferral, and the second packet (UseItem is a
+    // toggle) unequipped the piece the deferred first one had just
+    // placed - the equip/unequip toggle war the acceptance fleet
+    // measured as the "super slow" dress (a stretched quiver leaves
+    // the bow unable to shoot at all). The bound outlives one full
+    // bow cycle plus the tick cadence; a genuinely refused equip
+    // retries after it, bounded and rare.
+    inventoryResendTimeout = 4 * time.Second
 )
 
 // consumeUserCommands drains the command queue of the bot and applies
@@ -148,13 +164,23 @@ func (l *Loop) inventoryItemAllowed(objectID int32, slots []gear.Slot) bool {
     now := time.Now()
     for pendingID, pending := range l.pendingActions {
         if l.pendingInventoryConfirmed(pendingID, pending) ||
-            now.Sub(pending.at) >= inventoryConfirmTimeout {
+            now.Sub(pending.at) >= inventoryResendTimeout {
             delete(l.pendingActions, pendingID)
 
             continue
         }
         if pendingID == objectID {
+            // The same item: the re-send guard outlives the server's
+            // attack-window equip deferral (see
+            // inventoryResendTimeout) - a re-send inside it toggles
+            // the piece right back off.
             return false
+        }
+        if now.Sub(pending.at) >= inventoryConfirmTimeout {
+            // A stale pending of ANOTHER item no longer gates the
+            // slots it writes (the refused-request rescue), but the
+            // same-item guard above still holds its own re-send.
+            continue
         }
         for _, pendingSlot := range pending.slots {
             for _, slot := range slots {
@@ -169,12 +195,15 @@ func (l *Loop) inventoryItemAllowed(objectID int32, slots []gear.Slot) bool {
 }
 
 // prunePendingActions drops the in flight actions the tracker already
-// confirmed or whose confirmation window expired: the map holds only
-// the requests that still gate the new ones.
+// confirmed or whose re-send window expired: the map holds only the
+// requests that still gate the new ones. The bound is the SAME-ITEM
+// re-send window (inventoryResendTimeout) - the map entry IS the
+// same-item guard, a shorter prune would re-open the toggle the
+// guard exists to close.
 func (l *Loop) prunePendingActions(now time.Time) {
     for pendingID, pending := range l.pendingActions {
         if l.pendingInventoryConfirmed(pendingID, pending) ||
-            now.Sub(pending.at) >= inventoryConfirmTimeout {
+            now.Sub(pending.at) >= inventoryResendTimeout {
             delete(l.pendingActions, pendingID)
         }
     }

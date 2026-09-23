@@ -844,6 +844,32 @@ type Loop struct {
     kitePursuitDist     float64
     kitePursuitStall    int
     kitePursuitWalkOpen bool
+    // kiteFightFor/X/Y anchor the current fight's own ground (the
+    // round-14 location-general redesign): the self position at the
+    // fight's FIRST retreat resolution (see kiteResolveAndClick,
+    // kite.go). The retreat leash (kiteTerrainLane) and the curve
+    // turn side (kiteCurveSide) read the anchor INSTEAD of the
+    // hunting-square registry, so the kite works on any map, any
+    // ground, with or without a zone registry - the generated
+    // elven/dion tables own the target economy alone, never the
+    // fight. A fresh target re-anchors.
+    kiteFightFor int32
+    kiteFightX   int32
+    kiteFightY   int32
+    // The kite motion ledger of the current fight (see
+    // kite_ledger.go, the round-14 feedback ask): the per-fight
+    // standing/moving accounting that answers "does the archer run
+    // all the time" directly in the live log at the fight end -
+    // every standing second is named by its reason (the windup the
+    // server forces, the hold verdict, the unattributed idle).
+    kiteMotionFor     int32
+    kiteMotionAt      time.Time
+    kiteMotionMoving  time.Duration
+    kiteMotionWindup  time.Duration
+    kiteMotionHold    time.Duration
+    kiteMotionIdle    time.Duration
+    kiteMotionHPStart float64
+    kiteMotionHPMin   float64
     // kiteWalkBaseX/Y is the cell the kite walk was issued from -
     // the ladder's dead-click oracle: a character still standing on
     // this cell past the probe pace never moved whatever the
@@ -1102,8 +1128,13 @@ type Loop struct {
     // cell mode (see cell_policy.go) replaces the registry with the
     // Voronoi partition alternative - the zone fields then mirror
     // the patrol square of the held cell.
-    zones        []HuntingZone
-    cell         *cellHunter
+    zones []HuntingZone
+    cell  *cellHunter
+    // cellPin is the pending ground lock of SetCellPin: the pin the
+    // acceptance fleet installs BEFORE the registry exists lands
+    // here and SetHuntingCells re-applies it when the registry
+    // arrives (the hunter itself carries the live copy).
+    cellPin      string
     zoneRegion   string
     zonePickedID string
     zoneCheckAt  time.Time
@@ -2290,6 +2321,13 @@ func (l *Loop) engage() {
     if l.kiteClickWalk(now) {
         return
     }
+    // The kite motion ledger (see kite_ledger.go, the round-14
+    // feedback ask): the per-fight standing/moving accounting runs
+    // on every tick, fight or not - a cleared target closes the
+    // ledger with the summary line, a fresh one opens its own, and
+    // the ticks between book the seconds the fight spends moving,
+    // winding up, holding or standing idle.
+    l.kiteLedgerTick(now)
     if l.tracker.SelfFighting(l.target) {
         if l.lureArmed() && l.lureTick(now) {
             return

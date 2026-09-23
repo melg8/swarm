@@ -168,13 +168,16 @@ const (
     // bounds the walking share from above (2s walk, 1s shoot at the
     // fastest). The cornered hold re-probes on the same pacing.
     kiteStepPeriod = 3 * time.Second
-    // kiteStreakLimit bounds the consecutive kite steps of one
-    // target: a chaser at least as fast as the character never falls
-    // behind (the step opens no net distance), and an endless kite
-    // shuffle would starve the fight of every swing. Past the limit
-    // the archer stops kiting THIS target and fights it out - the
-    // losing fight machinery (losingFight, the panic run) still owns
-    // the death risk.
+    // kiteStreakLimit is the DIAGNOSTIC threshold of the proximity
+    // shuffle: a chaser at least as fast as the character never
+    // falls behind, and the shuffle repeats without opening
+    // distance. The round-14 redesign REMOVED the old "stop the
+    // shuffle, fight it out" answer - the standing trade is the
+    // melee damage the kite exists to avoid (the owner feedback: a
+    // same-speed chase answered by standing eats the whole health
+    // bar while a moving one outwaits the mob's home leash) - so
+    // the counter now only names the unwinnable race in the log
+    // while the retreat keeps running on the fight's own circle.
     kiteStreakLimit = 8
     // kiteTrainScanRange bounds the chaser scan of the retreat
     // DIRECTION: a train member farther than this from the character
@@ -265,6 +268,35 @@ const (
     // server keeps the auto-attack displaced while the character
     // moves, and a 110 chaser cannot hit what it cannot catch).
     kiteReshotFloor = 480.0
+    // kiteRoamRadius bounds how far the fight's retreats may drift
+    // from the FIGHT ANCHOR - the self position at the fight's first
+    // retreat resolution (see kiteResolveAndClick). The anchor is
+    // the live-observed farm point of the fight: the curving circle
+    // keeps the fight on its own ground wherever it started, and the
+    // radius only fences the edge cases (a long straight pursuit
+    // race, a breakout shove). This replaces the old hunting-square
+    // leash (the zone.Contains read of the generated elven/dion
+    // tables): the kite must stay LOCATION-GENERAL - it works on any
+    // map, any ground, with or without a zone registry, and the
+    // target economy alone owns the tables. Three bow engage radii
+    // leave the healthy circle well inside while a dragged chase
+    // still has room to maneuver.
+    kiteRoamRadius = 3 * userBowEngageRadius
+    // kiteShoveStep is the step length of the cornered-pocket SHOVE
+    // (issue #70, the round-14 always-run redesign): the last escape
+    // tier before the hold answers - a shorter, faster burst through
+    // the widest angular gap of the chaser bearings, sized under the
+    // ordinary retreat step so the shove clears the seam quickly
+    // instead of marching the whole corridor.
+    kiteShoveStep = 250.0
+    // kiteShoveFlankCos is the flank-clearance bound of the shove:
+    // the gap bisector must keep at least ~25 degrees (cos bound
+    // 0.906) off every chaser bearing - TIGHTER than the breakout
+    // cone (the 36 degrees of kiteBreakoutFlankCos) because the
+    // shove is the last resort of a sealed pocket, where the only
+    // lanes left thread closer to the flanks than the breakout
+    // tolerates. A gap narrower than this is melee, not a seam.
+    kiteShoveFlankCos = 0.906
     // kitePursuitContext bounds the freshness of the pursuit
     // context (kitePursuitFor/kitePursuitAt): the continuation
     // chain re-stamps every walk (the ~1.5 s window cadence), so
@@ -280,29 +312,25 @@ const (
     // pushes a healthy chain past the earlier 6 s stamp - the fight
     // never ended, the continuation still belonged to it).
     kitePursuitContext = 12 * time.Second
-    // kitePursuitStreakLimit is the runaway backstop of the pursuit
-    // chain: the continuation path carries its OWN budget (the
-    // proximity streak of kiteStreakLimit bounds the proximity
-    // shuffle alone - the round-11 audit measured the shared flat
-    // cap cutting the honest distance race: the 480 floor needs
-    // ~8-10 walk windows from melee on the 110-vs-125 elven ground,
-    // so the old flat 8 bound the race exactly one step short of
-    // the floor it raced for). The backstop only owns the chain
-    // that never resolves: a race that opens distance ENDS at the
-    // floor (the affordable re-shot), a race that stalls dies at
-    // kitePursuitStallLimit long before this bound - the limit
-    // catches the oscillating chase (a gain, a loss, a gain) that
-    // resets the stall ledger forever without ever reaching the
-    // floor.
+    // kitePursuitStreakLimit is the runaway DIAGNOSTIC threshold of
+    // the pursuit chain (issue #70, the round-14 always-run
+    // redesign): the old "the chain cannot walk forever - the
+    // standing fight keeps the damage on" backstop is GONE (the
+    // standing trade is the melee damage the kite exists to avoid;
+    // the fight-anchor leash and the curving circle bound the
+    // drift instead), so the counter now only names the
+    // never-resolving chain in the log while the chain keeps
+    // running - the mob's own home leash ends a truly unwinnable
+    // chase, the affordable re-shot ends a winnable one.
     kitePursuitStreakLimit = 12
-    // kitePursuitStallLimit bounds the consecutive pursuit walks
-    // that opened no distance: a chaser at least as fast as the
-    // character never falls behind (the walk ends where it started,
-    // distance-wise), and the chain would walk the map edge-to-edge
-    // without a shot. Two stalled windows in a row name the
-    // unwinnable race - the standing fight keeps the damage on
-    // while the flee machinery owns the death risk (the same answer
-    // the proximity streak limit gives its shuffle).
+    // kitePursuitStallLimit is the unwinnable-race DIAGNOSTIC
+    // threshold: a chaser at least as fast as the character never
+    // falls behind (the walk ends where it started, distance-wise).
+    // The round-14 redesign removed the old "two stalled windows -
+    // stand and fight" answer: the moving chase trades the melee
+    // blows for chase-cadence blows at worst and keeps every
+    // future shot affordable, so the ledger only names the parity
+    // race in the log now.
     kitePursuitStallLimit = 2
     // kitePursuitStallSlack is the progress bar of one pursuit
     // window: a walk must open at least this much distance on the
@@ -546,10 +574,15 @@ func (l *Loop) kiteLayerGates(now time.Time) bool {
 
 // kiteStepAdmitted guards the kite step of one tick: the shared
 // layer gates must pass (see kiteLayerGates), the kite pacing must
-// have aged out (the step re-probe), the streak limit must not be
-// spent, and a fresh target resets the streak of the previous one
-// (the distance race of one mob is not the race of the next).
-// Reports whether the step may run now.
+// have aged out (the step re-probe), and a fresh target resets the
+// streak of the previous one (the distance race of one mob is not
+// the race of the next). The round-14 always-run redesign removed
+// the old streak-limit hard stop ("stop the shuffle, fight it
+// out"): the standing trade is the melee damage the kite exists to
+// avoid, so the proximity step keeps answering a closed hostile
+// for as long as the fight runs - the streak counter crosses
+// kiteStreakLimit only as the diagnostic that names the unwinnable
+// race. Reports whether the step may run now.
 func (l *Loop) kiteStepAdmitted(now time.Time) bool {
     if !l.kiteLayerGates(now) {
         return false
@@ -562,9 +595,14 @@ func (l *Loop) kiteStepAdmitted(now time.Time) bool {
         l.kiteFor = l.target
         l.kiteStreak = 0
     }
-    if l.kiteStreak >= kiteStreakLimit {
-        // The distance race is unwinnable: stop the shuffle, fight.
-        return false
+    if l.kiteStreak == kiteStreakLimit {
+        // The diagnostic crossing (exactly once per crossing): the
+        // race is unwinnable, the retreat keeps running anyway - a
+        // same-speed chase outwaits the mob's home leash while a
+        // standing one eats the health bar.
+        l.logf("Hunt: the distance race on %d is unwinnable, "+
+            "running it out on the circle (step %d)",
+            l.target, l.kiteStreak)
     }
 
     return true
@@ -739,6 +777,17 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
 func (l *Loop) kiteResolveAndClick(
     now, until time.Time, selfX, selfY, selfZ int32,
 ) bool {
+    if l.kiteFightFor != l.target {
+        // The fight's own anchor (the round-14 location-general
+        // leash): the self position at the FIRST retreat resolution
+        // of this target is the live-observed farm point the whole
+        // fight circles - the retreat leash (kiteTerrainLane) and
+        // the curve turn side (kiteCurveSide) read it instead of
+        // the hunting-square registry, so the kite runs on any
+        // ground, mapped or not.
+        l.kiteFightFor = l.target
+        l.kiteFightX, l.kiteFightY = selfX, selfY
+    }
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
     if encircled && dirX == 0 && dirY == 0 {
         // The degenerate no-chaser scene (a tracker gap inside the
@@ -790,12 +839,38 @@ func (l *Loop) kiteResolveAndClick(
 
             return true
         }
+        // The SHOVE tier (issue #70, the round-14 always-run
+        // redesign): the hemisphere and the breakout cone both
+        // refused, and the old answer - hold the ground and shoot
+        // the way out - is the standing melee trade the kite exists
+        // to avoid (the owner feedback named it: the archer does
+        // not run, eats the damage). The shove threads the WIDEST
+        // ANGULAR GAP of the chaser bearings at a tighter flank
+        // bound than the breakout tolerates - a last-resort burst
+        // through the seam the cone refused - so a sealed pocket
+        // still answers with movement whenever the geometry leaves
+        // any lane at all. Only a pocket with no gap geometry left
+        // (every ray crowded or walled) keeps the hold.
+        endX, endY, shoved := l.kiteShoveResolve(
+            selfX, selfY, selfZ, l.kiteDeadCellsFor())
+        if shoved {
+            l.kiteHeldAt = time.Time{}
+            l.kiteAt = now
+            l.kiteIssueWalk(now, until, selfX, selfY, selfZ,
+                endX, endY)
+            l.logger.Printf("Hunt: the pocket on target %d has no "+
+                "clean lane, shoving through the widest gap %d %d",
+                l.target, endX, endY)
+
+            return true
+        }
         // Cornered: no walkable lane in the whole guarded
         // hemisphere (the raw away-ray of a normal train, the gap
-        // ray of an encircled one) and the breakout cone refused.
-        // The hold ground answer is the archetype rule - the bow is
-        // the always-weapon, the cornered archer never switches to
-        // a melee trade, it stands and shoots the way out.
+        // ray of an encircled one), the breakout cone and the
+        // shove all refused. The hold ground answer is the archetype
+        // rule - the bow is the always-weapon, the cornered archer
+        // never switches to a melee trade, it stands and shoots the
+        // way out.
         l.kiteHoldGround(now, encircled, why)
 
         return false
@@ -994,8 +1069,9 @@ func (l *Loop) kiteCurveDirection(
         return dirX, dirY
     }
 
-    // The constant contract (pinned by TestKiteCurveStepStaysInTheAwayHalfPlane):
-    // kiteCurveStep stays under the half-plane bound
+    // The constant contract (pinned by
+    // TestKiteCurveStepStaysInTheAwayHalfPlane): kiteCurveStep
+    // stays under the half-plane bound
     // (cos(step) >= kiteHalfPlaneSlack), so the bent ray can never
     // fold back into the train whatever the turn side - the guard
     // would mirror the side otherwise, but a step that needs the
@@ -1006,21 +1082,24 @@ func (l *Loop) kiteCurveDirection(
 }
 
 // kiteCurveSide picks the turn side of a fight's circle once: the
-// side whose tangential ray leans back toward the hunting zone
-// center when the leash knows one (the circle bends the drift back
-// toward the farm point), a fixed counterclockwise side otherwise.
+// side whose tangential ray leans back toward the FIGHT ANCHOR
+// (the live-observed ground the fight started on, see
+// kiteResolveAndClick - the round-14 location-general redesign
+// replaced the hunting-zone center read with it), a fixed
+// counterclockwise side before the first retreat anchors the fight
+// (and on any ground the anchor never landed).
 func (l *Loop) kiteCurveSide(
     dirX, dirY float64, selfX, selfY int32,
 ) float64 {
-    if l.zoneHalf == 0 {
+    if l.target == 0 || l.kiteFightFor != l.target {
         return 1
     }
-    toCenterX := float64(l.zoneCX - selfX)
-    toCenterY := float64(l.zoneCY - selfY)
-    if len := math.Hypot(toCenterX, toCenterY); len >= 1 {
+    toCenterX := float64(l.kiteFightX - selfX)
+    toCenterY := float64(l.kiteFightY - selfY)
+    if size := math.Hypot(toCenterX, toCenterY); size >= 1 {
         ccwX, ccwY := rotatePlanar(dirX, dirY, kiteCurveStep)
-        if ccwX*toCenterX/len+ccwY*toCenterY/len >=
-            dirX*toCenterX/len+dirY*toCenterY/len {
+        if ccwX*toCenterX/size+ccwY*toCenterY/size >=
+            dirX*toCenterX/size+dirY*toCenterY/size {
             return 1
         }
 
@@ -1291,26 +1370,25 @@ func (l *Loop) kitePursuitHold(
         } else {
             l.kitePursuitStall = 0
         }
+        if l.kitePursuitStall == kitePursuitStallLimit {
+            // The diagnostic crossing (once per crossing): the race
+            // is at parity, the chain keeps running anyway - see
+            // kitePursuitStallLimit, the round-14 always-run rule.
+            l.logf("Hunt: the pursuit race on %d is at parity "+
+                "(%d stalled windows), running the chase out",
+                l.target, l.kitePursuitStall)
+        }
         l.kitePursuitWalkOpen = false
         l.kitePursuitDist = dist
     }
-    if l.kitePursuitStall >= kitePursuitStallLimit {
-        // The race is unwinnable: the chaser matches the run speed,
-        // and every further window walks the same gap. The standing
-        // fight keeps the damage on. The verdict stands on the
-        // LEDGER, not the walk-open flag: the hold runs twice on the
-        // window-end tick (the re-click ladder's lapse probe and the
-        // engage), and the second call must read the same decline
-        // the first one accounted - only a fresh shot cycle (the
-        // kiteArmClick reset) or a gaining walk clears it.
-        return false
-    }
-    if l.kitePursuitSteps >= kitePursuitStreakLimit {
-        // The runaway backstop: the chain never resolved (an
-        // oscillating chase keeps resetting the stall ledger), the
-        // fight cannot walk forever - the standing fight keeps the
-        // damage on.
-        return false
+    if l.kitePursuitSteps == kitePursuitStreakLimit {
+        // The diagnostic crossing (once per crossing): the chain
+        // never resolved yet, the walk keeps going - the
+        // fight-anchor leash and the circle bound the drift (see
+        // kitePursuitStreakLimit, the round-14 always-run rule).
+        l.logf("Hunt: the pursuit chain on %d ran %d walks "+
+            "without a shot, holding the course",
+            l.target, l.kitePursuitSteps)
     }
     until := now.Add(l.kiteWalkWindow() + l.kite.ReengageDelay)
     if !l.kiteResolveAndClick(now, until, selfX, selfY, selfZ) {
@@ -1761,11 +1839,18 @@ func (l *Loop) kiteTerrainLane(
         selfX, selfY, selfZ, endX, endY); dodged {
         endX, endY = defX, defY
     }
-    if zone := l.zone(); zone != nil && !zone.Contains(endX, endY) {
-        // The lane leaves the hunting square: the leash outranks the
-        // kite - the next fan candidate may still fit inside the
-        // ground.
-        return 0, 0, false
+    if l.target != 0 && l.kiteFightFor == l.target {
+        // The location-general leash (the round-14 redesign): the
+        // endpoint must stay inside the fight's own roam radius
+        // around the fight anchor - the live-observed ground the
+        // fight started on (see kiteResolveAndClick), not the
+        // generated hunting-square registry. A fight that starts
+        // anywhere on any map keeps its retreats on its own ground;
+        // the zone tables never gate the kite again.
+        if math.Hypot(float64(endX-l.kiteFightX),
+            float64(endY-l.kiteFightY)) > kiteRoamRadius {
+            return 0, 0, false
+        }
     }
     laneX, laneY := float64(endX-selfX), float64(endY-selfY)
     if math.Hypot(laneX, laneY) < 1 {
@@ -2029,14 +2114,85 @@ func (l *Loop) kiteBreakoutCandidate(
 func kiteRayClearsTheFlanks(
     rayX, rayY float64, bearings []float64,
 ) bool {
+    return kiteRayClearsTheFlanksAt(
+        rayX, rayY, bearings, kiteBreakoutFlankCos)
+}
+
+// kiteRayClearsTheFlanksAt is the parameterized flank clearance of
+// kiteRayClearsTheFlanks: the cosine bound rides the caller (the
+// breakout cone holds the 36 degree bound, the shove tier accepts
+// the tighter 25 degree seams of the sealed pocket).
+func kiteRayClearsTheFlanksAt(
+    rayX, rayY float64, bearings []float64, flankCos float64,
+) bool {
     for _, bearing := range bearings {
         if rayX*math.Cos(bearing)+rayY*math.Sin(bearing) >=
-            kiteBreakoutFlankCos {
+            flankCos {
             return false
         }
     }
 
     return true
+}
+
+// kiteShoveResolve is the SHOVE tier of the cornered pocket (issue
+// #70, the round-14 always-run redesign): the last escape before
+// the hold. The breakout cone probes the folds AROUND the widest
+// gap (the gap ray rotated 135 degrees and 180) under the strict 36
+// degree flank bound; the shove probes the gap ray ITSELF (and its
+// +-15/+-30 degree edges) under the tighter 25 degree bound and a
+// shorter step - the seam the cone refuses by design is exactly
+// the lane a sealed pocket has left, and a burst through it beats
+// the standing melee trade the hold answers with. The terrain
+// battery (the camp deflection, the location-general leash, the
+// geodata wall, the water) and the dead-cell memory gate every
+// candidate exactly as the other ladders gate theirs; the shorter
+// kiteShoveStep also admits lanes the full 400 unit step would
+// wall on. Reports the endpoint when a seam carried the shove.
+func (l *Loop) kiteShoveResolve(
+    selfX, selfY, selfZ int32, dead [][2]int32,
+) (int32, int32, bool) {
+    bearings := l.kiteChaserBearings(
+        selfX, selfY, selfZ, l.kiteBearings[:0])
+    gapX, gapY, gap := kiteGapDirection(bearings)
+    if !gap {
+        // A lone chaser or a tracker gap: no seam exists to thread
+        // (the lone-chaser cone owns the wall-face wedges past the
+        // hemisphere edge) - the hold owns the answer.
+        return 0, 0, false
+    }
+    for _, off := range [5]float64{
+        0, math.Pi / 12, -math.Pi / 12,
+        math.Pi / 6, -math.Pi / 6,
+    } {
+        rayX, rayY := rotatePlanar(gapX, gapY, off)
+        if !kiteRayClearsTheFlanksAt(
+            rayX, rayY, bearings, kiteShoveFlankCos) {
+            continue
+        }
+        endX := selfX + int32(math.Round(rayX*kiteShoveStep))
+        endY := selfY + int32(math.Round(rayY*kiteShoveStep))
+        laneX, laneY, ok := l.kiteTerrainLane(
+            selfX, selfY, selfZ, endX, endY)
+        if !ok {
+            continue
+        }
+        refused := false
+        for _, cell := range dead {
+            if laneX == cell[0] && laneY == cell[1] {
+                refused = true
+
+                break
+            }
+        }
+        if refused {
+            continue
+        }
+
+        return laneX, laneY, true
+    }
+
+    return 0, 0, false
 }
 
 // kiteDeflectFromCamps bends one retreat candidate around the idle

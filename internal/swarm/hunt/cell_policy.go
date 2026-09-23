@@ -114,6 +114,12 @@ type cellHunter struct {
     // the held cell (-1 before the first pick).
     cells  []Cell
     picked int
+    // pin names a cell the economy may never leave (the acceptance
+    // fleet's per-slot ground lock, see SetCellPin): a pinned hunter
+    // picks the pinned cell first and never rotates off it - the
+    // followGround drift and the wait-or-rotate economy both stand
+    // down while the pin holds. Empty means the free economy.
+    pin string
     // leashes caches the convex polygon of every cell of the
     // registry (the ground scans resolve the containing hexagon
     // without rebuilding the vertex slices per lookup).
@@ -214,6 +220,11 @@ func (l *Loop) SetHuntingCells(cells []Cell) {
         return
     }
     l.cell = newCellHunter(cells, globalCellHub)
+    if l.cellPin != "" {
+        // A pin installed before the registry (see SetCellPin):
+        // the fresh hunter inherits it.
+        l.cell.pin = l.cellPin
+    }
     // The legacy zone state stands down: the zone bookkeeping of
     // the loop (the picked id, the overrides, the death caps)
     // mirrors the cell state instead.
@@ -226,6 +237,22 @@ func (l *Loop) SetHuntingCells(cells []Cell) {
     l.zoneMobPriority = nil
     l.cell.publishMesh(l)
     l.cell.publishView(l, time.Now())
+}
+
+// SetCellPin locks the hunt to one named cell (the acceptance
+// fleet's per-slot ground lock): a pinned loop picks the pinned
+// cell on its first evaluation and never rotates off it - the
+// five fleet slots stay on their five different grounds instead
+// of converging onto the shared ripe cells (the round-12/13 crowd:
+// three bots on one ground, the medians swinging with the mob
+// contest). The pin outranks the standing handoff and the economy
+// pick; an unknown or level-ineligible pin degrades to the free
+// economy with the log naming it.
+func (l *Loop) SetCellPin(cellID string) {
+    l.cellPin = cellID
+    if l.cell != nil {
+        l.cell.pin = cellID
+    }
 }
 
 // SetHuntingCellRegion installs the cell registry of one region by
@@ -262,6 +289,9 @@ func (l *Loop) cellEvaluate(now time.Time) {
         if level <= 0 {
             // The character stats have not arrived yet: the first
             // pick waits for the level.
+            return
+        }
+        if hunter.applyPinnedCell(l, level, now) {
             return
         }
         if x, y, _, ok := l.tracker.SelfPosition(); ok {
@@ -302,6 +332,50 @@ func (l *Loop) cellEvaluate(now time.Time) {
     hunter.waitOrRotate(l, now)
 }
 
+// applyPinnedCell serves the ground lock of SetCellPin on the
+// first evaluation: the pin outranks both the standing handoff and
+// the economy pick - the pin IS the intent. An unknown or
+// level-ineligible pin degrades to the free economy with the log
+// naming it. Reports whether the pin settled the pick.
+func (h *cellHunter) applyPinnedCell(
+    l *Loop, level int32, now time.Time,
+) bool {
+    if h.pin == "" {
+        return false
+    }
+    index := h.indexOf(h.pin)
+    if index < 0 {
+        l.logger.Printf("Hunt: the pinned cell %s is not "+
+            "in the registry, hunting the free economy", h.pin)
+
+        return false
+    }
+    if !cellEligible(h.cells[index], level) {
+        l.logger.Printf("Hunt: the pinned cell %s is "+
+            "outside the level %d window, hunting the "+
+            "free economy", h.pin, level)
+
+        return false
+    }
+    h.apply(l, index, now)
+    l.logger.Printf("Hunt: level %d: holding the "+
+        "pinned cell %s (the ground lock)",
+        level, h.cells[index].Name)
+
+    return true
+}
+
+// indexOf resolves the registry index of a cell id (-1 unknown).
+func (h *cellHunter) indexOf(cellID string) int {
+    for index := range h.cells {
+        if h.cells[index].ID == cellID {
+            return index
+        }
+    }
+
+    return -1
+}
+
 // readSelf caches the character position of the tick.
 func (h *cellHunter) readSelf(l *Loop) {
     if x, y, _, ok := l.tracker.SelfPosition(); ok {
@@ -340,6 +414,11 @@ func (h *cellHunter) groundOf(x int32, y int32) int {
 // clock of the left ground, so the rotation returns exactly when
 // its respawn refilled it.
 func (h *cellHunter) followGround(l *Loop, now time.Time) {
+    if h.pin != "" {
+        // The ground lock (see SetCellPin): the held cell never
+        // follows the free-roam fight off the pinned ground.
+        return
+    }
     if h.picked < 0 || !h.selfKnown {
         return
     }
@@ -856,6 +935,13 @@ func (h *cellHunter) accumulate(l *Loop, now time.Time) {
 // nothing at all is in sight, and moving there is the last resort of
 // the economy.
 func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
+    if h.pin != "" {
+        // The ground lock (see SetCellPin): the rotation economy
+        // stands down - the pinned cell is held through its empty
+        // stretches (the respawn refills it) and the starve switch
+        // never fires.
+        return
+    }
     if l.phase != phaseEngage || l.tripActive() ||
         l.tracker.SelfUnderAttack() || l.tracker.SelfSitting() {
         h.emptySince = time.Time{}
