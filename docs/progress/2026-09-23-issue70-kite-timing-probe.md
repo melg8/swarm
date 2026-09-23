@@ -663,3 +663,32 @@ The QA verdict also named the god-file growth (kite.go 2154 ->
 2375 against the 500-line owner rule) - the honest debt the next
 refactor round owns: the escape ladder family (the fan, the
 breakout, the shove) is a clean split candidate.
+
+## The round-16 record (the QA follow-up under the honest meter)
+
+Round 16 (runs/fleet-2026-09-23/round16.log, after the QA commits
+2a37e449): 18 of 30. The number is NOT like-for-like with round
+15's 22 - the QA round moved the ledger tick to the top of the
+fight tick, and the samples the old placement skipped behind the
+ladder returns now book: the avoidable-standing shares read HIGHER
+because the meter stopped flattering the redesign (temp20: 27 ->
+40 percent on the same ground; the walk-end gaps and the holds the
+old placement missed are the difference). The verdict floor fix is
+verified live: temp21's never-fought window now reads "97 fight
+samples, 0 shots observed" - a no-evidence line, not a pass.
+
+The honest standing that remains is the race-equilibrium P0 of the
+round-15 record, now measured under the strict meter: the
+walk-end-to-shot gaps of 0-200 ms (the auto re-shot firing the
+moment the walk ends at melee - temp20/23/24's medians 62-248) and
+the pocket holds (one round-16 ledger line: 17.5 s fight, 7.2 s of
+hold, 0 s moving - the sealed pocket the pass-through tier still
+did not crack: ZERO shove lines across all three rounds of this
+session; the tier stays live-unvalidated and the surround-hold
+cell stays the P1).
+
+The three-round spread on near-identical code (22 -> 18 with the
+meter change in between) re-confirms the rounds 12-13 P2: no
+single-round FAIL should name a behavior unimplemented - the
+repeated-round median-of-medians verdict owns the next audit
+round, alongside the race-length endpoint (the P0 design above).
