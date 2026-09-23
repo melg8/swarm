@@ -404,3 +404,88 @@ Open for the next round, ranked:
   13 s backdated stamp refusing the continuation; the breakout
   bounds (the 93-135 degree wedges unswept, the angular-only flank
   clearance) belong in the doc comment.
+
+## 2026-09-23, the attribution round and the wall-face escape (rounds 12-13)
+
+The task: continue fixes, upload BEFORE the tests, run the acceptance
+live rounds, fix the remaining issues. Pushed 05f69db7 (the
+attribution + the levers) BEFORE round 12, then 593b4fd1 (the
+wall-face escape) BEFORE round 13.
+
+- 05f69db7: THE ROUND-11 REGRESSION ATTRIBUTED - the wire-level log
+  mining paired every pursuit-continuation walk to the last shot:
+  temp24's 6.2 s median was 7 continuation walks (3.0-9.0 s lags)
+  against 4 honest 1.8 s windup-end retreats of the same slot. The
+  behavior was right, the metric was wrong. The fold now books the
+  FIRST confirmed retreat of each shot alone (lastRetreatShotAt).
+  The pursuit chain also owns its budget apart from the proximity
+  streak: the per-shot-cycle ledger (kiteArmClick resets it every
+  fresh shot, kiteIssueWalk on a fresh chain) counts only COMPLETED
+  walks (a cornered hold re-probe never mints a stall), stops the
+  parity race after two stalled windows (the progress gate, slack
+  20 under the honest 45-unit window gain) and the never-resolving
+  chain at the flat backstop 12. The re-shot floor rose 410 -> 480
+  (the cycle median rides ~80 under the floor; the passing slots
+  measured 496-511).
+- 593b4fd1: THE LONE-CHASER WALL-FACE ESCAPE - the round-12 live
+  verdict named the remaining early-retreat fails (temp24 6.2 s over
+  3 retreats) as refused windup-end retreats, and every pocket
+  refusal read "no gap geometry (the lone chaser owns the corner)".
+  The corner now probes the wall-face wedges the fan never swept
+  (the away ray folded 105/120/135 degrees each side) under the
+  flank clearance, the full terrain battery and the dead-cell skip;
+  the sealed pocket keeps its honest named refusal. The candidate
+  evaluation factored into kiteBreakoutCandidate (both ladders
+  share it; the refactor clears three pre-existing nlreturn
+  findings).
+
+The round-12 live verdict (runs/fleet-2026-09-23/round12.log, the
+per-run log under logs/acceptance/archer-fleet-20260923-193759-*):
+
+- shoots 5/5, max-range 2/5 (temp20 443, temp23 471, temp24 334 -
+  the passing medians rode the 480 floor; temp21 177 and temp22 88
+  are the crowded shared central cells), early-retreat 2/5 (the
+  fold gate cleaned temp21 to 1.9 s and temp23 to 2.0 s; temp22 2.6
+  s and temp24 6.2 s are the hold-dominated slots), quick-reshot
+  2/5 (temp20 2.8 s, temp23 1.6 s - the walk ends into holds),
+  curved 3/5 (the no-evidence slots spent their windows on short
+  volley fights).
+
+The round-13 live verdict (runs/fleet-2026-09-23/round13.log, the
+per-run log under logs/acceptance/archer-fleet-20260923-195432-*):
+
+- THE ESCAPE FIRED LIVE: 21 "breaking out" lines (round 12: 0), the
+  old lone-chaser refusal is GONE - exactly one sealed pocket reads
+  the new "the lone-chaser cone refused (0 of 6 rays crowded by the
+  flanks, 6 walled or dead)".
+- quick-reshot 3/5 (200 ms medians), early-retreat 2/5 (temp21 6.2
+  s over 12 retreats on the hex-106 crowd, temp24 31.2 s over 2 - a
+  recovery-dominated window), max-range 1/5 - the crowded-cell
+  medians fell (temp23 471 -> 224, temp24 334 -> 74): the round
+  stacked the bots onto the shared central cells harder (temp20 a
+  spent window at 71 samples, temp24 at 320). The behavior total
+  held at 14/25 - the escape traded the pocket holds for longer
+  wall-face retreat fights on the crowd, exactly the honest
+  trade-off the metric must now attribute.
+
+Open for the next round, ranked:
+
+- P0: the crowd attribution - the fleet's five slots share the
+  central cells run-to-run (round 13 stacked three bots on the same
+  ground; the medians swing 74-471 on the same cell across rounds).
+  The audit needs either a per-bot cell lock in the scenario reset
+  or a crowd-aware verdict split before the max-range behavior is
+  measurable on the mass cells.
+- P1: temp21's 12 late first-retreats on hex-106 (the surround-hold
+  cell): the surround hold has no escape ladder - the encircled
+  train case (2+ bearings, the anti-gap cone) refused 0 times in
+  round 13, the HOLDS are the gap. The hold-and-shoot answer may be
+  correct there; the verdict needs the hold time named per slot.
+- P1: the wall-face escape's race: the 105-135 degree folds open
+  distance slower than the straight retreat - the pursuit ledger's
+  stall gate may cut them short on the crowded cells (check the
+  stall refusals against the 21 breakouts).
+- P2: the round-to-round variance itself (three rounds, three
+  different fail sets on the same code) argues for a repeated-round
+  median-of-medians verdict in the audit before any single-round
+  FAIL names a behavior unimplemented.
