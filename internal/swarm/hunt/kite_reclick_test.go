@@ -48,7 +48,7 @@ func ageKiteWalkIssue(loop *Loop) {
 // healthy accepted click may legitimately not have answered yet.
 func TestKiteReclickLadderReissuesTheDeadClick(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1, "the kite step clicked once")
 
     // The click stayed silent: nothing moves, the pacing ages out.
@@ -72,7 +72,7 @@ func TestKiteReclickLadderReissuesTheDeadClick(t *testing.T) {
 // movement broadcast of a healthy click still clears the ladder.
 func TestKiteRefusalRotatesAtTheProbeAge(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The server's refusal answer lands right after the click: the
@@ -104,7 +104,7 @@ func TestKiteRefusalRotatesAtTheProbeAge(t *testing.T) {
 // never fold back onto a cell the server already refused.
 func TestKiteRefusalNeverReClicksTheRefusedCell(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     refused := map[[2]int32]bool{}
@@ -128,7 +128,7 @@ func TestKiteRefusalNeverReClicksTheRefusedCell(t *testing.T) {
 // dead and rotates the same way the refusal evidence does.
 func TestKiteSilentProbeRotatesTheDeadEndpoint(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The click stayed silent through the broadcast gate window.
@@ -155,7 +155,7 @@ func TestKiteRefusalWithNoLaneLeftStandsDown(t *testing.T) {
         return int32(to.X) == 44600, nil
     }
     loop.SetNavigator(nav)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the straight lane carried the step")
     require.Equal(t, [3]int32{44600, 50000, -3500}, game.walks[0])
@@ -181,7 +181,7 @@ func TestKiteRefusalWithNoLaneLeftStandsDown(t *testing.T) {
 // broadcast gate must get its chance, the walk keeps running.
 func TestKiteYoungWalkSurvivesAStragglerRefusal(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // A straggler refusal answer lands right after the initial
@@ -199,7 +199,7 @@ func TestKiteYoungWalkSurvivesAStragglerRefusal(t *testing.T) {
 // dead silent transport spends the bound and stops.
 func TestKiteReclickLadderBoundsTheClicks(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     for range kiteReclickLimit + 2 {
@@ -217,7 +217,7 @@ func TestKiteReclickLadderBoundsTheClicks(t *testing.T) {
 // walk.
 func TestKiteReclickLadderStandsDownWhenTheWalkRuns(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The server answered the click with the movement start
@@ -240,7 +240,7 @@ func TestKiteReclickLadderStandsDownWhenTheWalkRuns(t *testing.T) {
 // down, the next shot cycle re-arms it.
 func TestKiteReclickLadderQuietsWhenTheCharacterMoved(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The character arrived one cell off the issue point (a short
@@ -259,7 +259,7 @@ func TestKiteReclickLadderQuietsWhenTheCharacterMoved(t *testing.T) {
 // the tick, and a re-click there would only fight the re-engage.
 func TestKiteReclickLadderExpiresWithTheWindow(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The window burned with the character standing.
@@ -305,7 +305,7 @@ func TestKiteProximityStepArmsTheReclickLadder(t *testing.T) {
 // paced, not sprayed.
 func TestKiteReclickLadderDoesNotFirePastTheFreshPacing(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The pacing is fresh (the initial click just went out): the
@@ -329,7 +329,7 @@ func TestKiteBowWindowSpendsTheCooldown(t *testing.T) {
         {ID: state.AttrAtkSpd, Value: 337},
     })
     before := time.Now()
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The C1 disable formula: (500000 + reuse*333)/pAtkSpd.
@@ -351,7 +351,7 @@ func TestKiteBowWindowSpendsTheCooldown(t *testing.T) {
 // being parsed.
 func TestKiteBowWindowFallsBackWithoutTheSpeed(t *testing.T) {
     bot, _, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Zero(t, bot.SelfPAtkSpd(),
         "the scene never broadcast the attack speed")
     aged := time.Until(loop.kiteWalkUntil)

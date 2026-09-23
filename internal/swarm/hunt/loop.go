@@ -738,6 +738,25 @@ type Loop struct {
     // kiteAt paces the archer kite steps (see kite.go): one retreat
     // per period, the rest of the cycle stands and shoots.
     kiteAt time.Time
+    // kiteClickAt schedules the deferred retreat click of the live
+    // shot cycle (see kiteClickWalk, kite.go - the issue #70
+    // findings): the server saves a MoveToLocation issued inside
+    // the bow windup and replays it only at the disable end, where
+    // the re-shot cancels it, so the retreat click waits the windup
+    // end plus the safety lead before it goes out. The zero value
+    // disarms the schedule.
+    kiteClickAt time.Time
+    // kiteClickFor is the fight the deferred click belongs to (see
+    // kite.go): a target switch - the old target died, a fresh pick
+    // - disarms the schedule, the retreat serves the fight that
+    // armed it.
+    kiteClickFor int32
+    // kiteClickUntil bounds the walk window of the deferred click:
+    // the disable end of the arming shot plus the re-engage delay -
+    // the walk owns the reuse tail (the windup end to the disable
+    // end) and the forced attack re-request fires the moment the
+    // window lapses.
+    kiteClickUntil time.Time
     // kiteFor is the fight the kite streak counts for (the hunt
     // target): a fresh target resets the streak (kiteStreak). The
     // armed threat may be a train member - the streak still counts
@@ -2197,6 +2216,19 @@ func (l *Loop) engage() {
     // for a flag that says the character is fighting when the dump
     // says it stands.
     if l.kiteReclickWalk(now) {
+        return
+    }
+    // The deferred retreat click of the live shot cycle (see
+    // kite.go, issue #70): the server saves a MoveToLocation inside
+    // the bow windup and replays it at the disable end where the
+    // re-shot cancels it, so the shot broadcast arms a schedule
+    // instead of a click - the click fires here at the windup end
+    // and rides the accepted move window. It ticks ahead of the
+    // fight flag branch for the same reason the ladder does: the
+    // windup may lapse (or tear the stance down) while the tick
+    // machinery runs, and the deferred click must not wait for a
+    // flag that names a state the cycle already left.
+    if l.kiteClickWalk(now) {
         return
     }
     if l.tracker.SelfFighting(l.target) {

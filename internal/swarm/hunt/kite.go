@@ -217,11 +217,13 @@ const (
     // the packet is the server commit of the shot (the hit roll, the
     // arrow consumption and the HitTask schedule all happened before
     // the broadcast, and the damage task carries no attacker movement
-    // check), so the walk may start at once. The loop ticks four
+    // check). The broadcast arms the DEFERRED retreat schedule (see
+    // kiteArmClick - the issue #70 findings: the server forbids the
+    // movement through the windup, so the click waits the windup end
+    // instead of going out at the broadcast). The loop ticks four
     // times a second - the window keeps the broadcast catchable for
-    // at least two ticks while still starting the retreat inside the
-    // first second of the bow cooldown, before the chaser eats the
-    // opened gap back.
+    // at least two ticks while still bounding the schedule to the
+    // shot it belongs to.
     kiteShotWindow = 700 * time.Millisecond
     // kiteReclickPeriod paces the re-click ladder of the kite walk
     // (issue #60, the second round - the owner feedback: the bot
@@ -281,6 +283,21 @@ const (
     // and falls back to the shipped kiteStepWindow outside it.
     kiteWalkWindowMin = 1 * time.Second
     kiteWalkWindowMax = 5 * time.Second
+    // kiteWindupLead is the safety lead the deferred retreat click
+    // adds past the windup end before it goes out (issue #70, the
+    // kite timing findings): the live ladder measured the accepted
+    // move window OPENING at the windup end - a click 1500 ms after
+    // the shot moved at once (1.52 s) while a 1200 ms one stood to
+    // the cycle end (2.96 s), the boundary sitting at the
+    // theoretical (timeAtk+reuse)/2 = 1483 ms of pAtkSpd 337 - so
+    // the click must land safely PAST that boundary despite the
+    // quarter-second loop cadence and the broadcast lag. The lead
+    // trades 150 ms of the walk tail for the certainty the click
+    // rides the accepted window instead of the deferred one (the
+    // deferred click is replayed only at the disable end where the
+    // re-shot cancels it - the whole-reload stall the findings
+    // measured as the fleet retreat lag).
+    kiteWindupLead = 150 * time.Millisecond
 )
 
 // KiteParams is the tunable block of the kite fight (owner issue
@@ -462,9 +479,15 @@ func (l *Loop) kiteStepAdmitted(now time.Time) bool {
 // respects the movement window contract of the fight steps (the
 // forced attack re-requests wait out the walk), and the streak limit
 // (an unwinnable distance race falls back to the ordinary fight). A
-// fresh target resets the streak. Reports whether the tick issued
-// the step (the caller skips the rest of the fighting branch then -
-// the walk owns the movement).
+// fresh target resets the streak. The step timing honors the live
+// shot cycle (kiteShotPhase): inside the bow windup the click
+// defers to the windup end (the server would save an immediate one
+// and replay it at the disable end where the re-shot cancels it),
+// inside the accepted move window the click goes out at once with
+// the cycle end as its window, and with no live cycle the ordinary
+// full window applies. Reports whether the tick issued or armed the
+// step (the caller skips the rest of the fighting branch then - the
+// walk owns the movement).
 func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !l.kiteStepAdmitted(now) {
         return false
@@ -477,6 +500,138 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !ok || dist >= l.kite.RetreatRadius || dist < 1 {
         return false
     }
+    clickAt, until, live := l.kiteShotPhase(now)
+    if live && now.Before(clickAt) {
+        // The shot cycle holds its windup: an immediate click would
+        // defer to the disable end and die at the re-shot (the
+        // measured deferral of the issue #70 findings). The pressure
+        // trigger rides the same deferred schedule the shot-paced
+        // rhythm arms - one click at the boundary, the whole reload
+        // tail of walking.
+        if l.kiteArmClick(clickAt, until) {
+            l.logger.Printf("Hunt: hostile %d closed to %d units "+
+                "of the fight on %d inside the windup, the retreat "+
+                "waits the windup end", threatID,
+                int(math.Round(dist)), l.target)
+
+            return true
+        }
+
+        return false
+    }
+    if !live {
+        // No shot cycle owns the moment (the re-engage wait, a
+        // chase without a broadcast): the ordinary full window.
+        until = now.Add(l.kiteWalkWindow() + l.kite.ReengageDelay)
+    }
+    if !l.kiteResolveAndClick(now, until, selfX, selfY, selfZ) {
+        // The encircled or cornered hold answered (see
+        // kiteResolveAndClick): the hold ground rule owns the cycle.
+        return false
+    }
+    l.kiteStreak++
+    l.logger.Printf("Hunt: hostile %d closed to %d units of the "+
+        "fight on %d, kiting clear (step %d of %d)",
+        threatID, int(math.Round(dist)), l.target,
+        l.kiteStreak, kiteStreakLimit)
+
+    return true
+}
+
+// kiteFromShot arms the shot-paced retreat of the bow fighting
+// character (issue #60, reworked on the issue #70 findings): the
+// Attack broadcast of the character is the server commit of the bow
+// shot - the hit roll, the arrow consumption and the HitTask
+// schedule all happened before the packet, the damage task carries
+// no attacker movement check - but the measured server cycle FORBIDS
+// the movement through the first half of the bow disable window (the
+// windup): a MoveToLocation inside it is saved by the server AI and
+// replayed only at the disable end, where the re-shot cancels it
+// (PlayerAI.setIntentionMoveTo saves the intention, the replay rides
+// notifyActionReadyToAct - see docs/kite_timing_findings.md). The
+// broadcast therefore arms the DEFERRED retreat (kiteArmClick): the
+// click waits the windup end plus the safety lead, then fires
+// through kiteClickWalk into the accepted move window and the walk
+// banks the reload tail - the shoot, run the reuse tail, re-shoot
+// cycle the issue asks for. The retreat fires once per shot while a
+// hostile holds the pursue band (inside the bow engage radius - a
+// mob that keeps chasing the fight), the lane machinery (the train
+// direction, the camp deflection, the leash, the wall and the water
+// gates, the cornered hold) resolves at the click moment - the
+// chasers move while the character stands the windup out - and the
+// rhythm does NOT count toward the streak limit: the shots never
+// starve. A hostile beyond the band leaves the standing fight (the
+// stall watchdog owns the re-approach). Reports whether the tick
+// armed the deferred retreat.
+func (l *Loop) kiteFromShot(now time.Time) bool {
+    if !l.kiteLayerGates(now) {
+        return false
+    }
+    // The trigger itself: the character's own shot, fresh inside the
+    // broadcast window.
+    shotAt := l.tracker.SelfLastShotAt()
+    if shotAt.IsZero() || now.Sub(shotAt) > kiteShotWindow {
+        return false
+    }
+    selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
+    if !selfOK {
+        return false
+    }
+    threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
+    if !ok || dist >= userBowEngageRadius || dist < 1 {
+        return false
+    }
+    clickAt, until, live := l.kiteShotPhase(now)
+    if !live {
+        // The disable window cannot lapse while the broadcast is
+        // fresh (the window outlasts the freshness gate on every
+        // clamped speed); the guard keeps a degenerate broadcast
+        // (a zero pAtkSpd tearing the formula) from arming a
+        // schedule in the past.
+        return false
+    }
+    if now.Before(clickAt) {
+        // The windup holds the movement: the retreat defers to the
+        // accepted window (the measured deferral of an immediate
+        // click costs the whole reload of standing time).
+        if l.kiteArmClick(clickAt, until) {
+            l.logger.Printf("Hunt: shot released on %d, hostile %d "+
+                "holds %d units, the retreat clicks at the windup "+
+                "end", l.target, threatID, int(math.Round(dist)))
+
+            return true
+        }
+
+        return false
+    }
+    // The broadcast tick landed inside the accepted window already
+    // (the late catch of a fast bow): the retreat clicks at once,
+    // the walk owns the remainder of the cycle.
+    if !l.kiteResolveAndClick(now, until, selfX, selfY, selfZ) {
+        // The encircled or cornered hold answered.
+        return false
+    }
+    l.logger.Printf("Hunt: shot released on %d, hostile %d holds "+
+        "%d units, kiting the reload tail", l.target, threatID,
+        int(math.Round(dist)))
+
+    return true
+}
+
+// kiteResolveAndClick resolves the retreat lane against the live
+// train and terrain and issues the retreat click through the ladder
+// seam: the encircled train (the away vectors cancel - chasers stand
+// on every side) and the cornered battery (no walkable lane in the
+// whole away hemisphere) answer with the hold ground rule of the
+// archetype (never a weapon switch - the bow is the always-weapon),
+// a walkable lane clicks at once with the movement window the caller
+// computed. The shared seam serves the deferred click of the shot
+// cycle (kiteClickWalk), the accepted-window catch of the broadcast
+// tick and the ordinary proximity step - one resolution, one click
+// path, one ladder. Reports whether the click went out.
+func (l *Loop) kiteResolveAndClick(
+    now, until time.Time, selfX, selfY, selfZ int32,
+) bool {
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
     if encircled {
         // The train surrounds the character - the away vectors
@@ -501,95 +656,145 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     }
     l.kiteHeldAt = time.Time{}
     l.kiteAt = now
-    l.kiteStreak++
-    // The shared movement window of the fighting steps: the engage
-    // holds its forced attack re-requests until the walk finished
-    // (see the combatAvoidUntil gate of the engage branch). The
-    // re-engage delay rides the same timestamp - the knob of the
-    // tuning round. The window itself is the bow-aware one (the C1
-    // disable formula on the live pAtkSpd) so the walk spends the
-    // whole cooldown the server enforces.
-    l.combatAvoidUntil = now.Add(l.kiteWalkWindow() + l.kite.ReengageDelay)
-    l.logger.Printf("Hunt: hostile %d closed to %d units of the "+
-        "fight on %d, kiting clear (step %d of %d)",
-        threatID, int(math.Round(dist)), l.target,
-        l.kiteStreak, kiteStreakLimit)
-    l.kiteIssueWalk(now, selfX, selfY, selfZ, stepX, stepY)
+    l.kiteIssueWalk(now, until, selfX, selfY, selfZ, stepX, stepY)
 
     return true
 }
 
-// kiteFromShot steps the bow fighting character away the moment its
-// own shot released (issue #60): the Attack broadcast of the
-// character is the server commit of the bow shot - the hit roll, the
-// arrow consumption and the HitTask schedule all happened before the
-// packet, the damage task carries no attacker movement check, so
-// everything after the broadcast is the bow cooldown the character
-// may spend walking. The retreat fires once per shot while a hostile
-// holds the pursue band (inside the bow engage radius - a mob that
-// keeps chasing the fight), producing the shoot - run the reload -
-// gain distance - shoot again cycle the issue asks for: the melee
-// uptime drops to the stand moments only, a properly kiting archer
-// barely takes hits. The step shares the whole lane machinery with
-// the proximity kite (the train direction, the camp deflection, the
-// leash, the wall and the water gates, the cornered hold), paces
-// itself on the shot cycle instead of the step period and does NOT
-// count toward the streak limit: the rhythm keeps swinging once per
-// cooldown (the shots never starve - the unwinnable-race bound of
-// the shuffle does not apply to the fight itself). A hostile beyond
-// the band leaves the standing fight (the stall watchdog owns the
-// re-approach), and the encircled or cornered holds answer as
-// always. Reports whether the tick issued the step.
-func (l *Loop) kiteFromShot(now time.Time) bool {
-    if !l.kiteLayerGates(now) {
+// kiteArmClick arms the deferred retreat click of the live shot
+// cycle: the click time, the walk window end and the owning fight
+// land in the scheduler state (see kiteClickWalk - the issue #70
+// findings: the server saves a MoveToLocation inside the bow windup
+// and replays it only at the disable end, where the re-shot cancels
+// it, so the click waits the windup out) and the movement window the
+// forced attack re-requests respect stretches to the same end - a
+// re-request inside the cycle would interrupt the planned walk, and
+// inside the windup it only burns the server's bow disable answer
+// anyway. The arming is idempotent per schedule: the very same click
+// time (the very same shot) re-arms silently - the caller yields the
+// tick only on a fresh schedule. Reports whether the arming spent
+// the tick.
+func (l *Loop) kiteArmClick(clickAt, until time.Time) bool {
+    if l.kiteClickFor == l.target && l.kiteClickAt.Equal(clickAt) {
+        // The schedule of this very shot is already armed (a second
+        // trigger of the same cycle): the tick stays with the fight
+        // machinery (the potions, the casts).
         return false
     }
-    // The trigger itself: the character's own shot, fresh inside the
-    // broadcast window.
-    shotAt := l.tracker.SelfLastShotAt()
-    if shotAt.IsZero() || now.Sub(shotAt) > kiteShotWindow {
+    l.kiteClickAt = clickAt
+    l.kiteClickFor = l.target
+    l.kiteClickUntil = until
+    l.combatAvoidUntil = until
+
+    return true
+}
+
+// kiteClickWalk fires the deferred retreat click at the scheduled
+// boundary (see kiteArmClick): the windup of the arming shot held
+// the movement until now, so the click rides the accepted move
+// window - the server adopts the intention at once (the movement
+// broadcast follows) instead of saving it for the disable end. The
+// fire re-checks everything the windup may have changed: the fight
+// the schedule belongs to (a target switch - the old target died, a
+// fresh pick - disarms it), the threat band (a hostile that left the
+// pursue band is the stall watchdog's re-approach, not a retreat)
+// and the lane itself (the chasers moved while the character stood -
+// the train direction, the camp deflection and the dead-cell memory
+// all resolve fresh at the click moment). The encircled and the
+// cornered answers hold the ground as always. Reports whether the
+// tick spent the click.
+func (l *Loop) kiteClickWalk(now time.Time) bool {
+    if l.kiteClickAt.IsZero() {
         return false
     }
+    if l.kiteClickFor != l.target || l.target == 0 {
+        // The fight moved on: the schedule served the shot that
+        // armed it, a fresh fight re-arms its own. The movement
+        // hold dies with the ownership - but only the hold the
+        // arming itself set (the Equal guard): a walk already in
+        // flight keeps its own window, and the fire-time threat
+        // re-check below keeps the shot's real disable hold (a
+        // re-request the server would only refuse through the
+        // disable).
+        if l.combatAvoidUntil.Equal(l.kiteClickUntil) {
+            l.combatAvoidUntil = time.Time{}
+        }
+        l.kiteClickClear()
+
+        return false
+    }
+    if now.Before(l.kiteClickAt) {
+        // The windup still holds the movement: the tick stays with
+        // the fight machinery (the potions, the casts) - the
+        // movement window and the re-request gate are already armed.
+        return false
+    }
+    until := l.kiteClickUntil
+    l.kiteClickClear()
     selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
     if !selfOK {
         return false
     }
     threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
     if !ok || dist >= userBowEngageRadius || dist < 1 {
+        // The hostile left the pursue band (or the chase dissolved):
+        // the retreat has nothing to retreat from - the stall
+        // watchdog owns the re-approach, the next shot cycle re-arms
+        // the rhythm on its own broadcast.
         return false
     }
-    dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
-    if encircled {
-        // The train surrounds the character - the same answer as the
-        // proximity path: hold ground and shoot through it.
-        l.kiteHoldGround(now, true)
-
+    if !l.kiteResolveAndClick(now, until, selfX, selfY, selfZ) {
+        // The encircled or cornered hold answered (the hold paces
+        // its own re-probe): the next cycle re-arms fresh.
         return false
     }
-    stepX, stepY, found := l.kiteRetreatLaneSkipping(
-        selfX, selfY, selfZ, dirX, dirY, l.kiteDeadCellsFor())
-    if !found {
-        // Cornered: the hold ground answer of the archetype rule.
-        l.kiteHoldGround(now, false)
-
-        return false
-    }
-    l.kiteHeldAt = time.Time{}
-    l.kiteAt = now
-    // The shared movement window of the fighting steps: the engage
-    // holds its forced attack re-requests until the walk finished.
-    // The walk covers the bow disable window (timeAtk + reuse, the
-    // C1 formulas on the live pAtkSpd - the walk spends the whole
-    // cooldown running, the re-request lands the moment the server
-    // lifts the disable); the re-request waits for the ordinary
-    // post-window machinery.
-    l.combatAvoidUntil = now.Add(l.kiteWalkWindow() + l.kite.ReengageDelay)
-    l.logger.Printf("Hunt: shot released on %d, hostile %d holds "+
-        "%d units, kiting the reload", l.target, threatID,
+    l.logger.Printf("Hunt: the windup on %d ended (hostile %d at "+
+        "%d units), kiting the reload tail", l.target, threatID,
         int(math.Round(dist)))
-    l.kiteIssueWalk(now, selfX, selfY, selfZ, stepX, stepY)
 
     return true
+}
+
+// kiteClickClear stands the deferred click schedule down: the next
+// shot cycle (or the proximity trigger of the next fight) arms its
+// own schedule whole. The dead-cell memory and the ladder state
+// belong to their own lifecycles (the target and the walk).
+func (l *Loop) kiteClickClear() {
+    l.kiteClickAt = time.Time{}
+    l.kiteClickFor = 0
+    l.kiteClickUntil = time.Time{}
+}
+
+// kiteShotPhase resolves the server bow cycle a retreat must
+// respect: the shot broadcast anchors the windup (the server forbids
+// the movement before its end - the saved intention of
+// PlayerAI.setIntentionMoveTo) and the disable end (no re-shot
+// before it lapses), and the retreat click owns the reuse tail
+// between the two (the accepted move window of the issue #70
+// findings: the earliest immediate retreat sat at the windup end,
+// 1500 ms after the shot at pAtkSpd 337, while a click inside the
+// windup stood to the full cycle end). Reports the earliest accepted
+// click time (the windup end plus the safety lead), the walk window
+// end (the disable end plus the re-engage delay) and whether the
+// cycle is still live - a cycle that ended leaves the retreat to
+// the ordinary full window.
+func (l *Loop) kiteShotPhase(
+    now time.Time,
+) (clickAt, until time.Time, live bool) {
+    shotAt := l.tracker.SelfLastShotAt()
+    if shotAt.IsZero() {
+        return time.Time{}, time.Time{}, false
+    }
+    until = shotAt.Add(l.kiteWalkWindow() + l.kite.ReengageDelay)
+    if now.After(until) {
+        // The disable lapsed: the re-engage owns the moment, and a
+        // retreat riding the dead cycle would hold its window for
+        // nothing.
+        return time.Time{}, time.Time{}, false
+    }
+    clickAt = shotAt.Add(l.kiteWindupWindow() + kiteWindupLead)
+
+    return clickAt, until, true
 }
 
 // kiteIssueWalk sends the retreat click of one kite step and arms
@@ -598,20 +803,23 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
 // (see kiteReclickWalk) so the dead-click recovery - the repeated
 // click the owner's manual evidence names - rides the SAME retreat
 // instead of the character standing through the reload a swallowed
-// click leaves it. Both kite layers (the shot-paced rhythm and the
-// proximity path) issue their walks through this one seam; a fresh
-// step resets the ladder whole (a walk already in flight owns the
-// movement, the layer gates hold the double step). The window is
-// the bow-aware one (kiteWalkWindow - the C1 disable formula on the
-// live pAtkSpd) so the walk spends the whole cooldown the server
-// enforces, not a fixed guess.
+// click leaves it. Every kite path (the deferred click of the shot
+// cycle, the accepted-window catch, the proximity step) issues its
+// walks through this one seam; a fresh step resets the ladder whole
+// (a walk already in flight owns the movement, the layer gates hold
+// the double step). The window end is the caller's phase-aware
+// moment: the deferred click of a live cycle ends at the shot's
+// disable end (the walk owns the reuse tail, the forced attack
+// re-request fires the moment it lapses), a cycle-less step keeps
+// the full window from now.
 func (l *Loop) kiteIssueWalk(
-    now time.Time, selfX, selfY, selfZ, stepX, stepY int32,
+    now, until time.Time, selfX, selfY, selfZ, stepX, stepY int32,
 ) {
     l.kiteWalkX, l.kiteWalkY, l.kiteWalkZ = stepX, stepY, selfZ
     l.kiteWalkBaseX, l.kiteWalkBaseY = selfX, selfY
     l.kiteWalkIssuedAt = now
-    l.kiteWalkUntil = now.Add(l.kiteWalkWindow() + l.kite.ReengageDelay)
+    l.kiteWalkUntil = until
+    l.combatAvoidUntil = until
     l.kiteReclickAt = now
     l.kiteReclicks = 0
     l.kiteWalkDead = false
@@ -631,6 +839,23 @@ func (l *Loop) kiteIssueWalk(
     if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
         l.logger.Printf("Hunt: kite walk failed: %v", err)
     }
+}
+
+// kiteWindupWindow resolves the bow windup the live server forbids
+// the movement in: the Attack launch arms isAttackingNow for the
+// first half of the bow disable window (Creature.doAttack, the BOW
+// branch: _attackEndTime = now + timeToHit + reuse/2 = now +
+// (timeAtk+reuse)/2, with timeToHit = timeAtk/2 - the Mobius C1
+// source read of the issue #70 round), and PlayerAI.setIntentionMoveTo
+// answers a move inside it by SAVING the intention and replaying it
+// at notifyActionReadyToAct - the disable end, where the re-shot
+// cancels the replay. The live probe confirmed the boundary: the
+// 1500 ms click after the shot moved at once while the 1200 ms one
+// stood to the cycle end (docs/kite_timing_findings.md). The window
+// rides the same pAtkSpd formula, clamps and fallback as
+// kiteWalkWindow - exactly its first half.
+func (l *Loop) kiteWindupWindow() time.Duration {
+    return l.kiteWalkWindow() / 2
 }
 
 // kiteWalkWindow resolves the movement window the kite walk owns:

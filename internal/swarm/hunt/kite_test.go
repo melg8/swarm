@@ -49,12 +49,15 @@ func kiteBowBot(t *testing.T, mobX int32) (*state.Bot, *fakeGame, *Loop) {
 // TestKiteStepsAwayFromTheClosedTarget pins the core behavior: a bow
 // target inside the retreat radius (250) makes the fighting character
 // walk straight away from it - the retreat step of kiteStep (400)
-// units on the self-target axis.
+// units on the self-target axis. The scene carries a fresh shot, so
+// the first tick arms the deferred retreat (the windup hold of the
+// issue #70 findings) and the aged tick fires it - the walk asserts
+// the geometry once the click landed.
 func TestKiteStepsAwayFromTheClosedTarget(t *testing.T) {
     // The mob closed to 200 units: inside the kite trigger, outside
     // the melee range.
     bot, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "a closed bow target must trigger the kite step")
     step := game.walks[0]
@@ -114,9 +117,12 @@ func TestKiteIsBowOnly(t *testing.T) {
 // while the kite step owns the tick (the walk runs), the engage holds
 // its forced attack re-requests even after the fighting stance lapsed
 // - a request would interrupt the running retreat walk server-side.
+// The window is armed with the deferred schedule (combatAvoidUntil
+// stretches to the shot disable end the moment the windup defers the
+// click), so the hold covers the windup AND the walk.
 func TestKiteWindowHoldsTheReRequests(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The fighting stance lapsed while the character walks (no fresh
@@ -140,7 +146,7 @@ func TestKiteWindowHoldsTheReRequests(t *testing.T) {
 // pins for both callers.
 func TestKiteResumesTheAttackAfterTheStep(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The walk outlives the fighting stance freshness (3s from the
@@ -220,7 +226,8 @@ func mobChasesSelf(bot *state.Bot, objectID int32, x, z int32) {
 // the issue: a mob that chases the character (it targets self) arms
 // the retreat even while the fight target stays at range - the step
 // goes away from the CLOSER threat (the chasing member), not the
-// target the fight runs on.
+// target the fight runs on. The fresh shot of the scene defers the
+// click past the windup; the aged tick fires it.
 func TestKiteTrainMemberArmsTheRetreat(t *testing.T) {
     // The fight target holds 440 units out: inside the bow engage
     // radius (450), outside the retreat radius (250) - the target
@@ -232,7 +239,7 @@ func TestKiteTrainMemberArmsTheRetreat(t *testing.T) {
     spawnMobAt(bot, 8, 45200)
     mobChasesSelf(bot, 8, 45200, -3500)
 
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "a chasing train member inside the retreat radius must arm the kite")
     step := game.walks[0]
@@ -273,7 +280,9 @@ func TestKiteSkipsADeckGapTrainMember(t *testing.T) {
 // the retreat west-southwest, away from both, instead of the pure
 // west of the target-only vector (and a train on OPPOSITE sides
 // cancels the vectors entirely - the encircled hold - which the
-// surrounded case of kite_edge_test.go pins).
+// surrounded case of kite_edge_test.go pins). The fresh shot of the
+// scene defers the click past the windup; the aged tick fires it
+// and the geometry reads off the fired walk.
 func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
     // The fight target closes at 240 units east: inside the radius,
     // a step away from it alone would land west (x 44600).
@@ -283,7 +292,7 @@ func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
     // centroid drags the retreat off the pure west axis.
     trainMember(bot, 45127, 50127)
 
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the closed hostiles must arm the kite")
     step := game.walks[0]

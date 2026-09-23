@@ -117,3 +117,42 @@ thresholds encode the measured numbers (the retreat lag ceiling of
 - The live probe: `go run ./cmd/swarm -acceptance kite-timing-probe`
   (PASSED 2026-09-23, all ten rounds plus the cursor key round).
 - The live fleet audit: `go run ./cmd/swarm -acceptance archer-fleet`.
+
+## The implementation (2026-09-23, the deferred click round)
+
+The recommendations 1, 2 and 4 landed on `feature/improved-kite`
+(issue #70):
+
+- `kiteArmClick`/`kiteClickWalk`/`kiteShotPhase` (kite.go): the own
+  Attack broadcast now ARMS a deferred retreat instead of clicking at
+  once - `kiteShotPhase` reads the live `SelfPAtkSpd` through the
+  same clamped C1 formula as `kiteWalkWindow`, the windup is exactly
+  its first half, and the click waits the windup end plus
+  `kiteWindupLead` (150 ms - the safety margin for the quarter-second
+  loop cadence and the broadcast lag against the measured 1483 ms
+  boundary). The click fires only strictly before the disable end
+  (the `live` gate of `kiteShotPhase`) - the re-shot race of the
+  3000 ms probe row cannot happen.
+- The fire re-checks everything the standing windup changed: the
+  owning fight (a target switch disarms the schedule AND releases
+  the arming's own movement hold - the Equal guard keeps a walk in
+  flight and the fire-time threat re-check keeps the shot's real
+  disable hold), the pursue band and the whole lane machinery (the
+  train direction, the camp deflection, the dead cells resolve at
+  the click moment, not the broadcast moment).
+- `kiteResolveAndClick` is the one seam every path shares (the
+  deferred click, the accepted-window catch of a fast bow, the
+  ordinary proximity step): one resolution, one click path, one
+  re-click ladder. The walk window of a live cycle ends at the
+  shot's disable end - the walk banks the reuse tail (finding 2).
+- `avoidImpendingAdd` now respects the shared `combatAvoidUntil`
+  window: an add click inside a windup would defer to the disable
+  end and its window overwrite would reopen the re-request gate onto
+  the running kite walk.
+- `state.Bot.ApplyAttackAt` is the timestamped twin of
+  `ApplyAttack` - the repro scenes stage a shot a controlled age in
+  the past without sleeping the test out.
+- Recommendation 3 came free: a click issued inside the windup no
+  longer exists, so the ladder's refusal attribution never sees the
+  deferral answer. Recommendation 5 (the WASD retreat lane through
+  the windup) stays open - it needs the follow-up probe round.

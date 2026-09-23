@@ -83,7 +83,7 @@ func TestKiteParamsBrokenNumbersFallBackToTheShippedTuning(t *testing.T) {
     // the shipped step (400 units straight away on the x axis).
     _, game, loop := kiteBowBot(t, 45200)
     loop.SetKiteParams(KiteParams{Enabled: true})
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the zero numbers must not disable the fight")
     require.Equal(t, int32(44600), game.walks[0][0],
@@ -108,7 +108,7 @@ func TestKiteParamsReengageDelayHoldsTheReRequest(t *testing.T) {
         ReengageDelay: time.Second,
     })
     before := time.Now()
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
     // The hold: window (2s) + delay (1s), measured from the tick.
     require.WithinDuration(t,

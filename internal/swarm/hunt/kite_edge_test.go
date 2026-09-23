@@ -72,7 +72,7 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
     // The train member 200 units northeast: its away unit vector
     // points southwest, the target's own vector points west.
     trainMember(bot, 45141, 50141)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "a closed target with a train member must trigger the step")
 
@@ -113,7 +113,7 @@ func TestKiteSurroundedTrainHoldsGround(t *testing.T) {
     trainMember(bot, 44800, 50000)
     mobHitsCharacterAt(bot, 7, 45200)
 
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Empty(t, game.walks,
         "a surrounding train has no away direction - no step")
     require.Equal(t, int32(7), loop.kiteHeldFor,
@@ -155,7 +155,7 @@ func TestKiteCorneredHoldKeepsShooting(t *testing.T) {
     var logBuf bytes.Buffer
     loop.SetLogger(log.New(&logBuf, "", 0))
 
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Empty(t, game.walks,
         "a cornered archer stops retreating against the wall")
     require.Equal(t, int32(7), loop.kiteHeldFor,
@@ -189,7 +189,7 @@ func TestKiteCorneredHoldKeepsShooting(t *testing.T) {
 func TestKiteWaterBehindHoldsGround(t *testing.T) {
     _, game, loop := kiteEdgeBot(t)
     loop.SetNavigator(&fakeNavigator{overWater: true})
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Empty(t, game.walks,
         "a retreat into water is not a walkable lane")
     require.Equal(t, int32(7), loop.kiteHeldFor,
@@ -209,7 +209,7 @@ func TestKiteDeadEndLaneRePlansAtTheNextProbe(t *testing.T) {
 
     // The first probe: the straight west lane is open, the step
     // takes it.
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
     require.Equal(t, [3]int32{44600, 50000, -3500}, game.walks[0],
         "the straight away lane is the lane of record")
@@ -225,7 +225,7 @@ func TestKiteDeadEndLaneRePlansAtTheNextProbe(t *testing.T) {
         return to.X != 44600, nil
     }
 
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 2,
         "the dead end must re-plan, not stall the retreat")
     bent := game.walks[1]
@@ -273,7 +273,7 @@ func TestKiteCampDeflectsTheRetreatLane(t *testing.T) {
     // margin on the straight west retreat line (the closest point of
     // the lane clears it by 300 only).
     kiteCampMob(bot, 9, 44700, 49700)
-    loop.tick()
+    tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the camp must deflect the retreat, not cancel it")
 

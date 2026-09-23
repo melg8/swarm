@@ -2002,9 +2002,20 @@ func pawnDestination(m PawnMovement) (int32, int32) {
 // (see Creature.doAttack). When the played character is the target, the
 // trailing target location doubles as a position update of it.
 func (b *Bot) ApplyAttack(a Attack) {
+    b.ApplyAttackAt(a, time.Now())
+}
+
+// ApplyAttackAt is the timestamped twin of ApplyAttack: the packet
+// lands with the given arrival time instead of the wall clock. The
+// live session always feeds time.Now (through ApplyAttack); the
+// timestamped form serves the repro scenes that stage a shot a
+// controlled age in the past (the kite windup tests - the shot
+// freshness and the fight freshness age at different rates, and a
+// backdated broadcast pins the boundary between them).
+func (b *Bot) ApplyAttackAt(a Attack, at time.Time) {
     b.mu.Lock()
     defer b.mu.Unlock()
-    now := time.Now()
+    now := at
     facing := HeadingFromDelta(a.TargetX-a.X, a.TargetY-a.Y)
     hasFacing := a.TargetX != a.X || a.TargetY != a.Y
     if a.AttackerID == b.selfID {

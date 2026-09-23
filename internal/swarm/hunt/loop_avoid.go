@@ -282,6 +282,18 @@ const (
 // issued the step (the caller skips the chase logic then - the walk
 // owns the movement).
 func (l *Loop) avoidImpendingAdd(now time.Time) bool {
+    if now.Before(l.combatAvoidUntil) {
+        // Another fighting step owns the movement window (a kite
+        // walk, the deferred retreat of the live shot cycle - see
+        // kite.go, or an earlier add step): one movement owner per
+        // fight step, the shared combatAvoidUntil contract. An add
+        // click inside a bow windup would defer to the disable end
+        // (the server saves the intention) and its window overwrite
+        // would reopen the re-request gate onto the running kite
+        // walk - the premature forced attack stops the walk for a
+        // bow the server still holds disabled.
+        return false
+    }
     if !l.combatAvoidScanAt.IsZero() &&
         now.Sub(l.combatAvoidScanAt) < combatAvoidScanPeriod {
         return false
