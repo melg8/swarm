@@ -216,11 +216,12 @@ linters:
           - funlen
           - gocognit
           - maintidx
-      - path: (cmd/navmesh-export|cmd/cornerprobe|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))\.go$|^(cmd/navmesh-export|cmd/cornerprobe|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))/
+      - path: (cmd/navmesh-export|cmd/cornerprobe|cmd/navsize|cmd/navpack-verify|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))\.go$|^(cmd/navmesh-export|cmd/cornerprobe|cmd/navsize|cmd/navpack-verify|tools/repro_gamepath|tools/repro_rawpath|scripts/(geo_diag|geo_repair|tailcheck))/
         linters:
-          # The navmesh export driver, the gamepath and rawpath
-          # replay probes and the geodata scratch tools share the
-          # analysis-driver nature: they print by design, take raw
+          # The navmesh export driver, the navsize and navpack-verify
+          # pack measurement benches (issue #11), the gamepath and
+          # rawpath replay probes and the geodata scratch tools share
+          # the analysis-driver nature: they print by design, take raw
           # paths from argv (the taint check of a local scratch tool
           # flags the ordinary flag machinery), and the long data
           # tables exceed the line budget. Relief matches the

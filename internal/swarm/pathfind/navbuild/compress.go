@@ -53,12 +53,17 @@ func decodeZstd(raw []byte) ([]byte, error) {
     return data, err
 }
 
-// encodeZstd wraps the bytes into one zstd frame (the default speed
-// level: the decode cost the cold queries pay does not move with the
-// level, the ratio and the pack build time balance here).
+// encodeZstd wraps the bytes into one zstd frame. The best
+// compression level: the decode cost the cold queries pay does not
+// move with the encode level (a zstd property), so the ratio is free
+// at runtime and only the pack build time pays it - the measured
+// headroom over the old default level was 12.6% of the tile pack and
+// 82% of the plain abstract sidecars (issue #11: the default level
+// left 111 MB on the tiles, the unwrapped sidecars carried 333 MB of
+// compressible zero fields).
 var zstdEncoder, zstdEncoderErr = zstd.NewWriter(nil,
     zstd.WithEncoderConcurrency(1),
-    zstd.WithEncoderLevel(zstd.SpeedDefault))
+    zstd.WithEncoderLevel(zstd.SpeedBestCompression))
 
 // encodeZstdOnce encodes through the shared encoder (the encoder is
 // not concurrency safe, the callers hold - the pack pass runs one
