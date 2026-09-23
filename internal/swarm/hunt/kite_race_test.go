@@ -57,8 +57,9 @@ func selfShotFrom(
 // wherever it stands), the deficit bought back at the parity
 // exchange rate under it, fenced at the absolute cap and at the
 // fight's own leash budget (the roam radius minus the anchor
-// distance, with the shove tier of room left at the fence). The
-// behavioral opening pin - a mob at 200 answering with the 1350 leg
+// distance and the cell-rounding guard, with the shove tier of
+// room left at the fence). The
+// behavioral opening pin - a mob at 200 answering with the 1300 leg
 // (the fresh anchor's whole budget) - lives in
 // TestKiteStepsAwayFromTheClosedTarget; the duel half here pins the
 // floor boundary on the live fight: a live attacker 500 out (the
@@ -85,16 +86,19 @@ func TestKiteRaceStepLengthBuysBackTheFloor(t *testing.T) {
 
     // The anchored fight (the first resolution anchors it AT the
     // self position): the leash budget caps the leg at the roam
-    // radius minus the anchor distance, never under the shove tier.
+    // radius minus the anchor distance and the rounding guard
+    // (kiteArrivalEpsilon's half keeps the int32 cell rounding of
+    // the endpoint from crossing the fence the battery enforces),
+    // never under the shove tier.
     loop.kiteFightFor = 7
     loop.kiteFightX, loop.kiteFightY = 45000, 50000
-    require.InDelta(t, kiteRoamRadius,
+    require.InDelta(t, kiteRoamRadius-kiteArrivalEpsilon/2,
         loop.kiteStepLength(200, 45000, 50000), 0.001,
-        "the fresh anchor caps the race leg at its own roam radius")
-    require.InDelta(t, kiteRoamRadius-1000,
+        "the fresh anchor caps the race leg at its own leash budget")
+    require.InDelta(t, kiteRoamRadius-1000-kiteArrivalEpsilon/2,
         loop.kiteStepLength(200, 44000, 50000), 0.001,
         "the mid-circle anchor leaves only the leash budget "+
-            "(1350-1000 = 350)")
+            "(1350-1000-50 = 300)")
     require.InDelta(t, kiteShoveStep,
         loop.kiteStepLength(200, 45000-1330, 50000), 0.001,
         "a fight at the leash edge keeps the shove tier of room")
@@ -135,11 +139,11 @@ func TestKiteRaceChordKeepsTheCircleRadius(t *testing.T) {
 
     // The leg at the stand: the deficit 280 bought back at the
     // parity rate, capped by the leash budget the anchor 600 away
-    // leaves (1350-600 = 750).
+    // leaves (1350-600-50 = 700).
     leg := math.Min(
         kiteStep+(kiteReshotFloor-200)*kiteRaceFactor,
         kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius-600)
+    leg = math.Min(leg, kiteRoamRadius-600-kiteArrivalEpsilon/2)
     wantX, wantY, radiusTarget := kiteWantChord(
         45000, 50000, selfX, selfY, leg)
     require.InDelta(t, wantX, float64(chord[0]), 1.0,
@@ -170,9 +174,9 @@ func TestKiteRaceChordKeepsTheCircleRadius(t *testing.T) {
 // kiteIssueWalk: the race leg runs many times the ordinary step's
 // walk time, so the movement window scales with the walked distance
 // at the per-unit pace of the bow-aware window formula - leg/400 *
-// the C1 disable window of the live pAtkSpd. The 1350 leg of the
+// the C1 disable window of the live pAtkSpd. The 1300 leg of the
 // closed mob (the deficit cap of the fresh anchor) at the pAtkSpd
-// 337 of the Short Bow kit holds the movement for ~10.01s from the
+// 337 of the Short Bow kit holds the movement for ~9.64s from the
 // issue - the caller's own disable-end window (2.97s) never fences
 // the leg short.
 func TestKiteRaceWindowScalesWithTheLeg(t *testing.T) {
@@ -185,18 +189,19 @@ func TestKiteRaceWindowScalesWithTheLeg(t *testing.T) {
     shotAt := bot.SelfLastShotAt()
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
-    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[0],
+    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[0],
         "the closed mob answers with the full-budget race leg")
 
-    // The scaled window: 1350/400 * (500000 + reuse*333)/337 ms
-    // ~= 10.01s from the issue. A variable (not a constant) keeps
+    // The scaled window: 1300/400 * (500000 + reuse*333)/337 ms
+    // ~= 9.64s from the issue. A variable (not a constant) keeps
     // the formula a runtime conversion - a constant one is not
     // representable as the integer Duration and refuses to compile.
     const pAtkSpd = 337.0
     cooldownMS := (500000.0 + kiteBowReuseDelay*333.0) / pAtkSpd
+    leg := math.Hypot(
+        float64(game.walks[0][0]-45000), float64(game.walks[0][1]-50000))
     want := time.Duration(
-        cooldownMS * float64(time.Millisecond) *
-            kiteRoamRadius / kiteStep)
+        cooldownMS * float64(time.Millisecond) * leg / kiteStep)
     aged := loop.kiteWalkUntil.Sub(loop.kiteWalkIssuedAt)
     require.InDelta(t, float64(want), float64(aged),
         float64(50*time.Millisecond),
@@ -210,9 +215,9 @@ func TestKiteRaceWindowScalesWithTheLeg(t *testing.T) {
 
 // TestKiteRaceLadderReClicksTheMidRouteDrop pins the mid-route drop
 // recovery of the leg-long ladder: the walk adopts (the movement
-// broadcast runs), the character moves 400 of the 1350 leg, and the
+// broadcast runs), the character moves 400 of the 1300 leg, and the
 // walk DROPS - no more movement broadcasts, the character stands
-// mid-route, 950 short of the endpoint. The ladder re-bases onto the
+// mid-route, 900 short of the endpoint. The ladder re-bases onto the
 // drop cell and re-clicks the SAME endpoint: the recovery the
 // window-sized ladder never had (a silent drop mid-leg used to stand
 // the character through the rest of the window while the chaser
@@ -221,7 +226,7 @@ func TestKiteRaceLadderReClicksTheMidRouteDrop(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
-    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[0],
+    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[0],
         "the race leg clicked")
 
     // The walk adopts: the character runs the first 400 of the leg.
@@ -233,7 +238,7 @@ func TestKiteRaceLadderReClicksTheMidRouteDrop(t *testing.T) {
     require.Len(t, game.walks, 1,
         "the running walk sends no re-click")
 
-    // The walk drops mid-route: the character stands at 44600, 950
+    // The walk drops mid-route: the character stands at 44600, 900
     // short of the clicked endpoint. The ladder re-bases onto the
     // drop cell and re-clicks the SAME endpoint from there.
     moveSelfTo(bot, 44600, 50000, -3500)
@@ -241,7 +246,7 @@ func TestKiteRaceLadderReClicksTheMidRouteDrop(t *testing.T) {
     loop.tick()
     require.Len(t, game.walks, 2,
         "the mid-route drop re-clicks the endpoint")
-    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[1],
+    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[1],
         "the recovery aims the same endpoint from the new cell")
     require.Equal(t, int32(44600), loop.kiteWalkBaseX,
         "the ladder re-based onto the drop cell")
@@ -263,23 +268,23 @@ func TestKiteRaceLadderCompletesAtTheArrival(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
-    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[0])
+    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[0])
 
     // A stand 150 short of the endpoint: OUTSIDE the arrival
     // radius - the leg is not done, the ladder re-bases and
     // re-clicks the endpoint.
-    moveSelfTo(bot, 43800, 50000, -3500)
+    moveSelfTo(bot, 43850, 50000, -3500)
     ageKiteReclick(loop)
     loop.tick()
     require.Len(t, game.walks, 2,
         "a stand beyond the arrival radius keeps re-clicking")
-    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[1],
+    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[1],
         "the short stand keeps pushing the same endpoint")
 
     // A stand 80 short of the endpoint: INSIDE the arrival radius -
     // the leg completed, the ladder stands down, the window's
     // remainder belongs to the arrival shot's own cycle.
-    moveSelfTo(bot, 43730, 50000, -3500)
+    moveSelfTo(bot, 43780, 50000, -3500)
     ageKiteReclick(loop)
     loop.tick()
     require.Len(t, game.walks, 2,
@@ -303,7 +308,7 @@ func TestKiteRaceStallWatchdogRespectsTheWalkWindow(t *testing.T) {
         "the opening retreat issued at the race length")
 
     // The walk drops mid-route: the character stands 700 west of
-    // the mob (past the 650 bow stall radius), 950 short of the
+    // the mob (past the 650 bow stall radius), 900 short of the
     // clicked endpoint. The ladder spends its whole re-click budget
     // pushing the endpoint from the drop cell.
     moveSelfTo(bot, 44600, 50000, -3500)
@@ -314,7 +319,7 @@ func TestKiteRaceStallWatchdogRespectsTheWalkWindow(t *testing.T) {
     require.Len(t, game.walks, 1+kiteReclickLimit,
         "the drop episode re-clicked the endpoint to the budget")
     for _, walk := range game.walks {
-        require.Equal(t, int32(43650), walk[0],
+        require.Equal(t, int32(43700), walk[0],
             "every walk of the window runs away from the mob")
     }
 
@@ -328,7 +333,7 @@ func TestKiteRaceStallWatchdogRespectsTheWalkWindow(t *testing.T) {
         "during the kite window the stall watchdog never walks "+
             "toward the target")
 
-    // Past the scaled window (1350/400 * the 2s fallback = 6.75s
+    // Past the scaled window (1300/400 * the 2s fallback = 6.5s
     // from the issue) the ordinary answer returns: the ladder
     // stands down, and the stall watchdog walks the character back
     // toward the target - the gate opens exactly at the window end.

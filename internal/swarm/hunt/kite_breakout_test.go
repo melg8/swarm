@@ -108,7 +108,7 @@ func TestKiteBreakoutSkipsTheCrowdedRays(t *testing.T) {
     // The race legs outrun the open corridor of the old step: the
     // pocket mouth stays open only a short range around the
     // character (the fan candidates of the hemisphere sweep land
-    // 1350 out, past the mouth), while the shorter kiteStep weave
+    // 1300 out, past the mouth), while the shorter kiteStep weave
     // of the breakout ladder fits inside it.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
         return math.Hypot(to.X-45000, to.Y-50000) < 500, nil
@@ -144,12 +144,12 @@ func TestKiteRotationExhaustedBreaksOut(t *testing.T) {
     mobHitsCharacterAt(bot, 45200)
     nav := &fakeNavigator{}
     // Only two lanes answer open: the straight west lane of the gap
-    // fan at the RACE length (the 1350 deficit cap of the fresh
+    // fan at the RACE length (the 1300 deficit cap of the fresh
     // anchor - the initial retreat) and the straight south ray of
     // the breakout ladder (the ordinary 400 weave) - everything
     // else is walled.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X == 43650 ||
+        return to.X == 43700 ||
             (to.X == 45000 && to.Y == 49600), nil
     }
     loop.SetNavigator(nav)
@@ -160,7 +160,7 @@ func TestKiteRotationExhaustedBreaksOut(t *testing.T) {
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the open fan lane carried the opening retreat")
-    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[0])
+    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[0])
 
     // The west cell got refused and the walk aged past the probe:
     // the hemisphere sweep (the dead west cell skipped, every other

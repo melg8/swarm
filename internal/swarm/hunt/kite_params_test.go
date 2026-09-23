@@ -69,10 +69,10 @@ func TestKiteParamsWidenTheRetreatRadius(t *testing.T) {
     loop.tick()
     require.Len(t, game.walks, 1,
         "the widened radius arms the step from 300 units")
-    require.Equal(t, int32(43650), game.walks[0][0],
+    require.Equal(t, int32(43700), game.walks[0][0],
         "the step length still rides the race formula: the deficit "+
             "180 bought back at the parity rate caps at the fresh "+
-            "anchor's 1350 leash budget")
+            "anchor's 1300 leash budget")
 }
 
 // TestKiteParamsBrokenNumbersFallBackToTheShippedTuning pins the
@@ -83,14 +83,14 @@ func TestKiteParamsWidenTheRetreatRadius(t *testing.T) {
 func TestKiteParamsBrokenNumbersFallBackToTheShippedTuning(t *testing.T) {
     // The mob closed to 200 units: the shipped geometry answers with
     // the shipped race leg (the deficit 280 at the parity rate,
-    // capped at the fresh anchor's 1350 leash budget - straight away
+    // capped at the fresh anchor's 1300 leash budget - straight away
     // on the x axis).
     _, game, loop := kiteBowBot(t, 45200)
     loop.SetKiteParams(KiteParams{Enabled: true})
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the zero numbers must not disable the fight")
-    require.Equal(t, int32(43650), game.walks[0][0],
+    require.Equal(t, int32(43700), game.walks[0][0],
         "the zero step length falls back to the shipped race formula")
     require.InDelta(t, kiteRetreatRadius, loop.kite.RetreatRadius, 0.001,
         "the zero radius falls back to the shipped trigger")
@@ -102,14 +102,14 @@ func TestKiteParamsBrokenNumbersFallBackToTheShippedTuning(t *testing.T) {
 // knob against the round-17 composed window: the movement hold is
 // the max of the caller's window (the plain window plus the delay)
 // and the scaled window of the race leg (leg/kiteStep * the bow
-// window - the 1350 race leg of the closed mob scales the shipped 2s
-// fallback to 6.75s). A delay inside the scaled window changes
+// window - the 1300 race leg of the closed mob scales the shipped 2s
+// fallback to 6.5s). A delay inside the scaled window changes
 // nothing (the leg owns the hold), a delay past it extends the hold
 // one for one - the hold the tuning round widens when the aim needs
 // to settle.
 func TestKiteParamsReengageDelayHoldsTheReRequest(t *testing.T) {
     // The delay past the scaled window: the plain window (2s) plus
-    // the delay (6s) = 8s from the issue, past the scaled 6.75s of
+    // the delay (6s) = 8s from the issue, past the scaled 6.5s of
     // the race leg - the knob owns the hold.
     _, game, loop := kiteBowBotChaseFresh(t, 45200)
     loop.SetKiteParams(KiteParams{
@@ -123,7 +123,8 @@ func TestKiteParamsReengageDelayHoldsTheReRequest(t *testing.T) {
     loop.tick()
     require.Len(t, game.walks, 1)
     scaled := time.Duration(
-        kiteRoamRadius / kiteStep * float64(kiteStepWindow))
+        (kiteRoamRadius - kiteArrivalEpsilon/2) /
+            kiteStep * float64(kiteStepWindow))
     require.WithinDuration(t,
         before.Add(kiteStepWindow+6*time.Second),
         loop.combatAvoidUntil, 250*time.Millisecond,

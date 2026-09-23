@@ -53,13 +53,14 @@ func kiteBowBot(t *testing.T, mobX int32) (*state.Bot, *fakeGame, *Loop) {
 // buys back at the parity exchange rate (400 + 280*8 = 2640), the
 // absolute cap fences it at kiteRaceStepMax (1700) and the fresh
 // fight's own leash budget (kiteRoamRadius minus the anchor distance
-// - the first resolution anchors the fight AT the self position, so
-// the budget is the full 1350) caps the leg at 1350 - one long
-// continuous walk that ARRIVES back at the floor instead of the old
-// window-sized 400 shuffle that ended short of it. The scene carries
-// a fresh shot, so the first tick arms the deferred retreat (the
-// windup hold of the issue #70 findings) and the aged tick fires it
-// - the walk asserts the geometry once the click landed.
+// and the cell-rounding guard - the first resolution anchors the
+// fight AT the self position, so the budget is the full 1300) caps
+// the leg at 1300 - one long continuous walk that ARRIVES back at
+// the floor instead of the old window-sized 400 shuffle that ended
+// short of it. The scene carries a fresh shot, so the first tick
+// arms the deferred retreat (the windup hold of the issue #70
+// findings) and the aged tick fires it - the walk asserts the
+// geometry once the click landed.
 func TestKiteStepsAwayFromTheClosedTarget(t *testing.T) {
     // The mob closed to 200 units: inside the kite trigger, outside
     // the melee range.
@@ -74,8 +75,8 @@ func TestKiteStepsAwayFromTheClosedTarget(t *testing.T) {
         "the step keeps the character's deck")
     // The step direction: straight away from the target on the x
     // axis - the race leg capped at the fresh anchor's leash budget
-    // (min(400+280*8, 1700, 1350-0) = 1350) from the self position.
-    require.Equal(t, int32(43650), step[0])
+    // (min(400+280*8, 1700, 1350-0-50) = 1300) from the self position.
+    require.Equal(t, int32(43700), step[0])
     require.Equal(t, selfY, step[1])
     require.Empty(t, game.forces,
         "the kite tick must not re-request the attack")
@@ -158,8 +159,8 @@ func TestKiteReshotWaitsForTheRegainedDistance(t *testing.T) {
 
     // The walk outlives the fighting stance freshness (3s from the
     // last swing) AND the scaled movement window of the race leg
-    // (1350 units at the per-unit pace of the bow window: 1350/400 *
-    // the shipped 2s fallback = 6.75s): sleep past both so the tick
+    // (1300 units at the per-unit pace of the bow window: 1300/400 *
+    // the shipped 2s fallback = 6.5s): sleep past both so the tick
     // lands in the honest post-walk state - stance lapsed, step
     // window closed, the target still at 200 units (inside the 480
     // floor).
@@ -321,9 +322,9 @@ func TestKiteTrainMemberArmsTheRetreat(t *testing.T) {
     step := game.walks[0]
     // The step direction: straight away from the MEMBER on the x
     // axis (self 45000, member 45200 -> the race leg capped at the
-    // fresh anchor's 1350 budget lands west of the self), not away
+    // fresh anchor's 1300 budget lands west of the self), not away
     // from the fight target at 45440.
-    require.Equal(t, int32(43650), step[0])
+    require.Equal(t, int32(43700), step[0])
     require.Empty(t, game.forces,
         "the kite tick must not re-request the attack")
 }
@@ -376,7 +377,7 @@ func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
     // The centroid direction: away(target) = (-1, 0),
     // away(member) = (-127, -127)/179.6 -> the sum normalized. The
     // leg is the race step of the nearer threat (the member at 180:
-    // 400 + 300*8, capped at the fresh anchor's 1350 leash budget).
+    // 400 + 300*8, capped at the fresh anchor's 1300 leash budget).
     sumX := -1.0 - 127.0/math.Hypot(127, 127)
     sumY := -127.0 / math.Hypot(127, 127)
     sumLen := math.Hypot(sumX, sumY)
@@ -384,7 +385,7 @@ func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
     if leg > kiteRaceStepMax {
         leg = kiteRaceStepMax
     }
-    if budget := kiteRoamRadius - 0; budget < leg {
+    if budget := kiteRoamRadius - 0 - kiteArrivalEpsilon/2; budget < leg {
         leg = budget
     }
     require.InDelta(t, 45000+sumX/sumLen*leg, float64(step[0]), 1.0,

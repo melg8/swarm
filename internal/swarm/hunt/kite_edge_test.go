@@ -79,7 +79,7 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
     // The centroid direction, recomputed from first principles:
     // away(target) = (-1, 0), away(member) = (-141, -141)/199.4. The
     // leg is the race step of the nearer threat (the member at 199.4:
-    // 400 + the deficit * 8, capped at the fresh anchor's 1350 leash
+    // 400 + the deficit * 8, capped at the fresh anchor's 1300 leash
     // budget - the deficit leg is far past it).
     ax, ay := -1.0, 0.0
     bx := -141.0 / math.Hypot(141, 141)
@@ -90,7 +90,7 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
     leg := math.Min(
         kiteStep+(kiteReshotFloor-math.Hypot(141, 141))*kiteRaceFactor,
         kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius)
+    leg = math.Min(leg, kiteRoamRadius-kiteArrivalEpsilon/2)
     step := game.walks[0]
     require.InDelta(t, 45000+dirX*leg, float64(step[0]), 1.0,
         "the step direction is the centroid away-vector of the train")
@@ -132,11 +132,12 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
     // its bisector is the perpendicular ray - the deterministic
     // first-widest answer, no coin flip between the two halves. The
     // leg is the race step (the deficit 280 capped at the fresh
-    // anchor's 1350 leash budget), so the perpendicular escape
+    // anchor's 1300 leash budget), so the perpendicular escape
     // marches the whole leg north.
     require.InDelta(t, 45000.0, float64(step[0]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
-    require.InDelta(t, 50000+kiteRoamRadius, float64(step[1]), 1.0,
+    require.InDelta(t, 50000+kiteRoamRadius-kiteArrivalEpsilon/2,
+        float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
     // The perpendicular escape opens the distance to BOTH chasers.
     toTarget := math.Hypot(
@@ -236,10 +237,10 @@ func TestKiteWaterBehindHoldsGround(t *testing.T) {
 // door shut) re-plans onto the open 45 degree lane at the very next
 // probe - one hop later, never a walk into the dead end. The scene
 // sizes the race leg mid-band (a mob at 440: the deficit 40 buys the
-// 720 leg, well under the fresh anchor's 1350 leash budget) so the
+// 720 leg, well under the fresh anchor's 1300 leash budget) so the
 // diagonal fan candidate fits the roam fence - the full-budget leg
 // of a 200-unit mob leaves the 45 degree lanes no room (the
-// 1350*sqrt(2) diagonal overshoots the fence by the cell rounding).
+// 1300*sqrt(2) diagonal overshoots the fence by the cell rounding).
 func TestKiteDeadEndLaneRePlansAtTheNextProbe(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45440)
     nav := &fakeNavigator{}

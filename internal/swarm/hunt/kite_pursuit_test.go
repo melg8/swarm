@@ -23,11 +23,11 @@ import (
 // tests below pin the four gates one by one on the standard kite
 // scene (the lapse dance of pursuitWindowLapse carries each scaled
 // walk window of the race leg out - leg/400 * the bow window, the
-// 1350 leg of the 260-unit mob holds it for 6.75s - and lands the
+// 1300 leg of the 260-unit mob holds it for 6.5s - and lands the
 // arrival shot of the leg the way the live server does).
 
 // pursuitWindowLapse ages the scene past the scaled walk window of
-// the race leg (1350/400 * the 2s fallback = 6.75s), lands the
+// the race leg (1300/400 * the 2s fallback = 6.5s), lands the
 // ARRIVAL SHOT of the leg (the server's auto re-shot the armed
 // stance fires the moment the walk ends - the live fight view rides
 // those shots through a chain the fake mob never swings into) and
@@ -167,7 +167,7 @@ func TestKitePursuitContextExpiresTheStaleChain(t *testing.T) {
 
     // The context ages past its bound: the continuation must refuse
     // the stale chain whatever the distance holds. The sleep first
-    // carries the scaled walk window of the race leg out (6.75s),
+    // carries the scaled walk window of the race leg out (6.5s),
     // so the refused tick lands on the honest post-walk state -
     // the ladder stands down, the attack owns the tick.
     time.Sleep(7000 * time.Millisecond)

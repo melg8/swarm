@@ -467,12 +467,22 @@ const (
     // correction slower than it spends safety.
     kiteCircleArcHalf = math.Pi / 4
     // kiteCircleLeashShare caps the anchor-circle radius as a share
-    // of the roam radius: the leash check of the lane battery
-    // rejects endpoints OUTSIDE kiteRoamRadius, so the circle the
-    // chord lands on stays a share inside it - float noise and the
-    // cell granularity never push an equidistant endpoint over the
-    // fence the straight legs respect.
-    kiteCircleLeashShare = 0.92
+    // of the roam radius. The round-17 live verdict sized it: the
+    // circle at 0.92 (1242 units) carried the full 1700-unit race
+    // chord, but the fight drift - the character's displacement
+    // from the MOB'S STAND, not the anchor - adds the engage offset
+    // (the anchor sits a bow radius from the mob's stand) and broke
+    // the audit's 1500-unit drift leash at 1591-1712 on three of
+    // five slots, while the shove tier's 250-unit bursts off the
+    // 1242 ring crossed the 1350 roam fence and left the pack
+    // cells' surrounds at the hold. The 0.72 share (972 units)
+    // keeps every fence: the drift worst case 972+500 = 1472 stays
+    // inside 1500, the shove worst case 972+250 = 1222 stays inside
+    // 1350, and the chord at the cap (1.41 * 972 = 1370) still
+    // carries the typical race deficit (~163 * 8 + 400 = 1704 is
+    // the deep-collapse cap; the pursuit continuation chains the
+    // remainder the shorter chord cannot buy in one leg).
+    kiteCircleLeashShare = 0.72
     // kiteArrivalEpsilon is the arrival radius of the leg-long
     // re-click ladder (round 17): a stand within this distance of
     // the walk endpoint completes the leg (the server's cell
@@ -888,11 +898,18 @@ func (l *Loop) kiteStepLength(
     if l.kiteFightFor == l.target {
         // The leash budget of the straight legs: the worst-case ray
         // runs the radius straight out, so the anchor distance plus
-        // the step must stay inside the roam fence.
+        // the step must stay inside the roam fence. The margin
+        // (kiteArrivalEpsilon's half) keeps the int32 cell rounding
+        // of the endpoint from crossing the fence the battery
+        // enforces - a 1350-budget step rounded onto 1351 reads
+        // walled, and the round-17 live log measured the rotation
+        // cascade that follows (the refused clicks, the fan folds,
+        // the hold).
         anchorDist := math.Hypot(
             float64(selfX-l.kiteFightX),
             float64(selfY-l.kiteFightY))
-        if budget := kiteRoamRadius - anchorDist; budget < step {
+        if budget := kiteRoamRadius - anchorDist -
+            kiteArrivalEpsilon/2; budget < step {
             step = math.Max(kiteShoveStep, budget)
         }
     }

@@ -91,7 +91,7 @@ func TestKiteOpeningRetreatRunsStraight(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
-    require.Equal(t, int32(43650), game.walks[0][0],
+    require.Equal(t, int32(43700), game.walks[0][0],
         "the opening retreat runs the straight away-ray at the race length")
     require.True(t, loop.kiteCurved,
         "the issued walk spends the opening straight step")
@@ -108,7 +108,7 @@ func TestKiteSecondRetreatCurvesTheCircle(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
-    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[0],
+    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[0],
         "the opening retreat runs the straight race leg")
 
     // The character stands 600 west of the anchor (the mid-leg
@@ -121,11 +121,11 @@ func TestKiteSecondRetreatCurvesTheCircle(t *testing.T) {
     curved := game.walks[1]
     // The leg at the stand: the deficit 280 (the mob at 200) bought
     // back at the parity rate, capped by the leash budget the anchor
-    // 600 away leaves (1350-600 = 750).
+    // 600 away leaves (1350-600-50 = 700).
     leg := math.Min(
         kiteStep+(kiteReshotFloor-200)*kiteRaceFactor,
         kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius-600)
+    leg = math.Min(leg, kiteRoamRadius-600-kiteArrivalEpsilon/2)
     wantX, wantY, radiusTarget := kiteWantChord(
         45000, 50000, selfX, selfY, leg)
     require.InDelta(t, wantX, float64(curved[0]), 1.0,
@@ -179,7 +179,7 @@ func TestKiteFreshTargetResetsTheCircle(t *testing.T) {
     // The fresh fight re-anchors AT the self position and opens with
     // the straight away-ray at its own race length: the mob 400 out
     // owes a deficit of 80, so the leg runs 400 + 80*8 = 1040 - well
-    // under the fresh anchor's 1350 leash budget.
+    // under the fresh anchor's 1300 leash budget.
     require.Equal(t, int32(43960), fresh[0],
         "the fresh fight opens with the straight away-ray")
 }
@@ -213,7 +213,7 @@ func TestKiteCurveTurnsTowardTheZoneCenter(t *testing.T) {
     leg := math.Min(
         kiteStep+(kiteReshotFloor-200)*kiteRaceFactor,
         kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius-600)
+    leg = math.Min(leg, kiteRoamRadius-600-kiteArrivalEpsilon/2)
     _, wantY, radiusTarget := kiteWantChord(
         45000, 50000, selfX, selfY, leg)
     require.InDelta(t, wantY, float64(curved[1]), 1.0,
