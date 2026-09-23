@@ -126,12 +126,8 @@ package hunt
 // kites its fights.
 
 import (
-    "fmt"
     "math"
-    "sort"
     "time"
-
-    "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
 // The kiting constants of the archer fight.
@@ -436,6 +432,56 @@ const (
     // re-shot cancels it - the whole-reload stall the findings
     // measured as the fleet retreat lag).
     kiteWindupLead = 150 * time.Millisecond
+    // kiteRaceFactor scales the DISTANCE DEFICIT into the race leg
+    // length (issue #70, the round-17 race redesign): a retreat
+    // issued under kiteReshotFloor must arrive BACK at the floor or
+    // the arrival shot (the server auto re-shot the armed stance
+    // fires the moment the walk ends) lands at the collapsed range
+    // and the windup standstill hands the chaser the melee. The
+    // honest physics of the parity chase: the character nets
+    // (runSpeed - chaserSpeed)/runSpeed of every walked unit (~0.12
+    // for the 125 runner vs the 110 elven chasers), so buying back
+    // one unit of distance costs ~8 walked units - the factor that
+    // turns the deficit into the leg. The base kiteStep rides on
+    // top: the leg never shortens below the ordinary step.
+    kiteRaceFactor = 8.0
+    // kiteRaceStepMax caps the race leg: the leash-bounded circle
+    // (kiteRoamRadius, three bow engage radii) carries a chord of
+    // roughly 1.4x its radius at the 90 degree arc cap, so a leg
+    // past ~1700 has no room on any circle the anchor leashes - the
+    // deficit that deep belongs to the pursuit continuation chain,
+    // not one walk.
+    kiteRaceStepMax = 1700.0
+    // kiteCircleMinRadius is the anchor-circle radius under which
+    // the curving retreat keeps the straight away-ray: the opening
+    // legs of a fight sit on (or near) the anchor cell itself - the
+    // anchor IS the self position at the first retreat resolution -
+    // and a chord of a near-zero circle folds straight through the
+    // farm point. The circle takes over once the opening legs
+    // carried the fight onto its own ring.
+    kiteCircleMinRadius = 300.0
+    // kiteCircleArcHalf caps the half-arc the circle chord
+    // subtends (45 degrees, a 90 degree endpoint swing): past it
+    // the chord direction folds toward the chase half-plane the
+    // lane battery guards, and the equidistant swing buys drift
+    // correction slower than it spends safety.
+    kiteCircleArcHalf = math.Pi / 4
+    // kiteCircleLeashShare caps the anchor-circle radius as a share
+    // of the roam radius: the leash check of the lane battery
+    // rejects endpoints OUTSIDE kiteRoamRadius, so the circle the
+    // chord lands on stays a share inside it - float noise and the
+    // cell granularity never push an equidistant endpoint over the
+    // fence the straight legs respect.
+    kiteCircleLeashShare = 0.92
+    // kiteArrivalEpsilon is the arrival radius of the leg-long
+    // re-click ladder (round 17): a stand within this distance of
+    // the walk endpoint completes the leg (the server's cell
+    // granularity and a partial route's last walkable cell never
+    // leave the character exactly ON the clicked cell), while a
+    // stand beyond it - mid-route, or short of the endpoint after a
+    // partial path - re-arms the episode and keeps pushing the
+    // endpoint.
+    kiteArrivalEpsilon = 100.0
 )
 
 // KiteParams is the tunable block of the kite fight (owner issue
@@ -448,6 +494,7 @@ const (
 // constant (the streak limit, the train scan, the lane fan) stays a
 // package constant on purpose: the tuning round names these four,
 // the rest ride the shipped values until the numbers ask otherwise.
+
 type KiteParams struct {
     // Enabled gates the kite layer whole: false turns every bow fight
     // into the standing archer the baseline measures (the mob closes,
@@ -474,6 +521,7 @@ type KiteParams struct {
 // above read into the params shape. A loop starts with these - the
 // config file overrides per bot spec, everything else keeps the
 // behavior the acceptance scenario (#28) pins.
+
 func DefaultKiteParams() KiteParams {
     return KiteParams{
         Enabled:       true,
@@ -491,6 +539,7 @@ func DefaultKiteParams() KiteParams {
 // legitimate value (the window end IS the re-engage) - so only the
 // negative side normalizes. The kite state carries over: the override
 // between fights never resets the pacing or the streak.
+
 func (l *Loop) SetKiteParams(p KiteParams) {
     if p.RetreatRadius <= 0 {
         p.RetreatRadius = kiteRetreatRadius
@@ -526,6 +575,7 @@ func (l *Loop) SetKiteParams(p KiteParams) {
 // Returns the threat identity for the logs and its ground distance
 // to the character (the retreat DIRECTION weighs the whole train
 // through kiteTrainDirection, so the position itself has no reader).
+
 func (l *Loop) kiteThreat(
     selfX, selfY, selfZ int32,
 ) (id int32, dist float64, ok bool) {
@@ -557,6 +607,7 @@ func (l *Loop) kiteThreat(
 // hold pacing (a retreat with no walkable lane re-probes at the
 // kite period, not every tick). Reports whether a kite step of any
 // layer may run now.
+
 func (l *Loop) kiteLayerGates(now time.Time) bool {
     // The params gate comes first: a kite-disabled profile (the
     // standing-archer baseline of issue #29) never arms the layer,
@@ -586,6 +637,7 @@ func (l *Loop) kiteLayerGates(now time.Time) bool {
 // for as long as the fight runs - the streak counter crosses
 // kiteStreakLimit only as the diagnostic that names the unwinnable
 // race. Reports whether the step may run now.
+
 func (l *Loop) kiteStepAdmitted(now time.Time) bool {
     if !l.kiteLayerGates(now) {
         return false
@@ -636,6 +688,7 @@ func (l *Loop) kiteStepAdmitted(now time.Time) bool {
 // full window applies. Reports whether the tick issued or armed the
 // step (the caller skips the rest of the fighting branch then - the
 // walk owns the movement).
+
 func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !l.kiteStepAdmitted(now) {
         return false
@@ -700,6 +753,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
 // distance holds near the bow's own max), capped at the train scan
 // range - beyond it neither side reaches the other and the rhythm
 // has nothing to pace.
+
 func (l *Loop) kiteThreatBeyondThePursue(
     threatID int32, dist float64,
 ) bool {
@@ -742,6 +796,7 @@ func (l *Loop) kiteThreatBeyondThePursue(
 // starve. A hostile beyond the band leaves the standing fight (the
 // stall watchdog owns the re-approach). Reports whether the tick
 // armed the deferred retreat.
+
 func (l *Loop) kiteFromShot(now time.Time) bool {
     if !l.kiteLayerGates(now) {
         return false
@@ -797,6 +852,54 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
     return true
 }
 
+// kiteStepLength resolves the retreat leg length the moment arms
+// (issue #70, the round-17 race redesign): the plain kiteStep while
+// the fight holds the re-shot floor (the ordinary band step - the
+// fight distance is safe, the shot is affordable wherever it
+// stands), and the RACE leg under it - the deficit to the floor
+// bought back at the parity exchange rate (kiteRaceFactor) plus the
+// base step, so the leg ARRIVES back at the floor instead of ending
+// a few dozen units short of it. The round-15/16 fleet rounds
+// measured the fixed 400-unit leg landing at the melee medians
+// (141 units) cycle after cycle: the walk window equals the shot
+// cycle, the character stops at the endpoint exactly when the
+// server's re-shot is ready, and the armed stance fires it at the
+// collapsed range - the second shot of the cycle the owner named,
+// and the windup standstill of that shot hands the chaser the
+// melee. The race leg arrives at the floor, so the arrival shot (or
+// the re-request at the window end) is the ONE shot of the cycle,
+// fired from the safe distance. The leash budget caps the straight
+// legs: the endpoint of a straight step must stay inside the roam
+// radius around the fight anchor, and a fight already at the leash
+// edge keeps at least the shove tier of room (the circle chord of
+// the curving legs lands equidistant by construction and never
+// needs the budget).
+
+func (l *Loop) kiteStepLength(
+    dist float64, selfX, selfY int32,
+) float64 {
+    if dist >= kiteReshotFloor {
+        return l.kite.Step
+    }
+    step := l.kite.Step + (kiteReshotFloor-dist)*kiteRaceFactor
+    if step > kiteRaceStepMax {
+        step = kiteRaceStepMax
+    }
+    if l.kiteFightFor == l.target {
+        // The leash budget of the straight legs: the worst-case ray
+        // runs the radius straight out, so the anchor distance plus
+        // the step must stay inside the roam fence.
+        anchorDist := math.Hypot(
+            float64(selfX-l.kiteFightX),
+            float64(selfY-l.kiteFightY))
+        if budget := kiteRoamRadius - anchorDist; budget < step {
+            step = math.Max(kiteShoveStep, budget)
+        }
+    }
+
+    return step
+}
+
 // kiteResolveAndClick resolves the retreat lane against the live
 // train and terrain and issues the retreat click through the ladder
 // seam: the encircled train (the away vectors cancel - chasers stand
@@ -807,7 +910,12 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
 // computed. The shared seam serves the deferred click of the shot
 // cycle (kiteClickWalk), the accepted-window catch of the broadcast
 // tick and the ordinary proximity step - one resolution, one click
-// path, one ladder. Reports whether the click went out.
+// path, one ladder. The leg LENGTH is race-aware (kiteStepLength):
+// the live threat distance at the resolution moment sizes the step,
+// so a fight collapsed under the re-shot floor banks the whole
+// deficit into one long continuous walk instead of a chain of
+// window-sized shuffles. Reports whether the click went out.
+
 func (l *Loop) kiteResolveAndClick(
     now, until time.Time, selfX, selfY, selfZ int32,
 ) bool {
@@ -833,20 +941,33 @@ func (l *Loop) kiteResolveAndClick(
     }
     // The curving retreat (issue #70, the fifth behavior): the
     // opening retreat of a fight runs the straight away-ray, every
-    // later one leans the fixed tangential bearing on the fight's
-    // turn side - the circle. The RAW away vector stays the
-    // half-plane reference of the lane battery (the curve may bend
-    // the preferred ray, never the guard). An encircled train
-    // KEEPS its raw ray as the preference: the gap bisector already
-    // encodes the escape geometry, and a tangential lean on top of
-    // it would fold the step back onto a flanker.
+    // later one aims the CHORD of the fight's anchor circle - the
+    // endpoint lands exactly the circle's radius away from the
+    // anchor (the equidistant point of the owner's circling spec),
+    // on the turn side the fight keeps for its whole life. The RAW
+    // away vector stays the half-plane reference of the lane
+    // battery (the chord may bend the preferred ray, never the
+    // guard). An encircled train KEEPS its raw ray as the
+    // preference: the gap bisector already encodes the escape
+    // geometry, and a circle chord on top of it would fold the step
+    // back onto a flanker.
+    _, threatDist, threatOK := l.kiteThreat(selfX, selfY, selfZ)
+    stepLen := l.kite.Step
+    if threatOK {
+        // The race-aware leg length (kiteStepLength): the deficit
+        // to the re-shot floor at the resolution moment sizes the
+        // leg - one long continuous walk to the floor, not a
+        // window-sized shuffle that ends short of it.
+        stepLen = l.kiteStepLength(threatDist, selfX, selfY)
+    }
     prefX, prefY := dirX, dirY
     if !encircled {
-        prefX, prefY = l.kiteCurveDirection(dirX, dirY, selfX, selfY)
+        prefX, prefY = l.kiteCurveDirection(
+            dirX, dirY, selfX, selfY, stepLen)
     }
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
         selfX, selfY, selfZ, prefX, prefY, dirX, dirY,
-        l.kiteDeadCellsFor())
+        stepLen, l.kiteDeadCellsFor())
     if !found {
         // The hemisphere sweep is walled (the raw away-ray of a
         // normal train, the gap ray of an encircled one): BEFORE the
@@ -929,6 +1050,7 @@ func (l *Loop) kiteResolveAndClick(
 // time (the very same shot) re-arms silently - the caller yields the
 // tick only on a fresh schedule. Reports whether the arming spent
 // the tick.
+
 func (l *Loop) kiteArmClick(clickAt, until time.Time) bool {
     if l.kiteClickFor == l.target && l.kiteClickAt.Equal(clickAt) {
         // The schedule of this very shot is already armed (a second
@@ -969,6 +1091,7 @@ func (l *Loop) kiteArmClick(clickAt, until time.Time) bool {
 // all resolve fresh at the click moment). The encircled and the
 // cornered answers hold the ground as always. Reports whether the
 // tick spent the click.
+
 func (l *Loop) kiteClickWalk(now time.Time) bool {
     if l.kiteClickAt.IsZero() {
         return false
@@ -1037,6 +1160,7 @@ func (l *Loop) kiteClickWalk(now time.Time) bool {
 // shot cycle (or the proximity trigger of the next fight) arms its
 // own schedule whole. The dead-cell memory and the ladder state
 // belong to their own lifecycles (the target and the walk).
+
 func (l *Loop) kiteClickClear() {
     l.kiteClickAt = time.Time{}
     l.kiteClickFor = 0
@@ -1056,6 +1180,7 @@ func (l *Loop) kiteClickClear() {
 // end (the disable end plus the re-engage delay) and whether the
 // cycle is still live - a cycle that ended leaves the retreat to
 // the ordinary full window.
+
 func (l *Loop) kiteShotPhase(
     now time.Time,
 ) (clickAt, until time.Time, live bool) {
@@ -1075,25 +1200,34 @@ func (l *Loop) kiteShotPhase(
     return clickAt, until, true
 }
 
-// kiteCurveDirection bends the retreat ray into the curving circle
-// of the fight (issue #70, the fifth behavior): the OPENING retreat
-// of a fight runs the straight away-ray (the panic retreat opens
-// the distance at once), every later one leans the fixed tangential
-// bearing kiteCurveStep on the fight's turn side - the character
-// circles the fight instead of marching one ray, so the drift away
-// from the farm point stays bounded by the circle. The turn side
-// is the fight's own constant (kiteCurveSide picks it once: toward
-// the FIGHT ANCHOR when the first retreat anchored the fight, a
-// fixed side
-// otherwise). The step itself stays under the half-plane bound
-// (cos(kiteCurveStep) >= kiteHalfPlaneSlack, pinned by a unit
-// test), so the bent ray never folds back into the train whatever
-// the turn side. The advance to the curved steps belongs to the
-// issued walk alone (kiteIssueWalk): a cornered or refused retreat
-// spends nothing, the opening straight step stays armed until a
-// walk really goes out.
+// kiteCurveDirection bends the retreat ray into the circling ring of
+// the fight (issue #70, the fifth behavior, reworked round 17): the
+// OPENING retreat of a fight runs the straight away-ray (the panic
+// retreat opens the distance at once), every later one aims the
+// CHORD of the fight's anchor circle - the endpoint sits exactly the
+// circle's radius away from the FIGHT ANCHOR (the live-observed
+// ground the fight started on, see kiteResolveAndClick), swung the
+// fight's fixed turn side, so the character keeps the SAME distance
+// to the point it kites around: the owner's equidistant circling
+// spec, exactly. The chord carries the race leg (kiteStepLength)
+// when the circle has the room for it: the radius grows to the
+// length the leg needs (capped by the leash share), the half-arc
+// caps at kiteCircleArcHalf (a 90 degree endpoint swing - past it
+// the chord folds toward the chase half-plane the battery guards),
+// and a leg the capped circle cannot carry walks the shorter chord
+// anyway (the pursuit continuation re-arms the remainder). The
+// turn side is the fight's own constant (kiteCurveSide picks it
+// once: toward the FIGHT ANCHOR when the first retreat anchored the
+// fight, a fixed side otherwise). The advance to the curved steps
+// belongs to the issued walk alone (kiteIssueWalk): a cornered or
+// refused retreat spends nothing, the opening straight step stays
+// armed until a walk really goes out. The degenerate scenes - no
+// anchor, the opening radius under kiteCircleMinRadius, a chord
+// that degenerates to a point - keep the straight away-ray: the
+// circle owns the fight only where the fight really runs on one.
+
 func (l *Loop) kiteCurveDirection(
-    dirX, dirY float64, selfX, selfY int32,
+    dirX, dirY float64, selfX, selfY int32, step float64,
 ) (float64, float64) {
     if l.kiteCurveFor != l.target {
         l.kiteCurveFor = l.target
@@ -1103,17 +1237,53 @@ func (l *Loop) kiteCurveDirection(
     if !l.kiteCurved {
         return dirX, dirY
     }
+    if l.kiteFightFor != l.target || step < 1 {
+        // No anchored circle (or a degenerate leg): the straight
+        // away-ray serves the step.
+        return dirX, dirY
+    }
+    toSelfX := float64(selfX - l.kiteFightX)
+    toSelfY := float64(selfY - l.kiteFightY)
+    radius := math.Hypot(toSelfX, toSelfY)
+    if radius < kiteCircleMinRadius {
+        // The opening legs still sit on the anchor cell: a chord of
+        // a near-zero circle folds straight through the farm point.
+        return dirX, dirY
+    }
+    // The circle the chord lands on: the current radius, grown to
+    // the length the leg needs (the chord of the half-arc cap
+    // subtends 2*R*sin(kiteCircleArcHalf) ~= 1.41*R), fenced by the
+    // leash share so the equidistant endpoint never crosses the
+    // roam fence the battery enforces.
+    radiusTarget := math.Max(
+        radius, step*math.Sin(kiteCircleArcHalf))
+    leashMax := kiteRoamRadius * kiteCircleLeashShare
+    if radiusTarget > leashMax {
+        radiusTarget = leashMax
+    }
+    // The half-arc the chord subtends: asin(step / 2R), capped at
+    // the arc bound (the chord of a capped circle walks shorter than
+    // the leg - the pursuit continuation re-arms the remainder).
+    half := math.Asin(math.Min(1, step/(2*radiusTarget)))
+    if half > kiteCircleArcHalf {
+        half = kiteCircleArcHalf
+    }
+    // The equidistant endpoint: the radius vector swung the full
+    // arc (2*half) on the fight's turn side, rescaled to the target
+    // radius - the endpoint keeps the circle's distance to the
+    // anchor whatever the straight legs drifted it to.
+    unitX, unitY := toSelfX/radius, toSelfY/radius
+    swingX, swingY := rotatePlanar(
+        unitX, unitY, l.kiteCurveSign*2*half)
+    endX := float64(l.kiteFightX) + swingX*radiusTarget
+    endY := float64(l.kiteFightY) + swingY*radiusTarget
+    prefX := endX - float64(selfX)
+    prefY := endY - float64(selfY)
+    if size := math.Hypot(prefX, prefY); size >= 1 {
+        return prefX / size, prefY / size
+    }
 
-    // The constant contract (pinned by
-    // TestKiteCurveStepStaysInTheAwayHalfPlane): kiteCurveStep
-    // stays under the half-plane bound
-    // (cos(step) >= kiteHalfPlaneSlack), so the bent ray can never
-    // fold back into the train whatever the turn side - the guard
-    // would mirror the side otherwise, but a step that needs the
-    // mirror has no business being a circle bearing.
-    bentX, bentY := rotatePlanar(dirX, dirY, l.kiteCurveSign*kiteCurveStep)
-
-    return bentX, bentY
+    return dirX, dirY
 }
 
 // kiteCurveSide picks the turn side of a fight's circle once: the
@@ -1123,6 +1293,7 @@ func (l *Loop) kiteCurveDirection(
 // replaced the hunting-zone center read with it), a fixed
 // counterclockwise side before the first retreat anchors the fight
 // (and on any ground the anchor never landed).
+
 func (l *Loop) kiteCurveSide(
     dirX, dirY float64, selfX, selfY int32,
 ) float64 {
@@ -1159,12 +1330,32 @@ func (l *Loop) kiteCurveSide(
 // disable end (the walk owns the reuse tail, the forced attack
 // re-request fires the moment it lapses), a cycle-less step keeps
 // the full window from now.
+
 func (l *Loop) kiteIssueWalk(
     now, until time.Time, selfX, selfY, selfZ, stepX, stepY int32,
 ) {
     l.kiteWalkX, l.kiteWalkY, l.kiteWalkZ = stepX, stepY, selfZ
     l.kiteWalkBaseX, l.kiteWalkBaseY = selfX, selfY
     l.kiteWalkIssuedAt = now
+    // The window covers the WHOLE leg (the round-17 race redesign):
+    // the race leg runs many times the ordinary step's walk time,
+    // and a window that lapses mid-leg stands the ladder down and
+    // hands the tick to the forced attack re-request - which fires
+    // the shot at whatever collapsed range the leg has reached so
+    // far, the exact two-shots-per-cycle failure the owner named.
+    // The window scales with the walk distance at the per-unit pace
+    // of the bow-aware window formula (kiteWalkWindow per
+    // kiteStep), so the leg runs to its endpoint (or the pursuit
+    // continuation re-arms the next one) before anything else owns
+    // the movement.
+    if leg := math.Hypot(
+        float64(stepX-selfX), float64(stepY-selfY)); leg > l.kite.Step {
+        scaled := now.Add(time.Duration(
+            leg / l.kite.Step * float64(l.kiteWalkWindow())))
+        if scaled.After(until) {
+            until = scaled
+        }
+    }
     l.kiteWalkUntil = until
     l.combatAvoidUntil = until
     // The curving circle advances on the issued walk alone: the
@@ -1222,6 +1413,7 @@ func (l *Loop) kiteIssueWalk(
 // stood to the cycle end (docs/kite_timing_findings.md). The window
 // rides the same pAtkSpd formula, clamps and fallback as
 // kiteWalkWindow - exactly its first half.
+
 func (l *Loop) kiteWindupWindow() time.Duration {
     return l.kiteWalkWindow() / 2
 }
@@ -1242,6 +1434,7 @@ func (l *Loop) kiteWindupWindow() time.Duration {
 // second of every reload. A missing or absurd pAtkSpd broadcast
 // falls back to the shipped kiteStepWindow (the walk contract
 // never depends on the packet being parsed).
+
 func (l *Loop) kiteWalkWindow() time.Duration {
     spd := l.tracker.SelfPAtkSpd()
     if spd <= 0 {
@@ -1269,6 +1462,7 @@ func (l *Loop) kiteWalkWindow() time.Duration {
 // and the bot's own geodata does not always agree (the dump cells
 // read open in the shipped pack), so the ONLINE evidence is the
 // only refusal channel that never lies.
+
 func (l *Loop) kiteClickRefused() bool {
     if l.kiteReclickAt.IsZero() {
         return false
@@ -1289,6 +1483,7 @@ func (l *Loop) kiteClickRefused() bool {
 // Reports whether a fresh endpoint serves the retreat: an
 // encircled train or a battery that finds no lane leaves the
 // rotation empty and the caller stands the ladder down.
+
 func (l *Loop) kiteRotateDeadEndpoint(
     selfX, selfY, selfZ int32,
 ) bool {
@@ -1307,10 +1502,16 @@ func (l *Loop) kiteRotateDeadEndpoint(
     // a coverage sweep of the whole hemisphere, the circle owns
     // the fresh retreat preference alone - a rotation that clung
     // to the curved ray would sweep only the three candidates left
-    // of its fan.
+    // of its fan. The rotation keeps the leg LENGTH race-aware:
+    // the live threat at the rotation moment sizes the step.
+    stepLen := l.kite.Step
+    if _, threatDist, threatOK := l.kiteThreat(
+        selfX, selfY, selfZ); threatOK {
+        stepLen = l.kiteStepLength(threatDist, selfX, selfY)
+    }
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
         selfX, selfY, selfZ, dirX, dirY, dirX, dirY,
-        l.kiteWalkDeadCells[:l.kiteWalkDeadCount])
+        stepLen, l.kiteWalkDeadCells[:l.kiteWalkDeadCount])
     if !found {
         // The dead-endpoint sweep exhausted the hemisphere: the
         // pocket breakout probes the cone it never covered with the
@@ -1366,6 +1567,7 @@ func (l *Loop) kiteRotateDeadEndpoint(
 // ledger, the leash or the lane battery stops the chase - the walk
 // stands down and the re-request fires the affordable shot from the
 // opened distance. Reports whether the tick spent the continuation.
+
 func (l *Loop) kitePursuitHold(
     now time.Time, selfX, selfY, selfZ int32,
 ) bool {
@@ -1443,24 +1645,37 @@ func (l *Loop) kitePursuitHold(
 }
 
 // kiteReclickWalk is the re-click ladder of the kite retreat (issue
-// #60, the rounds two and three): the single retreat click of the
-// first round proved fragile three ways, and the owner's dumps show
-// the character standing through the whole bow reload while the mob
-// closed. The third-round acceptance dump named the dominant
-// mechanism exactly: the server answers SOME destination cells with
-// an instant bare ActionFailed (the MoveToLocation handler refusal
-// family - the isCompletelyBlocked destination check among others)
-// while the rotated fan lane a few cells aside walks fine, and the
-// bot's own geodata reads the refused cells open, so only the ONLINE
+// #60, the rounds two and three; the leg-long rework of round 17):
+// the single retreat click of the first round proved fragile three
+// ways, and the owner's dumps show the character standing through
+// the whole bow reload while the mob closed. The third-round
+// acceptance dump named the dominant mechanism exactly: the server
+// answers SOME destination cells with an instant bare ActionFailed
+// (the MoveToLocation handler refusal family - the
+// isCompletelyBlocked destination check among others) while the
+// rotated fan lane a few cells aside walks fine, and the bot's own
+// geodata reads the refused cells open, so only the ONLINE
 // evidence settles it. The ladder answers with the manual behavior
 // the owner demonstrated ("clicking behind the character runs 2
 // seconds no problem"), faster now per the third-round ask:
 //
-//   - while the movement window runs and the character stands on
-//     the issue cell, the click goes out again every
-//     kiteReclickPeriod (250ms - the tick cadence, the owner ask:
-//     "it should spam clicks much faster"); a re-click inside the
-//     broadcast gate just re-aims the same endpoint server-side.
+//   - while the movement window runs and the character stands
+//     (wherever the leg finds it - the issue cell, or mid-route
+//     after a silent drop or a short server path), the click goes
+//     out again every kiteReclickPeriod (250ms - the tick cadence,
+//     the owner ask: "it should spam clicks much faster"); a
+//     re-click inside the broadcast gate just re-aims the same
+//     endpoint server-side.
+//   - the RACE legs of round 17 run many times the ordinary
+//     step's walk time, so the ladder now lives for the WHOLE LEG:
+//     the walk adopting refreshes the episode budget (a mid-leg
+//     drop later gets its own re-clicks), a stand within
+//     kiteArrivalEpsilon of the endpoint completes the leg, and a
+//     stand anywhere short of it re-bases the ladder onto the
+//     current cell and re-clicks the endpoint - the recovery the
+//     window-sized ladder never had (a silent drop mid-leg used to
+//     stand the character through the rest of the window while
+//     the chaser collected the difference).
 //   - the moment the refusal evidence lands (kiteClickRefused - the
 //     ActionFailed answer the server gave the last click), the dead
 //     endpoint rotates onto the next fan candidate AT ONCE: the
@@ -1470,16 +1685,16 @@ func (l *Loop) kitePursuitHold(
 //     changes nothing).
 //   - the silent probe stays as the fallback for the H-006 silent
 //     drop (no ActionFailed at all): a walk unanswered past
-//     kiteProbeElapsed with the character still on the issue cell
-//     names the endpoint dead and rotates the same way.
+//     kiteProbeElapsed with the character still on the episode's
+//     issue cell names the endpoint dead and rotates the same way.
 //   - an encircled train or a lane battery with nothing left stands
-//     the ladder down (the cornered hold owns the answer), the walk
-//     starting clears it (the SelfWalking oracle), the character
-//     leaving the issue cell clears it, the window ending clears it
-//     (the forced attack re-request owns the tick).
+//     the ladder down (the cornered hold owns the answer), the
+//     window ending stands it down (the pursuit hold or the forced
+//     attack re-request owns the tick).
 //
 // Reports whether this tick spent a re-click so the caller yields
 // the tick to the walk.
+
 func (l *Loop) kiteReclickWalk(now time.Time) bool {
     if l.kiteWalkUntil.IsZero() {
         return false
@@ -1487,8 +1702,8 @@ func (l *Loop) kiteReclickWalk(now time.Time) bool {
     if now.After(l.kiteWalkUntil) {
         // The window ended: the pursuit hold asks first whether the
         // fight's distance still collapses under the re-shot floor
-        // (the 400 unit step outlasts the window, so this is the
-        // moment the walk really ends) - the continuation re-arms
+        // (the race leg outlasts its per-unit window, so this is
+        // the moment the walk really ends) - the continuation re-arms
         // the retreat, the ordinary stand-down hands the tick to
         // the forced attack re-request (the affordable shot).
         if selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition(); selfOK &&
@@ -1504,10 +1719,12 @@ func (l *Loop) kiteReclickWalk(now time.Time) bool {
         return false
     }
     if l.tracker.SelfWalking() {
-        // The walk runs: the click landed, the manual-clicking
-        // replication stops. The walk owns the movement until the
-        // window ends server-side interrupts it.
-        l.kiteWalkClear()
+        // The walk runs: the click landed. The episode budget
+        // refreshes (a mid-leg drop later gets its own re-clicks),
+        // the leg state stays armed for the whole window - the
+        // round-17 race legs need the ladder alive past the first
+        // adoption.
+        l.kiteReclicks = 0
 
         return false
     }
@@ -1515,14 +1732,28 @@ func (l *Loop) kiteReclickWalk(now time.Time) bool {
     if !selfOK {
         return false
     }
-    if selfX != l.kiteWalkBaseX || selfY != l.kiteWalkBaseY {
-        // The character left the issue cell: the click started
-        // something (the ground truth moved before the broadcast -
-        // or the walk already ran and finished short). The ladder
-        // stands down, the next shot cycle re-arms it fresh.
+    if math.Hypot(
+        float64(selfX-l.kiteWalkX),
+        float64(selfY-l.kiteWalkY)) <= kiteArrivalEpsilon {
+        // The leg completed: the character stands on (or within a
+        // cell's throw of) the endpoint. The ladder stands down,
+        // the window's remainder belongs to the arrival shot's own
+        // cycle (the shot-paced rhythm re-arms the next leg).
         l.kiteWalkClear()
 
         return false
+    }
+    if selfX != l.kiteWalkBaseX || selfY != l.kiteWalkBaseY {
+        // A fresh standing episode: the character left the last
+        // issue cell (a mid-leg silent drop, a short server path)
+        // and stands short of the endpoint - the ladder re-bases
+        // onto the current cell and keeps pushing the SAME endpoint
+        // (the rotation machinery owns the dead cells), the episode
+        // budget and the probe window re-arm whole.
+        l.kiteWalkBaseX, l.kiteWalkBaseY = selfX, selfY
+        l.kiteReclicks = 0
+        l.kiteWalkIssuedAt = now
+        l.kiteWalkDead = false
     }
     if l.kiteReclicks >= kiteReclickLimit {
         return false
@@ -1562,6 +1793,7 @@ func (l *Loop) kiteReclickWalk(now time.Time) bool {
 // every lane refused or blocked) stands the whole ladder down - the
 // cornered hold owns the answer, the next shot cycle re-arms the
 // retreat fresh.
+
 func (l *Loop) kiteReclickVerdict(
     now time.Time, selfX, selfY, selfZ int32, refused bool,
 ) bool {
@@ -1628,6 +1860,7 @@ func (l *Loop) kiteReclickVerdict(
 // already proved walkable never pays the probe tax on the same dead
 // straight cell again. A memory of another target (or an empty one)
 // answers nil - the plain resolution.
+
 func (l *Loop) kiteDeadCellsFor() [][2]int32 {
     if l.kiteDeadFor != l.target || l.kiteWalkDeadCount == 0 {
         return nil
@@ -1643,6 +1876,7 @@ func (l *Loop) kiteDeadCellsFor() [][2]int32 {
 // kiteIssueWalk. The dead-cell memory STAYS: it belongs to the
 // target, not the walk, and the next cycle of the same fight skips
 // the cells the server already refused.
+
 func (l *Loop) kiteWalkClear() {
     l.kiteWalkUntil = time.Time{}
     l.kiteWalkIssuedAt = time.Time{}
@@ -1660,428 +1894,7 @@ func (l *Loop) kiteWalkClear() {
 // answers can never disagree about the train's shape. The output
 // caps at the capacity of out (the kiteBearings scratch): a wider
 // train is the flee machinery's case, not a kite shape.
-func (l *Loop) kiteChaserBearings(
-    selfX, selfY, selfZ int32, out []float64,
-) []float64 {
-    // The fight target weighs first: it chases the retreat step
-    // wherever it lands, its away vector always counts.
-    if tx, ty, _, tok := l.tracker.ObjectPosition(l.target); tok {
-        dx := float64(selfX) - float64(tx)
-        dy := float64(selfY) - float64(ty)
-        if math.Hypot(dx, dy) >= 1 {
-            out = append(out, math.Atan2(
-                float64(ty-selfY), float64(tx-selfX)))
-        }
-    }
-    for _, chaser := range l.tracker.SelfAttackers() {
-        if chaser.ObjectID == l.target {
-            // The target already weighed in through its own vector.
-            continue
-        }
-        if chaser.Z != 0 &&
-            math.Abs(float64(chaser.Z-selfZ)) > deckReachableZ {
-            // Another deck: its swings cannot land, its lane crosses
-            // the geodata wall.
-            continue
-        }
-        dx := float64(selfX) - float64(chaser.X)
-        dy := float64(selfY) - float64(chaser.Y)
-        dist := math.Hypot(dx, dy)
-        if dist >= kiteTrainScanRange || dist < 1 {
-            // Too far to reach the character inside a step window -
-            // the flee machinery owns a chase that distant - or
-            // standing on the character itself (no away direction).
-            continue
-        }
-        out = append(out, math.Atan2(
-            float64(chaser.Y-selfY), float64(chaser.X-selfX)))
-        if len(out) == cap(out) {
-            // The scratch is full: the gap geometry of a wider
-            // train reads its nearest members alone (see
-            // kiteMaxTrainMembers).
-            break
-        }
-    }
 
-    return out
-}
-
-// kiteGapDirection resolves the escape ray of an encircled train:
-// the bisector of the WIDEST angular gap between the chaser
-// bearings - the direction that stays farthest from every flanker
-// at once. The live fleet round of issue #70 measured what the
-// standing encircled answer costs on the mass cells (a 26 second
-// stand with the train growing to three chasers, the potions and
-// the emergency logout of the wounded slots): the archer that keeps
-// stepping through the widest gap breaks the pile-up before it
-// forms, the one that stands invites it. The perpendicular break of
-// a two-mob line is the classic case - the bisector of the two 180
-// degree gaps opens the distance to BOTH chasers at once. Reports
-// the unit direction and whether the bearings leave a gap at all (a
-// single bearing or none pins no escape geometry).
-func kiteGapDirection(bearings []float64) (float64, float64, bool) {
-    if len(bearings) < 2 {
-        return 0, 0, false
-    }
-    sorted := make([]float64, len(bearings))
-    copy(sorted, bearings)
-    sort.Float64s(sorted)
-    // The widest gap between consecutive bearings, the wraparound
-    // included: the first widest gap wins the ties (a deterministic
-    // answer for the symmetric trains - two opposite chasers name
-    // the same perpendicular ray every call).
-    bestSpan := 0.0
-    bestAt := sorted[0]
-    for i := 1; i < len(sorted); i++ {
-        if span := sorted[i] - sorted[i-1]; span > bestSpan {
-            bestSpan, bestAt = span, sorted[i-1]
-        }
-    }
-    if span := sorted[0] + 2*math.Pi - sorted[len(sorted)-1]; span > bestSpan {
-        bestSpan, bestAt = span, sorted[len(sorted)-1]
-    }
-    bisector := bestAt + bestSpan/2
-
-    return math.Cos(bisector), math.Sin(bisector), true
-}
-
-// kiteTrainDirection resolves the retreat DIRECTION of one kite
-// step: the centroid away-vector of the chaser train - the fight
-// target's own away unit vector plus every SelfAttackers member
-// within the scan range and on a reachable deck. Each chaser weighs
-// one unit - the centroid semantics the issue names; the nearest
-// mob drags the direction hardest only through the trigger radius it
-// already crossed (the armed threat of kiteThreat). A train whose
-// away vectors cancel under the encirclement share names no
-// centroid - the WIDEST-GAP bisector takes the step over (the live
-// fleet round of issue #70 measured the standing encircled answer
-// as a death trap on the mass cells: the train only grows while the
-// archer stands - the gap ray keeps the movement contract of the
-// kite, the lane battery still owns the terrain, and the hold
-// ground answer survives for the gap that is walled or dead). The
-// positions are the raw last-known packet ones (the projected scan
-// only serves the nearest chaser); the trigger margin absorbs the
-// broadcast lag. Reports the unit direction (the centroid ray of a
-// normal train, the gap bisector of an encircled one, the zero of
-// the degenerate no-chaser scene) and whether the train encircles
-// the character.
-func (l *Loop) kiteTrainDirection(
-    selfX, selfY, selfZ int32,
-) (dirX, dirY float64, encircled bool) {
-    bearings := l.kiteChaserBearings(
-        selfX, selfY, selfZ, l.kiteBearings[:0])
-    var sumX, sumY float64
-    for _, bearing := range bearings {
-        sumX += -math.Cos(bearing)
-        sumY += -math.Sin(bearing)
-    }
-    count := float64(len(bearings))
-    sumLen := math.Hypot(sumX, sumY)
-    if sumLen < kiteEncircleShare*count || sumLen < 1 {
-        // The encircled sum (or the degenerate zero): the centroid
-        // names no direction - the widest-gap bisector serves the
-        // step when the bearings leave one.
-        if gapX, gapY, gap := kiteGapDirection(bearings); gap {
-            return gapX, gapY, true
-        }
-
-        return 0, 0, true
-    }
-
-    return sumX / sumLen, sumY / sumLen, false
-}
-
-// kiteRetreatLaneSkipping resolves the retreat lane of one kite step:
-// the straight away-ray first, then the fan candidates at kiteFanStep
-// increments each side of it - the open backward lanes over the
-// blocked corridors, the hemisphere edge as the last resort - minus
-// the candidates whose RESOLVED endpoints sit
-// in the dead set: the re-click ladder rotates a dead endpoint onto
-// the next fan candidate (the destination-cell refusal answer of
-// issue #60 - a cell the server refuses never starts a walk, so
-// clicking it again changes nothing) and the rotation needs the
-// lane battery to answer "which lane comes after these". An empty
-// dead set keeps every candidate (the plain resolution of the
-// first round). Every candidate runs the full lane gate battery
-// (the camp deflection, the leash, the away half-plane, the wall
-// and the water). Reports the endpoint and whether a walkable lane
-// exists.
-func (l *Loop) kiteRetreatLaneSkipping(
-    selfX, selfY, selfZ int32, prefX, prefY, awayX, awayY float64,
-    dead [][2]int32,
-) (int32, int32, bool) {
-    // The candidate rays of the away hemisphere around the
-    // PREFERRED direction (the straight away-ray of the opening
-    // retreat, the curved bearing of the circling ones): the
-    // preferred ray first (the lane of record), then the fan
-    // candidates widening symmetrically around it - the 45 degree
-    // lanes before the 90 degree ones. The half-plane reference
-    // stays the RAW away vector whatever the preference leans to.
-    var rays [1 + 2*kiteFanSteps][2]float64
-    rays[0] = [2]float64{prefX, prefY}
-    count := 1
-    for step := 1; step <= kiteFanSteps; step++ {
-        angle := kiteFanStep * float64(step)
-        for _, sign := range [2]float64{1, -1} {
-            rays[count][0], rays[count][1] =
-                rotatePlanar(prefX, prefY, sign*angle)
-            count++
-        }
-    }
-    for _, ray := range rays[:count] {
-        endX := selfX + int32(math.Round(ray[0]*l.kite.Step))
-        endY := selfY + int32(math.Round(ray[1]*l.kite.Step))
-        laneX, laneY, ok := l.kiteLaneResolve(
-            selfX, selfY, selfZ, endX, endY, awayX, awayY)
-        if !ok {
-            continue
-        }
-        refused := false
-        for _, cell := range dead {
-            if laneX == cell[0] && laneY == cell[1] {
-                refused = true
-
-                break
-            }
-        }
-        if refused {
-            // A cell the rotation already named dead (the server
-            // refused it or it stayed silent through the probe) -
-            // the next candidate serves the retreat instead.
-            continue
-        }
-
-        return laneX, laneY, true
-    }
-
-    return 0, 0, false
-}
-
-// kiteTerrainLane resolves the TERRAIN contract of one retreat
-// candidate: the camp deflection first (the tangent endpoint
-// replaces the straight one when the lane would wake a neighborhood
-// camp - the deflected endpoint runs the remaining gates like any
-// candidate), then the leash, the degenerate length, the geodata
-// wall and the water. The half-plane guard of the ordinary battery
-// is NOT here: the breakout tier replaces it with its own flank
-// clearance (see kiteBreakoutResolve). The terrain gates need the
-// navigator - without one (the no-geodata runtime, the plain unit
-// scenes) the leash alone fences the step.
-func (l *Loop) kiteTerrainLane(
-    selfX, selfY, selfZ, endX, endY int32,
-) (int32, int32, bool) {
-    if defX, defY, dodged := l.kiteDeflectFromCamps(
-        selfX, selfY, selfZ, endX, endY); dodged {
-        endX, endY = defX, defY
-    }
-    if l.target != 0 && l.kiteFightFor == l.target {
-        // The location-general leash (the round-14 redesign): the
-        // endpoint must stay inside the fight's own roam radius
-        // around the fight anchor - the live-observed ground the
-        // fight started on (see kiteResolveAndClick), not the
-        // generated hunting-square registry. A fight that starts
-        // anywhere on any map keeps its retreats on its own ground;
-        // the zone tables never gate the kite again.
-        if math.Hypot(float64(endX-l.kiteFightX),
-            float64(endY-l.kiteFightY)) > kiteRoamRadius {
-            return 0, 0, false
-        }
-    }
-    laneX, laneY := float64(endX-selfX), float64(endY-selfY)
-    if math.Hypot(laneX, laneY) < 1 {
-        return 0, 0, false
-    }
-    if l.navigator == nil {
-        // No geodata runtime: the leash alone fences the step (the
-        // contract of the first kite round).
-        return endX, endY, true
-    }
-    from := pathfind.Vec3{
-        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ)}
-    to := pathfind.Vec3{X: float64(endX), Y: float64(endY),
-        Z: float64(selfZ)}
-    if sight, err := l.navigator.LineOfSight(from, to); err != nil ||
-        !sight {
-        // A wall (or an unreadable geodata) behind: the lane is a
-        // corridor the walk cannot take.
-        return 0, 0, false
-    }
-    if l.navigator.OverWater(float64(endX), float64(endY),
-        int16(selfZ)) {
-        // Water behind: swimming trades the bow for the paddle.
-        return 0, 0, false
-    }
-
-    return endX, endY, true
-}
-
-// kiteLaneResolve resolves one retreat lane candidate to its final
-// endpoint and reports whether the lane carries a step: the terrain
-// contract of kiteTerrainLane plus the away half-plane guard. The
-// half-plane gate guards the deflections hardest: a lane may bend
-// sideways of the away-ray (the camp side-step exits the trigger
-// circle perpendicular), but never fold back toward the chasing
-// train.
-func (l *Loop) kiteLaneResolve(
-    selfX, selfY, selfZ, endX, endY int32,
-    dirX, dirY float64,
-) (int32, int32, bool) {
-    laneX, laneY, ok := l.kiteTerrainLane(
-        selfX, selfY, selfZ, endX, endY)
-    if !ok {
-        return 0, 0, false
-    }
-    laneLen := math.Hypot(
-        float64(laneX-selfX), float64(laneY-selfY))
-    if (float64(laneX-selfX)/laneLen)*dirX+
-        (float64(laneY-selfY)/laneLen)*dirY < kiteHalfPlaneSlack {
-        // The lane (a deep camp deflection, most likely) folded back
-        // toward the train: stepping it would walk INTO the melee the
-        // kite exists to avoid.
-        return 0, 0, false
-    }
-
-    return laneX, laneY, true
-}
-
-// kiteBreakoutResolve resolves the CORNERED-POCKET breakout lane of
-// the kite (issue #70, the walled-pocket round): when the hemisphere
-// sweep found no walkable lane - the raw away-ray of a normal train,
-// the gap ray of an encircled one - the escape may still live in the
-// cone that sweep never covered, on the FAR side of the chaser
-// line. The live fleet round measured the walled pocket of the hex
-// cells eating whole windows: the archer stood through hold after
-// hold (an 8.5 s median shot-to-retreat lag over four retreats)
-// while the chasers shifted, because the only open lanes threaded
-// between them - a step the away half-plane guard forbids by
-// design. The breakout admits those lanes under a STRICTER
-// contract than the guard it replaces: the flank clearance. Every
-// candidate keeps more than ~36 degrees off EVERY chaser bearing
-// (it weaves between the train's seams, it never runs onto a mob's
-// own ray), the full terrain battery still applies (the camp
-// deflection, the leash, the geodata wall, the water), the resolved
-// lane re-clears the flank bound after the deflection may have bent
-// it, and the dead cells stay skipped like any other lane. The
-// candidate ladder fans the ANTI-gap side - the three rays the
-// failed hemisphere never swept (its 93 degree reach leaves the
-// opposite cone uncovered) - ordered by the escape preference: the
-// 135 degree weaves off the gap ray first, the straight anti-gap
-// ray last (it points into the train's middle, the clearance gate
-// usually refuses it). A train of one no longer dies on the missing
-// seam: the LONE-CHASER ladder (see the inline block) probes the
-// wall-face wedges past the hemisphere edge instead - the escape
-// past the chaser's flanks. No bearing at all (a tracker gap)
-// names no geometry: the cornered hold owns the cycle. Reports the
-// endpoint, the refusal reason (empty on success) and whether a
-// breakout lane exists.
-//
-// Bounds (the round-11 QA audit): the ladders are DISCRETE ray
-// sets, not cone sweeps - the anti-gap ladder leaves the wedges
-// between the hemisphere edge (~93 degrees off the away-ray) and
-// its 135 degree weaves unswept, and the lone-chaser ladder steps
-// the same band at 105/120/135 (a pocket whose only lane sits at
-// ~110 degrees still slips between the rungs - the sweep density
-// is a live-tuning knob, not a correctness claim). The flank
-// clearance is ANGULAR-only and distance-blind: a chaser 700 units
-// off on a candidate's bearing vetoes it exactly like one at melee
-// (kiteBreakoutFlankCos knows no radius), and a deflection that
-// bends the resolved lane inside the flank bound reads as "walled"
-// in the refusal reason even when the pre-deflection ray cleared.
-// The live rounds of the walled-pocket session measured the
-// observed pockets as LONE-CHASER terrain corners: the anti-gap
-// ladder (two bearings minimum) never ran there, and the
-// lone-chaser ladder is the round-12 answer to exactly that
-// finding - its live verdict owns the next fleet round.
-func (l *Loop) kiteBreakoutResolve(
-    selfX, selfY, selfZ int32, dead [][2]int32,
-) (int32, int32, string, bool) {
-    bearings := l.kiteChaserBearings(
-        selfX, selfY, selfZ, l.kiteBearings[:0])
-    gapX, gapY, gap := kiteGapDirection(bearings)
-    if !gap {
-        if len(bearings) != 1 {
-            // No chaser bearing at all (the tracker gap inside the
-            // broadcast window): no cone exists to probe - the
-            // cornered hold owns the cycle.
-            return 0, 0, "no gap geometry (the tracker owns no " +
-                "bearing)", false
-        }
-        // THE LONE-CHASER TERRAIN CORNER (the round-11/12 live
-        // diagnostics named every observed pocket this): the
-        // hemisphere sweep died on the pocket walls, and no seam
-        // cone exists - a lone chaser has no seams to thread. The
-        // escape lives PAST the hemisphere edge, in the wall-face
-        // wedges the fan never sweeps (its 90 degree reach stops
-        // where these candidates start): the away ray rotated 105,
-        // 120 and 135 degrees on each side, the least fold first.
-        // The chaser entered through the pocket mouth, so the
-        // candidates run past its flanks - the same flank
-        // clearance the anti-gap ladder holds (every resolved lane
-        // keeps more than ~36 degrees off the chaser's own
-        // bearing), the same terrain battery (the deflection, the
-        // leash, the geodata wall, the water), the same dead-cell
-        // skip. The half-plane guard the normal fan answers to
-        // stays bypassed exactly as the anti-gap ladder bypasses
-        // it: the fold toward the chaser's flank IS the escape, the
-        // clearance keeps it off the melee; the pursuit ledger's
-        // stall gate owns the race the slower fold runs.
-        awayX := -math.Cos(bearings[0])
-        awayY := -math.Sin(bearings[0])
-        crowded, walled := 0, 0
-        for _, off := range [6]float64{
-            7 * math.Pi / 12, -7 * math.Pi / 12, // the 105s
-            2 * math.Pi / 3, -2 * math.Pi / 3, // the 120s
-            3 * math.Pi / 4, -3 * math.Pi / 4, // the 135s
-        } {
-            rayX, rayY := rotatePlanar(awayX, awayY, off)
-            laneX, laneY, status := l.kiteBreakoutCandidate(
-                selfX, selfY, selfZ, rayX, rayY, dead, bearings)
-            switch status {
-            case kiteBreakoutOpen:
-                return laneX, laneY, "", true
-            case kiteBreakoutCrowded:
-                crowded++
-            default:
-                walled++
-            }
-        }
-        reason := fmt.Sprintf("the lone-chaser cone refused (%d of "+
-            "%d rays crowded by the flanks, %d walled or dead)",
-            crowded, crowded+walled, walled)
-
-        return 0, 0, reason, false
-    }
-    crowded, walled := 0, 0
-    for _, off := range [3]float64{
-        3 * math.Pi / 4, -3 * math.Pi / 4, math.Pi,
-    } {
-        rayX, rayY := rotatePlanar(gapX, gapY, off)
-        laneX, laneY, status := l.kiteBreakoutCandidate(
-            selfX, selfY, selfZ, rayX, rayY, dead, bearings)
-        switch status {
-        case kiteBreakoutOpen:
-            return laneX, laneY, "", true
-        case kiteBreakoutCrowded:
-            crowded++
-        default:
-            walled++
-        }
-    }
-    // Every candidate of the anti-gap ladder refused: the reason
-    // names the split so the next live round reads the pocket's
-    // shape straight from the hold diagnostic (the fleet round of
-    // the breakout measured fourteen silent refusals - the event
-    // feed must carry the why, not just the hold).
-    reason := fmt.Sprintf("the cone refused (%d of %d rays crowded "+
-        "by the flanks, %d walled or dead)",
-        crowded, crowded+walled, walled)
-
-    return 0, 0, reason, false
-}
-
-// The candidate verdicts of the breakout ladders: the lane stands
-// open, a chaser bearing crowds it, or the terrain battery (or the
-// dead-cell memory) walled it.
 const (
     kiteBreakoutOpen = iota
     kiteBreakoutCrowded
@@ -2097,269 +1910,7 @@ const (
 // the dead-cell memory. The half-plane guard of the normal fan is
 // deliberately absent: the breakout exists to admit lanes the
 // hemisphere sweep forbids by design.
-func (l *Loop) kiteBreakoutCandidate(
-    selfX, selfY, selfZ int32,
-    rayX, rayY float64,
-    dead [][2]int32, bearings []float64,
-) (int32, int32, int) {
-    if !kiteRayClearsTheFlanks(rayX, rayY, bearings) {
-        // The candidate runs onto a chaser's own ray: the melee
-        // the kite exists to avoid, refused before the terrain
-        // battery pays a raycast on it.
-        return 0, 0, kiteBreakoutCrowded
-    }
-    endX := selfX + int32(math.Round(rayX*l.kite.Step))
-    endY := selfY + int32(math.Round(rayY*l.kite.Step))
-    laneX, laneY, ok := l.kiteTerrainLane(
-        selfX, selfY, selfZ, endX, endY)
-    if ok {
-        laneLen := math.Hypot(
-            float64(laneX-selfX), float64(laneY-selfY))
-        if laneLen < 1 || !kiteRayClearsTheFlanks(
-            float64(laneX-selfX)/laneLen,
-            float64(laneY-selfY)/laneLen, bearings) {
-            // The camp deflection bent the resolved lane onto a
-            // chaser's ray: the endpoint the walk would take
-            // fails the same clearance the candidate passed.
-            ok = false
-        }
-    }
-    if !ok {
-        return 0, 0, kiteBreakoutWalled
-    }
-    for _, cell := range dead {
-        if laneX == cell[0] && laneY == cell[1] {
-            // A cell the rotation already named dead (the server
-            // refused it or it stayed silent through the probe) -
-            // the next candidate serves the breakout instead.
-            return 0, 0, kiteBreakoutWalled
-        }
-    }
 
-    return laneX, laneY, kiteBreakoutOpen
-}
-
-// kiteRayClearsTheFlanks answers whether the planar unit ray keeps
-// the breakout flank clearance off every chaser bearing: the dot
-// product of the ray with each bearing's unit vector stays under
-// kiteBreakoutFlankCos (the angular distance stays above ~36
-// degrees). The pre-filter runs on the raw candidate before the
-// terrain battery, the post-check on the deflected lane the walk
-// would take - both read the same bearings scratch.
-func kiteRayClearsTheFlanks(
-    rayX, rayY float64, bearings []float64,
-) bool {
-    return kiteRayClearsTheFlanksAt(
-        rayX, rayY, bearings, kiteBreakoutFlankCos)
-}
-
-// kiteRayClearsTheFlanksAt is the parameterized flank clearance of
-// kiteRayClearsTheFlanks: the cosine bound rides the caller (the
-// breakout cone holds the 36 degree bound, the shove tier accepts
-// the tighter 25 degree seams of the sealed pocket).
-func kiteRayClearsTheFlanksAt(
-    rayX, rayY float64, bearings []float64, flankCos float64,
-) bool {
-    for _, bearing := range bearings {
-        if rayX*math.Cos(bearing)+rayY*math.Sin(bearing) >=
-            flankCos {
-            return false
-        }
-    }
-
-    return true
-}
-
-// kiteShoveResolve is the SHOVE tier of the cornered pocket (issue
-// #70, the round-14 always-run redesign): the last escape before
-// the hold. The breakout cone probes the folds AROUND the widest
-// gap (the gap ray rotated 135 degrees and 180) under the strict 36
-// degree flank bound; the shove probes the gap ray ITSELF (and its
-// +-15/+-30 degree edges) under the tighter 25 degree bound and a
-// shorter step - the seam the cone refuses by design is exactly
-// the lane a sealed pocket has left, and a burst through it beats
-// the standing melee trade the hold answers with.
-//
-// The round-14 live fleet measured the residual case the
-// pass-through tier closes: a 3+ mob pack at melee range leaves NO
-// ray inside the 25 degree bound (the surround holds ate whole
-// windows at 29-80 units, the archer trading arrows point-blank).
-// When every clean seam refuses by CROWDING, the LEAST-CROWDED
-// terrain-passable ray still goes - a step through a mob's flank
-// takes a glance blow on the way out, the standing hold takes the
-// whole pack's swings for as long as the fight stands. The terrain
-// battery (the camp deflection, the location-general leash, the
-// geodata wall, the water) and the dead-cell memory gate BOTH
-// tiers - a walled or server-refused endpoint never carries a
-// walk, and only a pocket walled on every side keeps the hold.
-func (l *Loop) kiteShoveResolve(
-    selfX, selfY, selfZ int32, dead [][2]int32,
-) (int32, int32, bool) {
-    bearings := l.kiteChaserBearings(
-        selfX, selfY, selfZ, l.kiteBearings[:0])
-    gapX, gapY, gap := kiteGapDirection(bearings)
-    if !gap {
-        // A lone chaser or a tracker gap: no seam exists to thread
-        // (the lone-chaser cone owns the wall-face wedges past the
-        // hemisphere edge) - the hold owns the answer.
-        return 0, 0, false
-    }
-    candidates := [5]float64{
-        0, math.Pi / 12, -math.Pi / 12,
-        math.Pi / 6, -math.Pi / 6,
-    }
-    // Tier one: the clean seam (every chaser bearing kept past the
-    // 25 degree flank bound). Tier two books the least-crowded
-    // terrain-passable ray along the way - the pass-through answer
-    // of the 3+ mob pack (see the function comment).
-    worstFlank := 2.0
-    worstX, worstY := int32(0), int32(0)
-    worstOK := false
-    for _, off := range candidates {
-        rayX, rayY := rotatePlanar(gapX, gapY, off)
-        endX := selfX + int32(math.Round(rayX*kiteShoveStep))
-        endY := selfY + int32(math.Round(rayY*kiteShoveStep))
-        laneX, laneY, ok := l.kiteTerrainLane(
-            selfX, selfY, selfZ, endX, endY)
-        if !ok || deadLane(laneX, laneY, dead) {
-            continue
-        }
-        // The post-deflection flank read (the QA audit of the
-        // round caught the gap): the terrain battery may deflect
-        // the endpoint around a camp, and the deflected lane - not
-        // the raw candidate ray - is the walk the character takes.
-        // The clearance verdicts (the clean-seam test and the
-        // least-crowded book) read the RESOLVED lane's direction,
-        // the same double read the breakout tier runs.
-        laneLen := math.Hypot(float64(laneX-selfX),
-            float64(laneY-selfY))
-        if laneLen < 1 {
-            continue
-        }
-        laneRX, laneRY := float64(laneX-selfX)/laneLen,
-            float64(laneY-selfY)/laneLen
-        worst := -2.0
-        for _, bearing := range bearings {
-            if c := laneRX*math.Cos(bearing) +
-                laneRY*math.Sin(bearing); c > worst {
-                worst = c
-            }
-        }
-        if worst < kiteShoveFlankCos {
-            // The clean seam: the first candidate whose RESOLVED
-            // lane clears every flank serves the shove.
-            return laneX, laneY, true
-        }
-        if worst < worstFlank {
-            // The least-crowded terrain-passable lane so far (the
-            // pass-through tier's book).
-            worstFlank, worstX, worstY, worstOK =
-                worst, laneX, laneY, true
-        }
-    }
-    if worstOK {
-        // Tier two: the pass-through - no clean seam exists, the
-        // thinnest rank of the pack carries the step anyway.
-        return worstX, worstY, true
-    }
-
-    return 0, 0, false
-}
-
-// deadLane reports whether the lane endpoint sits in the dead-cell
-// memory (the server refused it or it stayed silent through the
-// probe).
-func deadLane(laneX, laneY int32, dead [][2]int32) bool {
-    for _, cell := range dead {
-        if laneX == cell[0] && laneY == cell[1] {
-            return true
-        }
-    }
-
-    return false
-}
-
-// kiteDeflectFromCamps bends one retreat candidate around the idle
-// aggressive camps its line would wake: the first threat circle
-// (the effective aggro range plus the steering clearance) the
-// straight self-to-end segment enters deflects the endpoint onto the
-// tangent ray of that circle, on the side the segment leaned to -
-// the same geometry the transit walk steering uses
-// (steerClearOfAggro), minus its destination exemption: a retreat
-// has no destination-mob contract, a camp standing anywhere on the
-// lane (its endpoint included) must not be met. The chasers never
-// deflect the lane: they already hold the character as their target
-// (the scan skips them by the held target). Reports the deflected
-// endpoint and whether a deflection happened.
-func (l *Loop) kiteDeflectFromCamps(
-    selfX, selfY, selfZ, endX, endY int32,
-) (int32, int32, bool) {
-    segmentX := float64(endX - selfX)
-    segmentY := float64(endY - selfY)
-    segmentLen := math.Hypot(segmentX, segmentY)
-    if segmentLen < avoidMinSegment {
-        return endX, endY, false
-    }
-    l.avoidScratch = l.tracker.AppendAggroThreats(
-        l.avoidScratch[:0], l.target, avoidScanRange)
-    if len(l.avoidScratch) == 0 {
-        return endX, endY, false
-    }
-    // The first camp the straight lane would wake: the smallest
-    // along-lane parameter wins (the earliest wake), the deepest
-    // penetration breaks the tie - the same selection rule as the
-    // transit steering.
-    first := -1
-    firstT := 1.0
-    firstPen := 0.0
-    for i := range l.avoidScratch {
-        threat := &l.avoidScratch[i]
-        relX := threat.X - float64(selfX)
-        relY := threat.Y - float64(selfY)
-        t := (relX*segmentX + relY*segmentY) /
-            (segmentLen * segmentLen)
-        if t < 0 {
-            t = 0
-        } else if t > 1 {
-            t = 1
-        }
-        cx := float64(selfX) + segmentX*t
-        cy := float64(selfY) + segmentY*t
-        // The planar clearance mirrors the server's own 3D trigger:
-        // the retreat lane runs on the character's deck, a camp on
-        // another deck never blocks it.
-        dz := float64(threat.Z) - float64(selfZ)
-        clearance := math.Hypot(
-            math.Hypot(threat.X-cx, threat.Y-cy), dz)
-        needed := threat.AggroRange + avoidClearance
-        if pen := needed - clearance; pen > 0 && (t < firstT ||
-            (t == firstT && pen > firstPen)) {
-            first, firstT, firstPen = i, t, pen
-        }
-    }
-    if first < 0 {
-        return endX, endY, false
-    }
-    threat := &l.avoidScratch[first]
-    defX, defY := tangentClearDirection(
-        float64(selfX), float64(selfY), threat.X, threat.Y,
-        segmentX/segmentLen, segmentY/segmentLen,
-        threat.AggroRange+avoidClearance)
-
-    return selfX + int32(math.Round(defX*l.kite.Step)),
-        selfY + int32(math.Round(defY*l.kite.Step)), true
-}
-
-// kiteHoldGround arms the cornered hold of the kite: the archer
-// stops retreating and keeps shooting the bow at melee range. The
-// hold paces its own re-probe (the kite period) so a failed lane
-// never stutters the tick loop, and logs its reason once per hold
-// episode - a standing fight that names itself stays diagnosable in
-// the event feed. The surrounded flag picks the diagnostic wording
-// (the encircled train whose gap ray found no lane against the
-// walled corner), the breakout string names why the pocket breakout
-// refused the cone (the crowd, the terrain, the missing gap
-// geometry - empty when the breakout never applied).
 func (l *Loop) kiteHoldGround(now time.Time, surrounded bool,
     breakout string,
 ) {
@@ -2387,6 +1938,7 @@ func (l *Loop) kiteHoldGround(now time.Time, surrounded bool,
 
 // rotatePlanar rotates a planar unit direction by the given angle
 // (counterclockwise, the mathematical sign convention).
+
 func rotatePlanar(x, y, angle float64) (float64, float64) {
     cos, sin := math.Cos(angle), math.Sin(angle)
 

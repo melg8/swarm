@@ -5,18 +5,20 @@
 package hunt
 
 // The re-click ladder of the kite walk (issue #60, the rounds two
-// and three): the acceptance dump of the third round named the
-// dominant dead-click mechanism - the server answers specific kite
-// destination cells with an instant bare ActionFailed while the
-// rotated fan lanes walk fine. The tests pin the ladder: the paced
-// re-issue, the refusal-evidence rotation (at once, no probe wait),
-// the silent probe rotation, the refused-cell memory (a refused
-// cell is never re-clicked), the click bound, the bow-speed window
-// (the C1 disable formula on the live pAtkSpd) and the stand-down
-// paths (the walk running, the character moved, the window
+// and three, reworked leg-long in round 17): the acceptance dump of
+// the third round named the dominant dead-click mechanism - the
+// server answers specific kite destination cells with an instant
+// bare ActionFailed while the rotated fan lanes walk fine. The tests
+// pin the ladder: the paced re-issue, the refusal-evidence rotation
+// (at once, no probe wait), the silent probe rotation, the
+// refused-cell memory (a refused cell is never re-clicked), the
+// click bound, the leg-scaled walk window (the C1 disable formula
+// on the live pAtkSpd at the per-unit pace of the race leg) and the
+// stand-down paths (the leg completed at the endpoint, the window
 // expired, nothing left to rotate onto).
 
 import (
+    "math"
     "testing"
     "time"
 
@@ -88,15 +90,20 @@ func TestKiteRefusalRotatesAtTheProbeAge(t *testing.T) {
     require.True(t, loop.kiteWalkDead,
         "the refusal evidence latched the dead verdict")
 
-    // The walk ages past the probe: the rotation lands.
+    // The walk ages past the probe: the rotation lands. At the full
+    // anchored race length (1350, the fresh anchor's leash budget)
+    // the +-45 degree fan candidates overshoot the roam fence
+    // diagonally (the 1350*sqrt(2) diagonal crosses the 1350 fence
+    // by the cell rounding), so the rotation steps onto the +90
+    // degree candidate - the perpendicular lane.
     ageKiteReclick(loop)
     ageKiteWalkIssue(loop)
     loop.tick()
     require.Len(t, game.walks, 3)
     require.NotEqual(t, game.walks[1], game.walks[2],
         "the refused endpoint rotated onto the fan lane")
-    require.Equal(t, [3]int32{44717, 49717, -3500}, game.walks[2],
-        "the rotation takes the next fan candidate")
+    require.Equal(t, [3]int32{45000, 48650, -3500}, game.walks[2],
+        "the rotation takes the perpendicular fan candidate")
 }
 
 // TestKiteRefusalNeverReClicksTheRefusedCell pins the refused-cell
@@ -132,6 +139,10 @@ func TestKiteSilentProbeRotatesTheDeadEndpoint(t *testing.T) {
     require.Len(t, game.walks, 1)
 
     // The click stayed silent through the broadcast gate window.
+    // The rotation lands on the perpendicular fan candidate: at the
+    // full anchored race length the +-45 degree diagonals overshoot
+    // the roam fence (1350*sqrt(2) past the 1350 budget by the cell
+    // rounding), the +90 degree lane fits it exactly.
     ageKiteReclick(loop)
     ageKiteWalkIssue(loop)
     loop.tick()
@@ -139,7 +150,7 @@ func TestKiteSilentProbeRotatesTheDeadEndpoint(t *testing.T) {
     require.True(t, loop.kiteWalkDead, "the silent probe latched")
     require.NotEqual(t, game.walks[0], game.walks[1],
         "the silent endpoint rotated onto the fan lane")
-    require.Equal(t, [3]int32{44717, 49717, -3500}, game.walks[1])
+    require.Equal(t, [3]int32{45000, 48650, -3500}, game.walks[1])
 }
 
 // TestKiteRefusalWithNoLaneLeftStandsDown pins the cornered answer
@@ -148,17 +159,17 @@ func TestKiteSilentProbeRotatesTheDeadEndpoint(t *testing.T) {
 // does not grind a dead transport, the hold answer owns the cycle.
 func TestKiteRefusalWithNoLaneLeftStandsDown(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    // Only the straight west lane passes the line of sight; every
-    // fan candidate is walled.
+    // Only the straight west lane of the race leg passes the line
+    // of sight; every fan candidate is walled.
     nav := &fakeNavigator{}
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return int32(to.X) == 44600, nil
+        return int32(to.X) == 43650, nil
     }
     loop.SetNavigator(nav)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the straight lane carried the step")
-    require.Equal(t, [3]int32{44600, 50000, -3500}, game.walks[0])
+    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[0])
 
     // The straight cell got refused and the walk aged past the
     // probe: the rotation has no alternative lane (the fans are
@@ -210,48 +221,87 @@ func TestKiteReclickLadderBoundsTheClicks(t *testing.T) {
         "the ladder spends the click bound and stops")
 }
 
-// TestKiteReclickLadderStandsDownWhenTheWalkRuns pins the
-// SelfWalking oracle: the movement broadcast of the walk (the
-// character is moving) clears the ladder - the click landed, the
-// manual-clicking replication stops, no re-click fights the running
-// walk.
-func TestKiteReclickLadderStandsDownWhenTheWalkRuns(t *testing.T) {
+// TestKiteReclickLadderSurvivesTheWalkAdoption pins the leg-long
+// ladder of round 17: the movement broadcast of the walk (the
+// character is moving, SelfWalking true) no longer stands the ladder
+// down - the race legs run many times the ordinary step's walk time
+// and a silent drop later needs the re-click machinery alive. The
+// adoption refreshes the episode budget instead (a mid-leg drop gets
+// its own re-clicks), and a LATER standing drop mid-route re-bases
+// the ladder onto the current cell and keeps pushing the SAME
+// endpoint - the recovery the window-sized ladder never had (a
+// silent drop mid-leg used to stand the character through the rest
+// of the window while the chaser collected the difference).
+func TestKiteReclickLadderSurvivesTheWalkAdoption(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
-    // The server answered the click with the movement start
-    // broadcast: the character walks toward the endpoint.
+    // The click stays silent for two paced re-clicks: the episode
+    // budget runs down while the character stands on the issue
+    // cell.
+    for range 2 {
+        ageKiteReclick(loop)
+        loop.tick()
+    }
+    require.Len(t, game.walks, 3)
+    require.Equal(t, 2, loop.kiteReclicks,
+        "the silent clicks spent the episode budget")
+
+    // The server answers with the movement start broadcast: the
+    // character walks toward the endpoint. The adoption keeps the
+    // ladder armed and resets the episode budget - no re-click
+    // fights the running walk.
     bot.ApplyMovement(state.Movement{
         ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
-        DestX: 44600, DestY: 50000, DestZ: -3500,
+        DestX: 43650, DestY: 50000, DestZ: -3500,
     })
     ageKiteReclick(loop)
     loop.tick()
-    require.Len(t, game.walks, 1,
+    require.Len(t, game.walks, 3,
         "a running walk needs no re-click")
-    require.True(t, loop.kiteWalkUntil.IsZero(),
-        "the ladder stood down on the movement broadcast")
+    require.Zero(t, loop.kiteReclicks,
+        "the adoption resets the episode budget")
+    require.False(t, loop.kiteWalkUntil.IsZero(),
+        "the ladder stays armed through the running walk")
+
+    // The walk drops mid-route (no more movement broadcasts, the
+    // character stands 400 into the 1350 leg): the ladder re-bases
+    // onto the drop cell and re-clicks the SAME endpoint.
+    moveSelfTo(bot, 44600, 50000, -3500)
+    ageKiteReclick(loop)
+    loop.tick()
+    require.Len(t, game.walks, 4,
+        "the mid-route drop re-clicks the endpoint")
+    require.Equal(t, game.walks[0], game.walks[3],
+        "the recovery aims the same endpoint")
+    require.Equal(t, int32(44600), loop.kiteWalkBaseX,
+        "the ladder re-based onto the drop cell")
+    require.False(t, loop.kiteWalkUntil.IsZero(),
+        "the recovery keeps the ladder alive")
 }
 
-// TestKiteReclickLadderQuietsWhenTheCharacterMoved pins the
-// base-cell oracle: a character that left the issue cell tells the
-// ladder the click moved something after all - the ladder stands
-// down, the next shot cycle re-arms it.
-func TestKiteReclickLadderQuietsWhenTheCharacterMoved(t *testing.T) {
+// TestKiteReclickLadderCompletesAtTheEndpoint pins the arrival
+// stand-down of the leg-long ladder: a stand WITHIN
+// kiteArrivalEpsilon of the endpoint completes the leg (the server's
+// cell granularity and a partial route's last walkable cell never
+// land the character exactly on the clicked cell) - the ladder
+// stands down, the window's remainder belongs to the arrival shot's
+// own cycle.
+func TestKiteReclickLadderCompletesAtTheEndpoint(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
-    // The character arrived one cell off the issue point (a short
-    // wobble walk, standing again).
-    moveSelfTo(bot, 45020, 50000, -3500)
+    // The character arrives 50 units short of the clicked endpoint
+    // (43650): inside the 100 unit arrival radius.
+    moveSelfTo(bot, 43700, 50000, -3500)
     ageKiteReclick(loop)
     loop.tick()
     require.Len(t, game.walks, 1,
-        "a character off the issue cell needs no re-click")
+        "an arrived leg needs no re-click")
     require.True(t, loop.kiteWalkUntil.IsZero(),
-        "the ladder stood down on the base-cell change")
+        "the ladder stood down at the arrival")
 }
 
 // TestKiteReclickLadderExpiresWithTheWindow pins the window bound:
@@ -315,12 +365,17 @@ func TestKiteReclickLadderDoesNotFirePastTheFreshPacing(t *testing.T) {
         "a fresh pacing sends no re-click")
 }
 
-// TestKiteBowWindowSpendsTheCooldown pins the bow-speed window: the
-// live pAtkSpd the StatusUpdate broadcasts drives the C1 disable
-// formula (500000/pAtkSpd + reuseDelay*333/pAtkSpd, the reuse 1500
-// of the bow family) - the walk spends the whole cooldown the
-// server enforces between the shots ("its like 3 seconds to draw
-// shot" - the owner's own measurement of the Short Bow kit).
+// TestKiteBowWindowSpendsTheCooldown pins the leg-scaled
+// bow-speed window: the live pAtkSpd the StatusUpdate broadcasts
+// drives the C1 disable formula (500000/pAtkSpd +
+// reuseDelay*333/pAtkSpd, the reuse 1500 of the bow family) at the
+// PER-UNIT pace of the race leg - the walk spends the whole
+// cooldown the server enforces between the shots ("its like 3
+// seconds to draw shot" - the owner's own measurement of the Short
+// Bow kit) for every kiteStep of the leg, so the 1350 race leg of
+// the closed mob (the deficit cap of the fresh anchor) holds the
+// movement for ~10.01s from the issue: nothing interrupts the leg
+// before it reaches its endpoint.
 func TestKiteBowWindowSpendsTheCooldown(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     // The equipping broadcast of the bow: pAtkSpd 337 (the value
@@ -328,34 +383,41 @@ func TestKiteBowWindowSpendsTheCooldown(t *testing.T) {
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrAtkSpd, Value: 337},
     })
-    before := time.Now()
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
-    // The C1 disable formula: (500000 + reuse*333)/pAtkSpd.
+    // The C1 disable formula per kiteStep of the walked leg:
+    // (500000 + reuse*333)/pAtkSpd * leg/400.
     const pAtkSpd = 337.0
+    leg := math.Hypot(
+        float64(game.walks[0][0]-45000), float64(game.walks[0][1]-50000))
     wantMS := (500000.0 + kiteBowReuseDelay*333.0) / pAtkSpd
-    want := time.Duration(wantMS * float64(time.Millisecond))
-    aged := time.Until(loop.kiteWalkUntil)
-    require.InDelta(t, want, aged, float64(250*time.Millisecond),
-        "the walk window matches the C1 disable formula")
-    require.Greater(t, aged, kiteStepWindow,
-        "the bow window outlasts the shipped fixed window")
-    _ = before
-    _ = game
+    want := time.Duration(
+        wantMS * float64(time.Millisecond) * leg / kiteStep)
+    aged := loop.kiteWalkUntil.Sub(loop.kiteWalkIssuedAt)
+    require.InDelta(t, float64(want), float64(aged),
+        float64(50*time.Millisecond),
+        "the walk window scales with the leg at the C1 disable pace")
+    require.Greater(t, aged,
+        time.Duration(wantMS*float64(time.Millisecond)),
+        "the race leg window outlasts the plain cooldown window")
 }
 
 // TestKiteBowWindowFallsBackWithoutTheSpeed pins the fallback: no
 // pAtkSpd broadcast (the packet never arrived) keeps the shipped
-// fixed window - the walk contract never depends on the packet
-// being parsed.
+// fixed window pace - the walk contract never depends on the packet
+// being parsed - and the leg scaling still applies on top of it.
 func TestKiteBowWindowFallsBackWithoutTheSpeed(t *testing.T) {
-    bot, _, loop := kiteBowBot(t, 45200)
+    bot, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Zero(t, bot.SelfPAtkSpd(),
         "the scene never broadcast the attack speed")
-    aged := time.Until(loop.kiteWalkUntil)
-    require.InDelta(t, kiteStepWindow, aged,
-        float64(250*time.Millisecond),
-        "the missing speed falls back to the shipped window")
+    // The shipped fixed window at the leg pace: 1350/400 * 2s.
+    leg := math.Hypot(
+        float64(game.walks[0][0]-45000), float64(game.walks[0][1]-50000))
+    aged := loop.kiteWalkUntil.Sub(loop.kiteWalkIssuedAt)
+    require.InDelta(t, leg/kiteStep*float64(kiteStepWindow),
+        float64(aged), float64(50*time.Millisecond),
+        "the missing speed falls back to the shipped window at the "+
+            "leg pace")
 }

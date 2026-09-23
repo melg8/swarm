@@ -21,17 +21,23 @@ import (
 // backstop, and expires with the pursuit context (the respawned
 // same-id target never inherits the chain of its predecessor). The
 // tests below pin the four gates one by one on the standard kite
-// scene (the 3.2 s sleep carries each walk window out - the honest
-// post-walk state the live loop ticks).
+// scene (the lapse dance of pursuitWindowLapse carries each scaled
+// walk window of the race leg out - leg/400 * the bow window, the
+// 1350 leg of the 260-unit mob holds it for 6.75s - and lands the
+// arrival shot of the leg the way the live server does).
 
-// pursuitWindowLapse ages the scene past the walk window and the
-// fighting stance freshness, then hands the tick back: the shared
-// dance of every pursuit test (the window end is the only moment
-// the hold owns the tick, the stance lapse is what the live
-// post-walk state looks like).
-func pursuitWindowLapse(loop *Loop) {
-    time.Sleep(3200 * time.Millisecond)
+// pursuitWindowLapse ages the scene past the scaled walk window of
+// the race leg (1350/400 * the 2s fallback = 6.75s), lands the
+// ARRIVAL SHOT of the leg (the server's auto re-shot the armed
+// stance fires the moment the walk ends - the live fight view rides
+// those shots through a chain the fake mob never swings into) and
+// hands the tick back: the shared dance of every pursuit test (the
+// window end is the only moment the hold owns the tick, the stance
+// lapse is what the live post-walk state looks like).
+func pursuitWindowLapse(bot *state.Bot, loop *Loop, mobX int32) {
+    time.Sleep(7000 * time.Millisecond)
     loop.lastHit = time.Now().Add(-2 * time.Second)
+    selfSwingsAt(bot, mobX)
     loop.tick()
 }
 
@@ -50,13 +56,13 @@ func pursuitWindowLapse(loop *Loop) {
 // (the standing trade is the melee damage the kite exists to
 // avoid; the moving chase outwaits the mob's home leash).
 func TestKitePursuitStallRunsTheParityRace(t *testing.T) {
-    _, game, loop := kiteBowBot(t, 45260)
+    bot, game, loop := kiteBowBot(t, 45260)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // Window 1 lapses: the mob holds 260 (inside the re-shot floor),
     // the first continuation issues - no accounting behind it yet.
-    pursuitWindowLapse(loop)
+    pursuitWindowLapse(bot, loop, 45260)
     require.Empty(t, game.forces,
         "the re-shot waits for the regained distance")
     require.Len(t, game.walks, 2,
@@ -67,7 +73,7 @@ func TestKitePursuitStallRunsTheParityRace(t *testing.T) {
 
     // Window 2 lapses: the walk opened nothing (260 -> 260), the
     // first stall books - one stall alone never stopped the chain.
-    pursuitWindowLapse(loop)
+    pursuitWindowLapse(bot, loop, 45260)
     require.Len(t, game.walks, 3,
         "the first stall books without stopping the chain")
     require.Equal(t, 1, loop.kitePursuitStall)
@@ -76,7 +82,7 @@ func TestKitePursuitStallRunsTheParityRace(t *testing.T) {
     // Window 3: the second consecutive stall names the parity race
     // in the ledger - and the chain keeps running anyway (the
     // always-run rule: no standing trade answer exists anymore).
-    pursuitWindowLapse(loop)
+    pursuitWindowLapse(bot, loop, 45260)
     require.Len(t, game.walks, 4,
         "the parity race keeps running - the standing trade is gone")
     require.Equal(t, 2, loop.kitePursuitStall,
@@ -96,7 +102,7 @@ func TestKitePursuitProgressResetsTheStallLedger(t *testing.T) {
     require.Len(t, game.walks, 1)
 
     // The first continuation issues at 260.
-    pursuitWindowLapse(loop)
+    pursuitWindowLapse(bot, loop, 45260)
     require.Len(t, game.walks, 2)
 
     // The walk opened the gap (the mob fell behind to 440): the
@@ -105,7 +111,7 @@ func TestKitePursuitProgressResetsTheStallLedger(t *testing.T) {
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 45440, Y: 50000, Name: "Keltir",
     })
-    pursuitWindowLapse(loop)
+    pursuitWindowLapse(bot, loop, 45440)
     require.Len(t, game.walks, 3,
         "the gaining race must run on")
     require.Zero(t, loop.kitePursuitStall,
@@ -116,7 +122,7 @@ func TestKitePursuitProgressResetsTheStallLedger(t *testing.T) {
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 45260, Y: 50000, Name: "Keltir",
     })
-    pursuitWindowLapse(loop)
+    pursuitWindowLapse(bot, loop, 45260)
     require.Len(t, game.walks, 4,
         "a stall after a gain starts its own count, the chain runs")
     require.Equal(t, 1, loop.kitePursuitStall)
@@ -130,14 +136,14 @@ func TestKitePursuitProgressResetsTheStallLedger(t *testing.T) {
 // old budget - the fight-anchor leash and the curving circle bound
 // the drift, the standing trade answer is gone.
 func TestKitePursuitStreakNeverBoundsTheChain(t *testing.T) {
-    _, game, loop := kiteBowBot(t, 45260)
+    bot, game, loop := kiteBowBot(t, 45260)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
     // The chain spent the old budget without a single shot cycle
     // resolving it - the walk keeps going anyway.
     loop.kitePursuitSteps = kitePursuitStreakLimit
-    pursuitWindowLapse(loop)
+    pursuitWindowLapse(bot, loop, 45260)
     require.Len(t, game.walks, 2,
         "the runaway chain keeps running - the standing trade is gone")
     require.Empty(t, game.forces,
@@ -160,8 +166,11 @@ func TestKitePursuitContextExpiresTheStaleChain(t *testing.T) {
         "the issued walk stamped the pursuit context")
 
     // The context ages past its bound: the continuation must refuse
-    // the stale chain whatever the distance holds.
-    time.Sleep(3200 * time.Millisecond)
+    // the stale chain whatever the distance holds. The sleep first
+    // carries the scaled walk window of the race leg out (6.75s),
+    // so the refused tick lands on the honest post-walk state -
+    // the ladder stands down, the attack owns the tick.
+    time.Sleep(7000 * time.Millisecond)
     loop.kitePursuitAt = time.Now().Add(-13 * time.Second)
     loop.lastHit = time.Now().Add(-2 * time.Second)
     loop.tick()

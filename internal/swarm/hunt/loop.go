@@ -2419,6 +2419,7 @@ func (l *Loop) engage() {
                 stallRadius := l.stallRadiusFor()
                 if dist > stallRadius &&
                     !l.lureArmed() &&
+                    now.After(l.combatAvoidUntil) &&
                     !l.chaseProgress(
                         &l.engLastDist, &l.engDistAt, dist, now) &&
                     !l.tracker.SelfWalking() &&

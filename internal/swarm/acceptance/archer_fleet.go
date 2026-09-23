@@ -88,12 +88,19 @@ func archerFleetPassword(account string) string {
 // "maximum distance" behavior, the retreat lag ceiling of the "regain
 // the distance early" behavior (the server defers a click inside the
 // windup to the cycle end, so a lag under the ceiling means the click
-// rode the accepted window), the re-shot gap ceiling, the per-fight
-// drift leash of the curving retreat and the evidence floors.
+// rode the accepted window), the re-shot distance floor of the
+// "quick re-shot" behavior (the redesigned kite runs 10-13 s race
+// legs to regain the safe shooting distance before the single
+// re-shot, so the honest metric is the DISTANCE the re-shot lands at,
+// not the walk-end-to-shot gap - a collapsed-range arrival shot books
+// a ~zero gap) with the re-shot gap ceiling as its no-distance
+// fallback, the per-fight drift leash of the curving retreat and the
+// evidence floors.
 const (
     fleetFightDistFloor  = 250.0
     fleetRetreatLagCeil  = 2200 * time.Millisecond
     fleetReshotGapCeil   = 1500 * time.Millisecond
+    fleetReshotDistFloor = 400.0
     fleetFightDriftLeash = 1500.0
     fleetMinShots        = 3
     fleetMinRetreats     = 2
@@ -263,9 +270,10 @@ type fleetSample struct {
 
 // fleetWatch folds one bot's samples into the behavior evidence: the
 // shot count, the retreat lags (the movement start after a shot), the
-// re-shot gaps (the shot after a retreat walk ends), the fight
-// distance distribution, the per-fight drift of the curving retreat
-// and the retreat walk corners. The retreat metrics ride the
+// re-shot gaps (the shot after a retreat walk ends) with the fight
+// distances the re-shots landed at, the fight distance distribution,
+// the per-fight drift of the curving retreat and the retreat walk
+// corners. The retreat metrics ride the
 // DIRECTION gate: only a walk that moved away from the fight target
 // it started in counts as a kite retreat - the loot pickups, the
 // cell-rotation approaches and the chase-stall walks toward the
@@ -280,6 +288,7 @@ type fleetWatch struct {
     shots       int
     retreatLags []time.Duration
     reshotGaps  []time.Duration
+    reshotDists []float64
     fightDists  []float64
     // The per-fight curve attribution (the leash fix of the curve
     // round: the spawn-anchor displacement measured the hunt's own
@@ -372,6 +381,21 @@ func (w fleetWatch) foldMotion(s fleetSample) fleetWatch {
     return w
 }
 
+// reshotDist answers the fight distance a re-shot sample carries,
+// -1 when the sample held no known target range (the shot landed
+// outside a fighting sample, or the tracker lost the target stand
+// between the walk end and the shot): the quick-reshot verdict reads
+// the DISTANCE the re-shot lands at, and a missing distance must
+// never read as a passed floor - the verdict falls back to the gap
+// ceiling instead.
+func reshotDist(s fleetSample) float64 {
+    if s.fighting && s.fightDist >= 0 {
+        return s.fightDist
+    }
+
+    return -1
+}
+
 // foldWalkEnd settles the walk candidate at its end sample: the
 // away-direction verdict gates the pending retreat metrics (a walk
 // whose displacement leans away from the target it started against
@@ -399,11 +423,13 @@ func (w fleetWatch) foldWalkEnd(s fleetSample) fleetWatch {
                 s.shotAt != w.walkShotAt {
                 // The re-shot itself ended the walk (the server
                 // stops the movement on the attack): the gap is
-                // the walk end to the interrupt shot, ~zero. The
-                // walkShotAt guard keeps a mid-walk attach (the
-                // fold never saw the owning shot) from minting a
-                // fake zero.
+                // the walk end to the interrupt shot, ~zero, and
+                // the settling sample's fight distance is the range
+                // the re-shot landed at. The walkShotAt guard keeps
+                // a mid-walk attach (the fold never saw the owning
+                // shot) from minting a fake zero.
                 w.reshotGaps = append(w.reshotGaps, 0)
+                w.reshotDists = append(w.reshotDists, reshotDist(s))
             } else {
                 w.walkEndedAt = s.at
             }
@@ -441,14 +467,17 @@ func (w fleetWatch) foldWalkStart(s fleetSample) fleetWatch {
 }
 
 // foldShot latches a fresh own-shot sample: the shot counts, and
-// a walk that already ended before it closes the walk-end to
-// re-shot gap the quick-reshot verdict reads.
+// a walk that already ended before it books the re-shot the
+// quick-reshot verdict reads - the walk-end-to-shot gap with the
+// fight distance the shot landed at (the distance carries the
+// verdict, the gap stays the reported context).
 func (w fleetWatch) foldShot(s fleetSample) fleetWatch {
     w.shots++
     w.lastShot = s.shotAt
     if !w.walkEndedAt.IsZero() && s.shotAt.After(w.walkEndedAt) {
         if gap := s.shotAt.Sub(w.walkEndedAt); gap >= 0 {
             w.reshotGaps = append(w.reshotGaps, gap)
+            w.reshotDists = append(w.reshotDists, reshotDist(s))
         }
         w.walkEndedAt = time.Time{}
     }
@@ -700,6 +729,49 @@ func (w fleetWatch) curveVerdict() (ok bool, detail string,
         median, len(drifts), corners), true
 }
 
+// reshotVerdict folds the re-scoped quick-reshot behavior (round
+// 17): the redesigned kite runs long race legs (10-13 s of walking)
+// before the single re-shot, so the behavior is the DISTANCE the
+// re-shot lands at - the safe shooting distance regained - not the
+// walk-end-to-shot gap: a collapsed-range arrival shot books a
+// ~zero gap and sailed through the old gap ceiling. The KNOWN
+// distances alone feed the median; a window that lost them all
+// falls back to the gap ceiling so the verdict never reads vacuous.
+func (w fleetWatch) reshotVerdict(v *fleetVerdicts) {
+    v.reshotE = true
+    medianGap := medianDuration(w.reshotGaps)
+    // The re-scoped quick-reshot verdict: the redesigned kite
+    // runs long race legs (10-13 s of walking) before the single
+    // re-shot, so the behavior is the DISTANCE the re-shot lands
+    // at - the safe shooting distance regained - not the
+    // walk-end-to-shot gap: a collapsed-range arrival shot books
+    // a ~zero gap and sailed through the old gap ceiling. The
+    // KNOWN distances alone feed the median; a window that lost
+    // them all falls back to the gap ceiling so the verdict
+    // never reads vacuous.
+    dists := make([]float64, 0, len(w.reshotDists))
+    for _, dist := range w.reshotDists {
+        if dist >= 0 {
+            dists = append(dists, dist)
+        }
+    }
+    if len(dists) > 0 {
+        medianDist := medianFloat(dists)
+        v.reshot = medianDist >= fleetReshotDistFloor
+        v.reshotD = fmt.Sprintf("median re-shot distance %.0f"+
+            " units over %d re-shots, median walk-end-to-shot"+
+            " gap %s", medianDist, len(dists),
+            medianGap.Round(100*time.Millisecond))
+    } else {
+        v.reshot = medianGap <= fleetReshotGapCeil
+        v.reshotD = fmt.Sprintf("median walk-end-to-shot gap %s"+
+            " over %d walks, no re-shot distance observed"+
+            " - the gap ceiling fallback",
+            medianGap.Round(100*time.Millisecond),
+            len(w.reshotGaps))
+    }
+}
+
 // verdicts reads the folded evidence into the behavior outcomes: each
 // verdict holds only on its evidence floor (a bot that never fought
 // keeps the checks open, the detail says why).
@@ -757,12 +829,7 @@ func (w fleetWatch) verdicts() fleetVerdicts {
             len(w.retreatLags))
     }
     if len(w.reshotGaps) >= fleetMinRetreats {
-        v.reshotE = true
-        median := medianDuration(w.reshotGaps)
-        v.reshot = median <= fleetReshotGapCeil
-        v.reshotD = fmt.Sprintf("median walk-end-to-shot gap %s"+
-            " over %d walks", median.Round(100*time.Millisecond),
-            len(w.reshotGaps))
+        w.reshotVerdict(&v)
     }
     v.curve, v.curveD, v.curveE = w.curveVerdict()
 

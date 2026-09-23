@@ -48,11 +48,18 @@ func kiteBowBot(t *testing.T, mobX int32) (*state.Bot, *fakeGame, *Loop) {
 
 // TestKiteStepsAwayFromTheClosedTarget pins the core behavior: a bow
 // target inside the retreat radius (250) makes the fighting character
-// walk straight away from it - the retreat step of kiteStep (400)
-// units on the self-target axis. The scene carries a fresh shot, so
-// the first tick arms the deferred retreat (the windup hold of the
-// issue #70 findings) and the aged tick fires it - the walk asserts
-// the geometry once the click landed.
+// walk straight away from it - the RACE leg of the round-17 redesign
+// (kiteStepLength): the deficit to the re-shot floor (480-200 = 280)
+// buys back at the parity exchange rate (400 + 280*8 = 2640), the
+// absolute cap fences it at kiteRaceStepMax (1700) and the fresh
+// fight's own leash budget (kiteRoamRadius minus the anchor distance
+// - the first resolution anchors the fight AT the self position, so
+// the budget is the full 1350) caps the leg at 1350 - one long
+// continuous walk that ARRIVES back at the floor instead of the old
+// window-sized 400 shuffle that ended short of it. The scene carries
+// a fresh shot, so the first tick arms the deferred retreat (the
+// windup hold of the issue #70 findings) and the aged tick fires it
+// - the walk asserts the geometry once the click landed.
 func TestKiteStepsAwayFromTheClosedTarget(t *testing.T) {
     // The mob closed to 200 units: inside the kite trigger, outside
     // the melee range.
@@ -66,8 +73,9 @@ func TestKiteStepsAwayFromTheClosedTarget(t *testing.T) {
     require.Equal(t, selfZ, step[2],
         "the step keeps the character's deck")
     // The step direction: straight away from the target on the x
-    // axis - 400 units from the self position.
-    require.Equal(t, int32(44600), step[0])
+    // axis - the race leg capped at the fresh anchor's leash budget
+    // (min(400+280*8, 1700, 1350-0) = 1350) from the self position.
+    require.Equal(t, int32(43650), step[0])
     require.Equal(t, selfY, step[1])
     require.Empty(t, game.forces,
         "the kite tick must not re-request the attack")
@@ -149,10 +157,13 @@ func TestKiteReshotWaitsForTheRegainedDistance(t *testing.T) {
     require.Len(t, game.walks, 1)
 
     // The walk outlives the fighting stance freshness (3s from the
-    // last swing): sleep past it so the tick lands in the honest
-    // post-walk state - stance lapsed, step window long closed, the
-    // target still at 200 units (inside the 480 floor).
-    time.Sleep(3200 * time.Millisecond)
+    // last swing) AND the scaled movement window of the race leg
+    // (1350 units at the per-unit pace of the bow window: 1350/400 *
+    // the shipped 2s fallback = 6.75s): sleep past both so the tick
+    // lands in the honest post-walk state - stance lapsed, step
+    // window closed, the target still at 200 units (inside the 480
+    // floor).
+    time.Sleep(7000 * time.Millisecond)
     loop.lastHit = time.Now().Add(-2 * time.Second)
     loop.tick()
     require.Empty(t, game.forces,
@@ -161,11 +172,23 @@ func TestKiteReshotWaitsForTheRegainedDistance(t *testing.T) {
         "the pursuit continues the retreat at the window end")
 
     // The hostile opens past the floor: the affordable shot answers
-    // at the window end (the forces resume).
+    // at the window end. The walk of the continuation lapses, the
+    // ladder stands down (the pursuit hold declines past the floor),
+    // and the character's own fight activity carries one tick past
+    // the engage-stuck gate before the stance lapses - then the
+    // ordinary re-request machinery owns the moment (the forces
+    // resume).
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 45520, Y: 50000, Name: "Keltir",
     })
+    time.Sleep(7000 * time.Millisecond)
+    selfSwingsAt(bot, 45520)
+    loop.tick()
+    require.Len(t, game.walks, 2,
+        "a hostile past the floor ends the pursuit chain")
+    require.Empty(t, game.forces,
+        "the fresh fight view holds the re-request one tick")
     time.Sleep(3200 * time.Millisecond)
     loop.lastHit = time.Now().Add(-2 * time.Second)
     loop.tick()
@@ -297,9 +320,10 @@ func TestKiteTrainMemberArmsTheRetreat(t *testing.T) {
         "a chasing train member inside the retreat radius must arm the kite")
     step := game.walks[0]
     // The step direction: straight away from the MEMBER on the x
-    // axis (self 45000, member 45200 -> the step lands west of the
-    // self), not away from the fight target at 45440.
-    require.Equal(t, int32(44600), step[0])
+    // axis (self 45000, member 45200 -> the race leg capped at the
+    // fresh anchor's 1350 budget lands west of the self), not away
+    // from the fight target at 45440.
+    require.Equal(t, int32(43650), step[0])
     require.Empty(t, game.forces,
         "the kite tick must not re-request the attack")
 }
@@ -350,13 +374,22 @@ func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
         "the closed hostiles must arm the kite")
     step := game.walks[0]
     // The centroid direction: away(target) = (-1, 0),
-    // away(member) = (-127, -127)/179.6 -> the sum normalized.
+    // away(member) = (-127, -127)/179.6 -> the sum normalized. The
+    // leg is the race step of the nearer threat (the member at 180:
+    // 400 + 300*8, capped at the fresh anchor's 1350 leash budget).
     sumX := -1.0 - 127.0/math.Hypot(127, 127)
     sumY := -127.0 / math.Hypot(127, 127)
     sumLen := math.Hypot(sumX, sumY)
-    require.InDelta(t, 45000+sumX/sumLen*kiteStep, float64(step[0]), 1.0,
+    leg := kiteStep + (kiteReshotFloor-180.0)*kiteRaceFactor
+    if leg > kiteRaceStepMax {
+        leg = kiteRaceStepMax
+    }
+    if budget := kiteRoamRadius - 0; budget < leg {
+        leg = budget
+    }
+    require.InDelta(t, 45000+sumX/sumLen*leg, float64(step[0]), 1.0,
         "the step direction is the centroid away-vector of the train")
-    require.InDelta(t, 50000+sumY/sumLen*kiteStep, float64(step[1]), 1.0,
+    require.InDelta(t, 50000+sumY/sumLen*leg, float64(step[1]), 1.0,
         "the step direction is the centroid away-vector of the train")
     require.Less(t, step[1], int32(50000),
         "the northeast member must drag the retreat south of the "+

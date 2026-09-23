@@ -77,17 +77,24 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
         "a closed target with a train member must trigger the step")
 
     // The centroid direction, recomputed from first principles:
-    // away(target) = (-1, 0), away(member) = (-141, -141)/199.4.
+    // away(target) = (-1, 0), away(member) = (-141, -141)/199.4. The
+    // leg is the race step of the nearer threat (the member at 199.4:
+    // 400 + the deficit * 8, capped at the fresh anchor's 1350 leash
+    // budget - the deficit leg is far past it).
     ax, ay := -1.0, 0.0
     bx := -141.0 / math.Hypot(141, 141)
     by := -141.0 / math.Hypot(141, 141)
     sumX, sumY := ax+bx, ay+by
     dirX := sumX / math.Hypot(sumX, sumY)
     dirY := sumY / math.Hypot(sumX, sumY)
+    leg := math.Min(
+        kiteStep+(kiteReshotFloor-math.Hypot(141, 141))*kiteRaceFactor,
+        kiteRaceStepMax)
+    leg = math.Min(leg, kiteRoamRadius)
     step := game.walks[0]
-    require.InDelta(t, 45000+dirX*kiteStep, float64(step[0]), 1.0,
+    require.InDelta(t, 45000+dirX*leg, float64(step[0]), 1.0,
         "the step direction is the centroid away-vector of the train")
-    require.InDelta(t, 50000+dirY*kiteStep, float64(step[1]), 1.0,
+    require.InDelta(t, 50000+dirY*leg, float64(step[1]), 1.0,
         "the step direction is the centroid away-vector of the train")
     // The bent lane still opens the distance to both chasers.
     toTarget := math.Hypot(float64(step[0]-45200), float64(step[1]-50000))
@@ -114,7 +121,7 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
     // sum. Both mobs swing at the character (the fresh fighting
     // stance carries the shooting).
     trainMember(bot, 44800, 50000)
-    mobHitsCharacterAt(bot, 7, 45200)
+    mobHitsCharacterAt(bot, 45200)
 
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
@@ -123,10 +130,13 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
     // The widest gap of the east-west chaser line (bearing 0 to the
     // target, pi to the member) spans the northern half-plane and
     // its bisector is the perpendicular ray - the deterministic
-    // first-widest answer, no coin flip between the two halves.
+    // first-widest answer, no coin flip between the two halves. The
+    // leg is the race step (the deficit 280 capped at the fresh
+    // anchor's 1350 leash budget), so the perpendicular escape
+    // marches the whole leg north.
     require.InDelta(t, 45000.0, float64(step[0]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
-    require.InDelta(t, 50000+kiteStep, float64(step[1]), 1.0,
+    require.InDelta(t, 50000+kiteRoamRadius, float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
     // The perpendicular escape opens the distance to BOTH chasers.
     toTarget := math.Hypot(
@@ -224,37 +234,37 @@ func TestKiteWaterBehindHoldsGround(t *testing.T) {
 // TestKiteDeadEndLaneRePlansAtTheNextProbe pins the lane quality
 // rule: a retreat whose straight lane closes ahead (the wall grew, a
 // door shut) re-plans onto the open 45 degree lane at the very next
-// probe - one hop later, never a walk into the dead end.
+// probe - one hop later, never a walk into the dead end. The scene
+// sizes the race leg mid-band (a mob at 440: the deficit 40 buys the
+// 720 leg, well under the fresh anchor's 1350 leash budget) so the
+// diagonal fan candidate fits the roam fence - the full-budget leg
+// of a 200-unit mob leaves the 45 degree lanes no room (the
+// 1350*sqrt(2) diagonal overshoots the fence by the cell rounding).
 func TestKiteDeadEndLaneRePlansAtTheNextProbe(t *testing.T) {
-    bot, game, loop := kiteEdgeBot(t)
+    bot, game, loop := kiteBowBot(t, 45440)
     nav := &fakeNavigator{}
     loop.SetNavigator(nav)
 
     // The first probe: the straight west lane is open, the step
-    // takes it.
+    // takes it (the race leg: 400 + 40*8 = 720 out).
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
-    require.Equal(t, [3]int32{44600, 50000, -3500}, game.walks[0],
+    require.Equal(t, [3]int32{44280, 50000, -3500}, game.walks[0],
         "the straight away lane is the lane of record")
 
     // The next probe cycle: the pacing windows aged out, the fight
     // view refreshed, and the straight lane now answers blocked (the
     // corridor ahead closed - the dead end the character walked
-    // into).
+    // into). The second retreat of the fight keeps the straight
+    // preference (the character never left the anchor cell, so the
+    // circle owns no radius yet - kiteCurveDirection keeps the raw
+    // away-ray under kiteCircleMinRadius).
     loop.combatAvoidUntil = time.Time{}
     loop.kiteAt = time.Now().Add(-kiteStepPeriod)
-    selfSwingsAt(bot, 45200)
-    // The second retreat of the fight prefers the CURVED ray (the
-    // circling retreat of issue #70): the away-ray bent the fixed
-    // tangential bearing. The corridor ahead of that lane closes
-    // now - the dead end the character would walk into.
-    awayX, awayY := -1.0, 0.0
-    prefX, prefY := rotatePlanar(awayX, awayY, kiteCurveStep)
-    curvedX := 45000 + int32(math.Round(prefX*float64(kiteStep)))
-    curvedY := 50000 + int32(math.Round(prefY*float64(kiteStep)))
+    selfSwingsAt(bot, 45440)
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return int32(math.Round(to.X)) != curvedX ||
-            int32(math.Round(to.Y)) != curvedY, nil
+        return int32(math.Round(to.X)) != 44280 ||
+            int32(math.Round(to.Y)) != 50000, nil
     }
 
     tickPastTheWindup(loop)
@@ -262,16 +272,15 @@ func TestKiteDeadEndLaneRePlansAtTheNextProbe(t *testing.T) {
         "the dead end must re-plan, not stall the retreat")
     bent := game.walks[1]
     // The fan candidate inside the away half-plane: the preferred
-    // curved ray blocked, the 70+45 degree one folds back into the
-    // train (the half-plane gate), so the 70-45 degree lane carries
-    // the re-plan.
-    fanX, fanY := rotatePlanar(awayX, awayY, kiteCurveStep-kiteFanStep)
+    // straight ray blocked, the +45 degree lane (southwest of the
+    // west away-ray) carries the re-plan at the same race length.
+    fanX, fanY := rotatePlanar(-1, 0, kiteFanStep)
     require.InDelta(t,
-        float64(45000+int32(math.Round(fanX*float64(kiteStep)))),
+        float64(45000+int32(math.Round(fanX*720))),
         float64(bent[0]), 1.0,
         "the re-plan bends onto the half-open fan lane")
     require.InDelta(t,
-        float64(50000+int32(math.Round(fanY*float64(kiteStep)))),
+        float64(50000+int32(math.Round(fanY*720))),
         float64(bent[1]), 1.0,
         "the re-plan bends onto the half-open fan lane")
 }
@@ -375,9 +384,9 @@ func TestKiteCampDeflectsTheRetreatLane(t *testing.T) {
 // the blow lands on the character from the given position, so the
 // tracker holds the mob as a live attacker too (the surrounded train
 // swings from both sides).
-func mobHitsCharacterAt(bot *state.Bot, mobID int32, x int32) {
+func mobHitsCharacterAt(bot *state.Bot, x int32) {
     bot.ApplyAttack(state.Attack{
-        AttackerID: mobID, X: x, Y: 50000, Z: -3500,
+        AttackerID: stagedMobID, X: x, Y: 50000, Z: -3500,
         TargetX: 45000, TargetY: 50000, TargetZ: -3500,
         TargetIDs:   [state.AttackTargets]int32{100},
         TargetCount: 1,

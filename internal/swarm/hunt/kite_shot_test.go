@@ -122,8 +122,12 @@ func TestKiteShotPacedDefersTheRetreatPastTheWindup(t *testing.T) {
     require.True(t, ok)
     require.Equal(t, selfZ, step[2],
         "the step keeps the character's deck")
-    require.Equal(t, int32(44600), step[0],
-        "the step runs straight away from the target")
+    // The step runs straight away from the target at the RACE
+    // length: the mob 440 out owes a deficit of 40 to the re-shot
+    // floor, so the leg runs 400 + 40*8 = 720 (well under the fresh
+    // anchor's 1350 leash budget).
+    require.Equal(t, int32(44280), step[0],
+        "the step runs straight away from the target at the race length")
     require.Equal(t, selfY, step[1])
     require.True(t, loop.kiteClickAt.IsZero(),
         "the fired schedule disarms itself")
@@ -208,7 +212,7 @@ func TestKiteShotPacedWindowGuardsTheDoubleStep(t *testing.T) {
 func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     trainMember(bot, 44800, 50000)
-    mobHitsCharacterAt(bot, 7, 45200)
+    mobHitsCharacterAt(bot, 45200)
     loop.tick()
     require.Empty(t, game.walks,
         "the broadcast tick arms the schedule, not a walk")
@@ -219,7 +223,10 @@ func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
     step := game.walks[0]
     require.InDelta(t, 45000.0, float64(step[0]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
-    require.InDelta(t, 50000+kiteStep, float64(step[1]), 1.0,
+    // The gap bisector at the RACE length: the deficit 280 bought
+    // back at the parity rate caps at the fresh anchor's 1350 leash
+    // budget - the perpendicular break marches the whole leg north.
+    require.InDelta(t, 50000+kiteRoamRadius, float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
     require.True(t, loop.kiteHeldAt.IsZero(),
         "the gap answer is a step, not a hold")
@@ -236,7 +243,7 @@ func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
 func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     trainMember(bot, 44800, 50000)
-    mobHitsCharacterAt(bot, 7, 45200)
+    mobHitsCharacterAt(bot, 45200)
     nav := &fakeNavigator{}
     // The whole circle answers walled: the gap hemisphere (north of
     // the chaser line) AND the anti-gap breakout cone (south of it)
@@ -382,7 +389,7 @@ func TestKiteProximityDefersInsideTheWindup(t *testing.T) {
     // disable window still holds) - the fight view stays fresh (the
     // 3 s window of the chase step above).
     selfSwingsAt(bot, 45200)
-    bot.ApplyAttackAt(shotOf(bot, 45200),
+    bot.ApplyAttackAt(shotOf(45200),
         time.Now().Add(-800*time.Millisecond))
     loop.tick()
     require.Empty(t, game.walks,
@@ -397,7 +404,7 @@ func TestKiteProximityDefersInsideTheWindup(t *testing.T) {
 
 // shotOf rebuilds the character's own attack broadcast against the
 // given mob position (the ApplyAttackAt twin of selfSwingsAt).
-func shotOf(bot *state.Bot, x int32) state.Attack {
+func shotOf(x int32) state.Attack {
     return state.Attack{
         AttackerID:  100,
         X:           45000,

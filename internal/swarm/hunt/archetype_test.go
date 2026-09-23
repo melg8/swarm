@@ -20,10 +20,12 @@ package hunt
 // pins the seam the slice tests cannot see from inside their layer.
 
 import (
+    "math"
     "testing"
     "time"
 
     "github.com/melg8/swarm/internal/swarm/gear"
+    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -78,8 +80,12 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
     require.Len(t, game.walks, 1,
         "the archer profile with a worn bow must kite the closed mob")
     step := game.walks[0]
-    require.Equal(t, int32(44600), step[0],
-        "the kite steps away from the closed mob")
+    // The race leg of the round-17 redesign: the deficit 280 bought
+    // back at the parity rate caps at the fresh anchor's 1350 leash
+    // budget - the kite steps the whole leg away from the closed
+    // mob.
+    require.Equal(t, int32(43650), step[0],
+        "the kite steps away from the closed mob at the race length")
     require.Empty(t, game.forces,
         "the kite tick must not re-request the attack")
     require.Equal(t, int32(7), loop.kiteFor,
@@ -108,12 +114,29 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
     loop2.engageAt = time.Now()
     selfSwingsAt(bot2, 45200)
     loop2.lastHit = time.Now().Add(-time.Minute)
-    // The zone leash corners the retreat: the 400 unit step west
-    // would leave the square.
-    loop2.SetHuntingZone(45000, 50000, 200)
+    // A wall behind the retreat corners the archetype: the sealed
+    // pocket of the geodata (the away hemisphere walled, the
+    // wall-face wedges past the hemisphere edge walled too - only
+    // the narrow eastern corridor of the fight line stays clear,
+    // the same pocket the shot-paced corner test of
+    // kite_shot_test.go stages). The location-general leash of the
+    // round-14 redesign replaced the hunting-square zone read, so
+    // the corner must come from the terrain now.
+    nav := &fakeNavigator{}
+    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
+        return to.X > 45000 &&
+            math.Abs(float64(to.Y)-50000) < 100, nil
+    }
+    loop2.SetNavigator(nav)
+    // The fresh shot arms the deferred click, the aged click fires
+    // into the walled hemisphere - the cornered hold answers.
+    loop2.tick()
+    ageKiteClick(loop2)
     loop2.tick()
     require.Empty(t, game2.walks,
-        "the cornered archer holds ground against the leash")
+        "the cornered archer holds ground against the wall")
+    require.Equal(t, int32(7), loop2.kiteHeldFor,
+        "the cornered hold is armed for the target")
     require.True(t, loop2.bowEquipped(),
         "the cornered archetype keeps the bow in hand - never a "+
             "weapon switch")

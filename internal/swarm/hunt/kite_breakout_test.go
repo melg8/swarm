@@ -54,7 +54,7 @@ func pocketChaser(bot *state.Bot, objectID, x, y int32) {
 func TestKiteBreakoutThreadsTheWalledPocket(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     trainMember(bot, 44800, 50000)
-    mobHitsCharacterAt(bot, 7, 45200)
+    mobHitsCharacterAt(bot, 45200)
     nav := &fakeNavigator{}
     // The gap hemisphere (north of the chaser line) answers walled;
     // the anti-gap cone (south) stays open.
@@ -103,12 +103,15 @@ func TestKiteBreakoutSkipsTheCrowdedRays(t *testing.T) {
     // the bisector of the 225 degree open span) land within the
     // flank clearance of one of the two bearings.
     pocketChaser(bot, 9, 45141, 49859)
-    mobHitsCharacterAt(bot, 7, 44800)
+    mobHitsCharacterAt(bot, 44800)
     nav := &fakeNavigator{}
-    // The whole gap hemisphere and the shallow south answer walled;
-    // the deep south ray of the ladder stays open.
+    // The race legs outrun the open corridor of the old step: the
+    // pocket mouth stays open only a short range around the
+    // character (the fan candidates of the hemisphere sweep land
+    // 1350 out, past the mouth), while the shorter kiteStep weave
+    // of the breakout ladder fits inside it.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.Y < 49800, nil
+        return math.Hypot(to.X-45000, to.Y-50000) < 500, nil
     }
     loop.SetNavigator(nav)
 
@@ -138,22 +141,26 @@ func TestKiteBreakoutSkipsTheCrowdedRays(t *testing.T) {
 func TestKiteRotationExhaustedBreaksOut(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     trainMember(bot, 44800, 50000)
-    mobHitsCharacterAt(bot, 7, 45200)
+    mobHitsCharacterAt(bot, 45200)
     nav := &fakeNavigator{}
     // Only two lanes answer open: the straight west lane of the gap
-    // fan (the initial retreat) and the straight south ray of the
-    // breakout ladder - everything else is walled.
+    // fan at the RACE length (the 1350 deficit cap of the fresh
+    // anchor - the initial retreat) and the straight south ray of
+    // the breakout ladder (the ordinary 400 weave) - everything
+    // else is walled.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X == 44600 ||
+        return to.X == 43650 ||
             (to.X == 45000 && to.Y == 49600), nil
     }
     loop.SetNavigator(nav)
 
-    // The opening retreat takes the open west lane of the fan.
+    // The opening retreat takes the open west lane of the fan (the
+    // -90 degree candidate around the northern gap bisector, the
+    // full race leg out).
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the open fan lane carried the opening retreat")
-    require.Equal(t, [3]int32{44600, 50000, -3500}, game.walks[0])
+    require.Equal(t, [3]int32{43650, 50000, -3500}, game.walks[0])
 
     // The west cell got refused and the walk aged past the probe:
     // the hemisphere sweep (the dead west cell skipped, every other
@@ -181,7 +188,7 @@ func TestKiteRotationExhaustedBreaksOut(t *testing.T) {
 // flanks under the same clearance the anti-gap ladder holds.
 func TestKiteLoneChaserCornerEscapesTheWallFace(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
-    mobHitsCharacterAt(bot, 7, 45200)
+    mobHitsCharacterAt(bot, 45200)
     nav := &fakeNavigator{}
     // The pocket: the whole away hemisphere (west through north and
     // south, the fan's every candidate) answers walled; only the
@@ -222,7 +229,7 @@ func TestKiteLoneChaserCornerEscapesTheWallFace(t *testing.T) {
 // shape straight from the hold line.
 func TestKiteLoneChaserSealedPocketHolds(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
-    mobHitsCharacterAt(bot, 7, 45200)
+    mobHitsCharacterAt(bot, 45200)
     nav := &fakeNavigator{}
     nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
         return false, nil

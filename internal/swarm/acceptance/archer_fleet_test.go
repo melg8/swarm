@@ -136,7 +136,7 @@ func fleetKiteCycles(
         fromX, fromY := px, py
         toX := px + fleetStreamStep*math.Cos(heading)
         toY := py + fleetStreamStep*math.Sin(heading)
-        for step := 0; step < 8; step++ {
+        for step := range 8 {
             at := shotAt.Add(time.Duration(step) * cycle / 8)
             phase := 0.0
             if at.After(walkAt) {
@@ -198,12 +198,14 @@ func fleetKiteStream(
 
 // TestFleetFoldImprovedKite pins the fold against an improved
 // stream: the retreat lags ride the accepted window, the re-shots
-// land fast, the fights stay beyond the floor, the retreat corners
-// bend one way and the fight drift stays inside the leash.
+// land fast AND at the safe shooting distance (the redesigned kite
+// re-shoots at ~480 units, above the re-shot distance floor), the
+// fights stay beyond the floor, the retreat corners bend one way
+// and the fight drift stays inside the leash.
 func TestFleetFoldImprovedKite(t *testing.T) {
     watch := newFleetWatch()
     for _, sample := range fleetKiteStream(
-        3*time.Second, 1600*time.Millisecond, 380.0,
+        3*time.Second, 1600*time.Millisecond, 480.0,
         [2]int32{36000, 50229}, true,
     ) {
         watch = watch.fold(sample)
@@ -372,6 +374,8 @@ func TestFleetFoldDropsTheFleetNoiseWalks(t *testing.T) {
         "the toward-target chase walk must not feed the retreat lags")
     require.Empty(t, watch.reshotGaps,
         "the noise walks must not feed the reshot gaps")
+    require.Empty(t, watch.reshotDists,
+        "the noise walks must not feed the reshot distances")
 }
 
 // TestFleetFoldDropsThePursuitContinuationLags pins the
@@ -517,4 +521,188 @@ func TestFleetFoldCornerNeedsTheSameFight(t *testing.T) {
     require.Zero(t, watch.curveCorners(),
         "the cross-fight corner must not count")
     require.Len(t, watch.kiteFightDrifts(), 2)
+}
+
+// fleetRaceLegStream emits the synthetic samples of the redesigned
+// race-leg kite (the round-17 contract): each cycle books one shot,
+// one long retreat walk - the race leg that regains the safe
+// shooting distance - and the single re-shot at reShotDist once the
+// leg is done. The re-shot lands either after the walk-end settle
+// (the honest cycle: the leg completes, the shot answers at the
+// regained range) or it ends the walk itself (interrupt: the arrival
+// auto-shot of the collapsed-range regression, whose ~zero gap the
+// old gap ceiling passed as a quick re-shot). The character marches
+// straight away from the trailing target so every walk clears the
+// away-direction gate, and the fight distance rides the reShotDist
+// parameter the way the live sampler carries the measured range.
+func fleetRaceLegStream(
+    retreatLag, walkDur time.Duration, reShotDist float64,
+    interrupt bool, cycles int,
+) []fleetSample {
+    base := time.Now().Add(-2 * time.Minute)
+    const cadence = 250 * time.Millisecond
+    const step = 40.0
+    // The character and the trailing target: the walk marches west
+    // (away from the target stand) one step per cadence tick.
+    px, py := 36000.0, 50229.0
+    tx, ty := int32(36600), int32(50229)
+    // The cycle leaves room for the windup lag, the race leg, the
+    // settle and the re-shot before the next shot.
+    cycle := retreatLag + walkDur + 2*time.Second
+    var samples []fleetSample
+    emit := func(at time.Time, walking bool, shotAt time.Time) {
+        samples = append(samples, fleetSample{
+            at: at, walking: walking, shotAt: shotAt,
+            fighting: true, targetID: 1, hasTarget: true,
+            hasPos: true, fightDist: reShotDist, hpPct: 90,
+            tx: tx, ty: ty, x: int32(px), y: int32(py),
+        })
+    }
+    for i := range cycles {
+        shotAt := base.Add(time.Duration(i) * cycle)
+        emit(shotAt, false, shotAt)
+        fromX := px
+        // The race leg: walking samples from the windup-end lag.
+        for at := shotAt.Add(retreatLag); at.Before(shotAt.Add(retreatLag + walkDur)); at = at.Add(cadence) {
+            px -= step
+            emit(at, true, shotAt)
+        }
+        walkEnd := shotAt.Add(retreatLag + walkDur)
+        if interrupt {
+            // The arrival shot that ends the walk itself: the
+            // re-shot lands at the walk-end moment, ~zero gap.
+            emit(walkEnd, false, walkEnd)
+        } else {
+            // The honest cycle: the leg completes, the settle
+            // stands, then the re-shot answers at the regained
+            // range.
+            emit(walkEnd, false, shotAt)
+            reShot := walkEnd.Add(200 * time.Millisecond)
+            emit(reShot, false, reShot)
+        }
+        // The mob trails to the stand this cycle fought from (the
+        // chase of the next cycle).
+        tx, ty = int32(fromX), int32(py)
+    }
+
+    return samples
+}
+
+// TestFleetVerdictReshotReadsTheReShotDistance pins the round-17
+// re-scope of the quick-reshot verdict: the redesigned kite runs
+// long race legs (10-13 s of walking to regain the safe shooting
+// distance) before the single re-shot, so the verdict reads the
+// DISTANCE the re-shot lands at, not the walk-end-to-shot gap. A
+// re-shot at 500 units after a 12 s race leg passes the behavior
+// and the description names the median re-shot distance.
+func TestFleetVerdictReshotReadsTheReShotDistance(t *testing.T) {
+    watch := newFleetWatch()
+    for _, sample := range fleetRaceLegStream(
+        1600*time.Millisecond, 12*time.Second, 500.0, false, 3,
+    ) {
+        watch = watch.fold(sample)
+    }
+
+    require.Len(t, watch.reshotGaps, 3,
+        "each race leg closes with one re-shot")
+    require.Equal(t, []float64{500, 500, 500}, watch.reshotDists,
+        "every re-shot books the fight distance it landed at")
+    verdicts := watch.verdicts()
+    require.True(t, verdicts.reshotE,
+        "the race-leg re-shots armed the quick-reshot evidence")
+    require.True(t, verdicts.reshot, verdicts.reshotD)
+    require.Contains(t, verdicts.reshotD, "500",
+        "the verdict names the median re-shot distance")
+    require.Contains(t, verdicts.reshotD, "gap",
+        "the verdict keeps reporting the median gap")
+}
+
+// TestFleetVerdictReshotFailsTheCollapsedRangeReShot pins the
+// regression the re-scope exists to catch: the second shot at
+// collapsed range. The legacy kite's fixed short leg ends with the
+// parity chaser at melee reach and the surviving attack stance
+// firing the arrival auto-shot - a ~zero walk-end-to-shot gap that
+// the old gap ceiling read as a quick re-shot. The re-scoped verdict
+// reads the range: a re-shot at 141 units must FAIL the behavior and
+// the description must name the collapsed distance.
+func TestFleetVerdictReshotFailsTheCollapsedRangeReShot(t *testing.T) {
+    watch := newFleetWatch()
+    for _, sample := range fleetRaceLegStream(
+        1600*time.Millisecond, 1500*time.Millisecond, 141.0, true, 3,
+    ) {
+        watch = watch.fold(sample)
+    }
+
+    require.Equal(t, []time.Duration{0, 0, 0}, watch.reshotGaps,
+        "the arrival shots book the ~zero interrupt gap")
+    require.Equal(t, []float64{141, 141, 141}, watch.reshotDists,
+        "every re-shot books the collapsed fight distance")
+    verdicts := watch.verdicts()
+    require.True(t, verdicts.reshotE,
+        "the collapsed-range re-shots armed the quick-reshot"+
+            " evidence")
+    require.False(t, verdicts.reshot,
+        "the second shot at collapsed range must fail the"+
+            " quick-reshot behavior")
+    require.Contains(t, verdicts.reshotD, "141",
+        "the verdict names the collapsed re-shot distance")
+}
+
+// TestFleetVerdictReshotFallsBackToTheGapCeiling pins the
+// no-distance fallback: a re-shot sample that lost the fight range
+// (the target stand dropped out of the tracker between the walk end
+// and the shot) books -1, and a window of nothing else must fall
+// back to the old gap ceiling so the verdict never reads vacuous -
+// and say so in the description.
+func TestFleetVerdictReshotFallsBackToTheGapCeiling(t *testing.T) {
+    watch := newFleetWatch()
+    base := time.Now().Add(-time.Minute)
+    target := [2]int32{36600, 50229}
+    sample := func(at time.Time, walking bool, x, y int32,
+        fighting bool, shotAt time.Time,
+    ) fleetSample {
+        targetID := int32(0)
+        dist := -1.0
+        if fighting {
+            targetID = 1
+            dist = 300
+        }
+
+        return fleetSample{
+            at: at, walking: walking, fighting: fighting,
+            targetID: targetID, hasPos: true, hasTarget: fighting,
+            fightDist: dist, tx: target[0], ty: target[1],
+            shotAt: shotAt, hpPct: 90, x: x, y: y,
+        }
+    }
+    // Two cycles whose re-shot sample lost the fight: the walk
+    // ends inside the fight (the direction gate confirms the
+    // retreat), the shot lands 200 ms later with the target stand
+    // already gone.
+    for i := range 2 {
+        shot := base.Add(time.Duration(i) * 5 * time.Second)
+        watch = watch.fold(sample(shot, false, 36000, 50229,
+            true, shot))
+        for j := range 4 {
+            at := shot.Add(time.Duration(j) * 250 * time.Millisecond)
+            watch = watch.fold(sample(at, true,
+                36000-int32(j)*80, 50229, true, shot))
+        }
+        walkEnd := shot.Add(time.Second)
+        watch = watch.fold(sample(walkEnd, false, 35680, 50229,
+            true, shot))
+        reShot := walkEnd.Add(200 * time.Millisecond)
+        watch = watch.fold(sample(reShot, false, 35680, 50229,
+            false, reShot))
+    }
+
+    require.Equal(t, []float64{-1, -1}, watch.reshotDists,
+        "the lost-range re-shots book the missing distance")
+    verdicts := watch.verdicts()
+    require.True(t, verdicts.reshotE,
+        "the fallback window armed the quick-reshot evidence")
+    require.True(t, verdicts.reshot,
+        "the gap ceiling fallback keeps the verdict alive")
+    require.Contains(t, verdicts.reshotD, "fallback",
+        "the description names the gap ceiling fallback")
 }
