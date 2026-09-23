@@ -239,3 +239,56 @@ func TestKiteLoneChaserSealedPocketHolds(t *testing.T) {
             "flanks, 6 walled or dead)",
         "the sealed-pocket refusal names the cone and the counts")
 }
+
+// TestKiteShoveThreadsTheSeamTheConeRefuses pins the round-14 shove
+// tier: two chasers on opposite sides leave the gap bisector (the
+// northern perpendicular of the east-west line), and the shove takes
+// THAT ray itself at the shorter kiteShoveStep - the seam the
+// breakout cone refuses by design (it probes the 135/180 degree
+// folds of the gap ray, never the ray itself under the tighter 25
+// degree flank bound).
+func TestKiteShoveThreadsTheSeamTheConeRefuses(t *testing.T) {
+    bot, _, loop := kiteBowBot(t, 45200)
+    trainMember(bot, 44800, 50000)
+    loop.SetLogger(log.New(&bytes.Buffer{}, "", 0))
+
+    endX, endY, ok := loop.kiteShoveResolve(
+        45000, 50000, -3500, nil)
+    require.True(t, ok,
+        "the widest-gap seam carries the shove")
+    require.Equal(t, int32(45000), endX,
+        "the shove runs the gap bisector (north)")
+    require.InDelta(t, 50250.0, float64(endY), 1.0,
+        "the shove steps the shorter burst length (250 units)")
+}
+
+// TestKiteShoveRefusesTheLoneChaser pins the shove gate: a lone
+// chaser has no seam to thread (the lone-chaser cone owns the
+// wall-face wedges past the hemisphere edge) - the shove refuses and
+// the hold owns the answer.
+func TestKiteShoveRefusesTheLoneChaser(t *testing.T) {
+    _, _, loop := kiteBowBot(t, 45200)
+    loop.SetLogger(log.New(&bytes.Buffer{}, "", 0))
+
+    _, _, ok := loop.kiteShoveResolve(45000, 50000, -3500, nil)
+    require.False(t, ok,
+        "a lone chaser leaves no seam - the hold owns the pocket")
+}
+
+// TestKiteShoveSkipsTheDeadSeam pins the dead-cell memory of the
+// shove: a seam the server already refused (the rotation named the
+// endpoint dead) never carries a walk again - the shove rotates onto
+// the next seam edge instead of re-clicking the dead endpoint.
+func TestKiteShoveSkipsTheDeadSeam(t *testing.T) {
+    bot, _, loop := kiteBowBot(t, 45200)
+    trainMember(bot, 44800, 50000)
+    loop.SetLogger(log.New(&bytes.Buffer{}, "", 0))
+
+    endX, endY, ok := loop.kiteShoveResolve(45000, 50000, -3500,
+        [][2]int32{{45000, 50250}})
+    require.True(t, ok,
+        "the dead seam rotates the shove onto the edge candidate")
+    require.NotEqual(t, [2]int32{45000, 50250},
+        [2]int32{endX, endY},
+        "the dead seam never carries the shove twice")
+}
