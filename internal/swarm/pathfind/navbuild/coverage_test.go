@@ -26,7 +26,7 @@ func TestRealRegionWalkableCoverage(t *testing.T) {
     rl, err := extractRegion(data, 21, 19, opts.DedupDelta)
     require.NoError(t, err)
     sh := assignSheets(rl, opts.Climb, opts.MinSheetLayers)
-    rects, polyAt := buildRects(rl, sh, opts.Climb)
+    rects, polyAt := buildRects(rl, sh, opts.Climb, opts.MergeTolerance)
 
     var walkable, blocked, dropped, covered, holes int
     holeCells := make(map[int32]int)

@@ -149,6 +149,25 @@ hypothesis either way - the registry entry is unchanged.
    growth multiplies the polygon count (21_19: 91k -> 373k) - the
    price of routes that respect the walls and represent the squares
    as they are.
+   The **merge tolerance** (`Options.MergeTolerance`, the
+   `-merge-tolerance` flag of `cmd/navmesh-build`, issue #57)
+   relaxes the exact height rule: an adjacent pair whose height
+   delta fits the tolerance may share a rectangle (the walls and
+   the climb stay in force, so the interior stays walkable; the
+   climb caps the tolerance from above). The polygon corners then
+   carry the geodata heights of their corner cells and the runtime
+   bilinear surface blends the merged staircase - the route answers
+   move, which is the drift the corpus replay of
+   `cmd/navpack-verify` measures per candidate. The measured round
+   (the 20_18..21_19 block, 2 743 519 polys / 95.8 MB raw wire):
+   tolerance 8 halves the polygons (1 443 534) and cuts the raw
+   wire 63.9% (34.6 MB) but 242 of 329 corpus queries drift (125
+   waypoint count changes, 113 surface moves, 4 verdict flips);
+   tolerance 16-40 saturate at ~1.38M polys / 31.3 MB with 245
+   drifts. The zero-drift gate refuses every candidate: the blend
+   of merged heights is a genuine surface change, not a rounding
+   artifact - the reduction stays available behind the flag for
+   whatever gate the owner decides on.
 4. **The links** - the adjacent cell layer pairs of the whole region
    accumulate the open portal spans: the pair needs the height
    difference within the climb AND the NSWE walls open in both
