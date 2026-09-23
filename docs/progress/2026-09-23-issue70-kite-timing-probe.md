@@ -442,14 +442,21 @@ wall-face escape) BEFORE round 13.
 The round-12 live verdict (runs/fleet-2026-09-23/round12.log, the
 per-run log under logs/acceptance/archer-fleet-20260923-193759-*):
 
-- shoots 5/5, max-range 2/5 (temp20 443, temp23 471, temp24 334 -
-  the passing medians rode the 480 floor; temp21 177 and temp22 88
-  are the crowded shared central cells), early-retreat 2/5 (the
-  fold gate cleaned temp21 to 1.9 s and temp23 to 2.0 s; temp22 2.6
-  s and temp24 6.2 s are the hold-dominated slots), quick-reshot
-  2/5 (temp20 2.8 s, temp23 1.6 s - the walk ends into holds),
-  curved 3/5 (the no-evidence slots spent their windows on short
-  volley fights).
+- 16 of 25 behaviors (the best round yet; round 11 measured
+  10): shoots 5/5, max-range 3/5 (temp20 443, temp23 471, temp24
+  334 - the passing medians rode the 480 floor; temp21 177 and
+  temp22 88 are the crowded shared central cells), early-retreat
+  3/5 (the fold gate cleaned temp21 to 1.9 s and temp23 to 2.0 s;
+  temp22 2.6 s and temp24 6.2 s are the hold-dominated slots),
+  quick-reshot 3/5 (temp20 2.8 s, temp23 1.6 s - the walk ends into
+  holds), curved 2/5 (the no-evidence slots spent their windows on
+  short volley fights).
+- ERRATUM (the QA audit of this round caught it): the commit
+  message of 593b4fd1 and an earlier draft of this section misread
+  the fleet line's "N of 5 bots" as the FAILING count and claimed
+  14/25 - the actual round-12 verdict line reads max-range 3 of 5,
+  early-retreat 3 of 5, quick-reshot 3 of 5, curved 2 of 5. The
+  numbers above are the corrected record.
 
 The round-13 live verdict (runs/fleet-2026-09-23/round13.log, the
 per-run log under logs/acceptance/archer-fleet-20260923-195432-*):
@@ -463,10 +470,12 @@ per-run log under logs/acceptance/archer-fleet-20260923-195432-*):
   recovery-dominated window), max-range 1/5 - the crowded-cell
   medians fell (temp23 471 -> 224, temp24 334 -> 74): the round
   stacked the bots onto the shared central cells harder (temp20 a
-  spent window at 71 samples, temp24 at 320). The behavior total
-  held at 14/25 - the escape traded the pocket holds for longer
-  wall-face retreat fights on the crowd, exactly the honest
-  trade-off the metric must now attribute.
+  spent window at 71 samples, temp24 at 320). 14 of 25 behaviors -
+  a REAL 2-point decline from round 12's 16, not a hold: the escape
+  fired 21 times but the max-range verdict fell 3/5 -> 1/5 on the
+  crowd (the 105-135 degree folds open distance slower, the stall
+  gate may stand them down - the P1 below), and the surround holds
+  own the rest. The P0 crowd attribution owns the next round.
 
 Open for the next round, ranked:
 
