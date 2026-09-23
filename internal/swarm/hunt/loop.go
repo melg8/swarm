@@ -782,19 +782,40 @@ type Loop struct {
     kiteWalkBaseX int32
     kiteWalkBaseY int32
     // kiteReclickAt stamps the last click of the ladder (the initial
-    // click included): the kiteReclickPeriod pacing rides it.
+    // click included): the kiteReclickPeriod pacing rides it, and the
+    // refusal correlation (kiteClickRefused) reads it as the send
+    // baseline of the ActionFailed attribution.
     kiteReclickAt time.Time
+    // kiteWalkIssuedAt stamps the moment the kite walk went out: the
+    // silent probe of the ladder measures the walk age from it (a
+    // walk unanswered past kiteProbeElapsed with the character still
+    // on the issue cell names the endpoint dead without any refusal
+    // evidence - the H-006 silent drop signature).
+    kiteWalkIssuedAt time.Time
     // kiteReclicks counts the re-clicks spent on the current kite
-    // walk: the probe ordinal and the rotation read it - the second
-    // re-click latches the dead-click probe and rotates the dead
-    // endpoint onto the next fan candidate, the third is the last
-    // try of the rotated lane inside the window.
+    // walk: the click bound reads it (the packet budget of a dead
+    // transport).
     kiteReclicks int
-    // kiteWalkDead latches the probe verdict of the current walk:
-    // one diagnostic line per walk, the next dump reads the latch
-    // (and the rotation that follows it) to name the mechanism that
-    // ate the clicks.
+    // kiteWalkDead latches the dead-endpoint verdict of the current
+    // walk (the refusal evidence or the silent probe set it): one
+    // diagnostic line per walk, the rotation follows the latch.
     kiteWalkDead bool
+    // kiteWalkDeadCells carries the cells the rotation already named
+    // dead (the server refused the click or it stayed silent through
+    // the probe) and kiteWalkDeadCount the live prefix of it: the
+    // rotation resolves the next fan lane skipping the whole set - a
+    // refused cell never starts a walk, re-clicking it changes
+    // nothing. The array covers every candidate of the away
+    // hemisphere (the straight ray plus the fan).
+    kiteWalkDeadCells [1 + 2*kiteFanSteps][2]int32
+    kiteWalkDeadCount int
+    // kiteDeadFor is the fight the dead-cell memory belongs to: the
+    // memory persists across the walk cycles of one target (the
+    // terrain does not change between the shots - the later cycles
+    // start on a lane that already proved walkable instead of paying
+    // the probe tax on the same dead straight cell every cycle) and
+    // resets on the target change.
+    kiteDeadFor int32
     // kite carries the tunable block of the kite fight (see
     // kite.go): the loop starts at DefaultKiteParams - the shipped
     // tuning the acceptance scenario pins - and the launch config
