@@ -221,20 +221,36 @@ func TestKiteDeadEndLaneRePlansAtTheNextProbe(t *testing.T) {
     loop.combatAvoidUntil = time.Time{}
     loop.kiteAt = time.Now().Add(-kiteStepPeriod)
     selfSwingsAt(bot, 45200)
+    // The second retreat of the fight prefers the CURVED ray (the
+    // circling retreat of issue #70): the away-ray bent the fixed
+    // tangential bearing. The corridor ahead of that lane closes
+    // now - the dead end the character would walk into.
+    awayX, awayY := -1.0, 0.0
+    prefX, prefY := rotatePlanar(awayX, awayY, kiteCurveStep)
+    curvedX := 45000 + int32(math.Round(prefX*float64(kiteStep)))
+    curvedY := 50000 + int32(math.Round(prefY*float64(kiteStep)))
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X != 44600, nil
+        return int32(math.Round(to.X)) != curvedX ||
+            int32(math.Round(to.Y)) != curvedY, nil
     }
 
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 2,
         "the dead end must re-plan, not stall the retreat")
     bent := game.walks[1]
-    // The 45 degree lane southwest of the straight ray: the first
-    // open candidate of the fan.
-    require.InDelta(t, 45000-kiteStep*math.Sqrt2/2, float64(bent[0]), 1.0,
-        "the re-plan bends onto the 45 degree lane")
-    require.InDelta(t, 50000-kiteStep*math.Sqrt2/2, float64(bent[1]), 1.0,
-        "the re-plan bends onto the 45 degree lane")
+    // The fan candidate inside the away half-plane: the preferred
+    // curved ray blocked, the 70+45 degree one folds back into the
+    // train (the half-plane gate), so the 70-45 degree lane carries
+    // the re-plan.
+    fanX, fanY := rotatePlanar(awayX, awayY, kiteCurveStep-kiteFanStep)
+    require.InDelta(t,
+        float64(45000+int32(math.Round(fanX*float64(kiteStep)))),
+        float64(bent[0]), 1.0,
+        "the re-plan bends onto the half-open fan lane")
+    require.InDelta(t,
+        float64(50000+int32(math.Round(fanY*float64(kiteStep)))),
+        float64(bent[1]), 1.0,
+        "the re-plan bends onto the half-open fan lane")
 }
 
 // TestKiteHalfPlaneGuardRejectsTheFoldBack pins the away half-plane

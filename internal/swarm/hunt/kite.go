@@ -207,6 +207,17 @@ const (
     // back toward the train - the guard rejects the endpoints whose
     // retreat component turned negative beyond the float noise.
     kiteHalfPlaneSlack = -0.05
+    // kiteCurveStep is the tangential bearing of the curving retreat
+    // (issue #70, the fifth behavior): after the opening straight
+    // retreat of a fight every later retreat leans this far off the
+    // away-ray, on a turn side the fight keeps for its whole life -
+    // the character circles the fight instead of marching one ray,
+    // and the drift away from the farm point stays bounded by the
+    // circle's radius instead of the leash. The bearing rides the
+    // away half-plane (a mob that circled behind or a cornered
+    // hemisphere mirrors the turn side rather than fold a lane
+    // back into the train).
+    kiteCurveStep = 70 * math.Pi / 180
     // kiteHoldLogPeriod paces the cornered hold diagnostic: the hold
     // itself re-probes at the kite pacing, the log line lands once
     // per period - a cornered fight is a standing fight, the line is
@@ -643,8 +654,16 @@ func (l *Loop) kiteResolveAndClick(
 
         return false
     }
+    // The curving retreat (issue #70, the fifth behavior): the
+    // opening retreat of a fight runs the straight away-ray, every
+    // later one leans the fixed tangential bearing on the fight's
+    // turn side - the circle. The RAW away vector stays the
+    // half-plane reference of the lane battery (the curve may bend
+    // the preferred ray, never the guard).
+    prefX, prefY := l.kiteCurveDirection(dirX, dirY, selfX, selfY)
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
-        selfX, selfY, selfZ, dirX, dirY, l.kiteDeadCellsFor())
+        selfX, selfY, selfZ, prefX, prefY, dirX, dirY,
+        l.kiteDeadCellsFor())
     if !found {
         // Cornered: no walkable lane in the whole away hemisphere.
         // The hold ground answer is the archetype rule - the bow is
@@ -729,6 +748,18 @@ func (l *Loop) kiteClickWalk(now time.Time) bool {
         // movement window and the re-request gate are already armed.
         return false
     }
+    if now.After(l.kiteClickUntil) {
+        // The disable lapsed between the ticks (a stalled tick, a
+        // blocking write): a click now would race the re-shot and
+        // lose a whole cycle (the 3000 ms probe row of the findings)
+        // - its walk window is already past, the ladder would die
+        // on arrival and the forced re-request would cancel the
+        // just-issued walk. The schedule stands down; the next shot
+        // arms its own.
+        l.kiteClickClear()
+
+        return false
+    }
     until := l.kiteClickUntil
     l.kiteClickClear()
     selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
@@ -797,6 +828,70 @@ func (l *Loop) kiteShotPhase(
     return clickAt, until, true
 }
 
+// kiteCurveDirection bends the retreat ray into the curving circle
+// of the fight (issue #70, the fifth behavior): the OPENING retreat
+// of a fight runs the straight away-ray (the panic retreat opens
+// the distance at once), every later one leans the fixed tangential
+// bearing kiteCurveStep on the fight's turn side - the character
+// circles the fight instead of marching one ray, so the drift away
+// from the farm point stays bounded by the circle. The turn side
+// is the fight's own constant (kiteCurveSide picks it once: toward
+// the hunting zone center when the leash knows one, a fixed side
+// otherwise). The step itself stays under the half-plane bound
+// (cos(kiteCurveStep) >= kiteHalfPlaneSlack, pinned by a unit
+// test), so the bent ray never folds back into the train whatever
+// the turn side. The advance to the curved steps belongs to the
+// issued walk alone (kiteIssueWalk): a cornered or refused retreat
+// spends nothing, the opening straight step stays armed until a
+// walk really goes out.
+func (l *Loop) kiteCurveDirection(
+    dirX, dirY float64, selfX, selfY int32,
+) (float64, float64) {
+    if l.kiteCurveFor != l.target {
+        l.kiteCurveFor = l.target
+        l.kiteCurved = false
+        l.kiteCurveSign = l.kiteCurveSide(dirX, dirY, selfX, selfY)
+    }
+    if !l.kiteCurved {
+        return dirX, dirY
+    }
+
+    // The constant contract (pinned by TestKiteCurveStepStaysInTheAwayHalfPlane):
+    // kiteCurveStep stays under the half-plane bound
+    // (cos(step) >= kiteHalfPlaneSlack), so the bent ray can never
+    // fold back into the train whatever the turn side - the guard
+    // would mirror the side otherwise, but a step that needs the
+    // mirror has no business being a circle bearing.
+    bentX, bentY := rotatePlanar(dirX, dirY, l.kiteCurveSign*kiteCurveStep)
+
+    return bentX, bentY
+}
+
+// kiteCurveSide picks the turn side of a fight's circle once: the
+// side whose tangential ray leans back toward the hunting zone
+// center when the leash knows one (the circle bends the drift back
+// toward the farm point), a fixed counterclockwise side otherwise.
+func (l *Loop) kiteCurveSide(
+    dirX, dirY float64, selfX, selfY int32,
+) float64 {
+    if l.zoneHalf == 0 {
+        return 1
+    }
+    toCenterX := float64(l.zoneCX - selfX)
+    toCenterY := float64(l.zoneCY - selfY)
+    if len := math.Hypot(toCenterX, toCenterY); len >= 1 {
+        ccwX, ccwY := rotatePlanar(dirX, dirY, kiteCurveStep)
+        if ccwX*toCenterX/len+ccwY*toCenterY/len >=
+            dirX*toCenterX/len+dirY*toCenterY/len {
+            return 1
+        }
+
+        return -1
+    }
+
+    return 1
+}
+
 // kiteIssueWalk sends the retreat click of one kite step and arms
 // the re-click ladder on it (issue #60, the second round): the walk
 // endpoint, the issue cell and the window land in the ladder state
@@ -820,6 +915,10 @@ func (l *Loop) kiteIssueWalk(
     l.kiteWalkIssuedAt = now
     l.kiteWalkUntil = until
     l.combatAvoidUntil = until
+    // The curving circle advances on the issued walk alone: the
+    // opening straight retreat of the fight is spent, every later
+    // retreat leans the tangential bearing (kiteCurveDirection).
+    l.kiteCurved = true
     l.kiteReclickAt = now
     l.kiteReclicks = 0
     l.kiteWalkDead = false
@@ -933,8 +1032,13 @@ func (l *Loop) kiteRotateDeadEndpoint(
     if encircled {
         return false
     }
+    // The rotation stays AWAY-CENTERED (the raw away-ray the
+    // half-plane guards): the dead-endpoint recovery is a coverage
+    // sweep of the whole hemisphere, the circle owns the fresh
+    // retreat preference alone - a rotation that clung to the curved
+    // ray would sweep only the three candidates left of its fan.
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
-        selfX, selfY, selfZ, dirX, dirY,
+        selfX, selfY, selfZ, dirX, dirY, dirX, dirY,
         l.kiteWalkDeadCells[:l.kiteWalkDeadCount])
     if !found {
         return false
@@ -1224,21 +1328,24 @@ func (l *Loop) kiteTrainDirection(
 // and the water). Reports the endpoint and whether a walkable lane
 // exists.
 func (l *Loop) kiteRetreatLaneSkipping(
-    selfX, selfY, selfZ int32, dirX, dirY float64,
+    selfX, selfY, selfZ int32, prefX, prefY, awayX, awayY float64,
     dead [][2]int32,
 ) (int32, int32, bool) {
-    // The candidate rays of the away hemisphere: the straight
-    // away-ray first (the lane of record), then the fan candidates
-    // widening symmetrically around it - the 45 degree lanes before
-    // the 90 degree ones.
+    // The candidate rays of the away hemisphere around the
+    // PREFERRED direction (the straight away-ray of the opening
+    // retreat, the curved bearing of the circling ones): the
+    // preferred ray first (the lane of record), then the fan
+    // candidates widening symmetrically around it - the 45 degree
+    // lanes before the 90 degree ones. The half-plane reference
+    // stays the RAW away vector whatever the preference leans to.
     var rays [1 + 2*kiteFanSteps][2]float64
-    rays[0] = [2]float64{dirX, dirY}
+    rays[0] = [2]float64{prefX, prefY}
     count := 1
     for step := 1; step <= kiteFanSteps; step++ {
         angle := kiteFanStep * float64(step)
         for _, sign := range [2]float64{1, -1} {
             rays[count][0], rays[count][1] =
-                rotatePlanar(dirX, dirY, sign*angle)
+                rotatePlanar(prefX, prefY, sign*angle)
             count++
         }
     }
@@ -1246,7 +1353,7 @@ func (l *Loop) kiteRetreatLaneSkipping(
         endX := selfX + int32(math.Round(ray[0]*l.kite.Step))
         endY := selfY + int32(math.Round(ray[1]*l.kite.Step))
         laneX, laneY, ok := l.kiteLaneResolve(
-            selfX, selfY, selfZ, endX, endY, dirX, dirY)
+            selfX, selfY, selfZ, endX, endY, awayX, awayY)
         if !ok {
             continue
         }

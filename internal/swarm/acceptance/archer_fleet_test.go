@@ -171,3 +171,55 @@ func TestMedianDuration(t *testing.T) {
     require.Zero(t, medianFloat(nil))
     require.InDelta(t, 400.0, medianFloat([]float64{100, 400}), 0.01)
 }
+
+// TestFleetFoldDropsTheFleetNoiseWalks pins the reject path of the
+// direction gate: walks that move toward the fight target (the
+// chase-stall steps) or start outside a fight (the loot pickups,
+// the cell-rotation approaches) never feed the retreat medians -
+// the exact pollution the first live round measured into a 3.1 s
+// reshot median on walks the kite never issued.
+func TestFleetFoldDropsTheFleetNoiseWalks(t *testing.T) {
+    watch := newFleetWatch(36000, 50229)
+    base := time.Now().Add(-time.Minute)
+    target := [2]int32{36600, 50229}
+    sample := func(at time.Time, walking bool, x, y int32,
+        fighting bool, shotAt time.Time,
+    ) fleetSample {
+        return fleetSample{
+            at: at, walking: walking, fighting: fighting,
+            hasPos: true, hasTarget: fighting, fightDist: 300,
+            tx: target[0], ty: target[1], shotAt: shotAt, hpPct: 90,
+            x: x, y: y,
+        }
+    }
+    // The chase walk of the first fight: fighting, but the
+    // displacement runs TOWARD the target.
+    walk := base.Add(time.Second)
+    for i := range 4 {
+        at := walk.Add(time.Duration(i) * 250 * time.Millisecond)
+        watch = watch.fold(sample(at, true, 36000+int32(i)*80,
+            50229, true, base))
+    }
+    watch = watch.fold(sample(walk.Add(time.Second), false, 36320,
+        50229, true, base))
+    // The shot after the chase walk (the would-be reshot gap).
+    shot2 := base.Add(3 * time.Second)
+    watch = watch.fold(sample(shot2, false, 36320, 50229, true, shot2))
+    // The loot walk: no fight, any direction.
+    loot := base.Add(4 * time.Second)
+    for i := range 4 {
+        at := loot.Add(time.Duration(i) * 250 * time.Millisecond)
+        watch = watch.fold(sample(at, true, 36320-int32(i)*80,
+            50229, false, shot2))
+    }
+    watch = watch.fold(sample(loot.Add(time.Second), false, 36000,
+        50229, false, shot2))
+    shot3 := base.Add(6 * time.Second)
+    watch = watch.fold(sample(shot3, false, 36000, 50229, true, shot3))
+
+    require.Equal(t, 3, watch.shots)
+    require.Empty(t, watch.retreatLags,
+        "the toward-target chase walk must not feed the retreat lags")
+    require.Empty(t, watch.reshotGaps,
+        "the noise walks must not feed the reshot gaps")
+}

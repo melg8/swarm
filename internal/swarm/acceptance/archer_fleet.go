@@ -294,10 +294,14 @@ func (w fleetWatch) fold(s fleetSample) fleetWatch {
                 if w.havePendingLag {
                     w.retreatLags = append(w.retreatLags, w.pendingLag)
                 }
-                if !s.shotAt.IsZero() && s.shotAt != w.walkShotAt {
+                if !s.shotAt.IsZero() && !w.walkShotAt.IsZero() &&
+                    s.shotAt != w.walkShotAt {
                     // The re-shot itself ended the walk (the server
                     // stops the movement on the attack): the gap is
-                    // the walk end to the interrupt shot, ~zero.
+                    // the walk end to the interrupt shot, ~zero. The
+                    // walkShotAt guard keeps a mid-walk attach (the
+                    // fold never saw the owning shot) from minting a
+                    // fake zero.
                     w.reshotGaps = append(w.reshotGaps, 0)
                 } else {
                     w.walkEndedAt = s.at

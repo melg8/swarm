@@ -757,6 +757,18 @@ type Loop struct {
     // end) and the forced attack re-request fires the moment the
     // window lapses.
     kiteClickUntil time.Time
+    // kiteCurveFor is the fight the curving retreat circle belongs
+    // to (see kiteCurveDirection, kite.go): a fresh target starts
+    // its own circle - the opening straight retreat first, the
+    // tangential bearing of the fixed turn side after.
+    kiteCurveFor int32
+    // kiteCurved reports whether the fight spent its opening
+    // straight retreat (an issued walk alone spends it - see
+    // kiteIssueWalk; a cornered or refused retreat spends nothing).
+    kiteCurved bool
+    // kiteCurveSign is the turn side of the current fight's circle
+    // (+1 counterclockwise, -1 clockwise; see kiteCurveSide).
+    kiteCurveSign float64
     // kiteFor is the fight the kite streak counts for (the hunt
     // target): a fresh target resets the streak (kiteStreak). The
     // armed threat may be a train member - the streak still counts
