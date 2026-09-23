@@ -186,7 +186,7 @@ func fleetSpawnZ(engine *pathfind.Engine, x, y int32) int32 {
 
 // fleetSample is one observation of one fleet bot: the 250 ms monitor
 // tick latches the movement state, the last own shot stamp, the
-// position, the fight target and the health.
+// position, the fight target and its ground position, and the health.
 type fleetSample struct {
     at        time.Time
     walking   bool
@@ -195,13 +195,21 @@ type fleetSample struct {
     x, y      int32
     fighting  bool
     fightDist float64
+    hasTarget bool
+    tx, ty    int32
     hpPct     float64
 }
 
 // fleetWatch folds one bot's samples into the behavior evidence: the
 // shot count, the retreat lags (the movement start after a shot), the
-// re-shot gaps (the shot after a walk ends), the fight distance
-// distribution, the anchor leash and the walk direction turns.
+// re-shot gaps (the shot after a retreat walk ends), the fight
+// distance distribution, the anchor leash and the walk direction
+// turns. The retreat metrics ride the DIRECTION gate: only a walk
+// that moved away from the fight target it started in counts as a
+// kite retreat - the loot pickups, the cell-rotation approaches and
+// the chase-stall walks toward the target polluted the plain
+// walk population of the first live round (a 3.1 s walk-end-to-shot
+// median measured on walks the kite never issued).
 type fleetWatch struct {
     anchorX     int32
     anchorY     int32
@@ -221,6 +229,18 @@ type fleetWatch struct {
     lastX        int32
     lastY        int32
     haveLast     bool
+    // the pending retreat candidate of the running walk: armed at
+    // the walk start (the lag from the last shot), confirmed or
+    // dropped at the walk end by the away-direction check.
+    pendingLag      time.Duration
+    havePendingLag  bool
+    walkFighting    bool
+    haveWalkFrom    bool
+    walkFromX       int32
+    walkFromY       int32
+    walkTargetX     int32
+    walkTargetY     int32
+    walkShotAt      time.Time
 }
 
 // newFleetWatch arms the fold with the spawn anchor.
@@ -244,16 +264,50 @@ func (w fleetWatch) fold(s fleetSample) fleetWatch {
         }
     }
     if s.walking && w.walkStarted.IsZero() {
+        // The retreat candidate: the walk starts inside a live fight
+        // (the deferred click of the shot cycle). The lag is pending
+        // until the walk end confirms the direction - a chase-stall
+        // walk toward the target starts in a live fight too.
         w.walkStarted = s.at
+        w.walkFighting = s.fighting
+        w.haveWalkFrom = s.hasPos
+        w.walkFromX, w.walkFromY = s.x, s.y
+        w.walkTargetX, w.walkTargetY = s.tx, s.ty
+        w.walkShotAt = w.lastShot
         if !w.lastShot.IsZero() && s.at.After(w.lastShot) {
-            if lag := s.at.Sub(w.lastShot); lag >= 0 {
-                w.retreatLags = append(w.retreatLags, lag)
-            }
+            w.pendingLag = s.at.Sub(w.lastShot)
+            w.havePendingLag = true
         }
     }
     if !s.walking && !w.walkStarted.IsZero() {
+        // The walk ended: the away-direction verdict gates the
+        // pending retreat metrics. A walk whose displacement leans
+        // away from the target it started against is the kite
+        // retreat; anything else (a loot pickup, an approach of the
+        // next pick, a chase walk toward the target) is fleet noise.
+        if w.walkFighting && w.haveWalkFrom && s.hasPos {
+            dx := float64(s.x - w.walkFromX)
+            dy := float64(s.y - w.walkFromY)
+            awayX := float64(w.walkFromX - w.walkTargetX)
+            awayY := float64(w.walkFromY - w.walkTargetY)
+            if dx*awayX+dy*awayY > 0 {
+                if w.havePendingLag {
+                    w.retreatLags = append(w.retreatLags, w.pendingLag)
+                }
+                if !s.shotAt.IsZero() && s.shotAt != w.walkShotAt {
+                    // The re-shot itself ended the walk (the server
+                    // stops the movement on the attack): the gap is
+                    // the walk end to the interrupt shot, ~zero.
+                    w.reshotGaps = append(w.reshotGaps, 0)
+                } else {
+                    w.walkEndedAt = s.at
+                }
+            }
+        }
         w.walkStarted = time.Time{}
-        w.walkEndedAt = s.at
+        w.havePendingLag = false
+        w.walkFighting = false
+        w.haveWalkFrom = false
     }
     if s.fighting && s.fightDist >= 0 {
         w.fightDists = append(w.fightDists, s.fightDist)
@@ -578,6 +632,8 @@ func (b *fleetBotRun) foldSample() {
         if x, y, _, ok := tracker.SelfPosition(); ok {
             if tx, ty, _, tok := tracker.ObjectPosition(target); tok {
                 sample.fighting = true
+                sample.hasTarget = true
+                sample.tx, sample.ty = tx, ty
                 sample.fightDist = math.Hypot(float64(tx-x),
                     float64(ty-y))
             }

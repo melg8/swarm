@@ -65,38 +65,58 @@ func TestFleetSpawnZFallback(t *testing.T) {
         fleetSpawnZ(nil, 36000, 50229))
 }
 
-// fleetSampleStream builds a sample stream for the fold tests: shots
-// every cycle, retreat walks between them, a fight distance per
-// sample and a position that walks a small circle around the anchor
-// (the curved retreat the audit wants to see).
+// fleetSampleStream builds the sample timeline of one fleet slot: a
+// shot every cycle, a retreat walk that starts retreatLag after the
+// shot and runs a second and a half, the fight samples filling the
+// rest. The fight target stands east of the anchor and every retreat
+// walk moves away from it (the direction gate of the fold): straight
+// west for the legacy stream, bending around the anchor - the curved
+// retreat the audit wants to see - for the improved one.
 func fleetSampleStream(
     cycle time.Duration, retreatLag time.Duration,
     fightDist float64, anchor [2]int32, curved bool,
 ) []fleetSample {
     base := time.Now().Add(-time.Minute)
+    target := [2]int32{anchor[0] + 600, anchor[1]}
+    const walkDur = 1500 * time.Millisecond
     var samples []fleetSample
+    // The persistent walk state: the character stands where its last
+    // retreat left it - the arc angle around the anchor (the curved
+    // stream circles it) or the straight west offset.
+    angle, offsetX := 0.0, 300.0
     for shot := 0; shot < 4; shot++ {
         shotAt := base.Add(time.Duration(shot) * cycle)
         walkAt := shotAt.Add(retreatLag)
-        // The walk runs for a second, the fight samples fill the gap.
         for step := 0; step < 8; step++ {
             at := shotAt.Add(time.Duration(step) * cycle / 8)
             sample := fleetSample{
                 at: at, shotAt: shotAt, fighting: true,
-                fightDist: fightDist, hasPos: true, hpPct: 90,
+                fightDist: fightDist, hasPos: true, hasTarget: true,
+                tx: target[0], ty: target[1], hpPct: 90,
             }
-            angle := float64(step) * math.Pi / 6
-            radius := 300.0
-            if !curved {
-                angle = 0
-                radius = float64(step) * 60
+            // The retreat displacement: the away half-plane of the
+            // target, straight west or the anchor-bending arc.
+            phase := 0.0
+            if at.After(walkAt) {
+                phase = at.Sub(walkAt).Seconds() /
+                    walkDur.Seconds()
+                if phase > 1 {
+                    phase = 1
+                }
             }
-            sample.x = anchor[0] + int32(radius*math.Cos(angle))
-            sample.y = anchor[1] + int32(radius*math.Sin(angle))
-            sample.walking = at.After(walkAt) &&
-                at.Before(walkAt.Add(time.Second))
+            if curved {
+                cur := angle - 160.0*phase*math.Pi/180
+                sample.x = anchor[0] + int32(300*math.Cos(cur))
+                sample.y = anchor[1] + int32(300*math.Sin(cur))
+            } else {
+                sample.x = anchor[0] + int32(offsetX-400*phase)
+                sample.y = anchor[1]
+            }
+            sample.walking = at.After(walkAt) && at.Before(walkAt.Add(walkDur))
             samples = append(samples, sample)
         }
+        angle -= 160.0 * math.Pi / 180
+        offsetX -= 400
     }
 
     return samples
