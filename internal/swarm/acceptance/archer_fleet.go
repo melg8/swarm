@@ -475,23 +475,39 @@ func launchFleet(
     return bots
 }
 
-// waitFleetOnline waits until every fleet tracker reports online or
-// the budget lapses.
+// waitFleetOnline waits until every fleet tracker has entered the
+// world at least once or the budget lapses. The entry LATCH
+// tolerates the death-restart cycle of the starter-kit archers (the
+// level 7 fleet on the mass 3+ Kaboo cells dies sometimes: the first
+// live round measured a bot dying inside the launch minute, and its
+// village restart - the designed recovery with the cell regression -
+// outlasted the whole entry budget while the other four fought on):
+// a bot that entered and died mid-launch still entered, and the
+// audit window measures the kite rhythm of whatever the fleet does,
+// with the per-bot evidence floors naming the slots that spent the
+// window recovering instead of fighting.
 func waitFleetOnline(ctx context.Context, bots []*fleetBotRun) error {
     deadline := time.Now().Add(onlineWait)
+    entered := make([]bool, len(bots))
     for time.Now().Before(deadline) {
         if ctx.Err() != nil {
             return fmt.Errorf("cancelled: %w", ctx.Err())
         }
-        allOnline := true
-        for _, bot := range bots {
+        allIn := true
+        for i, bot := range bots {
+            if entered[i] {
+                continue
+            }
             if bot.tracker().Status() != state.StatusOnline {
-                allOnline = false
+                allIn = false
 
                 break
             }
+            entered[i] = true
+            bot.log.line("fleet: " + bot.slot.Account +
+                " entered the world")
         }
-        if allOnline {
+        if allIn {
             return nil
         }
         time.Sleep(time.Second)
