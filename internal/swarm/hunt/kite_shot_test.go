@@ -223,20 +223,23 @@ func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
 }
 
 // TestKiteShotPacedEncircledGapBlockedHoldsGround pins the encircled
-// hold of the gap-blocked pocket: the widest-gap ray and its whole
-// fan stand walled (the closed corner of the mass cells), and the
-// deferred click resolves to the hold ground rule - the encircled
-// archer stands and shoots the way out only when the gap itself is
-// closed.
+// hold of the CLOSED pocket: the widest-gap ray, its whole fan AND
+// the anti-gap breakout cone stand walled (the sealed corner of the
+// mass cells), and the deferred click resolves to the hold ground
+// rule - the encircled archer stands and shoots the way out only
+// when the whole circle is shut. A pocket that walls the gap
+// hemisphere alone no longer holds: the breakout tier threads the
+// anti-gap cone instead (kite_breakout_test.go pins that half).
 func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     trainMember(bot, 44800, 50000)
     mobHitsCharacterAt(bot, 7, 45200)
     nav := &fakeNavigator{}
-    // The whole gap hemisphere (north of the chaser line) answers
-    // walled: every gap fan candidate lands there.
-    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.Y < 50000, nil
+    // The whole circle answers walled: the gap hemisphere (north of
+    // the chaser line) AND the anti-gap breakout cone (south of it)
+    // - the sealed pocket.
+    nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
+        return false, nil
     }
     loop.SetNavigator(nav)
     loop.tick()
@@ -245,7 +248,7 @@ func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
     ageKiteClick(loop)
     loop.tick()
     require.Empty(t, game.walks,
-        "an encircled archer with a walled gap stops retreating")
+        "an encircled archer in a sealed pocket stops retreating")
     require.Equal(t, int32(7), loop.kiteHeldFor,
         "the encircled hold is armed for the target")
 }

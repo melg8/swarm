@@ -510,18 +510,27 @@ func medianFloat(values []float64) float64 {
     return sorted[len(sorted)/2]
 }
 
-// fleetVerdicts is the per-behavior outcome of one bot's watch.
+// fleetVerdicts is the per-behavior outcome of one bot's watch: the
+// verdict, its human detail and whether the evidence floor that
+// arms it ever engaged (the E fields - a slot that spent the window
+// recovering never armed them, and the fleet line names it under
+// "no evidence" instead of a behavior fail).
 type fleetVerdicts struct {
     maxRange  bool
     maxRangeD string
+    maxRangeE bool
     shoots    bool
     shootsD   string
+    shootsE   bool
     early     bool
     earlyD    string
+    earlyE    bool
     reshot    bool
     reshotD   string
+    reshotE   bool
     curve     bool
     curveD    string
+    curveE    bool
 }
 
 // verdicts reads the folded evidence into the behavior outcomes: each
@@ -540,9 +549,11 @@ func (w fleetWatch) verdicts() fleetVerdicts {
     }
     if w.shots >= fleetMinShots {
         v.shoots = true
+        v.shootsE = true
         v.shootsD = fmt.Sprintf("%d shots in the window", w.shots)
     }
     if len(w.fightDists) >= fleetMinFightSamples {
+        v.maxRangeE = true
         median := medianFloat(w.fightDists)
         v.maxRange = median >= fleetFightDistFloor
         v.maxRangeD = fmt.Sprintf("median fight distance %.0f"+
@@ -564,6 +575,7 @@ func (w fleetWatch) verdicts() fleetVerdicts {
         }
     }
     if len(w.retreatLags) >= fleetMinRetreats {
+        v.earlyE = true
         median := medianDuration(w.retreatLags)
         v.early = median <= fleetRetreatLagCeil
         v.earlyD = fmt.Sprintf("median shot-to-retreat lag %s"+
@@ -571,6 +583,7 @@ func (w fleetWatch) verdicts() fleetVerdicts {
             len(w.retreatLags))
     }
     if len(w.reshotGaps) >= fleetMinRetreats {
+        v.reshotE = true
         median := medianDuration(w.reshotGaps)
         v.reshot = median <= fleetReshotGapCeil
         v.reshotD = fmt.Sprintf("median walk-end-to-shot gap %s"+
@@ -586,6 +599,7 @@ func (w fleetWatch) verdicts() fleetVerdicts {
     drifts := w.kiteFightDrifts()
     corners := w.curveCorners()
     if len(drifts) > 0 && corners >= fleetMinTurns {
+        v.curveE = true
         median := medianFloat(drifts)
         leashed := median <= fleetFightDriftLeash
         v.curve = leashed
@@ -851,6 +865,7 @@ func fleetVerdict(
     }
     counts := map[string]int{}
     behind := map[string][]string{}
+    unevidenced := map[string][]string{}
     for _, bot := range bots {
         verdicts := bot.watch.verdicts()
         test.appendLog(fmt.Sprintf("fleet: %s on %s - max-range %t"+
@@ -862,22 +877,34 @@ func fleetVerdict(
             verdicts.early, verdicts.earlyD,
             verdicts.reshot, verdicts.reshotD,
             verdicts.curve, verdicts.curveD))
-        for id, ok := range map[string]bool{
-            checkFleetMaxRange: verdicts.maxRange,
-            checkFleetShoots:   verdicts.shoots,
-            checkFleetEarly:    verdicts.early,
-            checkFleetReshot:   verdicts.reshot,
-            checkFleetCurve:    verdicts.curve,
+        for id, verdict := range map[string]struct {
+            ok        bool
+            evidenced bool
+        }{
+            checkFleetMaxRange: {verdicts.maxRange, verdicts.maxRangeE},
+            checkFleetShoots:   {verdicts.shoots, verdicts.shootsE},
+            checkFleetEarly:    {verdicts.early, verdicts.earlyE},
+            checkFleetReshot:   {verdicts.reshot, verdicts.reshotE},
+            checkFleetCurve:    {verdicts.curve, verdicts.curveE},
         } {
-            if ok {
+            switch {
+            case verdict.ok:
                 counts[id]++
-            } else {
-                // The fleet line names the slots the behavior did
-                // not hold on - a true fail and a slot that spent
-                // the window recovering (the evidence floors never
-                // armed) both belong here: the per-bot line above
-                // says which of the two it was.
+            case verdict.evidenced:
+                // The slot gathered the evidence and fell short of
+                // the bar: a true behavior fail, named as such.
                 behind[id] = append(behind[id], bot.slot.Account)
+            default:
+                // A slot that spent the window recovering (the
+                // launch lag, the potion round, the empty-cell
+                // walk): the evidence floors never armed - a
+                // missing verdict, not a broken behavior. The
+                // per-bot line above says which of the two it was;
+                // the fleet line names the split so a single
+                // launch-lagged slot stops reading as a kite
+                // regression.
+                unevidenced[id] = append(unevidenced[id],
+                    bot.slot.Account)
             }
         }
     }
@@ -889,6 +916,10 @@ func fleetVerdict(
         detail := fmt.Sprintf("%d of %d bots", counts[id], total)
         if len(behind[id]) > 0 {
             detail += " (not passing: " + strings.Join(behind[id],
+                ", ") + ")"
+        }
+        if len(unevidenced[id]) > 0 {
+            detail += " (no evidence: " + strings.Join(unevidenced[id],
                 ", ") + ")"
         }
         test.updateCheck(id, counts[id] == total, detail)

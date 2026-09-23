@@ -217,6 +217,18 @@ const (
     // back toward the train - the guard rejects the endpoints whose
     // retreat component turned negative beyond the float noise.
     kiteHalfPlaneSlack = -0.05
+    // kiteBreakoutFlankCos is the flank-clearance bound of the
+    // cornered-pocket breakout (issue #70, the walled-pocket round):
+    // a breakout candidate serves the step only when its direction
+    // keeps more than ~36 degrees (the cosine bound 0.809) off EVERY
+    // chaser bearing. The breakout threads the cone the failed
+    // hemisphere sweep never covered - BETWEEN the chasers when the
+    // geometry leaves a lane - but it never runs onto a mob's own
+    // ray: that is the melee the kite exists to avoid. The bound
+    // clears the tightest weave the live pockets measured (the 50
+    // and 45 degree margins of the two-chaser and three-chaser
+    // corners) while refusing anything within a step of a bearing.
+    kiteBreakoutFlankCos = 0.809
     // kiteCurveStep is the tangential bearing of the curving retreat
     // (issue #70, the fifth behavior): after the opening straight
     // retreat of a fight every later retreat leans this far off the
@@ -705,6 +717,27 @@ func (l *Loop) kiteResolveAndClick(
         selfX, selfY, selfZ, prefX, prefY, dirX, dirY,
         l.kiteDeadCellsFor())
     if !found {
+        // The hemisphere sweep is walled (the raw away-ray of a
+        // normal train, the gap ray of an encircled one): BEFORE the
+        // hold answers, the pocket breakout probes the cone the
+        // sweep never covered - the anti-gap rays that thread
+        // between the chasers (issue #70, the walled-pocket round:
+        // the fleet measured the standing answer eating whole
+        // windows, an 8.5 s median shot-to-retreat lag on the
+        // pocket cell, while a lane through the train's own seams
+        // stood open south of the chaser line).
+        if endX, endY, broke := l.kiteBreakoutResolve(
+            selfX, selfY, selfZ, l.kiteDeadCellsFor()); broke {
+            l.kiteHeldAt = time.Time{}
+            l.kiteAt = now
+            l.kiteIssueWalk(now, until, selfX, selfY, selfZ,
+                endX, endY)
+            l.logger.Printf("Hunt: the retreat hemisphere on "+
+                "target %d is walled, breaking out through the "+
+                "clearance lane %d %d", l.target, endX, endY)
+
+            return true
+        }
         // Cornered: no walkable lane in the whole guarded
         // hemisphere (the raw away-ray of a normal train, the gap
         // ray of an encircled one). The hold ground answer is the
@@ -1087,6 +1120,24 @@ func (l *Loop) kiteRotateDeadEndpoint(
         selfX, selfY, selfZ, dirX, dirY, dirX, dirY,
         l.kiteWalkDeadCells[:l.kiteWalkDeadCount])
     if !found {
+        // The dead-endpoint sweep exhausted the hemisphere: the
+        // pocket breakout probes the cone it never covered with the
+        // SAME dead set - a refused or silent anti-gap lane lands in
+        // the memory like any other, the next probe starts on what
+        // the battery has left.
+        if endX, endY, broke := l.kiteBreakoutResolve(
+            selfX, selfY, selfZ,
+            l.kiteWalkDeadCells[:l.kiteWalkDeadCount]); broke {
+            l.logger.Printf("Hunt: rotating the kite retreat of "+
+                "target %d onto the breakout lane %d %d (the "+
+                "hemisphere exhausted, the endpoint %d %d refused "+
+                "or silent)",
+                l.target, endX, endY, l.kiteWalkX, l.kiteWalkY)
+            l.kiteWalkX, l.kiteWalkY = endX, endY
+
+            return true
+        }
+
         return false
     }
     l.logger.Printf("Hunt: rotating the kite retreat of target %d "+
@@ -1582,21 +1633,18 @@ func (l *Loop) kiteRetreatLaneSkipping(
     return 0, 0, false
 }
 
-// kiteLaneResolve resolves one retreat lane candidate to its final
-// endpoint and reports whether the lane carries a step: the camp
-// deflection first (the tangent endpoint replaces the straight one
-// when the lane would wake a neighborhood camp - the deflected
-// endpoint runs the remaining gates like any candidate), then the
-// leash, the away half-plane, the geodata wall and the water. The
-// half-plane gate guards the deflections hardest: a lane may bend
-// sideways of the away-ray (the camp side-step exits the trigger
-// circle perpendicular), but never fold back toward the chasing
-// train. The terrain gates need the navigator - without one (the
-// no-geodata runtime, the plain unit scenes) the leash alone fences
-// the step, exactly the contract of the first kite round.
-func (l *Loop) kiteLaneResolve(
+// kiteTerrainLane resolves the TERRAIN contract of one retreat
+// candidate: the camp deflection first (the tangent endpoint
+// replaces the straight one when the lane would wake a neighborhood
+// camp - the deflected endpoint runs the remaining gates like any
+// candidate), then the leash, the degenerate length, the geodata
+// wall and the water. The half-plane guard of the ordinary battery
+// is NOT here: the breakout tier replaces it with its own flank
+// clearance (see kiteBreakoutResolve). The terrain gates need the
+// navigator - without one (the no-geodata runtime, the plain unit
+// scenes) the leash alone fences the step.
+func (l *Loop) kiteTerrainLane(
     selfX, selfY, selfZ, endX, endY int32,
-    dirX, dirY float64,
 ) (int32, int32, bool) {
     if defX, defY, dodged := l.kiteDeflectFromCamps(
         selfX, selfY, selfZ, endX, endY); dodged {
@@ -1609,14 +1657,7 @@ func (l *Loop) kiteLaneResolve(
         return 0, 0, false
     }
     laneX, laneY := float64(endX-selfX), float64(endY-selfY)
-    laneLen := math.Hypot(laneX, laneY)
-    if laneLen < 1 {
-        return 0, 0, false
-    }
-    if laneX/laneLen*dirX+laneY/laneLen*dirY < kiteHalfPlaneSlack {
-        // The lane (a deep camp deflection, most likely) folded back
-        // toward the train: stepping it would walk INTO the melee the
-        // kite exists to avoid.
+    if math.Hypot(laneX, laneY) < 1 {
         return 0, 0, false
     }
     if l.navigator == nil {
@@ -1641,6 +1682,141 @@ func (l *Loop) kiteLaneResolve(
     }
 
     return endX, endY, true
+}
+
+// kiteLaneResolve resolves one retreat lane candidate to its final
+// endpoint and reports whether the lane carries a step: the terrain
+// contract of kiteTerrainLane plus the away half-plane guard. The
+// half-plane gate guards the deflections hardest: a lane may bend
+// sideways of the away-ray (the camp side-step exits the trigger
+// circle perpendicular), but never fold back toward the chasing
+// train.
+func (l *Loop) kiteLaneResolve(
+    selfX, selfY, selfZ, endX, endY int32,
+    dirX, dirY float64,
+) (int32, int32, bool) {
+    laneX, laneY, ok := l.kiteTerrainLane(
+        selfX, selfY, selfZ, endX, endY)
+    if !ok {
+        return 0, 0, false
+    }
+    laneLen := math.Hypot(
+        float64(laneX-selfX), float64(laneY-selfY))
+    if (float64(laneX-selfX)/laneLen)*dirX+
+        (float64(laneY-selfY)/laneLen)*dirY < kiteHalfPlaneSlack {
+        // The lane (a deep camp deflection, most likely) folded back
+        // toward the train: stepping it would walk INTO the melee the
+        // kite exists to avoid.
+        return 0, 0, false
+    }
+
+    return laneX, laneY, true
+}
+
+// kiteBreakoutResolve resolves the CORNERED-POCKET breakout lane of
+// the kite (issue #70, the walled-pocket round): when the hemisphere
+// sweep found no walkable lane - the raw away-ray of a normal train,
+// the gap ray of an encircled one - the escape may still live in the
+// cone that sweep never covered, on the FAR side of the chaser
+// line. The live fleet round measured the walled pocket of the hex
+// cells eating whole windows: the archer stood through hold after
+// hold (an 8.5 s median shot-to-retreat lag over four retreats)
+// while the chasers shifted, because the only open lanes threaded
+// between them - a step the away half-plane guard forbids by
+// design. The breakout admits those lanes under a STRICTER
+// contract than the guard it replaces: the flank clearance. Every
+// candidate keeps more than ~36 degrees off EVERY chaser bearing
+// (it weaves between the train's seams, it never runs onto a mob's
+// own ray), the full terrain battery still applies (the camp
+// deflection, the leash, the geodata wall, the water), the resolved
+// lane re-clears the flank bound after the deflection may have bent
+// it, and the dead cells stay skipped like any other lane. The
+// candidate ladder fans the ANTI-gap side - the three rays the
+// failed hemisphere never swept (its 93 degree reach leaves the
+// opposite cone uncovered) - ordered by the escape preference: the
+// 135 degree weaves off the gap ray first, the straight anti-gap
+// ray last (it points into the train's middle, the clearance gate
+// usually refuses it). A train of one (or a tracker gap) names no
+// gap geometry: the cornered hold owns the cycle, exactly as
+// before. Reports the endpoint and whether a breakout lane exists.
+func (l *Loop) kiteBreakoutResolve(
+    selfX, selfY, selfZ int32, dead [][2]int32,
+) (int32, int32, bool) {
+    bearings := l.kiteChaserBearings(
+        selfX, selfY, selfZ, l.kiteBearings[:0])
+    gapX, gapY, gap := kiteGapDirection(bearings)
+    if !gap {
+        // A single chaser (or a tracker gap inside the broadcast
+        // window): no second hemisphere exists - the cornered hold
+        // owns the cycle.
+        return 0, 0, false
+    }
+    for _, off := range [3]float64{
+        3 * math.Pi / 4, -3 * math.Pi / 4, math.Pi,
+    } {
+        rayX, rayY := rotatePlanar(gapX, gapY, off)
+        if !kiteRayClearsTheFlanks(rayX, rayY, bearings) {
+            // The candidate runs onto a chaser's own ray: the melee
+            // the kite exists to avoid, refused before the terrain
+            // battery pays a raycast on it.
+            continue
+        }
+        endX := selfX + int32(math.Round(rayX*l.kite.Step))
+        endY := selfY + int32(math.Round(rayY*l.kite.Step))
+        laneX, laneY, ok := l.kiteTerrainLane(
+            selfX, selfY, selfZ, endX, endY)
+        if !ok {
+            continue
+        }
+        laneLen := math.Hypot(
+            float64(laneX-selfX), float64(laneY-selfY))
+        if laneLen < 1 || !kiteRayClearsTheFlanks(
+            float64(laneX-selfX)/laneLen,
+            float64(laneY-selfY)/laneLen, bearings) {
+            // The camp deflection bent the resolved lane onto a
+            // chaser's ray: the endpoint the walk would take fails
+            // the same clearance the candidate passed.
+            continue
+        }
+        refused := false
+        for _, cell := range dead {
+            if laneX == cell[0] && laneY == cell[1] {
+                refused = true
+
+                break
+            }
+        }
+        if refused {
+            // A cell the rotation already named dead (the server
+            // refused it or it stayed silent through the probe) -
+            // the next candidate serves the breakout instead.
+            continue
+        }
+
+        return laneX, laneY, true
+    }
+
+    return 0, 0, false
+}
+
+// kiteRayClearsTheFlanks answers whether the planar unit ray keeps
+// the breakout flank clearance off every chaser bearing: the dot
+// product of the ray with each bearing's unit vector stays under
+// kiteBreakoutFlankCos (the angular distance stays above ~36
+// degrees). The pre-filter runs on the raw candidate before the
+// terrain battery, the post-check on the deflected lane the walk
+// would take - both read the same bearings scratch.
+func kiteRayClearsTheFlanks(
+    rayX, rayY float64, bearings []float64,
+) bool {
+    for _, bearing := range bearings {
+        if rayX*math.Cos(bearing)+rayY*math.Sin(bearing) >=
+            kiteBreakoutFlankCos {
+            return false
+        }
+    }
+
+    return true
 }
 
 // kiteDeflectFromCamps bends one retreat candidate around the idle

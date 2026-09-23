@@ -214,6 +214,9 @@ func TestFleetFoldImprovedKite(t *testing.T) {
     require.True(t, verdicts.early, verdicts.earlyD)
     require.True(t, verdicts.reshot, verdicts.reshotD)
     require.True(t, verdicts.curve, verdicts.curveD)
+    require.True(t, verdicts.maxRangeE && verdicts.shootsE &&
+        verdicts.earlyE && verdicts.reshotE && verdicts.curveE,
+        "an honest slot arms every evidence floor")
     require.Len(t, watch.kiteFightDrifts(), 1,
         "one fight ran through the stream")
 }
@@ -239,6 +242,49 @@ func TestFleetFoldLegacyKite(t *testing.T) {
     require.False(t, verdicts.curve,
         "the straight runaway must fail the curved-retreat behavior")
     require.True(t, verdicts.shoots)
+    // The evidence floors armed: the fleet line must name these as
+    // TRUE behavior fails, not slots that spent the window.
+    require.True(t, verdicts.maxRangeE,
+        "the melee fights gathered the max-range evidence")
+    require.True(t, verdicts.earlyE,
+        "the deferred retreats gathered the early-retreat evidence")
+}
+
+// TestFleetVerdictsNameTheSpentWindow pins the evidence split of the
+// fleet line: a slot that spent its window recovering (the launch
+// lag, the potion round, the empty-cell walk) never arms the
+// evidence floors - its verdicts read false with every E flag down,
+// and the fleet line names it under "no evidence" instead of a
+// behavior fail.
+func TestFleetVerdictsNameTheSpentWindow(t *testing.T) {
+    watch := newFleetWatch()
+    // A dry window: the slot logged nothing but its own presence.
+    verdicts := watch.verdicts()
+    require.False(t, verdicts.maxRange || verdicts.shoots ||
+        verdicts.early || verdicts.reshot || verdicts.curve,
+        "a slot that never fought holds no verdict")
+    require.False(t, verdicts.maxRangeE || verdicts.shootsE ||
+        verdicts.earlyE || verdicts.reshotE || verdicts.curveE,
+        "a spent window never arms the evidence floors")
+
+    // The fought window: the shots, the retreats and the fight
+    // distances all armed their floors - the max-range fail rides
+    // the armed evidence (a true behavior fail, never a spent
+    // window).
+    fight := newFleetWatch()
+    for _, sample := range fleetKiteStream(
+        3*time.Second, 1600*time.Millisecond, 200.0,
+        [2]int32{36000, 50229}, false,
+    ) {
+        fight = fight.fold(sample)
+    }
+    fought := fight.verdicts()
+    require.True(t, fought.shootsE && fought.maxRangeE,
+        "the fought window armed the shooting evidence")
+    require.True(t, fought.earlyE && fought.reshotE,
+        "the stream's retreats armed the retreat evidence")
+    require.False(t, fought.maxRange,
+        "the melee stream must fail the max-range behavior")
 }
 
 // TestMedianDuration pins the median helpers on even and odd slices.
