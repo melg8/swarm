@@ -34,11 +34,26 @@ const archerFleetScenarioID = "archer-fleet"
 // archerFleetDefaultMinutes is the live window of the fleet audit:
 // the whole scenario (five ensures, five resets, the staggered logins,
 // the window, the teardown) must land under five minutes on the live
-// stack, and the window itself is the observed fight time.
-const archerFleetDefaultMinutes = 2.5
+// stack, and the window itself is the observed fight time. The
+// measured overhead of the launch and the teardown is ~25 seconds,
+// so a 3 minute window rides ~3.4 minutes wall-clock - the extra
+// half minute over the old 2.5 buys the per-fight corner evidence
+// the curving verdict needs (the sparse-fight slots of the 2.5
+// minute rounds closed with a single corner against the floor of
+// two - more fights, more corners, the same honest attribution).
+const archerFleetDefaultMinutes = 3.0
 
 // archerFleetShutdownGrace bounds the teardown of the five sessions.
 const archerFleetShutdownGrace = 45 * time.Second
+
+// fleetOnlineBudget bounds the staggered five-slot launch inside the
+// fleet timeout: the measured launch lands the fifth slot ~13
+// seconds after the scenario start, so the budget rides three times
+// the measurement (the entry latch keeps a slot that enters late
+// harmless - it samples less, the verdict names it). The shared
+// onlineWait (90 s, the single-bot pathological-stack bound) would
+// push the three minute window past the five minute ask.
+const fleetOnlineBudget = 40 * time.Second
 
 // archerFleetSlotDesc is one fleet slot: the temp account and the
 // spawn cell focus the archer wakes on.
@@ -147,10 +162,12 @@ func archerFleetDuration() time.Duration {
 }
 
 // archerFleetTimeout computes the scenario timeout: the window plus
-// the startup and the teardown, kept under the five minute ask.
+// the startup and the teardown, kept under the five minute ask (the
+// three minute window rides the fleet's own measured launch budget -
+// the shared 90 s online wait belongs to the single-bot scenarios).
 func archerFleetTimeout() time.Duration {
-    return archerFleetDuration() + 2*ensurePause + onlineWait +
-        archerFleetShutdownGrace
+    return archerFleetDuration() + 2*ensurePause +
+        fleetOnlineBudget + archerFleetShutdownGrace
 }
 
 // The fleet vitals (measured on the live stack): the server
