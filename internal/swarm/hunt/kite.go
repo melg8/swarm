@@ -683,6 +683,36 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     return true
 }
 
+// kiteThreatBeyondThePursue reports whether the threat left the
+// pursue band with no live attack behind it (the round-14 fleet
+// duel finding): a hostile beyond the bow engage radius that is NOT
+// an attacker (a fleeing melee mob, a target standing off) is the
+// stall watchdog's re-approach case, while a LIVE ATTACKER beyond
+// the band - the measured ranged duel, a Kaboo shooter holding 474
+// units and trading arrows - keeps the shot-paced rhythm moving:
+// the standing answer ate 21 s of idle trading in one measured
+// window while the melee adds closed on the stationary archer. The
+// strafe rides the same curving retreat the rhythm always runs (the
+// distance holds near the bow's own max), capped at the train scan
+// range - beyond it neither side reaches the other and the rhythm
+// has nothing to pace.
+func (l *Loop) kiteThreatBeyondThePursue(
+    threatID int32, dist float64,
+) bool {
+    if dist < userBowEngageRadius || dist >= kiteTrainScanRange {
+        return dist >= kiteTrainScanRange
+    }
+    for _, attacker := range l.tracker.SelfAttackers() {
+        if attacker.ObjectID == threatID {
+            // A live attacker beyond the band (the ranged duel)
+            // still rides the rhythm.
+            return false
+        }
+    }
+
+    return true
+}
+
 // kiteFromShot arms the shot-paced retreat of the bow fighting
 // character (issue #60, reworked on the issue #70 findings): the
 // Attack broadcast of the character is the server commit of the bow
@@ -723,7 +753,7 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
         return false
     }
     threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
-    if !ok || dist >= userBowEngageRadius || dist < 1 {
+    if !ok || l.kiteThreatBeyondThePursue(threatID, dist) || dist < 1 {
         return false
     }
     clickAt, until, live := l.kiteShotPhase(now)
@@ -980,7 +1010,7 @@ func (l *Loop) kiteClickWalk(now time.Time) bool {
         return false
     }
     threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
-    if !ok || dist >= userBowEngageRadius || dist < 1 {
+    if !ok || l.kiteThreatBeyondThePursue(threatID, dist) || dist < 1 {
         // The hostile left the pursue band (or the chase dissolved):
         // the retreat has nothing to retreat from - the stall
         // watchdog owns the re-approach, the next shot cycle re-arms
@@ -2143,12 +2173,20 @@ func kiteRayClearsTheFlanksAt(
 // +-15/+-30 degree edges) under the tighter 25 degree bound and a
 // shorter step - the seam the cone refuses by design is exactly
 // the lane a sealed pocket has left, and a burst through it beats
-// the standing melee trade the hold answers with. The terrain
+// the standing melee trade the hold answers with.
+//
+// The round-14 live fleet measured the residual case the
+// pass-through tier closes: a 3+ mob pack at melee range leaves NO
+// ray inside the 25 degree bound (the surround holds ate whole
+// windows at 29-80 units, the archer trading arrows point-blank).
+// When every clean seam refuses by CROWDING, the LEAST-CROWDED
+// terrain-passable ray still goes - a step through a mob's flank
+// takes a glance blow on the way out, the standing hold takes the
+// whole pack's swings for as long as the fight stands. The terrain
 // battery (the camp deflection, the location-general leash, the
-// geodata wall, the water) and the dead-cell memory gate every
-// candidate exactly as the other ladders gate theirs; the shorter
-// kiteShoveStep also admits lanes the full 400 unit step would
-// wall on. Reports the endpoint when a seam carried the shove.
+// geodata wall, the water) and the dead-cell memory gate BOTH
+// tiers - a walled or server-refused endpoint never carries a
+// walk, and only a pocket walled on every side keeps the hold.
 func (l *Loop) kiteShoveResolve(
     selfX, selfY, selfZ int32, dead [][2]int32,
 ) (int32, int32, bool) {
@@ -2161,38 +2199,65 @@ func (l *Loop) kiteShoveResolve(
         // hemisphere edge) - the hold owns the answer.
         return 0, 0, false
     }
-    for _, off := range [5]float64{
+    candidates := [5]float64{
         0, math.Pi / 12, -math.Pi / 12,
         math.Pi / 6, -math.Pi / 6,
-    } {
+    }
+    // Tier one: the clean seam (every chaser bearing kept past the
+    // 25 degree flank bound). Tier two books the least-crowded
+    // terrain-passable ray along the way - the pass-through answer
+    // of the 3+ mob pack (see the function comment).
+    worstFlank := 2.0
+    worstX, worstY := int32(0), int32(0)
+    worstOK := false
+    for _, off := range candidates {
         rayX, rayY := rotatePlanar(gapX, gapY, off)
-        if !kiteRayClearsTheFlanksAt(
-            rayX, rayY, bearings, kiteShoveFlankCos) {
-            continue
+        worst := -2.0
+        for _, bearing := range bearings {
+            if c := rayX*math.Cos(bearing) +
+                rayY*math.Sin(bearing); c > worst {
+                worst = c
+            }
         }
         endX := selfX + int32(math.Round(rayX*kiteShoveStep))
         endY := selfY + int32(math.Round(rayY*kiteShoveStep))
         laneX, laneY, ok := l.kiteTerrainLane(
             selfX, selfY, selfZ, endX, endY)
-        if !ok {
+        if !ok || deadLane(laneX, laneY, dead) {
             continue
         }
-        refused := false
-        for _, cell := range dead {
-            if laneX == cell[0] && laneY == cell[1] {
-                refused = true
-
-                break
-            }
+        if worst < kiteShoveFlankCos {
+            // The clean seam: the first candidate that clears every
+            // flank and the terrain serves the shove.
+            return laneX, laneY, true
         }
-        if refused {
-            continue
+        if worst < worstFlank {
+            // The least-crowded terrain-passable ray so far (the
+            // pass-through tier's book).
+            worstFlank, worstX, worstY, worstOK =
+                worst, laneX, laneY, true
         }
-
-        return laneX, laneY, true
+    }
+    if worstOK {
+        // Tier two: the pass-through - no clean seam exists, the
+        // thinnest rank of the pack carries the step anyway.
+        return worstX, worstY, true
     }
 
     return 0, 0, false
+}
+
+// deadLane reports whether the lane endpoint sits in the dead-cell
+// memory (the server refused it or it stayed silent through the
+// probe).
+func deadLane(laneX, laneY int32, dead [][2]int32) bool {
+    for _, cell := range dead {
+        if laneX == cell[0] && laneY == cell[1] {
+            return true
+        }
+    }
+
+    return false
 }
 
 // kiteDeflectFromCamps bends one retreat candidate around the idle
