@@ -138,7 +138,7 @@ func TestKiteWindowHoldsTheReRequests(t *testing.T) {
 // TestKiteReshotWaitsForTheRegainedDistance pins the pursuit hold
 // of the cycle end (issue #70, the max-range behavior): the walk
 // window closed on a hostile still inside the re-shot floor (the
-// 410 line - the next windup would drag a 110-speed chaser down to
+// 480 line - the next windup would drag a 110-speed chaser down to
 // melee from there), and the engage continues the retreat instead
 // of re-requesting the shot. A hostile beyond the floor answers the
 // affordable shot at once - the re-shot waits for the distance,
@@ -151,7 +151,7 @@ func TestKiteReshotWaitsForTheRegainedDistance(t *testing.T) {
     // The walk outlives the fighting stance freshness (3s from the
     // last swing): sleep past it so the tick lands in the honest
     // post-walk state - stance lapsed, step window long closed, the
-    // target still at 200 units (inside the 410 floor).
+    // target still at 200 units (inside the 480 floor).
     time.Sleep(3200 * time.Millisecond)
     loop.lastHit = time.Now().Add(-2 * time.Second)
     loop.tick()
@@ -164,7 +164,7 @@ func TestKiteReshotWaitsForTheRegainedDistance(t *testing.T) {
     // at the window end (the forces resume).
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
-        X: 45420, Y: 50000, Name: "Keltir",
+        X: 45520, Y: 50000, Name: "Keltir",
     })
     time.Sleep(3200 * time.Millisecond)
     loop.lastHit = time.Now().Add(-2 * time.Second)

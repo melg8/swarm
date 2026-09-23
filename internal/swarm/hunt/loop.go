@@ -822,6 +822,28 @@ type Loop struct {
     // history.
     kitePursuitFor int32
     kitePursuitAt  time.Time
+    // The pursuit ledger of the current shot cycle (see
+    // kitePursuitHold): the continuation chain owns its budget
+    // apart from the proximity streak - the race it runs is the
+    // re-shot's own (each new shot re-arms the whole race), so a
+    // shared flat counter cuts the honest distance race short (the
+    // round-11 fleet audit measured the flat 8 bound biting one
+    // step short of the re-shot floor). kitePursuitSteps counts the
+    // continuations issued since the last shot; kitePursuitDist is
+    // the threat distance at the last accounting; kitePursuitStall
+    // counts the CONSECUTIVE walks that opened no distance (the
+    // unwinnable race); kitePursuitWalkOpen marks the walk whose
+    // window-end accounting is still owed - a cornered hold re-probe
+    // between the walks never mints a stall (the hold pause is not a
+    // lost race step, the pocket cells survive their holds on
+    // exactly that). The ledger resets whole on every fresh shot
+    // cycle (kiteArmClick) and on any walk issued outside the
+    // previous chain's context (kiteIssueWalk - a new fight or the
+    // respawned same-id target starts its own race).
+    kitePursuitSteps    int
+    kitePursuitDist     float64
+    kitePursuitStall    int
+    kitePursuitWalkOpen bool
     // kiteWalkBaseX/Y is the cell the kite walk was issued from -
     // the ladder's dead-click oracle: a character still standing on
     // this cell past the probe pace never moved whatever the

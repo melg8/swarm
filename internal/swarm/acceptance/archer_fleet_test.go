@@ -374,6 +374,69 @@ func TestFleetFoldDropsTheFleetNoiseWalks(t *testing.T) {
         "the noise walks must not feed the reshot gaps")
 }
 
+// TestFleetFoldDropsThePursuitContinuationLags pins the
+// first-per-shot gate of the retreat lags: the pursuit-continuation
+// walks of one shot cycle (the pursuit hold re-arming the retreat
+// while the chaser stays inside the re-shot floor - one walk every
+// ~3 s, up to the 12 s pursuit context after the owning shot) pair
+// to the SAME owning shot, and the round-11 fleet audit minted
+// their 3-12 s lags straight into the early-retreat medians
+// (temp24's 6.2 s median was 7 continuation walks against 4 honest
+// 1.8 s windup-end retreats of the same slot). Only the FIRST
+// confirmed retreat of each shot feeds the median; a fresh shot
+// re-arms its own.
+func TestFleetFoldDropsThePursuitContinuationLags(t *testing.T) {
+    watch := newFleetWatch()
+    base := time.Now().Add(-time.Minute)
+    target := [2]int32{36600, 50229}
+    sample := func(at time.Time, walking bool, x, y int32,
+        shotAt time.Time,
+    ) fleetSample {
+        return fleetSample{
+            at: at, walking: walking, fighting: true, targetID: 1,
+            hasTarget: true, hasPos: true, fightDist: 300,
+            tx: target[0], ty: target[1], shotAt: shotAt, hpPct: 90,
+            x: x, y: y,
+        }
+    }
+    // awayWalk folds one confirmed away-walk: four walking samples
+    // marching 320 units off the target, then the standing end
+    // sample that confirms the direction.
+    awayWalk := func(start time.Time, shot time.Time) {
+        for i := range 4 {
+            watch = watch.fold(sample(
+                start.Add(time.Duration(i)*250*time.Millisecond),
+                true, 36000-int32(i)*80, 50229, time.Time{}))
+        }
+        watch = watch.fold(sample(start.Add(time.Second), false,
+            35680, 50229, shot))
+    }
+
+    // The shot and its windup-end retreat 1.8 s later: the honest
+    // first retreat of the cycle.
+    shot1 := base
+    watch = watch.fold(sample(shot1, false, 36000, 50229, shot1))
+    awayWalk(base.Add(1800*time.Millisecond), shot1)
+
+    // The pursuit continuations of the SAME shot: the chaser holds
+    // inside the re-shot floor, the hold re-arms the retreat at
+    // 3.1 s and 6.1 s - the exact lags the round-11 audit measured
+    // into the medians.
+    awayWalk(base.Add(3100*time.Millisecond), shot1)
+    awayWalk(base.Add(6100*time.Millisecond), shot1)
+
+    // A fresh shot cycle: its own first retreat feeds the median.
+    shot2 := base.Add(8 * time.Second)
+    watch = watch.fold(sample(shot2, false, 35680, 50229, shot2))
+    awayWalk(shot2.Add(1900*time.Millisecond), shot2)
+
+    require.Equal(t, 2, watch.shots)
+    require.Equal(t, []time.Duration{
+        1800 * time.Millisecond, 1900 * time.Millisecond,
+    }, watch.retreatLags,
+        "only the first confirmed retreat of each shot feeds the lags")
+}
+
 // TestFleetFoldLeashIgnoresTheCellRotation pins the leash
 // attribution fix of the curve round: the drift measures one fight
 // at a time against the mob's stand that fight opened on, so a

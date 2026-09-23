@@ -247,7 +247,11 @@ type fleetSample struct {
 // cell-rotation approaches and the chase-stall walks toward the
 // target polluted the plain walk population of the first live round
 // (a 3.1 s walk-end-to-shot median measured on walks the kite never
-// issued).
+// issued). The retreat LAGS additionally ride the FIRST-PER-SHOT
+// gate (lastRetreatShotAt): the pursuit-continuation walks of one
+// shot cycle never re-feed the median (the round-11 regression
+// audit measured them as 3-12 s lags against the honest 1.8 s
+// windup-end retreats of the same slots).
 type fleetWatch struct {
     shots       int
     retreatLags []time.Duration
@@ -295,6 +299,20 @@ type fleetWatch struct {
     walkTargetX    int32
     walkTargetY    int32
     walkShotAt     time.Time
+    // lastRetreatShotAt names the shot whose first confirmed retreat
+    // is already booked: the pursuit-continuation walks of one shot
+    // cycle (the hold keeps re-arming the retreat while the chaser
+    // stays inside the re-shot floor - one new walk every ~3 s,
+    // startable up to the 12 s pursuit context after the owning
+    // shot) all pair to the SAME shot, and the round-11 fleet audit
+    // minted their 3-12 s lags straight into the early-retreat
+    // medians (temp24's 6.2 s median was 7 continuation walks
+    // against 4 honest 1.8 s windup-end retreats). The gate books
+    // the FIRST confirmed retreat of each shot alone: the metric
+    // measures how fast the archer answers a shot with a retreat,
+    // and a continuation is the ongoing retreat of the shot that
+    // already answered.
+    lastRetreatShotAt time.Time
 }
 
 // newFleetWatch arms the fold.
@@ -344,8 +362,14 @@ func (w fleetWatch) fold(s fleetSample) fleetWatch {
             awayX := float64(w.walkFromX - w.walkTargetX)
             awayY := float64(w.walkFromY - w.walkTargetY)
             if dx*awayX+dy*awayY > 0 {
-                if w.havePendingLag {
+                if w.havePendingLag &&
+                    w.walkShotAt != w.lastRetreatShotAt {
+                    // The first confirmed retreat of its owning shot
+                    // (the continuation walks of the same cycle pair
+                    // to the same shot and never re-feed the median
+                    // - see lastRetreatShotAt).
                     w.retreatLags = append(w.retreatLags, w.pendingLag)
+                    w.lastRetreatShotAt = w.walkShotAt
                 }
                 if !s.shotAt.IsZero() && !w.walkShotAt.IsZero() &&
                     s.shotAt != w.walkShotAt {
