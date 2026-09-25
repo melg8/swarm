@@ -42,6 +42,9 @@ func validCommand(cmd commandRequest) bool {
         return cmd.ObjectID != 0 && cmd.Count >= 1
     case state.CommandZone:
         return cmd.Count >= 0
+    case state.CommandClaimPosition, state.CommandCursorWalk,
+        state.CommandClickWalk:
+        return cmd.X != 0 || cmd.Y != 0 || cmd.Z != 0
     case state.CommandSay:
         // The Say packet validation mirrors the Say2.runImpl refusals:
         // an empty text or an unknown channel would disconnect the
@@ -94,6 +97,18 @@ func describeCommand(cmd commandRequest) string {
             " of item " + strconv.Itoa(int(cmd.ObjectID))
     case state.CommandZone:
         return "user command: hunt in zone " + strconv.Itoa(int(cmd.Count))
+    case state.CommandClaimPosition:
+        return "user command: claim position " + strconv.Itoa(int(cmd.X)) +
+            " " + strconv.Itoa(int(cmd.Y)) + " " +
+            strconv.Itoa(int(cmd.Z))
+    case state.CommandCursorWalk:
+        return "user command: cursor key walk to " +
+            strconv.Itoa(int(cmd.X)) + " " + strconv.Itoa(int(cmd.Y)) +
+            " " + strconv.Itoa(int(cmd.Z))
+    case state.CommandClickWalk:
+        return "user command: raw click to " + strconv.Itoa(int(cmd.X)) +
+            " " + strconv.Itoa(int(cmd.Y)) + " " +
+            strconv.Itoa(int(cmd.Z))
     case state.CommandSay:
         text := []rune(cmd.Text)
         if len(text) > 40 {

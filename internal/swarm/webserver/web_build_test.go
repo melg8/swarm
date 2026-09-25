@@ -99,8 +99,8 @@ func TestStaticScriptsAnswerNoCache(t *testing.T) {
     server, _ := newTestServer(t)
 
     for path, want := range map[string]string{
-        "/app.js":   "no-cache",
-        "/style.css": "no-cache",
+        "/app.js":             "no-cache",
+        "/style.css":          "no-cache",
         "/maps/21_19/0_0.jpg": "",
     } {
         recorder := httptest.NewRecorder()

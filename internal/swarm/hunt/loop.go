@@ -39,6 +39,13 @@ type GameAPI interface {
     // cursor key escape of a click-refusing cell (see
     // Loop.beginCursorKeyEscape).
     CursorKeyWalkTo(x int32, y int32, z int32) error
+    // ClickWalkTo sends one raw mouse-mode ground click without the
+    // route planning and without touching the position stream
+    // ownership: the probe click of the movement abuse scenarios
+    // (the self MoveToLocation echo reports the server position) and
+    // the disarm click that returns a cursor key session to the
+    // click movement.
+    ClickWalkTo(x int32, y int32, z int32) error
     // ClaimValidatePosition reports a claimed client position: while
     // the cursor key movement is armed the server syncs the claim
     // straight into the world and broadcasts it, so the claims walk

@@ -211,6 +211,12 @@ func (l *Loop) applyUserCommand(cmd state.Command) {
         l.userDestroy(cmd)
     case state.CommandSay:
         l.userSay(cmd)
+    case state.CommandClaimPosition:
+        l.userClaimPosition(cmd)
+    case state.CommandCursorWalk:
+        l.userCursorWalk(cmd)
+    case state.CommandClickWalk:
+        l.userClickWalk(cmd)
     case state.CommandMove, state.CommandAttack, state.CommandPickup:
         l.userMovement(cmd)
     default:
@@ -230,6 +236,55 @@ func (l *Loop) userSay(cmd state.Command) {
         cmd.Text, cmd.Channel)
     if err := l.game.Say(cmd.Text, cmd.Channel, cmd.Target); err != nil {
         l.logf("Hunt: say failed: %v", err)
+    }
+}
+
+// userClaimPosition reports one claimed client placement to the
+// server (ValidatePosition 0x48): the raw position stream of the
+// movement abuse channels. The server side handler decides what the
+// claim means - the desync branch adopts any placement more than one
+// move-speed unit away from the server position, an armed cursor key
+// session adopts every claim - so the command itself carries no
+// policy, it only speaks the packet. The claims gate the echo ticker
+// (see GameClient.ClaimValidatePosition): the stream belongs to its
+// sender until the next mouse-mode WalkTo.
+func (l *Loop) userClaimPosition(cmd state.Command) {
+    l.logf("Hunt: user command: claim position %d %d %d",
+        cmd.X, cmd.Y, cmd.Z)
+    if err := l.game.ClaimValidatePosition(
+        cmd.X, cmd.Y, cmd.Z, l.tracker.SelfHeading()); err != nil {
+        l.logf("Hunt: claim position failed: %v", err)
+    }
+}
+
+// userCursorWalk arms the cursor key movement of the session
+// (MoveToLocation 0x01 in keyboard mode, the arrow keys of the
+// official client): the server adopts the packet origin, latches the
+// cursor key flag and every following claim moves the character
+// server-side without any click validation. The command is the
+// keyboard-mode twin of a raw click - no route planning, no arrival
+// phase, the AI simply walks the target while the claims own the
+// placement.
+func (l *Loop) userCursorWalk(cmd state.Command) {
+    l.logf("Hunt: user command: cursor key walk to %d %d %d",
+        cmd.X, cmd.Y, cmd.Z)
+    if err := l.game.CursorKeyWalkTo(cmd.X, cmd.Y, cmd.Z); err != nil {
+        l.logf("Hunt: cursor key walk failed: %v", err)
+    }
+}
+
+// userClickWalk sends one raw mouse-mode ground click without the
+// route planning of the manual move: the probe click of the desync
+// abuse (the self MoveToLocation echo reports the server position of
+// the moment) and the disarm click that returns a cursor key session
+// to the click movement. The click never touches the position stream
+// ownership (see GameClient.ClickWalkTo), so a claim stream keeps
+// running through it.
+func (l *Loop) userClickWalk(cmd state.Command) {
+    l.logf("Hunt: user command: raw click to %d %d %d",
+        cmd.X, cmd.Y, cmd.Z)
+    if err := l.game.ClickWalkTo(cmd.X, cmd.Y, cmd.Z); err != nil {
+        l.logf("Hunt: raw click failed: %v", err)
     }
 }
 

@@ -41,6 +41,7 @@ type fakeGame struct {
     pickups     []int32
     walks       [][3]int32
     cursorWalks [][3]int32
+    rawClicks   [][3]int32
     claims      [][4]int32
     sits        int
     restarts    int
@@ -107,6 +108,18 @@ func (f *fakeGame) CursorKeyWalkTo(x int32, y int32, z int32) error {
         return f.lastError
     }
     f.cursorWalks = append(f.cursorWalks, [3]int32{x, y, z})
+
+    return nil
+}
+
+// ClickWalkTo records the raw mouse-mode click of the movement
+// abuse probes (the stream-neutral click that never reopens the
+// echo ticker).
+func (f *fakeGame) ClickWalkTo(x int32, y int32, z int32) error {
+    if f.lastError != nil {
+        return f.lastError
+    }
+    f.rawClicks = append(f.rawClicks, [3]int32{x, y, z})
 
     return nil
 }

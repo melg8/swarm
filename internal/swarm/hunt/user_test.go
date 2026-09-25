@@ -863,3 +863,74 @@ func TestUserMoveStandsUpTheRestingCharacter(t *testing.T) {
         "the manual walk starts once the character stands")
     require.Equal(t, 1, game.sits, "no double toggle")
 }
+
+// TestUserClaimPositionCommandStreamsTheClaim pins the claim command
+// semantics: the claimed placement is forwarded to the game session
+// verbatim (the raw position stream of the movement abuse channels -
+// the server side handler owns the policy) and the command never
+// switches the loop phase.
+func TestUserClaimPositionCommandStreamsTheClaim(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    spawnMob(bot)
+    loop.lastHit = time.Now().Add(-time.Minute)
+
+    pushCommand(bot, state.Command{
+        Kind: state.CommandClaimPosition,
+        X:    44300, Y: 50700, Z: -3500,
+    })
+    loop.tick()
+
+    require.Len(t, game.claims, 1)
+    require.Equal(t, [4]int32{44300, 50700, -3500, 0}, game.claims[0],
+        "the claim carries the placement and the tracked heading")
+    require.Equal(t, phaseEngage, loop.phase,
+        "a claim command must not switch the phase")
+}
+
+// TestUserCursorWalkCommandArmsTheKeyboardMode pins the cursor walk
+// command semantics: the keyboard-mode move request goes to the game
+// session with the raw target (no route planning, no manual phase -
+// the cursor key session owns the placement from there).
+func TestUserCursorWalkCommandArmsTheKeyboardMode(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+
+    pushCommand(bot, state.Command{
+        Kind: state.CommandCursorWalk,
+        X:    43000, Y: 51000, Z: -2992,
+    })
+    loop.tick()
+
+    require.Equal(t, [][3]int32{{43000, 51000, -2992}},
+        game.cursorWalks)
+    require.Empty(t, game.walks,
+        "the cursor walk never rides the planned walk path")
+    require.Equal(t, phaseEngage, loop.phase,
+        "a cursor walk command must not switch the phase")
+}
+
+// TestUserClickWalkCommandSendsTheRawClick pins the raw click
+// semantics: the click target goes to the game session as one
+// mouse-mode request (the probe and disarm click of the movement
+// abuse scenarios) without the route planning or the manual phase of
+// the planned move.
+func TestUserClickWalkCommandSendsTheRawClick(t *testing.T) {
+    bot := newTestBot()
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+
+    pushCommand(bot, state.Command{
+        Kind: state.CommandClickWalk,
+        X:    45100, Y: 50100, Z: -3500,
+    })
+    loop.tick()
+
+    require.Equal(t, [][3]int32{{45100, 50100, -3500}}, game.rawClicks)
+    require.Empty(t, game.walks,
+        "the raw click never rides the planned walk path")
+    require.Equal(t, phaseEngage, loop.phase,
+        "a raw click command must not switch the phase")
+}

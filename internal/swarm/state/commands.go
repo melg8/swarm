@@ -27,6 +27,25 @@ const (
     // CommandSay sends a chat message through the character (the
     // channel select and the text input of the web chat window).
     CommandSay = "say"
+    // CommandClaimPosition reports a claimed client placement
+    // (ValidatePosition 0x48) at an arbitrary world point: the
+    // server side handler adopts claims the desync branch or an
+    // armed cursor key session accepts, so the command is the raw
+    // position stream of the movement abuse scenarios (and the
+    // manual webui demo of the same channel).
+    CommandClaimPosition = "claimPosition"
+    // CommandCursorWalk arms the cursor key movement of the session
+    // (MoveToLocation 0x01 in keyboard mode): the server adopts the
+    // packet origin, latches the cursor key flag and every following
+    // claim moves the character server-side without any click
+    // validation.
+    CommandCursorWalk = "cursorWalk"
+    // CommandClickWalk sends one raw mouse-mode ground click without
+    // the route planning of CommandMove: the probe click of the
+    // desync scenario (the self MoveToLocation echo reports the
+    // server position) and the disarm click that returns a cursor
+    // key session to the click movement.
+    CommandClickWalk = "clickWalk"
 )
 
 // Command is one manual command of the web interface, queued on the bot

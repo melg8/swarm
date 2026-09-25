@@ -911,6 +911,44 @@ func (gc *GameClient) CursorKeyWalkTo(
     return nil
 }
 
+// ClickWalkTo sends one raw mouse-mode ground click (MoveToLocation
+// 0x01, movement mode 1) without touching the position stream
+// ownership: unlike WalkTo it does not hand the stream back to the
+// echo ticker, so a session whose claims own the stream (the cursor
+// key escape, the movement abuse scenarios) keeps that ownership
+// across the click. The abuse probes ride it - a click during a
+// claim stream must not reopen the echo ticker, whose claim of the
+// last broadcast placement would race the stream and teleport the
+// character a hop backwards through the desync branch of
+// ValidatePosition.runImpl. The server ignores the origin in mouse
+// mode (MoveToLocation.runImpl reads it in the keyboard branch
+// only); the first movement broadcast of the fresh server side walk
+// echoes the origin back to the clicking client itself
+// (Player.broadcastPacket includes the sender), which is exactly the
+// server position observation the probes want.
+func (gc *GameClient) ClickWalkTo(x int32, y int32, z int32) error {
+    request := togameserver.NewMoveToLocationRequestPacket()
+    request.TargetX = x
+    request.TargetY = y
+    request.TargetZ = z
+    // The origin carries the last observed placement; mouse mode
+    // never reads it, a zero placement (no observation yet) is as
+    // honest as a stale one.
+    if gc.tracker != nil {
+        if selfX, selfY, selfZ, ok := gc.tracker.SelfPosition(); ok {
+            request.OriginX = selfX
+            request.OriginY = selfY
+            request.OriginZ = selfZ
+        }
+    }
+    request.Mode = togameserver.MoveModeMouse
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to send the raw click: %w", err)
+    }
+
+    return nil
+}
+
 // ClaimValidatePosition reports a CLAIMED client position of the
 // character (ValidatePosition 0x48): while the server's cursor key
 // movement is armed, the claimed placement is synced straight into

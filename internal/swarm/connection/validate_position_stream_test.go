@@ -567,3 +567,55 @@ func snapshotObjectHeading(tracker *state.Bot, objectID int32) (int32, bool) {
 
     return 0, false
 }
+
+// TestGameClientRawClickKeepsTheClaimsStream pins the probe click of
+// the movement abuse scenarios: the raw click walks in the mouse
+// movement mode like a plain ground click, but unlike WalkTo it never
+// hands the position stream back to the echo ticker - a click between
+// two claims must not reopen the echo, whose claim of the last
+// broadcast placement would race the claim stream and teleport the
+// character a hop backwards through the desync branch of the server
+// side handler.
+func TestGameClientRawClickKeepsTheClaimsStream(t *testing.T) {
+    validations := make(chan []byte, 16)
+    moves := make(chan []byte, 16)
+    server := startFakeGameServer(t)
+    server.flow = absorbingFlowWithMoves(validations, moves)
+
+    client, tracker := newValidatingSession(t, server)
+    tracker.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 45400, Y: 50000, Z: -3040, Heading: 32114,
+    })
+
+    // The claim opens the stream ownership, the raw click probes the
+    // server position - in the mouse movement mode. The claim rides
+    // the validation tap first (the tap observes every outbound
+    // ValidatePosition, the claim included).
+    require.NoError(t, client.ClaimValidatePosition(
+        44700, 50000, -3040, 16000))
+    x, y, z, heading := awaitValidation(t, validations)
+    require.Equal(t, int32(44700), x)
+    require.Equal(t, int32(50000), y)
+    require.Equal(t, int32(-3040), z)
+    require.Equal(t, int32(16000), heading)
+    require.NoError(t, client.ClickWalkTo(44660, 50000, -3040))
+    target, origin, mode := awaitMove(t, moves)
+    require.Equal(t, [3]int32{44660, 50000, -3040}, target)
+    require.Equal(t, [3]int32{45400, 50000, -3040}, origin,
+        "the raw click carries the tracked origin")
+    require.Equal(t, int32(1), mode,
+        "the raw click walks in the mouse movement mode")
+
+    // The claims still own the stream: the echo stays quiet for a
+    // changed tracker placement (the plain WalkTo would return it).
+    tracker.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 44700, Y: 50000, Z: -3040, Heading: 16000,
+    })
+    validation := positionValidation{}
+    require.NoError(t, client.validatePosition(&validation))
+    select {
+    case payload := <-validations:
+        t.Fatalf("the echo leaked past the raw click: %v", payload)
+    case <-time.After(300 * time.Millisecond):
+    }
+}
