@@ -434,6 +434,57 @@ conversation or in a commit message: it lives in the registry below.
   ridden placement); see docs/protocol_description.md (the
   ValidatePosition section).
 
+### H-010: the movement channels scale to world distances
+
+- Assumption: the desync and cursor channels hold over a ride of
+  100,000+ units and minutes of streaming - no server task (the
+  observed position save, the zone revalidation of setXYZ, the
+  movement task of the armed cursor session) reverts or blocks the
+  drift mid ride, the last server position bookkeeping never
+  interferes and the logout store keeps the far placement - so the
+  channels are a world map transport, not a local hop trick.
+- Relied on by: the route acceptance scenarios
+  (internal/swarm/acceptance/desync_route.go and cursor_route.go):
+  the mesh navigator plans the elven forest to Gludio corridor
+  (about 109,000 units, the same navmesh planner the fleet serves)
+  and the claim ladders ride it end to end; the pass gates pin the
+  arrival at the Gludio teleporter point, the effective speed, the
+  corridor distance and the stored placement.
+- Verify: run both route scenarios on the live stack - the probe
+  echoes must confirm the corridor hops, the final placement must sit
+  at the Gludio arrival point and the character row must keep it.
+- Status: verified 2026-09-26 by the live scenario runs (the paced
+  desync ladder: 112 guides, 14 of 14 probes confirmed, 1913 units
+  per second effective against the 144 run speed, 109,003 units, the
+  character row stored the Gludio placement; the cursor stream: 1383
+  claims, 460 of 461 cycles confirmed, 622 units per second, 112,512
+  units, the row stored the Gludio placement); see
+  docs/protocol_description.md (the ValidatePosition section).
+
+### H-011: the ValidatePosition stream is unthrottled at burst rate
+
+- Assumption: no flood protector, rate cap or kick answers a burst of
+  ValidatePosition packets - the FloodProtector.ini list of the stack
+  holds no entry for the packet, so a session may stream a whole
+  route ladder within a handful of hunt loop ticks and the server
+  adopts every claim at packet pace (the desync branch per claim),
+  crossing any distance in seconds.
+- Relied on by: the fast route acceptance scenario
+  (internal/swarm/acceptance/fast_route.go): the sprint dumps the
+  whole guide ladder in batches of 16 claims per tick (two queued
+  batches fill the 32 slot command queue exactly, so a delayed tick
+  never drops a claim) and the arrival probe reads the adopted Gludio
+  placement back.
+- Verify: run the fast-route scenario on the live stack - the server
+  must stay connected through the burst, the arrival echo must land
+  at the Gludio point and the effective speed must land in the tens
+  of thousands of units per second.
+- Status: verified 2026-09-26 by the live scenario run (7 batches of
+  16 claims, 112 guides adopted in 3.4 seconds of riding, 29,536
+  units per second effective against the 144 run speed - 205x - over
+  109,003 units, the character row stored the Gludio placement); see
+  docs/protocol_description.md (the ValidatePosition section).
+
 ## Mandatory first step of every task: deploy and verify the environment
 
 Any task in this repository - a bug fix, a feature, a refactor, a test

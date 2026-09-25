@@ -1082,6 +1082,22 @@ these commands, so a run of either test is replayable by hand from
 the command API (see `docs/protocol_description.md`, the
 ValidatePosition section, for the server side channels).
 
+The three route rounds (`desync-route`, `cursor-route` and the sprint
+`fast-route`) ride the same commands one scale up: the mesh navigator
+plans the corridor from the elven forest creation spawn to the Gludio
+teleporter arrival point (about 109,000 units through the Neutral
+Zone - the segmented hierarchical search over the `data/navmesh`
+tiles, the same planner the fleet bot serves) and the claims carry
+the level 19 character with the one million adena wallet along the
+pathfinding guides - the paced desync ladder (a claim per guide, a
+probe click every eighth), the interpolated cursor key stream (94
+unit steps under the move speed band) and the unthrottled sprint
+(the whole ladder in batches of 16 claims per tick, about 29,500
+units per second over the whole corridor). The rounds need the
+navmesh tiles built (`go run ./cmd/navmesh-build -geodata
+data/geodata -out data/navmesh`, docs/navmesh.md) - the corridor
+spans the regions 19_19 through 21_21.
+
 ## The statistics tab
 
 The Stats tab (`web/stats.js`, the collector of

@@ -118,6 +118,112 @@ const fullDressTimeout = 5 * time.Minute
 func Definitions() []TestDef {
     return []TestDef{
         {
+            ID:      desyncRouteID,
+            Title:   desyncRouteTitle,
+            Account: desyncRouteAccount,
+            Timeout: desyncRouteTimeout,
+            Description: "Start: the elven fighter temp21 wakes at " +
+                "the character creation point of the elven forest " +
+                "(46045 41251 -3440) as a bare LEVEL 19 character " +
+                "with the ONE MILLION ADENA wallet (339 hp / 137 mp " +
+                "/ 135 cp, the C1 level table vitals). Flow: the " +
+                "long route desync abuse - the mesh navigator (the " +
+                "same navmesh route planner the fleet bot serves) " +
+                "plans the corridor from the forest spawn to the " +
+                "Gludio teleporter arrival point (-12787 122779 " +
+                "-3114, about 100k units through the Neutral Zone, " +
+                "a twelve minute honest run) and the desync claim " +
+                "ladder hops the server side placement along the " +
+                "PATHFINDING guides - every claim beyond the move " +
+                "speed band is ADOPTED by the out of sync " +
+                "correction of ValidatePosition.runImpl " +
+                "(player.setXYZ, no distance cap), the claims skip " +
+                "the guides closer than 700 units (the correction " +
+                "band of the handler) and the probe clicks every " +
+                "eighth guide read the adopted placements back " +
+                "through the self MoveToLocation echoes. Pass: the " +
+                "plan holds, the echo confirms the ladder moved, " +
+                "the effective speed is at least twice the server " +
+                "reported run speed, the corridor distance of " +
+                "100,000+ units is covered, the final placement " +
+                "sits at the Gludio arrival point and the logout " +
+                "store keeps it (the world scale demonstration of " +
+                "the desync channel; the route rides the mesh " +
+                "tiles of data/navmesh, the claims the " +
+                "claimPosition command, the probes the clickWalk " +
+                "command).",
+            Scenario: desyncRouteScenario,
+        },
+        {
+            ID:      cursorRouteID,
+            Title:   cursorRouteTitle,
+            Account: cursorRouteAccount,
+            Timeout: cursorRouteTimeout,
+            Description: "Start: the elven fighter temp22 wakes at " +
+                "the character creation point of the elven forest " +
+                "(46045 41251 -3440) as a bare LEVEL 19 character " +
+                "with the ONE MILLION ADENA wallet. Flow: the long " +
+                "route cursor movement abuse - the mesh navigator " +
+                "plans the corridor from the forest spawn to the " +
+                "Gludio teleporter arrival point (-12787 122779 " +
+                "-3114) and the cursor key claim stream rides the " +
+                "PATHFINDING guides - the keyboard mode arm " +
+                "(MoveToLocation mode 0, the arrow keys of the " +
+                "official client) latches the session cursor key " +
+                "flag and every following ValidatePosition claim is " +
+                "synced straight into the world and broadcast back " +
+                "(setSyncedXYZ, no speed and no distance " +
+                "validation), the interpolated 94 unit steps ride " +
+                "the corridor polyline (every step UNDER the move " +
+                "speed band the desync branch would need, so only " +
+                "the cursor key branch can adopt them) and the " +
+                "echoed placements stream back from the server " +
+                "itself. Pass: the plan holds, the echo confirms " +
+                "the stream moved, the effective speed is at least " +
+                "twice the server reported run speed, the corridor " +
+                "distance of 100,000+ units is covered, the final " +
+                "placement sits at the Gludio arrival point and " +
+                "the logout store keeps it (the world scale " +
+                "demonstration of the cursor channel; the arm " +
+                "rides the cursorWalk command, the claims the " +
+                "claimPosition command).",
+            Scenario: cursorRouteScenario,
+        },
+        {
+            ID:      fastRouteID,
+            Title:   fastRouteTitle,
+            Account: fastRouteAccount,
+            Timeout: fastRouteTimeout,
+            Description: "Start: the elven fighter temp23 wakes at " +
+                "the character creation point of the elven forest " +
+                "(46045 41251 -3440) as a bare LEVEL 19 character " +
+                "with the ONE MILLION ADENA wallet. Flow: the " +
+                "fastest ride the packet channels allow over the " +
+                "same corridor - the mesh navigator plans the " +
+                "route from the forest spawn to the Gludio " +
+                "teleporter arrival point (-12787 122779 -3114) " +
+                "and the sprint dumps the whole guide ladder at " +
+                "FULL QUEUE RATE: the desync branch of " +
+                "ValidatePosition.runImpl adopts every claim beyond " +
+                "the move speed band with NO distance cap and the " +
+                "server holds no flood protector over the packet, " +
+                "so batches of up to 16 claims (two queued batches " +
+                "fill the 32 slot command queue exactly, one hunt loop " +
+                "tick per batch) carry the character the whole " +
+                "100k unit corridor in seconds - a twelve minute " +
+                "honest run crossed in the time a real character " +
+                "crosses one screen. Pass: the plan holds, the " +
+                "arrival echo confirms the Gludio placement, the " +
+                "effective speed is at least twice the server " +
+                "reported run speed (it lands in the tens of " +
+                "thousands of units per second), the corridor " +
+                "distance of 100,000+ units is covered and the " +
+                "logout store keeps the Gludio placement (the " +
+                "speed ceiling demonstration of the abuse " +
+                "channels).",
+            Scenario: fastRouteScenario,
+        },
+        {
             ID:      desyncScenarioID,
             Title:   desyncScenarioTitle,
             Account: desyncAccount,

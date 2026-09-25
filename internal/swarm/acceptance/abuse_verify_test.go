@@ -18,33 +18,39 @@ import (
 // channels a bot can ride faster than the run speed the server would
 // move the character at.
 
-// TestDesyncScenarioOwnsTheListHead pins the head slot of the
-// scenario list: the desync round is the newest and owns the first
-// slot, the cursor movement round the second.
+// TestDesyncScenarioOwnsTheListHead pins the slots of the short
+// movement abuse rounds behind the three route rounds: the desync
+// drift owns the fourth slot, the cursor movement round the fifth.
 func TestDesyncScenarioOwnsTheListHead(t *testing.T) {
     defs := Definitions()
     require.NotEmpty(t, defs)
-    require.Equal(t, desyncScenarioID, defs[0].ID,
-        "the desync position scenario owns the list head")
-    require.Equal(t, desyncAccount, defs[0].Account)
-    require.Equal(t, desyncTimeout, defs[0].Timeout)
-    require.NotNil(t, defs[0].Scenario)
+    require.Equal(t, desyncRouteID, defs[0].ID,
+        "the desync route scenario owns the list head")
+    require.Equal(t, cursorRouteID, defs[1].ID,
+        "the cursor route scenario owns the second slot")
+    require.Equal(t, fastRouteID, defs[2].ID,
+        "the fast route scenario owns the third slot")
+    require.Equal(t, desyncScenarioID, defs[3].ID,
+        "the desync position scenario owns the fourth slot")
+    require.Equal(t, desyncAccount, defs[3].Account)
+    require.Equal(t, desyncTimeout, defs[3].Timeout)
+    require.NotNil(t, defs[3].Scenario)
     for _, needle := range []string{
         "46045 41251 -3440", "ValidatePosition", "setXYZ",
         "700 units west", "twice", "3000+ units",
     } {
-        require.Contains(t, defs[0].Description, needle)
+        require.Contains(t, defs[3].Description, needle)
     }
 
-    require.Equal(t, cursorScenarioID, defs[1].ID,
-        "the cursor movement scenario owns the second slot")
-    require.Equal(t, cursorAccount, defs[1].Account)
-    require.Equal(t, cursorTimeout, defs[1].Timeout)
-    require.NotNil(t, defs[1].Scenario)
+    require.Equal(t, cursorScenarioID, defs[4].ID,
+        "the cursor movement scenario owns the fifth slot")
+    require.Equal(t, cursorAccount, defs[4].Account)
+    require.Equal(t, cursorTimeout, defs[4].Timeout)
+    require.NotNil(t, defs[4].Scenario)
     for _, needle := range []string{
         "cursor key", "94 unit hops", "twice", "3000+ units",
     } {
-        require.Contains(t, defs[1].Description, needle)
+        require.Contains(t, defs[4].Description, needle)
     }
 }
 

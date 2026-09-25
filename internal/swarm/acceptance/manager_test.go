@@ -76,7 +76,8 @@ func TestDefinitionsUseTempAccounts(t *testing.T) {
             classTransferAccount, escapeAccount, dressAccount,
             pocketAccount, churchAccount, delevelAccount,
             stuckAccountA, stuckAccountB, plazaHerbielAccount,
-            archerKiteAccount, desyncAccount, cursorAccount:
+            archerKiteAccount, desyncAccount, cursorAccount,
+            desyncRouteAccount, cursorRouteAccount, fastRouteAccount:
         default:
             t.Fatalf("scenario %s owns the unexpected account %s",
                 def.ID, def.Account)

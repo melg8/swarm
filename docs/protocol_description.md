@@ -333,7 +333,24 @@ Two server side branches make the packet a movement channel a bot can
 outrun the run speed with (the movement abuse acceptance scenarios
 `desync-position` and `cursor-movement` demonstrate both, verified live
 2026-09-26 - 544 and 804 units per second against the 144 run speed of
-the elven fighter):
+the elven fighter). Both scale to the whole world map: the route
+rounds (`desync-route`, `cursor-route` and the sprint `fast-route`,
+verified live 2026-09-26) ride the SAME channels along the navmesh
+corridor the fleet bot itself plans - from the elven forest creation
+spawn to the Gludio teleporter arrival point, about 109,000 units
+through the Neutral Zone (a twelve minute honest run at the 144 run
+speed) - with the level 19 character and the one million adena wallet
+of the user contract. The paced desync ladder covers the corridor at
+1913 units per second (13x the run speed, every eighth guide confirmed
+by its probe echo), the cursor key stream rides the interpolated 94
+unit steps at 622 units per second (460 of 461 cycles confirmed) and
+the sprint - the whole guide ladder dumped in batches of 16 claims per
+hunt loop tick, the desync branch adopting every claim as it arrives -
+crosses the 109k corridor in 3.4 seconds of riding, 29,536 units per
+second (205x the run speed): no flood protector covers the packet, no
+rate cap answers the burst and no server task reverts the drift mid
+ride (the logout store keeps the Gludio placement in the character
+row):
 
 - The desync correction. After the teleport/cast/vehicle/fall gates and
   the sane z gate (+-20000), a claim whose 3D distance to the server

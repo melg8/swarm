@@ -138,7 +138,7 @@ func cursorChecks() []Check {
         },
         {
             ID:     checkCursorSpeed,
-            Label:  "moved faster than twice the run speed",
+            Label:  labelRouteSpeed,
             Done:   false,
             Detail: "the ride has not started",
         },

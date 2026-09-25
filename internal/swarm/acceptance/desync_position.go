@@ -134,7 +134,7 @@ func desyncChecks() []Check {
         },
         {
             ID:     checkDesyncSpeed,
-            Label:  "moved faster than twice the run speed",
+            Label:  labelRouteSpeed,
             Done:   false,
             Detail: "the drift has not started",
         },
