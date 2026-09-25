@@ -37,6 +37,7 @@ type sinkGame struct{}
 
 func (s *sinkGame) AttackTarget(_ int32) error          { return nil }
 func (s *sinkGame) WalkTo(_, _, _ int32) error          { return nil }
+func (s *sinkGame) AbuseMovementEnabled() bool          { return false }
 func (s *sinkGame) CursorKeyWalkTo(_, _, _ int32) error { return nil }
 func (s *sinkGame) ClickWalkTo(_, _, _ int32) error     { return nil }
 func (s *sinkGame) ClaimValidatePosition(_, _, _, _ int32) error {

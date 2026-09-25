@@ -1061,6 +1061,17 @@ func (l *Loop) tickUserAttack(now time.Time) {
             "units, walking to the target", int(dist))
         fighting = false
     }
+    // The abuse engage claim of the -abuse mode owns every approach
+    // leg of the manual attack: a target beyond the engage radius is
+    // reached through the claim channel instead of the server side
+    // run - the armed chase of the early return below, the stalled
+    // chase fallback and the fresh selection request all start the
+    // very run the mode replaces (see abuseEngageClaim). The claim
+    // sits ahead of the select pacing on purpose: the approach is
+    // not a player action, it must not burn the action cadence.
+    if l.abuseEngageClaim(l.userTarget, now) {
+        return
+    }
     if fighting {
         // The fight is running right now: the swings and the chase
         // steps keep the engagement fresh, the death branch takes

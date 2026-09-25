@@ -43,6 +43,7 @@ type fakeGame struct {
     cursorWalks [][3]int32
     rawClicks   [][3]int32
     claims      [][4]int32
+    abuse       bool
     sits        int
     restarts    int
     destroys    [][2]int32
@@ -99,6 +100,13 @@ func (f *fakeGame) WalkTo(x int32, y int32, z int32) error {
     f.walks = append(f.walks, [3]int32{x, y, z})
 
     return nil
+}
+
+// AbuseMovementEnabled reports the abuse movement mode of the fake:
+// the tests arm it to verify the engage claims of the -abuse mode
+// (see Loop.abuseEngageClaim).
+func (f *fakeGame) AbuseMovementEnabled() bool {
+    return f.abuse
 }
 
 // CursorKeyWalkTo records the keyboard-mode move request of the

@@ -520,6 +520,42 @@ conversation or in a commit message: it lives in the registry below.
   stream after it); see docs/protocol_description.md (the
   ValidatePosition section).
 
+### H-013: the engage claims teleport the fight approaches, no run-up leg stays
+
+- Assumption: the approach to a fight target can ride the cursor key
+  claim channel the same way the walks do - the attack request is
+  itself a movement order (the forced attack arms the chase intention
+  and the server AI runs the character to the target at run speed
+  while the chase stays healthy), so a claim at the engage point
+  (half the weapon engage radius on the line from the target toward
+  the character) lands the character inside the attack range the
+  moment the server adopts it, the planned chase dies with the
+  placement change, and no run leg ever covers the distance - under
+  `-abuse` every bot "teleports" next to the mob it engages instead
+  of running up to it.
+- Relied on by: `hunt.abuseEngageClaim` (the engage point geometry,
+  the retry-period pacing, the approach ownership report) and its
+  hooks - the armed-chase branch of the engage (past the stall
+  watchdog), the pre-attack branch of the engage (before the first
+  AttackTarget) and the manual attack flow of `tickUserAttack` (ahead
+  of the fighting early return); unit tests in
+  internal/swarm/hunt/abuse_engage_test.go (the claim before the
+  attack, the claim through the healthy chase, the pacing, the manual
+  flows, the no-flag regressions).
+- Verify: launch a hunting bot with `-abuse -hunt` against the live
+  stack and watch its fights - every approach beyond the weapon range
+  must log one engage claim and start the fight within a tick or two
+  (no MoveToPawn chase leg covering hundreds of units at the 144 run
+  speed), a bot without the flag must keep the ordinary run-up.
+- Status: verified 2026-09-26 by the live hunt runs (the elven village
+  hunt: 26 engage claims, 34 kills in 6 minutes, zero chase-stall
+  fallbacks, the claim-to-kill gap distance independent - a 924 unit
+  approach killed in 9 s against 8 s for a 156 unit one while the
+  honest run of 924 units alone costs 7.4 s; the no-flag control run
+  showed the ordinary run-up, zero claim lines and a slower kill
+  cycle, 12.4 s per kill against 10.2 s); see
+  docs/progress/2026-09-26-abuse-engage.md.
+
 ## Mandatory first step of every task: deploy and verify the environment
 
 Any task in this repository - a bug fix, a feature, a refactor, a test

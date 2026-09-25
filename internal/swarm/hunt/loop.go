@@ -31,6 +31,13 @@ type GameAPI interface {
     // WalkTo makes the character walk to a world point, like a ground
     // click of the official client.
     WalkTo(x int32, y int32, z int32) error
+    // AbuseMovementEnabled reports whether the session rides the
+    // movement abuse channel (the -abuse launch flag): every walk is
+    // an adopted position claim instead of a server side run, and
+    // the engage steps of the hunt loop land the character next to
+    // the fight target through the same claims instead of the server
+    // side chase (see Loop.abuseEngageClaim).
+    AbuseMovementEnabled() bool
     // CursorKeyWalkTo sends the keyboard-mode move request (the
     // cursor keys of the official client, MoveToLocation movement
     // mode 0): the server arms the cursor key movement of the
@@ -655,6 +662,14 @@ type Loop struct {
     delevelAborts int
     engageAt      time.Time
     targetSkip    map[int32]time.Time
+    // abuseEngageAt and abuseEngageFor pace the engage claims of the
+    // abuse movement mode (see abuseEngageClaim): the last claim of
+    // the approach teleport and the target it served - the echo of a
+    // claim needs a tick to land in the tracker, so the repeats of a
+    // target that keeps its distance ride the engage retry period
+    // instead of stacking a claim every tick.
+    abuseEngageAt  time.Time
+    abuseEngageFor int32
     // The lure is the ranged luring state of the current pick (nil when
     // no lure runs): the melee answer to a covered target, see
     // lure.go.
@@ -2275,6 +2290,16 @@ func (l *Loop) engage() {
         // health bar down faster than the natural regeneration, the
         // potion buys the swings that finish the first attacker.
         l.maybeDrinkFightPotion(now)
+        // The abuse engage claim of the -abuse mode: the approach
+        // leg of an armed chase rides the claims too - one adopted
+        // placement next to the target instead of the server side
+        // run the chase would cover (see abuseEngageClaim). The
+        // claim owns the tick past the stall watchdog: the watchdog
+        // walk is the fallback of the ordinary mode, the claim
+        // replaces the very chase it watches.
+        if l.abuseEngageClaim(l.target, now) {
+            return
+        }
         // The swings land right now: nothing to re-request. A stale
         // engagement (the fight was interrupted, the auto attack flag
         // and the combat window linger) falls through and keeps
@@ -2322,6 +2347,16 @@ func (l *Loop) engage() {
         return
     }
     if l.lureArmed() && l.lureTick(now) {
+        return
+    }
+    // The abuse engage claim of the -abuse mode: a target beyond the
+    // engage radius is reached through the claim channel BEFORE the
+    // attack request - the request arms the server side chase and the
+    // chase would run the character to the target at run speed, the
+    // exact movement the mode replaces (see abuseEngageClaim). The
+    // claim lands the character next to the target first, the forced
+    // attack of the next tick starts the fight in range.
+    if l.abuseEngageClaim(l.target, now) {
         return
     }
     if err := l.game.AttackTarget(l.target); err != nil {

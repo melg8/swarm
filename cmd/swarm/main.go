@@ -104,7 +104,11 @@ type config struct {
     // each walk request becomes one adopted position claim with no
     // speed and no distance validation (the cursor key claim channel
     // the desync/cursor/fast route scenarios verified live, see
-    // connection.GameClient.EnableAbuseMovement).
+    // connection.GameClient.EnableAbuseMovement). The engage claims
+    // carry the fight approaches too: a mob beyond the weapon range
+    // is reached through one claim at the engage point next to it -
+    // the teleport - instead of the server side chase the attack
+    // request would run (see hunt.abuseEngageClaim).
     abuse         bool
     pathfindTest  bool
     testFightUI   bool

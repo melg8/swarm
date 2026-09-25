@@ -19,6 +19,7 @@ type benchGame struct{}
 
 func (b *benchGame) AttackTarget(_ int32) error          { return nil }
 func (b *benchGame) WalkTo(_, _, _ int32) error          { return nil }
+func (b *benchGame) AbuseMovementEnabled() bool          { return false }
 func (b *benchGame) CursorKeyWalkTo(_, _, _ int32) error { return nil }
 func (b *benchGame) ClickWalkTo(_, _, _ int32) error     { return nil }
 func (b *benchGame) ClaimValidatePosition(_, _, _, _ int32) error {

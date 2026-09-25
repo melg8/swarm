@@ -404,6 +404,22 @@ evidence the flag dropped or never latched - re-arms on the next walk
 so the claims never degrade into the silent desync adoption without
 the readback.
 
+The engage claims close the last direct leg: the approach to a fight
+target (see `hunt.abuseEngageClaim`). The attack request itself is a
+movement order - the forced attack arms the chase intention and the
+server AI runs the character to the target at run speed while the
+chase stays healthy - so a flag that only swaps `WalkTo` leaves the
+run-up in place. Under `-abuse` every approach leg (the armed chase
+of a running fight, the stalled chase fallback, the fresh selection
+request and the manual attack flow alike) instead sends ONE claim at
+the engage point - half the weapon engage radius on the line from the
+target toward the character - which lands the character inside the
+attack range the moment the server adopts it; the chase the server
+planned dies with the placement change, so no run leg ever covers the
+distance. The claim repeats at the engage retry period while the
+target keeps its distance, and the whole leg stays untouched without
+the flag.
+
 | Offset | Size | Field |
 |--------|------|-------|
 | 0 | 1 | Opcode 0x48 |
