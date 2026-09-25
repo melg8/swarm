@@ -118,6 +118,67 @@ const fullDressTimeout = 5 * time.Minute
 func Definitions() []TestDef {
     return []TestDef{
         {
+            ID:      desyncScenarioID,
+            Title:   desyncScenarioTitle,
+            Account: desyncAccount,
+            Timeout: desyncTimeout,
+            Description: "Start: the elven fighter temp19 wakes at " +
+                "the character creation point of the elven village " +
+                "(46045 41251 -3440) as a bare level 15 character " +
+                "(the standard vitals, an empty bag - the drift never " +
+                "walks a step). Flow: the desync abuse of the " +
+                "ValidatePosition handler (ValidatePosition.runImpl) - " +
+                "every claimed placement whose distance to the server " +
+                "position exceeds the move speed is ADOPTED by the out " +
+                "of sync correction (player.setXYZ(claim)) with no " +
+                "upper bound, no geodata and no door check, so the " +
+                "claim ladder hops the server side position 700 units " +
+                "west per claim (8 hops, 5600 units in about ten " +
+                "seconds) while the probe clicks read every adopted " +
+                "placement back through the self MoveToLocation echo. " +
+                "Pass: a majority of the hops confirmed by their echo " +
+                "origins, the effective speed at least twice the " +
+                "server reported run speed, a displacement of 3000+ " +
+                "units and the logout store keeping the drifted " +
+                "placement in the character row (the movement abuse " +
+                "demonstration of the desync channel; the claims ride " +
+                "the claimPosition command, the probes the clickWalk " +
+                "command, both hand-drivable from the webui).",
+            Scenario: desyncScenario,
+        },
+        {
+            ID:      cursorScenarioID,
+            Title:   cursorScenarioTitle,
+            Account: cursorAccount,
+            Timeout: cursorTimeout,
+            Description: "Start: the elven fighter temp20 wakes at " +
+                "the character creation point of the elven village " +
+                "(46045 41251 -3440) as a bare level 15 character " +
+                "(the standard vitals, an empty bag). Flow: the " +
+                "cursor movement abuse - the keyboard mode arm " +
+                "(MoveToLocation mode 0, the arrow keys of the " +
+                "official client) latches the session cursor key " +
+                "flag (MoveToLocation.runImpl) and every following " +
+                "ValidatePosition claim is synced straight into the " +
+                "world and broadcast back (setSyncedXYZ, no speed " +
+                "validation at all), so the claim stream rides the " +
+                "server side position along the line west in fixed " +
+                "94 unit hops (60 claims, 5640 units in about ten " +
+                "seconds) - every hop UNDER the 125 unit move speed " +
+                "band the desync branch would need, so only the " +
+                "cursor key branch can adopt the claims. Pass: a " +
+                "majority of the stream cycles confirmed by their " +
+                "echoed placements, the effective speed at least " +
+                "twice the server reported run speed, a " +
+                "displacement of 3000+ units and the logout store " +
+                "keeping the ridden placement (the movement abuse " +
+                "demonstration of the cursor channel; the arm rides " +
+                "the cursorWalk command, the claims the " +
+                "claimPosition command, the disarm the clickWalk " +
+                "command, all hand-drivable from the webui).",
+            Scenario: cursorScenario,
+        },
+        {
             ID:      archerKiteScenarioID,
             Title:   "archer kite · the ranged farm contract",
             Account: archerKiteAccount,

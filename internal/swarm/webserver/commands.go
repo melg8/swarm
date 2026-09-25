@@ -34,7 +34,8 @@ type commandRequest struct {
 // id and a drop needs a positive count.
 func validCommand(cmd commandRequest) bool {
     switch cmd.Kind {
-    case state.CommandMove:
+    case state.CommandMove, state.CommandClaimPosition,
+        state.CommandCursorWalk, state.CommandClickWalk:
         return cmd.X != 0 || cmd.Y != 0 || cmd.Z != 0
     case state.CommandAttack, state.CommandPickup, state.CommandUseItem:
         return cmd.ObjectID != 0
@@ -42,9 +43,6 @@ func validCommand(cmd commandRequest) bool {
         return cmd.ObjectID != 0 && cmd.Count >= 1
     case state.CommandZone:
         return cmd.Count >= 0
-    case state.CommandClaimPosition, state.CommandCursorWalk,
-        state.CommandClickWalk:
-        return cmd.X != 0 || cmd.Y != 0 || cmd.Z != 0
     case state.CommandSay:
         // The Say packet validation mirrors the Say2.runImpl refusals:
         // an empty text or an unknown channel would disconnect the

@@ -15,6 +15,7 @@ import (
     "io"
     "net"
     "os"
+    "strconv"
     "strings"
     "time"
 )
@@ -530,4 +531,57 @@ func readLenEncInt(payload []byte, pos int) (int64, int, error) {
 func appendUint32(dst []byte, value uint32) []byte {
     return append(dst, byte(value), byte(value>>8), byte(value>>16),
         byte(value>>24))
+}
+
+// readStoredPosition reads the placement the server stored for the
+// temp character of the reset: the logout store writes the character
+// row once the session ends (a calm character immediately, a character
+// that left in combat fifteen seconds after the stance lapses), so
+// the read waits the offline poll first. The stored placement is the
+// server side truth of where the character stood - the evidence the
+// movement abuse scenarios check their drifted placements against.
+func (m *Manager) readStoredPosition(
+    reset characterReset, test *Test,
+) (int32, int32, int32, error) {
+    db, err := m.dbConnect()
+    if err != nil {
+        m.dbClose()
+
+        return 0, 0, 0, fmt.Errorf("connect: %w", err)
+    }
+    charID, err := characterID(db, reset)
+    if err != nil {
+        m.dbClose()
+
+        return 0, 0, 0, err
+    }
+    waitCharacterOffline(db, charID, test.appendLog)
+    rows, err := db.Query("SELECT x, y, z FROM characters WHERE charId=" +
+        strconv.FormatInt(charID, 10))
+    if err != nil {
+        m.dbClose()
+
+        return 0, 0, 0, fmt.Errorf("query the character row: %w", err)
+    }
+    if len(rows) != 1 || len(rows[0]) != 3 {
+        return 0, 0, 0, fmt.Errorf(
+            "the character row of %s did not answer a placement", reset.Char)
+    }
+    x, err := strconv.ParseInt(rows[0][0], 10, 32)
+    if err != nil {
+        return 0, 0, 0, fmt.Errorf("parse the stored x %q: %w",
+            rows[0][0], err)
+    }
+    y, err := strconv.ParseInt(rows[0][1], 10, 32)
+    if err != nil {
+        return 0, 0, 0, fmt.Errorf("parse the stored y %q: %w",
+            rows[0][1], err)
+    }
+    z, err := strconv.ParseInt(rows[0][2], 10, 32)
+    if err != nil {
+        return 0, 0, 0, fmt.Errorf("parse the stored z %q: %w",
+            rows[0][2], err)
+    }
+
+    return int32(x), int32(y), int32(z), nil
 }
