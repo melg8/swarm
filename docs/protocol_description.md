@@ -329,6 +329,42 @@ streams, the only movement a click-refusing cell answers - the
 and the first mouse-mode walk returns it (see
 `GameClient.ClaimValidatePosition`).
 
+Two server side branches make the packet a movement channel a bot can
+outrun the run speed with (the movement abuse acceptance scenarios
+`desync-position` and `cursor-movement` demonstrate both, verified live
+2026-09-26 - 544 and 804 units per second against the 144 run speed of
+the elven fighter):
+
+- The desync correction. After the teleport/cast/vehicle/fall gates and
+  the sane z gate (+-20000), a claim whose 3D distance to the server
+  position exceeds `getStat().getMoveSpeed()` (the current move speed:
+  the run speed of a running character, 125 for the bare elven fighter
+  template, 144 with the speed multiplier the server reports) hits the
+  "Check out of sync" branch and the server calls
+  `player.setXYZ(claim)` - the desync resolution TRUSTS the client.
+  There is no upper distance bound on the jump (a claim 700 units away
+  adopts as readily as one 7000 away), no geodata check and no door
+  check (the door check of the handler only guards the
+  `setLastServerPosition` bookkeeping); the adopted z is the claimed z
+  whenever the server z is not above it. Claims within the move speed
+  distance are ignored for the placement (the middle band only answers
+  a 500..600 unit or a tall z drift with a ValidateLocation correction
+  packet), so a drift ladder of claims one hop past the move speed
+  each teleports the server placement hop by hop at the packet pace -
+  the `desync-position` scenario hops 700 units per claim.
+- The cursor key branch. While the session holds the cursor key flag
+  (armed by a keyboard-mode MoveToLocation, see below), EVERY claim -
+  any distance, even under the move speed band - is synced into the
+  world through `setSyncedXYZ` (which also rewires the active MoveData
+  so the server side movement continues from the claim) and broadcast
+  as ValidateLocation; `Player.broadcastPacket` sends the broadcast to
+  the moving player itself, so the claiming session reads every
+  adopted placement back. No speed validation runs anywhere on the
+  path: the client position stream IS the server position - the
+  `cursor-movement` scenario rides fixed 94 unit hops (under the move
+  speed band, so only this branch can adopt them) at several times the
+  run speed.
+
 | Offset | Size | Field |
 |--------|------|-------|
 | 0 | 1 | Opcode 0x48 |

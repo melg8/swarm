@@ -89,3 +89,53 @@ webui acceptance panel serves them like every other scenario
 
 - (start) Branch created off main; the stack deployed
   (STACK_READY); the server sources read and the facts above pinned.
+- (commit 0a43695c) The raw movement command channel: the
+  `claimPosition`, `cursorWalk` and `clickWalk` webui commands, the
+  hunt loop one shot handlers and `GameClient.ClickWalkTo` (the raw
+  mouse-mode click that never hands the position stream back to the
+  echo ticker - the probe of the desync round must not reopen it, an
+  echo claim of the stale broadcast placement would teleport the
+  character a hop backwards through the same desync branch). Unit
+  tests: the command semantics (hunt/user_test.go), the click bytes
+  and the stream ownership (connection/validate_position_stream_
+  test.go).
+- (commit 14bc3806) The two scenarios: `desync-position` (temp19,
+  the 8 hop claim ladder with per hop probe clicks) and
+  `cursor-movement` (temp20, the keyboard mode arm with the 60 claim
+  ride in 94 unit hops), the shared abuse session harness (the
+  character prologue, the manual session, the graceful logout, the
+  stored placement read of the character row) and the webui
+  registration at the head of the list. The pass gates: a majority of
+  the hops/cycles confirmed by their echoes, the effective speed at
+  least twice the server reported run speed, 3000+ units and the
+  stored placement within the walk-past tolerance.
+- (live verification, 2026-09-26) Both scenarios PASS against the
+  deployed vanilla stack:
+  - `desync-position`: 8 of 8 hops confirmed (every echo landed
+    exactly on the probe target 60 units past its claim), 544 units
+    per second effective against the 144 run speed the server
+    reported (3.8x), 5660 units covered, the character row stored
+    40385 41251 -3440 (60 from the final claim).
+  - `cursor-movement`: 20 of 20 stream cycles confirmed (the echoes
+    mirrored the claims exactly), 804 units per second effective
+    (5.6x the run speed), 5640 units covered, the character row
+    stored 40345 41251 -3440.
+  - The webui invocation path verified end to end: the panel list
+    serves both scenarios, `POST /api/acceptance/tests/cursor-
+    movement/run` answers 202, the run passes and the API reports the
+    checks and the log tail (the demo script:
+    /home/z/my-project/scripts/webui_abuse_demo.sh, outside the
+    repository).
+- (docs) The protocol notes extended with the desync branch and the
+  cursor key branch facts (docs/protocol_description.md), the webui
+  command documentation extended with the three raw movement
+  commands (docs/webui.md) and the hypothesis registry entries
+  H-008/H-009 recorded as verified (AGENTS.md).
+
+## Open items
+
+- The push to origin fails: the GitHub token of the owner prompt
+  answers 401 Bad credentials for every auth format (likely revoked
+  by the GitHub secret scanning - the token was pasted in plain
+  text). The commits sit on the local branch ready to push once a
+  valid token arrives.

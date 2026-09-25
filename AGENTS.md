@@ -379,6 +379,61 @@ conversation or in a commit message: it lives in the registry below.
   mechanisms above) plus the issue #60 dump cadence; see
   docs/hunting.md (the shot-paced retreat section).
 
+### H-008: the desync correction of ValidatePosition adopts any far claim
+
+- Assumption: the "Check out of sync" branch of
+  `ValidatePosition.runImpl` resolves every claim whose 3D distance to
+  the server position exceeds `getStat().getMoveSpeed()` by calling
+  `player.setXYZ(claim)` - with no upper distance bound, no geodata
+  check and no door check - so a claim ladder of hops one stride past
+  the move speed teleports the server placement across the map at the
+  packet pace, far beyond the run speed the server itself would move
+  the character at.
+- Relied on by: the desync-position acceptance scenario
+  (internal/swarm/acceptance/desync_position.go, the claimPosition and
+  clickWalk commands of the movement abuse round): the probe clicks
+  read the adopted placements back through the self MoveToLocation
+  echo and the logout store check pins the final placement.
+- Verify: read `ValidatePosition.runImpl` (the gates, the out of sync
+  branch, the absence of a distance cap), `Creature.setXYZ` (the zone
+  region revalidation only); then run the scenario on the live stack -
+  8 hops of 700 units must all be confirmed by their echoes and the
+  character row must keep the drifted placement.
+- Status: verified 2026-09-26 by the Mobius C1 source read plus the
+  live scenario runs (8 of 8 hops confirmed, 544 units per second
+  effective against the 144 run speed the server reported, the
+  character row stored the drift); see
+  docs/protocol_description.md (the ValidatePosition section).
+
+### H-009: the cursor key session follows the claim stream at any speed
+
+- Assumption: a keyboard-mode MoveToLocation (movement mode 0,
+  KeyboardMovement enabled by default) latches the session cursor key
+  flag, and every following ValidatePosition claim is synced into the
+  world through `setSyncedXYZ` and broadcast - with no speed
+  validation anywhere on the path - so a claim stream of hops UNDER
+  the move speed band (which the desync branch would ignore) rides the
+  server placement at the stream pace; the stream proves the cursor
+  channel alone.
+- Relied on by: the cursor-movement acceptance scenario
+  (internal/swarm/acceptance/cursor_movement.go, the cursorWalk,
+  claimPosition and clickWalk commands): the 94 unit claim hops
+  (deliberately under the 125 move speed band) must be adopted - only
+  the cursor key branch can adopt them - and the echoes plus the
+  logout store pin the ride.
+- Verify: read `MoveToLocation.runImpl` (the mode 0 branch, the origin
+  adoption window, the flag latch), `ValidatePosition.runImpl` (the
+  cursor key branch), `Creature.setSyncedXYZ` and
+  `Player.broadcastPacket` (the self delivery of the
+  ValidateLocation broadcast); then run the scenario on the live
+  stack - the claim cycles must be confirmed by their echoed
+  placements at several times the run speed.
+- Status: verified 2026-09-26 by the Mobius C1 source read plus the
+  live scenario runs (20 of 20 cycles confirmed, 804 units per second
+  effective against the 144 run speed, the character row stored the
+  ridden placement); see docs/protocol_description.md (the
+  ValidatePosition section).
+
 ## Mandatory first step of every task: deploy and verify the environment
 
 Any task in this repository - a bug fix, a feature, a refactor, a test

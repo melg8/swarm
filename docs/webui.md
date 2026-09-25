@@ -1068,6 +1068,20 @@ MoveToLocation instead of waiting for the old walk - the server
 replaces the destination of a running walk), so a click somewhere else
 changes the direction immediately.
 
+Three one shot movement commands of the same queue expose the raw
+movement channels the acceptance scenarios of the movement abuse
+rounds drive (claimPosition, cursorWalk, clickWalk - one shot like
+say, no phase switch): `claimPosition` reports an arbitrary claimed
+placement (ValidatePosition 0x48), `cursorWalk` arms the keyboard
+mode cursor key movement (MoveToLocation mode 0) and `clickWalk`
+sends one raw mouse-mode click without the route planning and without
+handing the position stream back to the echo ticker (the probe and
+disarm click - `GameClient.ClickWalkTo`). The `desync-position` and
+`cursor-movement` scenarios of the acceptance panel ride exactly
+these commands, so a run of either test is replayable by hand from
+the command API (see `docs/protocol_description.md`, the
+ValidatePosition section, for the server side channels).
+
 ## The statistics tab
 
 The Stats tab (`web/stats.js`, the collector of
