@@ -9,6 +9,7 @@ import (
     "errors"
     "fmt"
     "log"
+    "math"
     "net"
     "os"
     "strconv"
@@ -246,6 +247,31 @@ type GameClient struct {
     // position would fight the claims one broadcast behind (see
     // ClaimValidatePosition).
     claimsOwnStream atomic.Bool
+    // abuseMovement is the -abuse launch flag: every walk request of
+    // the session rides the movement abuse channel (the cursor key
+    // claim stream) instead of the server side run - one adopted
+    // claim per destination, no speed and no distance validation
+    // (see abuseWalkTo).
+    abuseMovement atomic.Bool
+    // cursorKeyArmed mirrors the server side cursor key flag of the
+    // session (MoveToLocation.runImpl latches it in keyboard mode
+    // and clears it on every mouse mode request). The client cannot
+    // read the flag back, so the mirror is best effort - set on the
+    // arm send, cleared on every mouse mode send - and the echo
+    // silence of the claims re-arms it (see abuseNeedsArm).
+    cursorKeyArmed atomic.Bool
+    // selfValidateAt is the moment of the last ValidateLocation
+    // broadcast of the own character: while the cursor key flag
+    // holds, the server echoes every adopted claim back to the
+    // session, so a fresh timestamp proves the abuse channel is
+    // alive and a stale one (past abuseEchoGrace with claims on the
+    // wire) means the flag dropped and the arm must repeat.
+    selfValidateAt atomic.Int64
+    // abuseClaims counts the claims that left through the abuse
+    // channel: the echo grace check only applies once a claim had
+    // the chance to be echoed back (the very first arm of a session
+    // never waits for an echo it caused itself).
+    abuseClaims atomic.Int64
 }
 
 // statusAttrsCapacity bounds the scratch attributes of status updates.
@@ -323,6 +349,10 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
         skills:          nil,
         statusAttrs:     [statusAttrsCapacity]state.Attribute{},
         claimsOwnStream: atomic.Bool{},
+        abuseMovement:   atomic.Bool{},
+        cursorKeyArmed:  atomic.Bool{},
+        selfValidateAt:  atomic.Int64{},
+        abuseClaims:     atomic.Int64{},
     }
 
     writer := packet.NewWriter()
@@ -847,7 +877,14 @@ func (gc *GameClient) validatePosition(validation *positionValidation) error {
 // mouse mode). The hunt loop uses it to run toward a drop: this build of
 // the Mobius C1 server has no click handler for ground items, so the
 // character would otherwise never move toward the loot by itself.
+//
+// The abuse movement mode (-abuse) diverts the request onto the
+// movement abuse channel instead (see abuseWalkTo): one adopted
+// position claim per destination instead of the server side run.
 func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
+    if gc.abuseMovement.Load() {
+        return gc.abuseWalkTo(x, y, z)
+    }
     selfX, selfY, selfZ, ok := gc.tracker.SelfPosition()
     if !ok {
         return errors.New("failed to walk: own position is unknown")
@@ -858,6 +895,7 @@ func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
     // the client position validation owns the stream again (see
     // claimsOwnStream).
     gc.claimsOwnStream.Store(false)
+    gc.cursorKeyArmed.Store(false)
     request := togameserver.NewMoveToLocationRequestPacket()
     request.TargetX = x
     request.TargetY = y
@@ -871,6 +909,122 @@ func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
     }
 
     return nil
+}
+
+// abuseEchoGrace bounds the echo silence of the abuse channel: while
+// the cursor key flag holds, the server echoes every adopted claim
+// back within the round trip, so a claim stream whose own character
+// broadcast stayed quiet this long rides a dropped flag (a refused
+// arm, a mouse mode click of another path) and the next walk re-arms.
+const abuseEchoGrace = 10 * time.Second
+
+// The aim distance of the abuse arm, comfortably past the 9900 unit
+// walk request cap of the server (MoveToLocation.runImpl refuses
+// every walk whose target sits further): the cursor key flag latches
+// in the mode 0 branch BEFORE the cap check, so an arm aimed past the
+// cap latches the flag without ever starting the server side run it
+// replaces (the fleet smoke caught a fresh character whose near aim
+// ran its first leg at run speed instead - the walk of a within cap
+// arm is server discretion, the refusal of a past cap one is not).
+const abuseArmAim = 10500.0
+
+// abuseArmTarget aims the arm of an abuse walk: a point
+// abuseArmAim units from the standing point on the destination line,
+// past the walk request cap so the arm never starts a run.
+func abuseArmTarget(selfX, selfY, x, y int32) (int32, int32) {
+    dx := float64(x - selfX)
+    dy := float64(y - selfY)
+    length := math.Hypot(dx, dy)
+    if length < 1 {
+        // A degenerate line (the destination sits on the standing
+        // point): aim north, any far point arms the flag.
+        return selfX, selfY + int32(abuseArmAim)
+    }
+    scale := abuseArmAim / length
+
+    return selfX + int32(dx*scale), selfY + int32(dy*scale)
+}
+
+// EnableAbuseMovement arms the abuse movement mode of the session
+// (the -abuse launch flag): every later WalkTo rides the movement
+// abuse channel instead of the server side run. The mode is a pure
+// channel swap - the hunt loop keeps planning, pacing and arrival
+// checking its walks exactly as before, only the physical move
+// changes from the validated server run to the adopted position
+// claim.
+func (gc *GameClient) EnableAbuseMovement() {
+    gc.abuseMovement.Store(true)
+}
+
+// AbuseMovementEnabled reports whether the abuse movement mode is
+// armed (the -abuse launch flag of the session).
+func (gc *GameClient) AbuseMovementEnabled() bool {
+    return gc.abuseMovement.Load()
+}
+
+// abuseNeedsArm reports whether the next abuse walk must latch the
+// server side cursor key flag first: either the client never armed
+// it (or watched a mouse mode request clear it), or the claims
+// stopped echoing back - a claim stream whose own character
+// ValidateLocation broadcast stayed quiet past abuseEchoGrace rides
+// a flag the server dropped or never latched, and the claims would
+// degrade to the silent desync adoption without the readback. The
+// echo evidence only applies once a claim left the wire (the arm of
+// a fresh session never waits for an echo it caused itself).
+func (gc *GameClient) abuseNeedsArm() bool {
+    if !gc.cursorKeyArmed.Load() {
+        return true
+    }
+    if gc.abuseClaims.Load() == 0 {
+        return false
+    }
+    lastEcho := time.Unix(0, gc.selfValidateAt.Load())
+
+    return time.Since(lastEcho) > abuseEchoGrace
+}
+
+// abuseWalkTo moves the character through the movement abuse channel
+// instead of the server side run: the keyboard mode arm latches the
+// cursor key flag of the session (MoveToLocation.runImpl latches it
+// in the mode 0 branch before the 9900 unit walk cap, so even a far
+// destination arms without a walk - the cursor route round proved it
+// live arming toward a point 100k units away) and the claimed
+// placement rides the cursor key branch of ValidatePosition.runImpl:
+// setSyncedXYZ adopts EVERY claim of an armed session with no speed
+// and no distance validation and broadcasts the placement back, so
+// one packet per destination IS the move. The tracker learns the new
+// placement from the broadcast the same tick, which keeps every
+// arrival check, stuck detector and redirect of the hunt loop
+// working unchanged - the fast route round crossed the 109k unit
+// corridor through this exact channel at 205 times the run speed.
+// A destination that equals the standing point never leaves (the
+// server refuses the arm whose target matches the origin outright,
+// and the claim of the current placement moves nothing).
+func (gc *GameClient) abuseWalkTo(x int32, y int32, z int32) error {
+    selfX, selfY, _, ok := gc.tracker.SelfPosition()
+    if !ok {
+        return errors.New(
+            "failed to abuse walk: own position is unknown")
+    }
+    if x == selfX && y == selfY {
+        // Already standing on the destination: the move is a no-op
+        // and the arm toward it would be refused (target == origin),
+        // so nothing leaves the wire.
+        return nil
+    }
+    if gc.abuseNeedsArm() {
+        // The arm aims PAST the walk request cap on the destination
+        // line (see abuseArmAim): the flag latches before the cap
+        // check refuses the walk, so the arm never starts the run it
+        // replaces - the claim that follows carries the character.
+        armX, armY := abuseArmTarget(selfX, selfY, x, y)
+        if err := gc.CursorKeyWalkTo(armX, armY, z); err != nil {
+            return err
+        }
+    }
+    gc.abuseClaims.Add(1)
+
+    return gc.ClaimValidatePosition(x, y, z, gc.tracker.SelfHeading())
 }
 
 // CursorKeyWalkTo sends the keyboard-mode move request (MoveToLocation
@@ -907,6 +1061,12 @@ func (gc *GameClient) CursorKeyWalkTo(
         return fmt.Errorf(
             "failed to send the cursor key move: %w", err)
     }
+    // The keyboard mode request latches the cursor key flag of the
+    // session (a walk refused past the 9900 unit cap latches it too -
+    // the flag flips before the cap check): the mirror of the abuse
+    // channel follows, so the next abuse walk claims straight away
+    // instead of arming twice.
+    gc.cursorKeyArmed.Store(true)
 
     return nil
 }
@@ -945,6 +1105,10 @@ func (gc *GameClient) ClickWalkTo(x int32, y int32, z int32) error {
     if err := gc.sendPacket(request); err != nil {
         return fmt.Errorf("failed to send the raw click: %w", err)
     }
+    // The mouse mode click clears the server side cursor key flag
+    // (MoveToLocation.runImpl): the mirror follows, so the next
+    // abuse walk re-arms before its claim.
+    gc.cursorKeyArmed.Store(false)
 
     return nil
 }

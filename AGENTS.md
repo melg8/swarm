@@ -485,6 +485,41 @@ conversation or in a commit message: it lives in the registry below.
   109,003 units, the character row stored the Gludio placement); see
   docs/protocol_description.md (the ValidatePosition section).
 
+### H-012: the abuse channel carries the live hunt loop, not only the demos
+
+- Assumption: swapping every `WalkTo` of a live bot onto the cursor key
+  claim channel (the `-abuse` launch flag, see
+  connection.GameClient.EnableAbuseMovement) keeps the hunt loop
+  working - the claim echoes (the self ValidateLocation broadcasts of
+  the armed session) update the tracker fast enough that the arrival
+  checks, the stuck ladders and the manual walk phases conclude
+  instead of grinding, the once per session arm latches through the
+  whole session and the echo-silence re-arm heals a dropped flag - so
+  the movement abuse is a drop-in transport for the real bot, not only
+  for the scripted acceptance rides.
+- Relied on by: the `-abuse` flag of cmd/swarm (every bot of the
+  launch moves through the claims instead of the server side runs) and
+  its unit tests (internal/swarm/connection/abuse_movement_test.go:
+  the arm once then claims only contract, the standing point no-op,
+  the disarm and the echo-silence re-arms).
+- Verify: launch a bot with `-abuse` against the live stack and watch
+  its movement - the manual map click must land the character on the
+  clicked point within a tick (no server side run), the hunt patrol
+  and the zone returns must advance at claim pace with no stuck
+  escalations, and the packet stream must show one keyboard-mode arm
+  followed by bare ValidatePosition claims.
+- Status: verified 2026-09-26 by the live runs (the single bot: the
+  manual map click of a 56,878 unit jump crossed in the same second
+  the claim left - the honest run would take 395 seconds at the 144
+  run speed; the two bot fleet smoke: exactly one arm per session -
+  the past-cap aim of the first fleet round caught a fresh character
+  running its first leg at run speed, the 10,500 unit aim fixed it -
+  every later walk a bare claim, both bots landed their 2,030 and
+  3,226 unit trips at about 400 units per second effective, the
+  packet trace shows the 0x01 arm once per session and the 0x48 claim
+  stream after it); see docs/protocol_description.md (the
+  ValidatePosition section).
+
 ## Mandatory first step of every task: deploy and verify the environment
 
 Any task in this repository - a bug fix, a feature, a refactor, a test

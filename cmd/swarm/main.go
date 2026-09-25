@@ -93,12 +93,19 @@ const (
 )
 
 type config struct {
-    loginAddress  string
-    account       string
-    password      string
-    charName      string
-    webAddress    string
-    hunt          bool
+    loginAddress string
+    account      string
+    password     string
+    charName     string
+    webAddress   string
+    hunt         bool
+    // abuse is the -abuse flag: every bot of the launch moves through
+    // the movement abuse channel instead of the server side run -
+    // each walk request becomes one adopted position claim with no
+    // speed and no distance validation (the cursor key claim channel
+    // the desync/cursor/fast route scenarios verified live, see
+    // connection.GameClient.EnableAbuseMovement).
+    abuse         bool
     pathfindTest  bool
     testFightUI   bool
     testFightUIV1 bool
@@ -214,6 +221,7 @@ func parseFlags() config {
         charName:         "",
         webAddress:       "",
         hunt:             false,
+        abuse:            false,
         pathfindTest:     false,
         testFightUI:      false,
         testFightUIV1:    false,
@@ -259,6 +267,16 @@ func parseFlags() config {
         "web interface address, empty disables it")
     flag.BoolVar(&cfg.hunt, "hunt", false,
         "auto hunt: attack, pick up loot and manage inventory")
+    flag.BoolVar(&cfg.abuse, "abuse", false,
+        "move every bot through the movement abuse channel instead of "+
+            "running: each walk request becomes one ValidatePosition "+
+            "claim the server adopts with no speed and no distance "+
+            "validation (the cursor key branch of the armed session - "+
+            "the same channel the desync/cursor/fast route scenarios "+
+            "verified live at 4x to 205x the run speed), so every "+
+            "segment, waypoint and clicked destination lands in one "+
+            "packet. The hunt loop keeps its own planning and pacing; "+
+            "only the physical move changes")
     flag.BoolVar(&cfg.pathfindTest, "pathfind-test", false,
         "map pathfinding test UI instead of the bot: no game connection, "+
             "draggable start and end markers show the found path")
@@ -480,6 +498,22 @@ func connectGameServer(auth *connection.AuthResult) (net.Conn, error) {
     return conn, nil
 }
 
+// armAbuseMovement swaps the movement channel of one bot session when
+// the -abuse flag is set: every walk of the session rides the cursor
+// key claims instead of the server side run (see
+// connection.GameClient.EnableAbuseMovement). The call sits right
+// after the tracker attach so the mode covers the whole session,
+// fleet bot and single bot alike (the fleet goroutines launch the
+// same runBot with their plan slot config).
+func armAbuseMovement(game *connection.GameClient, cfg config) {
+    if !cfg.abuse {
+        return
+    }
+    game.EnableAbuseMovement()
+    log.Println("Movement abuse channel armed: every walk rides " +
+        "the cursor key claims instead of the server run")
+}
+
 // runBot performs one bot session: login, game handshake, authentication,
 // character creation, entering the world and staying in it until the
 // context is done or the session fails. The hunt loop of the session is
@@ -533,6 +567,13 @@ func runBot( //nolint:funlen // linear session script
     // second close is a no-op.
     defer func() { _ = game.Close() }()
     game.SetTracker(tracker)
+    // The -abuse flag swaps the movement channel of the session (and
+    // of every bot of the fleet - the fleet goroutines launch the
+    // same runBot with their plan slot config): the walks stop being
+    // server side runs and become the adopted position claims of the
+    // movement abuse channel. The mode survives the reconnects of
+    // the supervisor - every later session re-arms it the same way.
+    armAbuseMovement(game, cfg)
 
     // The proxy observes the whole session (the recorder replays it to
     // connecting C1 clients) and forwards their packets through the

@@ -5,7 +5,9 @@
 package main
 
 import (
+    "flag"
     "log"
+    "os"
     "testing"
 
     "github.com/melg8/swarm/internal/swarm/acceptance"
@@ -13,6 +15,31 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
+
+// TestAbuseFlagParses pins the -abuse flag contract: the plain launch
+// keeps the server side runs, the flag swaps the movement channel of
+// every bot onto the movement abuse claims (see
+// connection.GameClient.EnableAbuseMovement).
+func TestAbuseFlagParses(t *testing.T) {
+    savedFlags := flag.CommandLine
+    savedArgs := os.Args
+    t.Cleanup(func() {
+        flag.CommandLine = savedFlags
+        os.Args = savedArgs
+    })
+
+    t.Run("the plain launch keeps the runs", func(t *testing.T) {
+        flag.CommandLine = flag.NewFlagSet("swarm", flag.ContinueOnError)
+        os.Args = []string{"swarm"}
+        require.False(t, parseFlags().abuse)
+    })
+
+    t.Run("the flag arms the abuse channel", func(t *testing.T) {
+        flag.CommandLine = flag.NewFlagSet("swarm", flag.ContinueOnError)
+        os.Args = []string{"swarm", "-abuse"}
+        require.True(t, parseFlags().abuse)
+    })
+}
 
 // TestHuntEventLoggerMirrorsHuntLines pins the loop logger wiring: the
 // hunt decision lines land in the tracker event log without the

@@ -382,6 +382,28 @@ row):
   speed band, so only this branch can adopt them) at several times the
   run speed.
 
+The `-abuse` launch flag turns the cursor key branch into the movement
+channel of every live bot (see `GameClient.EnableAbuseMovement` and
+`abuseWalkTo`): each `WalkTo` of the hunt loop - every patrol segment,
+town trip waypoint, loot run, kite retreat and manual map click -
+becomes ONE adopted claim instead of a server side run. The first walk
+of a session latches the cursor key flag with a keyboard-mode
+MoveToLocation aimed 10,500 units out on the destination line - past
+the 9900 unit walk request cap, where the flag latches in the mode 0
+branch BEFORE the cap check refuses the walk, so the arm never starts
+the run it replaces (a within-cap aim would sometimes run it: the
+fleet smoke caught a fresh character running its first leg at run
+speed) - every later walk is a bare ValidatePosition claim, and the
+loop keeps planning, pacing and arrival checking exactly as before,
+which keeps every arrival radius, stuck detector and redirect working
+off the broadcast echoes. The arm self-heals two ways: a mouse-mode
+request of any other path (the raw click command) clears the server
+flag and the client mirror follows, and a claim stream whose own
+ValidateLocation echo went silent past a ten second grace window -
+evidence the flag dropped or never latched - re-arms on the next walk
+so the claims never degrade into the silent desync adoption without
+the readback.
+
 | Offset | Size | Field |
 |--------|------|-------|
 | 0 | 1 | Opcode 0x48 |

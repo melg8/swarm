@@ -11,6 +11,8 @@ package connection
 // into the state tracker.
 
 import (
+    "time"
+
     fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
     togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
     "github.com/melg8/swarm/internal/swarm/state"
@@ -217,6 +219,14 @@ func (gc *GameClient) applyValidateLocation(payload []byte) {
     }
     if gc.tracker != nil {
         place := gc.validateLoc
+        // The self broadcast is the echo evidence of the abuse
+        // movement channel: while the cursor key flag holds, the
+        // server echoes every adopted claim back to the session, so
+        // the timestamp keeps the re-arm check of abuseWalkTo honest
+        // (a silent echo past the grace window re-arms the flag).
+        if place.ObjectID == gc.tracker.SelfObjectID() {
+            gc.selfValidateAt.Store(time.Now().UnixNano())
+        }
         gc.tracker.ApplyPlacement(state.Placement{
             ObjectID: place.ObjectID,
             X:        place.X,
