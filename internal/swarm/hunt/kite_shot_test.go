@@ -121,13 +121,11 @@ func TestKiteShotPacedDefersTheRetreatPastTheWindup(t *testing.T) {
     require.True(t, ok)
     require.Equal(t, selfZ, step[2],
         "the step keeps the character's deck")
-    // The step runs straight away from the target at the RACE
-    // length: the mob 440 out owes a deficit of 40 to the re-shot
-    // floor, so the formula runs 400 + 40*8 = 720, capped by the
-    // opening ring budget around the mob's stand
-    // (972-440-50 = 482).
-    require.Equal(t, int32(44518), step[0],
-        "the step runs straight away from the target at the race length")
+    // The step runs straight away from the target at the plain
+    // shot-cycle length: the opening ring budget around the mob's
+    // stand (972-440-50 = 482) fits the 400 step whole.
+    require.Equal(t, int32(44600), step[0],
+        "the step runs straight away from the target at the plain step")
     require.Equal(t, selfY, step[1])
     require.True(t, loop.kiteClickAt.IsZero(),
         "the fired schedule disarms itself")
@@ -223,13 +221,10 @@ func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
     step := game.walks[0]
     require.InDelta(t, 45000.0, float64(step[0]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
-    // The gap bisector at the RACE length: the deficit 280 bought
-    // back at the parity rate, capped by the opening ring budget
-    // around the target's stand (972-200-50 = 722) - the
-    // perpendicular break marches that leg north.
-    require.InDelta(t, 50000+kiteRoamRadius*kiteRingLeashShare-
-        kiteArrivalEpsilon/2-200,
-        float64(step[1]), 1.0,
+    // The gap bisector at the plain shot-cycle length: the opening
+    // ring budget around the target's stand (972-200-50 = 722) fits
+    // the 400 step whole - the perpendicular break marches it north.
+    require.InDelta(t, 50000.0+kiteStep, float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
     require.True(t, loop.kiteHeldAt.IsZero(),
         "the gap answer is a step, not a hold")

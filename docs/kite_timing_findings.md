@@ -8,6 +8,15 @@ Orc Grunt SW-5 cell, one raw wire session (no hunt loop), ten ladder
 rounds plus the cursor key round. The run of 2026-09-23 14:06-14:08
 (all ten rounds landed, the scenario PASSED).
 
+**Superseded design note (2026-11-09):** this file records the raw
+server timing that the current retreat still rides (the windup end at
+~1.5 s, the disable end at ~3 s, the deferred click inside the
+windup). The safe-distance gates built on top of these numbers (the
+re-shot floor, the pursuit hold) were removed by the 2026-11-09
+shot-cycle contract - `docs/hunting.md` ("The continuous retreat")
+carries the current design; read the numbers here, not the policy of
+the later sections.
+
 ## The server bow cycle (live numbers, pAtkSpd 337)
 
 ```

@@ -836,36 +836,6 @@ type Loop struct {
     // re-click would only fight the re-engage for the movement. The
     // zero value disarms the ladder.
     kiteWalkUntil time.Time
-    // kitePursuitFor names the fight the last kite retreat served
-    // and kitePursuitAt stamps the walk that served it: the pursuit
-    // hold of the walk tail (see kite.go) continues a walk only
-    // behind a FRESH retreat of the same fight - a close hostile of
-    // the approach phase (no shot, no retreat behind it) must never
-    // trigger the continuation, the engage requests the attack
-    // instead. The stamp expires the context: the Mobius respawn
-    // re-uses the object id, so the ownership alone would let a
-    // stale context of the PREVIOUS fight answer the approach of the
-    // respawned one - the continuation chain re-stamps every walk.
-    kitePursuitFor int32
-    kitePursuitAt  time.Time
-    // kitePursuitShot stamps the own shot broadcast the current
-    // pursuit ledger belongs to: every fresh shot starts a fresh
-    // race (the re-shot proves the distance opened, or the windup
-    // ended affordable), so the steps, stalls and the open walk of
-    // the previous cycle never inherit into the new one. The zero
-    // value precedes the first shot.
-    kitePursuitShot time.Time
-    // kitePursuitSteps counts the continuation walks issued since
-    // the last shot (see kitePursuitHold): crossing
-    // kitePursuitStreakLimit names the runaway chain in the log
-    // while the walk keeps running (the owner rule of the
-    // 2026-11-09 round - a walled lane is the only standing-shoot
-    // case, a slow race never stops the retreat itself). The counter
-    // resets on every fresh shot cycle (kitePursuitCycle) and on any
-    // walk issued outside the previous chain's context
-    // (kiteIssueWalk - a new fight or the respawned same-id target
-    // starts its own race).
-    kitePursuitSteps int
     // kiteFightFor/X/Y anchor the current fight's own ground (the
     // round-14 location-general redesign): the position of the
     // fight target at the fight's FIRST retreat resolution (see
@@ -2519,17 +2489,14 @@ func (l *Loop) engage() {
     if l.lureArmed() && l.lureTick(now) {
         return
     }
-    // The archer kite owns the re-shot: a live bow fight whose
-    // retreat already ran keeps running while the hostile holds
-    // inside the re-shot floor, instead of committing the next shot
-    // at the collapsed range (see kiteDeferShot, kite.go - the owner
-    // rule of the 2026-11-09 round: shoot only from the safe
-    // distance, run the reload). The cornered fight keeps its shot
-    // through the hold, and the first engage of a fresh fight keeps
-    // its attack request (no retreat stands behind it yet).
-    if l.kiteDeferShot(now) {
-        return
-    }
+    // The forced attack re-request here IS the next bow shot of the
+    // kite cycle (the owner contract of the 2026-11-09 round): the
+    // retreat window ends at the shot's disable end, so the request
+    // goes out the moment the bow is ready - whatever range the
+    // chaser reached meanwhile. Waiting for a "safe" distance is the
+    // treadmill the 5-minute acceptance run measured (20-30 s
+    // between the shots, the mob regenerating faster than the
+    // arrows).
     if err := l.game.AttackTarget(l.target); err != nil {
         l.logf("Hunt: attack failed: %v", err)
 

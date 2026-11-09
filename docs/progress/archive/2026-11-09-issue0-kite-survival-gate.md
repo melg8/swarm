@@ -1,4 +1,4 @@
-# The archer kite survival gate: disengage below the escape line (status: in progress)
+# The archer kite survival gate: disengage below the escape line (status: complete)
 
 Started 2026-11-09, branch feature/kite-range-contract, issue #0
 (the owner instruction, no board issue). Follow-up of
@@ -150,6 +150,8 @@ arrows 590.
 
 ## Status
 
-In progress: the code, tests, docs and the 5-minute live
-confirmation are done; the closing commit and the fragment archive
-remain.
+Complete. The commit `aa1e8119` carries the disengage gate, the
+standing-sample band and the bow fence; the 5-minute run 9b
+(`logs/acceptance/archer-kite-20261109-230523-34856-1.log`) passed
+every check. The follow-up round of the shot cycle continues on the
+same branch (see `2026-11-10-issue0-kite-shot-cycle.md`).

@@ -79,20 +79,16 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
 
     // The centroid direction, recomputed from first principles:
     // away(target) = (-1, 0), away(member) = (-141, -141)/199.4. The
-    // leg is the race step of the nearer threat (the member at 199.4:
-    // 400 + the deficit * 8, capped at the opening ring budget
-    // around the target's stand - 972-200-50 = 722- the deficit leg
-    // is far past it).
+    // leg is the plain shot-cycle step, fenced by the opening ring
+    // budget around the target's stand (972-200-50 = 722), which
+    // fits the 400 step whole.
     ax, ay := -1.0, 0.0
     bx := -141.0 / math.Hypot(141, 141)
     by := -141.0 / math.Hypot(141, 141)
     sumX, sumY := ax+bx, ay+by
     dirX := sumX / math.Hypot(sumX, sumY)
     dirY := sumY / math.Hypot(sumX, sumY)
-    leg := math.Min(
-        kiteStep+(kiteReshotFloor-math.Hypot(141, 141))*kiteRaceFactor,
-        kiteRaceStepMax)
-    leg = math.Min(leg,
+    leg := math.Min(kiteStep,
         kiteRoamRadius*kiteRingLeashShare-200-kiteArrivalEpsilon/2)
     step := game.walks[0]
     require.InDelta(t, 45000+dirX*leg, float64(step[0]), 1.0,
@@ -134,14 +130,12 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
     // target, pi to the member) spans the northern half-plane and
     // its bisector is the perpendicular ray - the deterministic
     // first-widest answer, no coin flip between the two halves. The
-    // leg is the race step capped at the opening ring budget around
-    // the target's stand (972-200-50 = 722), so the perpendicular
-    // escape marches that leg north.
+    // leg is the plain shot-cycle step (the opening ring budget
+    // 972-200-50 = 722 fits it whole), so the perpendicular escape
+    // marches 400 units north.
     require.InDelta(t, 45000.0, float64(step[0]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
-    require.InDelta(t, 50000+kiteRoamRadius*kiteRingLeashShare-
-        kiteArrivalEpsilon/2-200,
-        float64(step[1]), 1.0,
+    require.InDelta(t, 50000.0+kiteStep, float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
     // The perpendicular escape opens the distance to BOTH chasers.
     toTarget := math.Hypot(
@@ -261,15 +255,15 @@ func TestKiteBlockedStraightLaneHoldsGround(t *testing.T) {
 // the archer buys the distance it can instead of holding on an open
 // runway. The live 17:43/17:44 dumps measured the old cornered hold
 // firing while the lane was walkable, and this is the in-process twin:
-// the full race leg is refused, the three-quarter hop lands.
+// the full plain step is refused, the three-quarter hop lands.
 func TestKiteBlockedFarEndTakesTheShorterHop(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     nav := &fakeNavigator{}
     nav.validateHook = func(
         from, to pathfind.Vec3,
     ) (pathfind.Vec3, bool) {
-        if int32(math.Round(to.X)) == 44278 {
-            // The far end of the opening 722-unit leg is walled.
+        if int32(math.Round(to.X)) == 44600 {
+            // The far end of the opening 400-unit leg is walled.
             return from, false
         }
 
@@ -280,9 +274,7 @@ func TestKiteBlockedFarEndTakesTheShorterHop(t *testing.T) {
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "a far-end wall still walks the shorter straight hop")
-    ringRun := kiteRoamRadius*kiteRingLeashShare - 200 -
-        kiteArrivalEpsilon/2
-    rung := math.Round(ringRun * 0.75)
+    rung := math.Round(kiteStep * 0.75)
     require.Equal(t, int32(45000-rung), game.walks[0][0],
         "the ladder takes the three-quarter rung of the same ray")
     require.Equal(t, int32(50000), game.walks[0][1],
@@ -320,8 +312,8 @@ func TestKiteLiveTargetReAnchorsTheRing(t *testing.T) {
         "the anchor follows the live target")
     require.Equal(t, int32(50000), loop.kiteFightY,
         "the anchor follows the live target")
-    require.Equal(t, int32(43178), game.walks[0][0],
-        "the leg budgets against the re-anchored ring")
+    require.Equal(t, int32(43600), game.walks[0][0],
+        "the leg runs the plain step from the re-anchored fight")
     require.Equal(t, int32(50000), game.walks[0][1],
         "the leg keeps the straight away-ray")
     require.True(t, loop.kiteHeldAt.IsZero(),
@@ -412,7 +404,7 @@ func TestKiteCampDoesNotBendTheStraightRetreat(t *testing.T) {
     require.Len(t, game.walks, 1,
         "the camp must not cancel the straight retreat")
     step := game.walks[0]
-    require.InDelta(t, 44278.0, float64(step[0]), 1.0,
+    require.InDelta(t, 44600.0, float64(step[0]), 1.0,
         "the retreat keeps the straight west ray")
     require.InDelta(t, 50000.0, float64(step[1]), 1.0,
         "the retreat keeps the straight west ray")
