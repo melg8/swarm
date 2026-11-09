@@ -10,6 +10,33 @@ import (
     "github.com/stretchr/testify/require"
 )
 
+// TestSelfEngagedByCountsTheIncomingAttack pins the two-sided
+// engagement view behind the engage stuck gate: a mob that holds the
+// character as its own target is engaged even when the character
+// itself has no fresh swing (the C1 bow reuse window refuses every
+// attack request while the mob keeps swinging).
+func TestSelfEngagedByCountsTheIncomingAttack(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 45600, Y: 50000, Name: "Gremlin",
+    })
+    require.False(t, bot.SelfEngagedBy(7),
+        "a bystander is not engaged")
+
+    bot.ApplyAttack(Attack{
+        AttackerID: 7, X: 45600, Y: 50000, Z: -3500,
+        TargetCount: 1,
+        TargetIDs:   [AttackTargets]int32{100},
+        TargetX:     45000, TargetY: 50000, TargetZ: -3500,
+    })
+    require.False(t, bot.SelfFighting(7),
+        "the own fight view stays cold without a swing")
+    require.True(t, bot.SelfEngagedBy(7),
+        "the incoming attack engages the target")
+}
+
 // A pawn movement toward a known non attackable npc is the interact
 // walk of the Mobius player AI (the approach to the ~36 unit talk
 // distance): it aims the character at the npc but marks no combat, so

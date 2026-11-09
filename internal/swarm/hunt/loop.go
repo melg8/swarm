@@ -2156,7 +2156,7 @@ func (l *Loop) engage() {
             l.clearBlindRecovery()
         }
     }
-    if l.target != 0 && !l.tracker.SelfFighting(l.target) &&
+    if l.target != 0 && !l.tracker.SelfEngagedBy(l.target) &&
         !l.engageAt.IsZero() && now.Sub(l.engageAt) > engageStuckTimeout &&
         !l.blindRecoveryArmed(now) {
         // The repeated attack requests never started a real
@@ -2174,7 +2174,13 @@ func (l *Loop) engage() {
         // DIFFERENT object id replaces the stale one, so the
         // target is dropped and skipped for a while; the
         // blind recovery owns the obstructed case with its
-        // own budgets instead.
+        // own budgets instead. The target ATTACKING the
+        // character counts as engaged through the same
+        // SelfEngagedBy call: the bow reuse window can refuse
+        // every attack request while the mob keeps swinging
+        // (the 14:02:40 dump dropped a grunt that stood at
+        // 17-34 units and hitting), and dropping it left the
+        // blows unanswered.
         l.logf("Hunt: target %d does not engage, "+
             "switching to another", l.target)
         if l.targetSkip == nil {

@@ -131,8 +131,21 @@ archer-kite re-check.
   walls every lane; the cornered logout still fires, the log names
   the wall).
 
+### 2026-11-09 - hunt: count an incoming attack as an engagement
+
+- `state.Bot.SelfEngagedBy` answers the two-sided engagement: the
+  own fresh swing/chase OR the target holding the character as its
+  own target (`SelfFighting` alone missed the second side, which is
+  exactly the bow reuse window case).
+- The 12 s engage stuck gate uses it, so a mob that is swinging at
+  the character keeps its target while `ActionFailed` answers the
+  character's own attack requests; an idle selection still drops.
+- Tests: `TestSelfEngagedByCountsTheIncomingAttack`,
+  `TestEngageGateKeepsTheAttackingTarget`,
+  `TestEngageGateDropsTheIdleSelection`.
+
 ## Status
 
-In progress: fixes 1-2 landed; fix 3 (engage gate fed by incoming
-attacks) next.
+In progress: fixes 1-3 landed; fix 4 (terrain-gated add sidestep)
+next.
 

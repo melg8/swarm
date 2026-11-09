@@ -1525,6 +1525,45 @@ func TestLoopPileUpNamesTheWalledLane(t *testing.T) {
     require.NotContains(t, logBuf.String(), "shook the chase")
 }
 
+// TestEngageGateKeepsTheAttackingTarget pins the engage stuck gate
+// fix: a target that holds the character as its own target is
+// engaged even when the character's own swing is missing - the bow
+// reuse window refuses the attack requests (Creature.
+// canUseRangeWeapon) while the mob keeps hitting. The 14:02:40 dump
+// dropped such a grunt after 12 s and left the blows unanswered.
+func TestEngageGateKeepsTheAttackingTarget(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45600)
+    attackerHits(bot, 7, 45600)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.target = 7
+    loop.engageAt = time.Now().Add(-engageStuckTimeout - time.Second)
+
+    loop.tick()
+    require.Equal(t, int32(7), loop.target,
+        "the mob that attacks the character is engaged")
+    require.False(t, loop.targetSkipped(7, time.Now()),
+        "the attacking target is not sent to the skip list")
+}
+
+// TestEngageGateDropsTheIdleSelection is the control of the gate: a
+// selected target that neither swings nor attacks still loses the
+// engagement after the stuck timeout (the stale server selection the
+// gate exists for).
+func TestEngageGateDropsTheIdleSelection(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45600)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.target = 7
+    loop.engageAt = time.Now().Add(-engageStuckTimeout - time.Second)
+
+    loop.tick()
+    require.Zero(t, loop.target,
+        "an idle selection is dropped after the stuck timeout")
+}
+
 func TestLoopKeepsFightingAgainstOneAttacker(t *testing.T) {
     bot := newTestBot()
     bot.ApplyNpcInfo(state.NpcInfo{

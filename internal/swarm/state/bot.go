@@ -754,6 +754,32 @@ func (b *Bot) SelfFighting(targetID int32) bool {
         b.char.fightingFresh(time.Now())
 }
 
+// SelfEngagedBy reports whether the given target is still a live
+// engagement for the character, counting BOTH sides: the own fresh
+// swing or chase step, or the target holding the character as its own
+// target. The one-sided SelfFighting view reads a point-blank bow
+// fight as a stuck selection while the C1 bow reuse window refuses
+// every attack request (Creature.canUseRangeWeapon answers
+// ActionFailed and reschedules the retry) and the mob keeps swinging -
+// the engage stuck gate then dropped the target that was killing the
+// character. The object side needs no freshness window: a target that
+// switched away replaces TargetID with the new victim, and a dead
+// target fails the attackable test.
+func (b *Bot) SelfEngagedBy(targetID int32) bool {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    if b.char.FightingTargetID == targetID &&
+        b.char.fightingFresh(time.Now()) {
+        return true
+    }
+    obj, _ := b.objectLocked(targetID)
+    if obj == nil || obj.Dead || obj.Kind != kindNPC || !obj.Attackable {
+        return false
+    }
+
+    return b.selfID != 0 && obj.TargetID == b.selfID
+}
+
 // SelfCannotSeeTargetAt returns when the server last answered the attack
 // with "Cannot see target." (zero when it never happened): the geodata
 // line of sight to the attack target is blocked, an obstacle stands
