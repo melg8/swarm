@@ -400,20 +400,7 @@ func (l *Loop) panicPileUpRun(now time.Time) {
         l.logger.Printf("Hunt: %d mobs piled on us, running %.0f units "+
             "from the aggro point before the logout",
             l.tracker.SelfAttackerCount(), panicRunDistance)
-        // Drop the fight the pack joined: the dropped target
-        // lands on the long skip list (the run must not
-        // re-engage it), the pending engage bookkeeping
-        // clears - the same handoff fleeFromTarget makes.
-        if l.target != 0 {
-            if l.targetSkip == nil {
-                l.targetSkip = make(map[int32]time.Time)
-            }
-            l.targetSkip[l.target] = now.Add(fleeSkipDelay)
-            l.target = 0
-            l.engageAt = time.Time{}
-            l.clearBlindRecovery()
-            l.noTargetSince = time.Time{}
-        }
+        l.dropPileUpFight(now)
     }
     if dist := l.panicAnchorDistance(); dist >= panicRunDistance {
         l.logger.Printf("Hunt: %.0f units from the aggro point, "+
@@ -470,6 +457,24 @@ func (l *Loop) panicPileUpRun(now time.Time) {
     if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
         l.logger.Printf("Hunt: pile up escape walk failed: %v", err)
     }
+}
+
+// dropPileUpFight drops the fight the pack joined: the dropped
+// target lands on the long skip list (the run must not re-engage
+// it) and the pending engage bookkeeping clears - the same handoff
+// fleeFromTarget makes.
+func (l *Loop) dropPileUpFight(now time.Time) {
+    if l.target == 0 {
+        return
+    }
+    if l.targetSkip == nil {
+        l.targetSkip = make(map[int32]time.Time)
+    }
+    l.targetSkip[l.target] = now.Add(fleeSkipDelay)
+    l.target = 0
+    l.engageAt = time.Time{}
+    l.clearBlindRecovery()
+    l.noTargetSince = time.Time{}
 }
 
 // panicAnchorDistance measures how far the character stands from

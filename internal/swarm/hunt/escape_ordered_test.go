@@ -173,7 +173,7 @@ func TestEscapeClosureWatchdogReanchorsOnAnOpeningGap(t *testing.T) {
 
     require.False(t, held, "an opening gap never ends the escape")
     require.GreaterOrEqual(t, gap, float64(1000))
-    require.Equal(t, gap, loop.fleeGap, "the probe re-anchors")
+    require.InDelta(t, gap, loop.fleeGap, 1e-9, "the probe re-anchors")
 }
 
 // TestEscapeStallWatchdogReanchorsOnProgress pins the rolling

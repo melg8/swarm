@@ -345,32 +345,17 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     // straight lane and froze, the add stayed on top of the
     // character). Every candidate runs the same terrain contract the
     // kite retreat lanes use (see combatAvoidLane).
-    baseX, baseY := dx/dist, dy/dist
-    for stepIdx := 0; stepIdx <= combatAvoidFanSteps; stepIdx++ {
-        angle := combatAvoidFanStep * float64(stepIdx)
-        for _, sign := range [2]int{1, -1} {
-            if stepIdx == 0 && sign < 0 {
-                // The straight lane is its own mirror.
-                continue
-            }
-            dirX, dirY := rotatePlanar(
-                baseX, baseY, float64(sign)*angle)
-            stepX, stepY, ok := l.combatAvoidLane(
-                selfX, selfY, selfZ, dirX, dirY)
-            if !ok {
-                continue
-            }
-            l.combatAvoidAt = now
-            l.combatAvoidUntil = now.Add(combatAvoidStepPeriod)
-            l.logger.Printf("Hunt: %s stalks the fight %d units out, "+
-                "stepping clear", threat.Name,
-                int(math.Round(dist)))
-            if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
-                l.logger.Printf("Hunt: combat avoid walk failed: %v", err)
-            }
-
-            return true
+    if stepX, stepY, ok := l.combatAvoidFanStep(
+        selfX, selfY, selfZ, dx/dist, dy/dist); ok {
+        l.combatAvoidAt = now
+        l.combatAvoidUntil = now.Add(combatAvoidStepPeriod)
+        l.logger.Printf("Hunt: %s stalks the fight %d units out, "+
+            "stepping clear", threat.Name, int(math.Round(dist)))
+        if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
+            l.logger.Printf("Hunt: combat avoid walk failed: %v", err)
         }
+
+        return true
     }
     // Every lane is walled, over water or outside the leash: the
     // fight holds the ground instead of clicking into the obstacle
@@ -387,6 +372,32 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     }
 
     return false
+}
+
+// combatAvoidFanStep walks the sidestep fan around the away ray: the
+// straight lane first, then the flanking lanes each side at
+// combatAvoidFanStep. Reports the first candidate that passes the
+// terrain contract (see combatAvoidLane) and whether one exists.
+func (l *Loop) combatAvoidFanStep(
+    selfX, selfY, selfZ int32, dirX, dirY float64,
+) (int32, int32, bool) {
+    for stepIdx := 0; stepIdx <= combatAvoidFanSteps; stepIdx++ {
+        angle := combatAvoidFanStep * float64(stepIdx)
+        for _, sign := range [2]int{1, -1} {
+            if stepIdx == 0 && sign < 0 {
+                // The straight lane is its own mirror.
+                continue
+            }
+            rotX, rotY := rotatePlanar(dirX, dirY, float64(sign)*angle)
+            laneX, laneY, ok := l.combatAvoidLane(selfX, selfY, selfZ,
+                rotX, rotY)
+            if ok {
+                return laneX, laneY, true
+            }
+        }
+    }
+
+    return 0, 0, false
 }
 
 // combatAvoidLane resolves one sidestep candidate through the terrain

@@ -188,8 +188,23 @@ archer-kite re-check.
 - Tests: `TestKiteBowRetryRefusalIsNotAttributedToTheClick`,
   `TestKiteRetreatClickRefusalStillLatches`.
 
+### 2026-11-09 - the lint round of the six fixes
+
+- `combatAvoidFanStep` carries the sidestep fan loop, so
+  `avoidImpendingAdd` stays under the cyclop limit; the umbra
+  `rotatePlanar` answer splits into locals (a two-value return cannot
+  feed a multi-argument call).
+- `dropPileUpFight` carries the target drop of `panicPileUpRun`
+  (skip list, cleared engage bookkeeping), so the function stays
+  under the funlen limit without a suppression.
+- `TestEscapeClosureWatchdogReanchorsOnAnOpeningGap` compares the
+  re-anchored gap with `require.InDelta` (the testify float rule).
+- Gate: `golangci-lint run ./internal/swarm/hunt/...
+  ./internal/swarm/state/...` 0 issues; the focused
+  fight/flee/escape/kite suite passes (66 s).
+
 ## Status
 
-In progress: all six fixes landed; the package verification, the
-live `temp18` re-check and the push remain.
+In progress: all six fixes landed and are lint clean; the live
+`temp18` re-check and the push remain.
 
