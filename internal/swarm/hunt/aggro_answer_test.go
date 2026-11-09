@@ -230,3 +230,62 @@ func TestKiteAnswersTheAddOnAPeacefulApproach(t *testing.T) {
     require.Equal(t, int32(8), loop.target,
         "the add owns the answer on the peaceful approach")
 }
+
+// TestTargetlessAggroKeepsFlyingTheBowAdd pins the flight
+// persistence of the targetless pick: after the losing verdict drops
+// a fight, the aggro answer must not re-adopt the melee chaser while
+// a bow attacker still fires - every re-adoption turned the flight
+// around and walked the character back into the archer range (the
+// 2026-11-10 run-23 window ping-ponged through the drop/adopt cycle
+// every half second and spent 40 percent of the health on it).
+func TestTargetlessAggroKeepsFlyingTheBowAdd(t *testing.T) {
+    bot := newTestBot()
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: true, Change: 1},
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000469, Attackable: true,
+        X: 45350, Y: 50000, RightHandItem: 14,
+        Name: "Kaboo Orc Archer",
+    })
+    attackerHits(bot, 8, 45350)
+    spawnMobAt(bot, 9, 45200)
+    mobChasesSelf(bot, 9, 45200, -3500)
+    hurtTo(bot, 65)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.lastHit = time.Now().Add(-time.Minute)
+    require.True(t, loop.attackerEngageable(9),
+        "the melee chaser alone is engageable")
+
+    loop.engage()
+    require.Zero(t, loop.target,
+        "the bow add keeps the fight dropped")
+    require.NotEmpty(t, game.walks,
+        "the flight owns the targetless pick")
+}
+
+// TestTargetlessAggroKeepsTheFleeSkip pins the other guard of the
+// same answer: a mob the loop just fled is not re-adopted on the
+// next tick, the skip holds the flight authority.
+func TestTargetlessAggroKeepsTheFleeSkip(t *testing.T) {
+    bot := newTestBot()
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: true, Change: 1},
+    })
+    spawnMobAt(bot, 7, 45200)
+    mobChasesSelf(bot, 7, 45200, -3500)
+    hurtTo(bot, 65)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.targetSkip = map[int32]time.Time{
+        7: time.Now().Add(time.Minute),
+    }
+
+    loop.engage()
+    require.Zero(t, loop.target,
+        "the skipped chaser stays dropped")
+    require.NotEmpty(t, game.walks,
+        "the flight keeps the answer")
+}

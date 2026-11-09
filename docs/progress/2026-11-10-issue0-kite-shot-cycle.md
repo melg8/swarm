@@ -162,3 +162,16 @@ acceptance code, then the fragment archive.
   of every reload inside the melee range, so a pack the arrows cannot
   out-damage is dropped and flown instead of held. The critical-HP
   logout stays armed above it.
+- Run 23 (5 minutes, build 606055ca) PASSED: 60 shots, 50 of 50 shot
+  gaps inside the 4 s cooldown, 55 kite steps (47 shot-cycle), 9
+  kills, 107 fight samples, min HP 25 percent, min 540 arrows, online
+  the whole window. The run carried the run-21 scene again: a level 8
+  Kaboo Orc Archer joined at +117 s, the losing verdict dropped the
+  grunt and the straight flight answered (29 + 63 + 63 damage taken
+  before the archer fell out of range, no logout).
+- The flight log showed the drop/adopt ping-pong: the targetless
+  aggro answer re-adopted the fled grunt every half second (it
+  ignored the flee skip) while the archer was still firing, so the
+  character turned back into the archer range until the next drop.
+  The targetless answer now skips a just-fled attacker and keeps the
+  flight while a bow add is present.

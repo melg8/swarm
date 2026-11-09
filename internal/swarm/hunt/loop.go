@@ -2302,7 +2302,17 @@ func (l *Loop) engage() {
         // defensive flow: the standard escape walk that logs
         // out when it never shakes the chase.
         if attacker, ok := l.tracker.NearestAttacker(); ok {
-            if !l.attackerEngageable(attacker.ObjectID) {
+            if !l.attackerEngageable(attacker.ObjectID) ||
+                l.targetSkipped(attacker.ObjectID, now) ||
+                l.tracker.HasBowAttackerBesides(attacker.ObjectID) {
+                // The defensive flow owns this attacker: it
+                // outranks the character, the loop just ran from
+                // it (the skip keeps the flight authority), or a
+                // bow add is still firing - re-adopting the melee
+                // chaser there walked the character back into the
+                // archer's range on every flight tick (the
+                // 2026-11-10 run-23 window ping-ponged through
+                // the drop/adopt cycle every half second).
                 l.fleeFromThreat(now)
 
                 return
