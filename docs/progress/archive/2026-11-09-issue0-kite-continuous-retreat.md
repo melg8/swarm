@@ -1,4 +1,4 @@
-# The continuous archer retreat: never stand through the reload (status: in progress)
+# The continuous archer retreat: never stand through the reload (status: complete)
 
 Started 2026-11-09, branch feature/kite-range-contract, issue #0
 (the owner instruction, no board issue).
@@ -141,3 +141,18 @@ Constraints:
   PASS reproduced the shot -> windup-end retreat -> pursuit chain ->
   re-shot cadence (22:12:36).
 - Next: `task verify`, the atomic commits, and the fragment archive.
+
+## Status
+
+Complete. All five commits are pushed on `feature/kite-range-contract`
+(the state chase track, the continuous retreat, the defensive flight,
+the engage ceiling, the docs). The live `archer-kite` scenario passed
+twice (runs 5 and 6); the hunt, state and acceptance suites are green.
+
+One pre-existing platform issue surfaced by `task verify` on the
+Windows dev host: `internal/swarm/session` fails
+`TestGzipFileKeepsTheOriginalWhenTheCopyFails` and
+`TestGzipFileCompressesOnSuccess` because the gzip archive keeps the
+file handle open while the test expects the rename/delete to free it
+(the same two tests fail at HEAD in a clean worktree, so the round
+did not introduce it; the Linux CI runs them green).
