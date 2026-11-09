@@ -10,6 +10,8 @@ package hunt
 // resets the aggro through the logout.
 
 import (
+    "bytes"
+    "log"
     "testing"
     "time"
 
@@ -111,6 +113,67 @@ func TestFleeLogsOutWhenTheEscapeDoesNotMove(t *testing.T) {
         100*time.Millisecond))
     require.Equal(t, 1, game.logouts,
         "a dead escape resets the aggro instead of standing in the blows")
+}
+
+// TestFleeLogsOutWhenTheChaserKeepsPace pins the closure-rate exit:
+// the character walks the whole segment but the chaser holds the gap
+// (a mob of the character's own run speed), so the probe window ends
+// the session instead of burning the full flee budget. The 14:03:09
+// dump ran 21 s with a level 10 Kaboo Orc Fighter at ~19 units.
+func TestFleeLogsOutWhenTheChaserKeepsPace(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45019)
+    attackerHits(bot, 7, 45019)
+    game := &fakeGame{}
+    logBuf := &bytes.Buffer{}
+    loop := NewLoop(game, bot)
+    loop.SetLogger(log.New(logBuf, "", 0))
+    base := time.Now().Add(-time.Minute)
+
+    loop.fleeFromThreat(base)
+    require.Len(t, game.walks, 1, "the escape issues its first segment")
+    require.Zero(t, game.logouts)
+
+    // The character covered the segment and the chaser matched it:
+    // the gap stays at ~19 units when the probe window lapses.
+    relocateSelf(bot, 44400, 50000)
+    bot.ApplyMovement(state.Movement{
+        ObjectID: 7, X: 44419, Y: 50000, Z: -3500,
+        DestX: 44419, DestY: 50000, DestZ: -3500,
+    })
+    loop.fleeFromThreat(base.Add(fleeGapWindow + time.Second))
+
+    require.Equal(t, 1, game.logouts,
+        "a chaser that keeps pace ends the session early")
+    require.Contains(t, logBuf.String(), "the chaser keeps pace at")
+}
+
+// TestEscapeClosureWatchdogReanchorsOnAnOpeningGap pins the healthy
+// half: a gap that widened past the open margin keeps the escape
+// running and re-anchors the probe.
+func TestEscapeClosureWatchdogReanchorsOnAnOpeningGap(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45019)
+    attackerHits(bot, 7, 45019)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    base := time.Now().Add(-time.Minute)
+
+    loop.fleeFromThreat(base)
+    require.Len(t, game.walks, 1)
+
+    // The chaser turned home / fell behind: the gap opened well past
+    // the margin at the probe.
+    relocateSelf(bot, 44400, 50000)
+    bot.ApplyMovement(state.Movement{
+        ObjectID: 7, X: 45400, Y: 50000, Z: -3500,
+        DestX: 45400, DestY: 50000, DestZ: -3500,
+    })
+    gap, held := loop.escapeNotOpening(base.Add(fleeGapWindow + time.Second))
+
+    require.False(t, held, "an opening gap never ends the escape")
+    require.GreaterOrEqual(t, gap, float64(1000))
+    require.Equal(t, gap, loop.fleeGap, "the probe re-anchors")
 }
 
 // TestEscapeStallWatchdogReanchorsOnProgress pins the rolling

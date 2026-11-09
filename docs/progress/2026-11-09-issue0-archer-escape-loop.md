@@ -158,8 +158,23 @@ archer-kite re-check.
 - Tests: `TestFightStepFansAroundTheWalledLane`,
   `TestFightStepHoldsWhenEveryLaneIsWalled`.
 
+### 2026-11-09 - hunt: end the flee on a chaser that keeps pace
+
+- `fleeFromThreat` arms a closure-rate probe with the episode
+  (`fleeGapAt`/`fleeGap`): after `fleeGapWindow` (8 s) the threat
+  distance must have widened by `fleeGapOpen` (150 units), otherwise
+  `escapeNotOpening` names the parity-speed chase and the session
+  logs out early instead of burning the 20 s budget.
+- The stalled watch measures the character's own travel, the closure
+  watch measures the gap - a chaser running at the character's speed
+  defeats the first and is caught by the second.
+- `clearEscapeAnchor` ends both observations with the episode; the
+  stagnation soft reset clears them too.
+- Tests: `TestFleeLogsOutWhenTheChaserKeepsPace`,
+  `TestEscapeClosureWatchdogReanchorsOnAnOpeningGap`.
+
 ## Status
 
-In progress: fixes 1-4 landed; fix 5 (chaser closure-rate flee exit)
-next.
+In progress: fixes 1-5 landed; fix 6 (bow-retry refusal
+misattribution) next.
 

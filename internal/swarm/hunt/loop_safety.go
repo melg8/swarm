@@ -75,6 +75,7 @@ func (l *Loop) fleeFromThreat(now time.Time) {
     l.fleeAt = now
     if l.fleeSince.IsZero() {
         l.fleeSince = now
+        l.noteFleeGap(now)
     }
     if now.Sub(l.fleeSince) >= fleeLogoutAfter {
         // The escape never shook the chase: the mobs keep the
@@ -95,6 +96,19 @@ func (l *Loop) fleeFromThreat(now time.Time) {
         l.logf("Hunt: the escape moved less than %.0f units in "+
             "%.0fs, resetting the aggro via logout",
             escapeNoProgressDistance, escapeNoProgressWindow.Seconds())
+        l.emergencyLogout()
+
+        return
+    }
+    if gap, held := l.escapeNotOpening(now); held {
+        // The character travels, but the chaser travels with it:
+        // the gap never widens, so the run would burn the whole
+        // budget for nothing (the 14:03:09 dump: a level 10 Kaboo
+        // Orc Fighter held ~19 units through 21 s of fleeing).
+        // Reset the aggro now.
+        l.logf("Hunt: the chaser keeps pace at %.0f units after "+
+            "%.0fs of fleeing, resetting the aggro via logout",
+            gap, fleeGapWindow.Seconds())
         l.emergencyLogout()
 
         return
@@ -250,6 +264,59 @@ func (l *Loop) escapeStalled(now time.Time) bool {
     return false
 }
 
+// noteFleeGap anchors the closure-rate watchdog of the escape: the
+// moment the episode opened and the distance to its threat then. A
+// chase with no threat to measure (a bare under-attack window) arms
+// nothing - the stalled watch and the flee budget own that case.
+func (l *Loop) noteFleeGap(now time.Time) {
+    l.fleeGapAt = now
+    l.fleeGap = 0
+    x, y, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return
+    }
+    threatX, threatY, ok := l.threatPosition()
+    if !ok {
+        return
+    }
+    l.fleeGap = math.Hypot(float64(x-threatX), float64(y-threatY))
+}
+
+// escapeNotOpening reports whether the chase held its distance through
+// the current probe window: the window lapsed and the threat is still
+// no farther than fleeGapOpen past the anchor gap, so the chaser runs
+// at the character's speed and the escape cannot shake it. The gap is
+// re-measured every call; a window that did widen the gap (a mob
+// turning home, a slower chaser, the character breaking the line of
+// sight) re-anchors the probe and keeps the escape running. Reports
+// the measured gap and the verdict; no live threat means the escape
+// has nothing to measure and the flee code's other branches own it.
+func (l *Loop) escapeNotOpening(now time.Time) (float64, bool) {
+    if l.fleeGapAt.IsZero() {
+        return 0, false
+    }
+    if now.Sub(l.fleeGapAt) < fleeGapWindow {
+        return 0, false
+    }
+    x, y, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return 0, false
+    }
+    threatX, threatY, ok := l.threatPosition()
+    if !ok {
+        return 0, false
+    }
+    gap := math.Hypot(float64(x-threatX), float64(y-threatY))
+    if gap >= l.fleeGap+fleeGapOpen {
+        l.fleeGapAt = now
+        l.fleeGap = gap
+
+        return gap, false
+    }
+
+    return gap, true
+}
+
 // noteEscapeWalk starts the no-progress window of an issued escape
 // segment: the first walk of the episode anchors the window at the
 // spot it was issued from, later walks leave the running window
@@ -267,12 +334,15 @@ func (l *Loop) noteEscapeWalk(now time.Time) {
     l.escapeAnchorX, l.escapeAnchorY = x, y
 }
 
-// clearEscapeAnchor ends the no-progress observation with the flee
-// episode: the next escape starts a fresh window.
+// clearEscapeAnchor ends the escape observations with the flee
+// episode: the no-progress window and the closure-rate probe. The
+// next escape starts fresh windows.
 func (l *Loop) clearEscapeAnchor() {
     l.escapeAnchorAt = time.Time{}
     l.escapeAnchorX, l.escapeAnchorY = 0, 0
     l.escapeWalkAt = time.Time{}
+    l.fleeGapAt = time.Time{}
+    l.fleeGap = 0
 }
 
 // threatPosition returns the position of the mob the escape runs

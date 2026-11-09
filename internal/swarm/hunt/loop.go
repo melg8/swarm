@@ -368,6 +368,15 @@ const (
     // distance within it (a cornered or blocked escape) still
     // ends the session rather than running forever.
     fleeLogoutAfter = 20 * time.Second
+    // fleeGapWindow and fleeGapOpen are the closure-rate contract of
+    // the escape: within the window the threat distance must widen by
+    // the open margin, otherwise the chaser keeps pace (the mobs of
+    // the deployment run at the character's speed) and the session
+    // ends early instead of burning the whole flee budget against a
+    // chase that cannot be shaken. The stalled watch measures the
+    // character's own travel; this one measures the gap.
+    fleeGapWindow = 8 * time.Second
+    fleeGapOpen   = 150.0
     // pileUpFightMaxAttackers is the attacker count a winnable pile
     // up still tanks (see pileUpWinnable): two mobs are the reported
     // softlock case, the third is the headroom for a wandering add
@@ -976,6 +985,14 @@ type Loop struct {
     // the session logs out to reset the aggro instead of running
     // forever. A recovered health or a fresh fight clears it.
     fleeSince time.Time
+    // fleeGapAt and fleeGap anchor the closure-rate watchdog of the
+    // escape: the moment the probe opened and the threat distance
+    // then. A chaser that keeps pace holds the gap flat while the
+    // character walks the whole budget (the 14:03:09 dump: 21 s at
+    // ~19 units), so a window that fails to widen the gap ends the
+    // session early instead (see escapeNotOpening).
+    fleeGapAt time.Time
+    fleeGap   float64
     // escapeAnchorAt/X/Y anchor the escape no-progress watchdog: the
     // spot and the moment the current observation window opened. A
     // window that lapses with less than escapeNoProgressDistance
@@ -1410,6 +1427,8 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         kiteReclickAt:       time.Time{},
         fleeAt:              time.Time{},
         fleeSince:           time.Time{},
+        fleeGapAt:           time.Time{},
+        fleeGap:             0,
         escapeAnchorAt:      time.Time{},
         escapeAnchorX:       0,
         escapeAnchorY:       0,

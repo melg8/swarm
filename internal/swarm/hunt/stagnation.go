@@ -208,6 +208,7 @@ func (l *Loop) stagnationSoftReset(now time.Time) {
     l.panicAt = time.Time{}
     l.fleeAt = time.Time{}
     l.fleeSince = time.Time{}
+    l.clearEscapeAnchor()
     l.noTargetSince = time.Time{}
     l.lastHit = time.Time{}
     // A trip caught mid freeze restarts from scratch: the frozen
