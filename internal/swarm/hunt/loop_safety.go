@@ -67,12 +67,27 @@ func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
 // pocket) and a window that moved less than escapeNoProgressDistance
 // (the silent H-006 click drop, a walk pinned against the terrain).
 // Both reset the aggro through the emergency logout - the user rule
-// "relog when the fight cannot be won".
+// "relog when the fight cannot be won". The bow-wielding character
+// answers with the straight kite flight instead (kiteFleeThreat):
+// the fan is clamped to the hunting zone box and logs kites out of
+// their own ground (the run-3 acceptance dump), so it only serves
+// the scenes the flight refuses (a melee weapon, a bow attacker, a
+// walled straight lane).
 func (l *Loop) fleeFromThreat(now time.Time) {
     if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
         return
     }
     l.fleeAt = now
+    if l.kiteFleeThreat(now) {
+        // The archer flight owns the defensive flee (see
+        // kiteFleeThreat): the straight away-ray of the train, the
+        // full escape segment, its own window and the re-click
+        // ladder. The fan below stays the fallback of a genuinely
+        // walled lane - it is clamped to the hunting zone box, and
+        // the run-3 acceptance measured the logout it produces on a
+        // kite fight that drifted across the cell boundaries.
+        return
+    }
     if l.fleeSince.IsZero() {
         l.fleeSince = now
         l.noteFleeGap(now)
