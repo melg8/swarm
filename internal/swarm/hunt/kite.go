@@ -598,20 +598,43 @@ func (l *Loop) kiteOwnsRetreat() bool {
         !l.tracker.ObjectUsesBow(l.target)
 }
 
+// kiteLayerArmed reports whether the archer kite owns the defensive
+// answer of this character: the profile enables the layer and the
+// bow is in hand. The melee escape fan is never a fallback of it
+// (see fleeFromThreat).
+func (l *Loop) kiteLayerArmed() bool {
+    return l.kite.Enabled && l.bowEquipped()
+}
+
 // kiteFlightWanted reports whether the straight flight could own the
-// aggro answer right now: the kite layer is on, the bow is in hand
-// and the nearest attacker is a melee chaser (a bow attacker cannot
-// be outrun, see kiteFleeThreat). Unlike kiteFlightOwnsEscape the
-// fight target may still be held: the pile up gate reads it to
-// CONVERT the unwinnable standing kite into the flight (the target
-// is dropped on the same tick).
+// aggro answer right now: the kite layer is armed and the nearest
+// attacker is a melee chaser (a bow attacker cannot be outrun, see
+// kiteFleeThreat). Unlike kiteFlightOwnsEscape the fight target may
+// still be held: the pile up gate reads it to CONVERT the unwinnable
+// standing kite into the flight (the target is dropped on the same
+// tick).
 func (l *Loop) kiteFlightWanted() bool {
-    if !l.kite.Enabled || !l.bowEquipped() {
+    if !l.kiteLayerArmed() {
         return false
     }
     attacker, ok := l.tracker.NearestAttacker()
 
     return ok && !l.tracker.ObjectUsesBow(attacker.ObjectID)
+}
+
+// kiteKillWindow reports whether the held fight target is one or two
+// arrows from death (see pileUpKillWindowPercent): the pile up gate
+// never throws such a fight away. The 2026-11-10 run-24 dump dropped
+// a 24 percent grunt when a level 10 Kaboo Orc Fighter joined - the
+// kill was two arrows away and the flight that replaced it ran into
+// a corner pocket 30 seconds later.
+func (l *Loop) kiteKillWindow() bool {
+    if l.target == 0 {
+        return false
+    }
+    hp := l.tracker.ObjectHealthPercent(l.target)
+
+    return hp > 0 && hp <= pileUpKillWindowPercent
 }
 
 // kiteFlightOwnsEscape reports whether the TARGETLESS straight flight
@@ -729,13 +752,40 @@ func (l *Loop) kiteFleeBusy(now time.Time) bool {
 }
 
 // kiteFleeHeld reports whether the last flight leg found no lane: the
-// hold paces the re-probe at the kite period and yields the ticks in
-// between to the melee fan (the cornered answer of the escape flow).
-// Only the targetless hold (kiteHeldFor == 0) belongs to the flight -
-// a fight hold of a live target names its own fight.
+// hold paces the re-probe at the kite period and the flight KEEPS the
+// ticks in between (a targetless hold owns the flight; see
+// kiteFleeThreat). Only the targetless hold (kiteHeldFor == 0)
+// belongs to the flight - a fight hold of a live target names its own
+// fight.
 func (l *Loop) kiteFleeHeld(now time.Time) bool {
     return l.kiteHeldFor == 0 && !l.kiteHeldAt.IsZero() &&
         now.Sub(l.kiteHeldAt) < l.kite.StepPeriod
+}
+
+// kiteFlightMovable reports whether the bow may start a movement
+// right now: the server SAVES a MoveToLocation that lands inside the
+// bow windup (the first half of the disable window, see
+// kiteWindupWindow) and replays it only at the disable end, so a
+// flight click inside the windup travels seconds later - and the
+// escape stall watchdog reads those saved seconds as a dead click
+// and logs the session out (the 2026-11-10 run-24 dump: the fight
+// was dropped 250 ms after the shot, the first flight click went out
+// at once, the server held it 2.7 s and the 3 s no-progress window
+// ended a healthy 99 percent flight). The flight waits the windup out
+// and issues its first leg on the accepted side. A gauge that is
+// absent, malformed or stale owns no live cycle - the flight is free
+// to move.
+func (l *Loop) kiteFlightMovable(now time.Time) bool {
+    at, cycle := l.tracker.SelfBowCycle()
+    if at.IsZero() || cycle <= 0 || now.Before(at) ||
+        now.Sub(at) > kiteGaugeMaxAge {
+        return true
+    }
+    if cycle < kiteWalkWindowFloor || cycle > kiteWalkWindowMax {
+        return true
+    }
+
+    return !now.Before(at.Add(cycle/2 + kiteWindupLead))
 }
 
 // kiteFleeThreat answers a defensive flee with the STRAIGHT bow
@@ -768,7 +818,7 @@ func (l *Loop) kiteFleeHeld(now time.Time) bool {
 // logout. The critical-HP logout of the tick top stays armed above
 // both. Reports whether the flight spent the tick.
 func (l *Loop) kiteFleeThreat(now time.Time) bool {
-    if !l.kite.Enabled || !l.bowEquipped() {
+    if !l.kiteLayerArmed() {
         return false
     }
     attacker, ok := l.tracker.NearestAttacker()
@@ -779,7 +829,19 @@ func (l *Loop) kiteFleeThreat(now time.Time) bool {
         return true
     }
     if l.kiteFleeHeld(now) {
-        return false
+        // The walled-lane hold of the flight owns every tick: the
+        // re-probe fires at the kite period, the zone-clamped melee
+        // fan never runs behind it (its no-lane and no-progress
+        // guards log a drifted archer out mid-flight - the
+        // 2026-11-10 run-24 dump).
+        return true
+    }
+    if !l.kiteFlightMovable(now) {
+        // The bow windup owns the moment: a move request inside it
+        // is saved by the server and replayed at the disable end
+        // (see kiteFlightMovable), so the flight waits instead of
+        // arming a deferred click the stall watchdog misreads.
+        return true
     }
     if !l.standUpGuarded(now) {
         // The stand request (or the server side stand settle) owns
@@ -793,33 +855,55 @@ func (l *Loop) kiteFleeThreat(now time.Time) bool {
     if attacker.Z != 0 &&
         math.Abs(float64(attacker.Z-selfZ)) > deckReachableZ {
         // Another deck: its swings cannot land and the straight lane
-        // crosses the geodata wall - the fan owns this chase.
+        // crosses the geodata wall - the hunt owns this chase.
         return false
     }
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
     if dirX == 0 && dirY == 0 {
         // No chaser bearing to run from (the attacker targets the
-        // character but its position has not broadcast yet): the fan
-        // answers this tick.
+        // character but its position has not broadcast yet): the
+        // next tick re-probes.
         return false
     }
     until := now.Add(l.kiteWalkWindow(now) + l.kite.ReengageDelay)
     stepX, stepY, found := l.kiteRetreatLane(
         selfX, selfY, selfZ, dirX, dirY, dirX, dirY,
         escapeWalkDistance)
+    breakout := false
     if !found {
-        // Every straight rung of the away-ray is walled (and the
-        // angular escape found no bearing inside the away half-plane):
-        // the flight holds for one kite period and re-probes, the fan
-        // owns the ticks in between.
+        // The away side is a dead end (a corner pocket, a wall
+        // behind the flight): break out through the back half-plane
+        // - the open ground the character came from, THROUGH the
+        // chaser's bearing - instead of handing the tick to the
+        // zone-clamped fan and its logout (the 2026-11-10 run-24
+        // dump: 30 s of healthy flight ended in a north-west pocket
+        // and the fan reset the aggro at 99 percent health).
+        stepX, stepY, found = l.kiteRetreatLane(
+            selfX, selfY, selfZ, -dirX, -dirY, -dirX, -dirY,
+            escapeWalkDistance)
+        breakout = found
+    }
+    if !found {
+        // A full pocket: hold the ground and re-probe at the kite
+        // period. The flight keeps the tick - the critical-HP logout
+        // of the tick top stays armed above it.
         l.kiteHoldGround(now, encircled)
 
-        return false
+        return true
     }
     l.kiteHeldAt = time.Time{}
     l.kiteIssueWalk(now, until, selfX, selfY, selfZ, stepX, stepY)
     l.noteEscapeWalk(now)
     l.fleeSince = time.Time{}
+    if breakout {
+        l.logger.Printf("Hunt: the away lane from %s is walled, "+
+            "breaking out through the open back lane (step %d)",
+            attacker.Name,
+            int(math.Round(math.Hypot(
+                float64(stepX-selfX), float64(stepY-selfY)))))
+
+        return true
+    }
     l.logger.Printf("Hunt: %s holds the bow flee at %d units, "+
         "kiting clear (step %d)", attacker.Name,
         int(math.Round(math.Hypot(
@@ -1738,10 +1822,12 @@ func (l *Loop) kiteHoldGround(now time.Time, surrounded bool) {
         switch {
         case l.target == 0:
             // The targetless hold belongs to the defensive flight
-            // (kiteFleeThreat): a walled lane hands the ticks to the
-            // melee fan for one kite period before the re-probe.
+            // (kiteFleeThreat): the full pocket keeps the ticks and
+            // re-probes at the kite period - the zone-clamped fan
+            // never runs behind it.
             l.logger.Printf("Hunt: no straight bow flee lane opens " +
-                "from the chase, the fan owns the next kite period")
+                "from the chase, holding the ground through the " +
+                "chase")
         case surrounded:
             l.logger.Printf("Hunt: the chasers surround the bow "+
                 "fight on target %d, holding ground and shooting "+

@@ -88,6 +88,18 @@ func (l *Loop) fleeFromThreat(now time.Time) {
         // kite fight that drifted across the cell boundaries.
         return
     }
+    if l.kiteLayerArmed() {
+        // The bow character never falls back to the zone-clamped
+        // melee fan. A flight that refused the tick (a bow attacker
+        // on the nearest bearing, a chaser on another deck, a
+        // bearing not broadcast yet) is answered by the hunt's
+        // standing trade on the next tick, while a walled lane holds
+        // the flight (see kiteFleeThreat); the fan's no-lane and
+        // no-progress guards would only log the session out - the
+        // 2026-11-10 run-24 dump reset the aggro at 99 percent
+        // health 30 s into a healthy flight.
+        return
+    }
     if l.fleeSince.IsZero() {
         l.fleeSince = now
         l.noteFleeGap(now)

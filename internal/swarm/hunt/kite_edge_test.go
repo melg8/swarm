@@ -648,6 +648,65 @@ func TestKitePileUpTakesTheFlight(t *testing.T) {
         "the flight runs away from the pack")
 }
 
+// kitePileUpScene arms the unwinnable pile up of the 2026-11-10 run-24
+// dump: a bow archer on a melee pick with two adds the engage ceiling
+// refuses. The pick health selects the kill-window verdict.
+func kitePileUpScene(
+    t *testing.T, targetHP int32,
+) (*state.Bot, *fakeGame, *Loop) {
+    t.Helper()
+    bot, game, loop := kiteBowBot(t, 45440)
+    bot.ApplyStatusUpdate(100, []state.Attribute{
+        {ID: state.AttrLevel, Value: 10},
+    })
+    setMobHealth(bot, 7, targetHP)
+    for i, objectID := range []int32{8, 9} {
+        x := int32(45100 + i*100)
+        bot.ApplyNpcInfo(state.NpcInfo{
+            ObjectID: objectID, TemplateID: 1000010,
+            Attackable: true, X: x, Y: 50000, Name: "High Orc",
+        })
+        mobChasesSelf(bot, objectID, x, -3500)
+    }
+
+    return bot, game, loop
+}
+
+// TestKitePileUpFinishesTheKillWindow pins the kill window of the
+// pile up gate: the 2026-11-10 run-24 dump dropped a 24 percent grunt
+// when a level 10 add joined, threw away the two arrows that finished
+// it and flew into a corner pocket 30 seconds later. A target one or
+// two arrows from death keeps the fight; a healthy pick of the same
+// pack still converts to the survival flight.
+func TestKitePileUpFinishesTheKillWindow(t *testing.T) {
+    _, game, loop := kitePileUpScene(t, 24)
+    require.False(t, loop.pileUpWinnable(),
+        "the pack outranks the engage ceiling")
+    require.True(t, loop.kiteOwnsRetreat(),
+        "the bow owns the running fight")
+    require.True(t, loop.kiteFlightWanted(),
+        "the melee pack is fleeable")
+    require.True(t, loop.kiteKillWindow(),
+        "24 percent is inside the kill window")
+
+    loop.tick()
+    require.Equal(t, int32(7), loop.target,
+        "the kill window keeps the fight")
+    require.True(t, loop.panicAt.IsZero(),
+        "the kill window never arms the pile up run")
+    require.Zero(t, game.logouts,
+        "the kill finishes in the world")
+
+    _, healthyGame, healthyLoop := kitePileUpScene(t, 80)
+    require.False(t, healthyLoop.kiteKillWindow(),
+        "a healthy pick stands past the kill window")
+    healthyLoop.tick()
+    require.Zero(t, healthyLoop.target,
+        "the healthy pick still converts to the flight")
+    require.NotEmpty(t, healthyGame.walks,
+        "the straight flight answers the healthy pile up")
+}
+
 // TestKiteFlightOwnsTheTargetlessPileUp pins the survival handoff of
 // the 2026-11-10 acceptance run: the losing-fight verdict drops the
 // melee pick when a bow add joins, and the targetless straight flight

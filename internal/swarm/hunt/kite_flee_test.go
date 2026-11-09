@@ -21,6 +21,7 @@ import (
     "testing"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -133,19 +134,19 @@ func TestKiteFleeThreatOutlastsTheClosureWatchdogs(t *testing.T) {
         "the fan budget stays zero behind the flight")
 }
 
-// TestKiteFleeThreatFallsBackToTheFanOnAWalledLane pins the cornered
-// answer: a straight lane the terrain (here the blanket click
-// refusal) walls at every rung and every escape angle stamps the
-// flight hold for one kite period and hands the tick to the fan -
-// the flight itself issues nothing. The hold lapses and the flight
-// re-probes the same ray.
-func TestKiteFleeThreatFallsBackToTheFanOnAWalledLane(t *testing.T) {
+// TestKiteFleeThreatHoldsTheWalledLane pins the full-pocket answer
+// of the 2026-11-10 run-24 dump: when every rung of the away-ray and
+// of the back half-plane is walled, the flight holds the ground and
+// KEEPS the ticks - the zone-clamped melee fan never runs behind it,
+// because its no-lane guard logged the drifted archer out mid-flight
+// at 99 percent health. The hold lapses and the flight re-probes.
+func TestKiteFleeThreatHoldsTheWalledLane(t *testing.T) {
     _, game, loop := kiteFleeBot(t)
     loop.SetNavigator(&fakeNavigator{refuseClicks: true})
     base := time.Now()
 
-    require.False(t, loop.kiteFleeThreat(base),
-        "the walled flight yields the tick")
+    require.True(t, loop.kiteFleeThreat(base),
+        "the walled flight keeps the tick")
     require.Empty(t, game.walks, "the walled flight issues no walk")
     require.Equal(t, int32(0), loop.kiteHeldFor,
         "the flight hold is a targetless hold")
@@ -154,29 +155,105 @@ func TestKiteFleeThreatFallsBackToTheFanOnAWalledLane(t *testing.T) {
     require.True(t, loop.fleeSince.IsZero(),
         "the direct call does not start the fan episode")
 
-    // The hook runs the fan instead: the melee escape owns the
-    // cornered scene.
+    // The hold paces the re-probe and the fan never takes over.
     loop.fleeFromThreat(base.Add(time.Second))
-    require.Len(t, game.walks, 1, "the fan walks the cornered scene")
-    require.False(t, loop.fleeSince.IsZero(),
-        "the fan episode starts behind the walled flight")
-    require.Zero(t, game.logouts, "one fan step is no dead escape")
+    require.Empty(t, game.walks, "the fan never walks behind the hold")
+    require.Zero(t, game.logouts, "the hold never logs out")
+    require.True(t, loop.fleeSince.IsZero(),
+        "the fan episode never starts behind the flight")
 
     // The hold lapses: the flight re-probes the straight ray and owns
     // the movement again once the terrain opens.
     loop.SetNavigator(&fakeNavigator{})
     require.True(t, loop.kiteFleeThreat(base.Add(4*time.Second)),
         "the flight re-probes after the hold period")
-    require.Len(t, game.walks, 2, "the re-probe issues its own leg")
+    require.Len(t, game.walks, 1, "the re-probe issues its own leg")
     require.True(t, loop.kiteHeldAt.IsZero(),
         "the open lane clears the flight hold")
 }
 
-// TestKiteFleeThreatLeavesTheBowAttackerToTheFan pins the enemy
-// weapon gate on the defensive path too (the owner rule of the
-// round): a bow-wielding attacker cannot be outrun, so the flight
-// never arms and the generic fan keeps the answer.
-func TestKiteFleeThreatLeavesTheBowAttackerToTheFan(t *testing.T) {
+// TestKiteFleeThreatBreaksOutOfThePocket pins the cornered flight of
+// the run-24 dump: the away half-plane is a dead end while the
+// ground behind the character (through the chaser's bearing) stands
+// open. The flight breaks out through the back half-plane instead of
+// holding the pocket until the fan logs the session out.
+func TestKiteFleeThreatBreaksOutOfThePocket(t *testing.T) {
+    _, game, loop := kiteFleeBot(t)
+    loop.SetNavigator(&fakeNavigator{
+        validateHook: func(_, to pathfind.Vec3) (pathfind.Vec3, bool) {
+            if to.X <= 45000 {
+                // The north-west pocket of the live run: every
+                // westward line and the perpendicular rail are
+                // walled.
+                return pathfind.Vec3{}, false
+            }
+
+            return to, true
+        },
+    })
+
+    require.True(t, loop.kiteFleeThreat(time.Now()),
+        "the flight breaks out instead of holding")
+    require.Len(t, game.walks, 1, "the breakout issues its leg")
+    require.Greater(t, game.walks[0][0], int32(45000),
+        "the leg runs back through the chaser bearing")
+    require.True(t, loop.kiteHeldAt.IsZero(),
+        "the breakout stamps no hold")
+}
+
+// TestKiteFleeThreatWaitsTheBowWindup pins the run-24 false stall:
+// the fight was dropped 250 ms after a shot, the first flight click
+// went out inside the bow windup, the server saved it and replayed
+// it at the disable end 2.7 s later - and the 3 s no-progress window
+// ended a healthy 99 percent flight. The flight waits the windup out
+// and arms nothing on the deferred click.
+func TestKiteFleeThreatWaitsTheBowWindup(t *testing.T) {
+    bot, game, loop := kiteFleeBot(t)
+    shotAt := time.Now().Add(-500 * time.Millisecond)
+    bot.ApplyShotGaugeAt(2965*time.Millisecond, shotAt)
+    require.False(t, loop.kiteFlightMovable(time.Now()),
+        "the windup holds the movement")
+
+    require.True(t, loop.kiteFleeThreat(time.Now()),
+        "the waiting flight keeps the tick")
+    require.Empty(t, game.walks, "no click goes out inside the windup")
+    require.True(t, loop.kiteWalkUntil.IsZero(),
+        "the waiting flight arms no walk window")
+    require.True(t, loop.escapeAnchorAt.IsZero(),
+        "no stall anchor arms on the deferred click")
+
+    // The windup lapses (the accepted side starts past half the
+    // cycle plus the lead): the first leg goes out.
+    moved := shotAt.Add(2965*time.Millisecond/2 + kiteWindupLead +
+        100*time.Millisecond)
+    require.True(t, loop.kiteFlightMovable(moved),
+        "the accepted side frees the movement")
+    require.True(t, loop.kiteFleeThreat(moved),
+        "the flight issues the first leg")
+    require.Len(t, game.walks, 1, "the leg goes out after the windup")
+    require.False(t, loop.escapeAnchorAt.IsZero(),
+        "the issued leg arms the stall anchor")
+}
+
+// TestKiteFleeThreatIgnoresAStaleGauge pins the other side of the
+// windup gate: a gauge that outlived its fight owns no live cycle,
+// so the flight is free to move at once.
+func TestKiteFleeThreatIgnoresAStaleGauge(t *testing.T) {
+    bot, game, loop := kiteFleeBot(t)
+    bot.ApplyShotGaugeAt(2965*time.Millisecond,
+        time.Now().Add(-kiteGaugeMaxAge-time.Second))
+    require.True(t, loop.kiteFlightMovable(time.Now()))
+
+    require.True(t, loop.kiteFleeThreat(time.Now()))
+    require.Len(t, game.walks, 1, "the stale gauge holds nothing")
+}
+
+// TestKiteFleeThreatLeavesTheBowAttackerToTheHunt pins the enemy
+// weapon gate on the defensive path (the owner rule of the round):
+// a bow-wielding attacker cannot be outrun, so the flight never arms.
+// The zone-clamped fan never answers it either - the hunt's standing
+// trade owns the next tick, not the logout.
+func TestKiteFleeThreatLeavesTheBowAttackerToTheHunt(t *testing.T) {
     bot, game, loop := kiteFleeBot(t)
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
@@ -191,10 +268,11 @@ func TestKiteFleeThreatLeavesTheBowAttackerToTheFan(t *testing.T) {
         "the bow gate leaves no flight hold behind")
 
     loop.fleeFromThreat(time.Now())
-    require.Len(t, game.walks, 1,
-        "the fan answers the bow attacker")
-    require.False(t, loop.fleeSince.IsZero(),
-        "the fan episode owns the flee")
+    require.Empty(t, game.walks,
+        "the fan never answers the bow attacker")
+    require.Zero(t, game.logouts, "the standing trade owns the tick")
+    require.True(t, loop.fleeSince.IsZero(),
+        "the fan episode never starts")
 }
 
 // TestKiteFleeThreatStaysOffWithoutTheKite pins the profile gate: a

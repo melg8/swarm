@@ -383,6 +383,14 @@ const (
     // that trails the fight - the health gate escalates into the
     // panic run the moment the tanking turns into a death risk.
     pileUpFightMaxAttackers = 3
+    // pileUpKillWindowPercent is the target health under which the
+    // pile up gate never converts the standing kite into the flight:
+    // one or two arrows finish the kill the fight already paid for.
+    // The 2026-11-10 run-24 dump dropped a 24 percent grunt when a
+    // level 10 Kaboo Orc Fighter joined; the kill was two arrows
+    // away and the flight that replaced it ran into a corner pocket
+    // 30 seconds later.
+    pileUpKillWindowPercent = 30.0
     // settleWindow bounds the post relogin settle (see settle.go):
     // the spawn protection of the deployed stack lasts far longer
     // (600 s), the window only stops the hold from outliving the
@@ -1732,14 +1740,18 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
         }
         if l.tracker.SelfAttackerCount() >= panicLogoutAttackers &&
             !l.pileUpWinnable() && !l.settleHolding() {
-            if l.kiteOwnsRetreat() && l.kiteFlightWanted() {
+            if l.kiteOwnsRetreat() && l.kiteFlightWanted() &&
+                !l.kiteKillWindow() {
                 // The standing kite turned unwinnable: the shot
                 // cycle spends half of every reload inside the
                 // melee range, so the pack grinds the health down
                 // while the character waits for the bow. The
                 // straight flight is the survival answer - the
                 // fight is dropped and the away-ray opens the
-                // ground (see dropFightForFlight).
+                // ground (see dropFightForFlight). A target inside
+                // the kill window is finished first: the flight
+                // would throw the kill away and the pack trade of
+                // two arrows is its price.
                 l.dropFightForFlight(time.Now())
 
                 return

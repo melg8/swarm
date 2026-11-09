@@ -175,3 +175,54 @@ acceptance code, then the fragment archive.
   character turned back into the archer range until the next drop.
   The targetless answer now skips a just-fled attacker and keeps the
   flight while a bow add is present.
+
+### 2026-11-10 - run 24: the pocket logout and the deferred flight click
+
+- Run 24 (5 minutes, build 6b74bc6c) failed `survives` with two
+  escape-stall logouts, both from the flight falling through to the
+  zone-clamped melee fan:
+  - +84 s: a level 10 Kaboo Orc Fighter joined a 24 percent grunt,
+    the pile up gate dropped the fight at 73 percent health, the
+    flight ran ~30 s north-west to the pocket at (33480, 53016),
+    the away half-plane was walled, the hold returned false and the
+    fan logged "no escape lane opens from the chase" at 99 percent
+    health.
+  - +131 s: the flight click was saved by the bow windup, replayed
+    2.7 s later, and the 3 s `escapeStalled` watchdog reset the aggro
+    at 99 percent health.
+- The bow character no longer falls back to the zone-clamped fan
+  (`kiteLayerArmed` guard of `fleeFromThreat`): a refused flight tick
+  is answered by the hunt's standing trade, a walled lane is held by
+  the flight itself, and only the critical-HP logout (< 12 percent)
+  can still reset the session.
+- The walled hold keeps the tick (`kiteFleeThreat` returns true for
+  the hold period) and the away half-plane gets a breakout attempt
+  through the open back half-plane - the ground behind the character,
+  through the chaser's bearing - before the full pocket holds.
+- The flight waits out the bow windup before its first click
+  (`kiteFlightMovable`): the server saves a move issued inside the
+  windup and replays it at the disable end, so the stall watchdog
+  read the saved seconds as a dead click.
+- The pile up gate keeps a fight whose target is inside the kill
+  window (`pileUpKillWindowPercent` 30): one or two arrows finish the
+  kill the fight already paid for instead of throwing it away into a
+  flight (the run-24 24 percent grunt).
+- Unit tests: `TestKiteFleeThreatHoldsTheWalledLane`,
+  `TestKiteFleeThreatBreaksOutOfThePocket`,
+  `TestKiteFleeThreatWaitsTheBowWindup`,
+  `TestKiteFleeThreatIgnoresAStaleGauge`,
+  `TestKiteFleeThreatLeavesTheBowAttackerToTheHunt`,
+  `TestKitePileUpFinishesTheKillWindow`.
+- The full `internal/swarm/hunt` and `internal/swarm/state` suites
+  pass, and `golangci-lint run --new` reports zero issues.
+- Run 25 (5 minutes, the fix set above) PASSED: 47 shots, 44 of 47
+  shot gaps inside the 4 s cooldown (94 percent), 63 kite steps (28
+  shot-cycle), 0 holds, 12 kills, 91 standing fight samples with the
+  farthest at 533 units, min HP 66 percent, min 554 arrows, online
+  the whole window, no escape-stall logout. The log carried a
+  two-minute continuous kite against the level 10 Kaboo Orc Fighter
+  (the +73 s to +186 s stretch, 15-30 steps of 700 units) without a
+  single hold or reset.
+- Next: the `docs/hunting.md` update (the bow add rule, the pile-up
+  conversion and its kill window, the windup-wait flight, the
+  breakout and the fan removal) and the fragment archive.
