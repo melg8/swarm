@@ -866,3 +866,25 @@ THE ROUND-19 GATES: `go test ./internal/swarm/hunt/ -run TestKite`
 green (89 s), the full hunt package green (157 s), the acceptance
 package green. Next: the fleet archer round (the five-cell audit)
 on this build, then the range contract closes.
+
+THE ROUND-19 LINT ROUND (the full gate cleanup): the uncapped
+`golangci-lint run ./...` on the round-19 tree reported six
+findings, each fixed at the source with no suppression -
+`kiteLanePreference` (the ray-and-length seam of the retreat step,
+funlen back under 65), `avoidDeepestThreat` (the band-penetration
+scan of loop_avoid.go, cyclop back under 15), the probe session
+polling its run-context Done channel instead of carrying the
+context in the struct (containedctx), `for range 3` in the anchor
+attempts, the injectReset call wrapped at 80 columns, and
+kiteWalkWindowMin renamed kiteWalkWindowFloor (the unit-suffix
+revive finding). Commit 4d6bbe16.
+
+THE ROUND-19 PUSH: the five commits (b0b24148 fixture indentation,
+b04be9ba the continuous circle, 4c9a3b50 the same-tick clock pins,
+11ff3aef the round-19 record, 4d6bbe16 the lint round) sit on
+`feature/kite-range-contract` on top of 44f7c00c and are pushed -
+the branch is ready for review/merge. Gates on the final tree:
+`task prepush` green (build, vet, lint --new, whitespace, the
+acceptance 9 s and full hunt 156 s packages), full lint zero
+issues. Next: the fleet archer round (the five-cell audit) on this
+build, then the range contract closes.
