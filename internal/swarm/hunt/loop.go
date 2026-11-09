@@ -1725,13 +1725,30 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
 
             return
         }
-        if !l.panicAt.IsZero() ||
-            (l.tracker.SelfAttackerCount() >= panicLogoutAttackers &&
-                !l.pileUpWinnable() && !l.settleHolding() &&
-                !l.kiteOwnsRetreat() && !l.kiteFlightOwnsEscape()) {
+        if !l.panicAt.IsZero() {
             l.panicPileUpRun(time.Now())
 
             return
+        }
+        if l.tracker.SelfAttackerCount() >= panicLogoutAttackers &&
+            !l.pileUpWinnable() && !l.settleHolding() {
+            if l.kiteOwnsRetreat() && l.kiteFlightWanted() {
+                // The standing kite turned unwinnable: the shot
+                // cycle spends half of every reload inside the
+                // melee range, so the pack grinds the health down
+                // while the character waits for the bow. The
+                // straight flight is the survival answer - the
+                // fight is dropped and the away-ray opens the
+                // ground (see dropFightForFlight).
+                l.dropFightForFlight(time.Now())
+
+                return
+            }
+            if !l.kiteOwnsRetreat() && !l.kiteFlightOwnsEscape() {
+                l.panicPileUpRun(time.Now())
+
+                return
+            }
         }
     }
     if l.logoutDone {
@@ -2100,6 +2117,17 @@ func (l *Loop) engage() {
         if attacker, ok := l.tracker.NearestAttacker(); ok &&
             attacker.ObjectID != l.target {
             switch {
+            case l.kiteOwnsRetreat() && l.tracker.SelfEngagedBy(l.target):
+                // The live kite fight keeps its pick: every fresh
+                // add joins the train the straight retreat direction
+                // already answers, and switching the arrows to each
+                // one spread the damage across the pack while every
+                // mob regenerated it back - the 2026-11-10 run-22
+                // fight never resolved a kill in 131 seconds while
+                // three grunts took turns stealing the target. A
+                // peaceful pick an add caught on the approach is
+                // engaged by neither side, so the entry below still
+                // answers it.
             case !l.attackerEngageable(attacker.ObjectID) &&
                 l.kiteOwnsRetreat():
                 // The attacker outranks the character and the archer

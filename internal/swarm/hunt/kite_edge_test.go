@@ -604,13 +604,15 @@ func TestKiteOwnsTheAddAnswer(t *testing.T) {
         "the step runs away from the add")
 }
 
-// TestKiteOwnsThePileUpAnswer pins the pile up gate of the archer
+// TestKitePileUpTakesTheFlight pins the pile up answer of the archer
 // fight: two attackers past the engage ceiling make the pile up
 // unwinnable, and the old unconditional arming ran the melee escape
-// and logged the session out on the drifted kite ground. While the
-// kite owns the retreat the arming stands down - the critical-HP
-// logout (< 12%) stays armed above it.
-func TestKiteOwnsThePileUpAnswer(t *testing.T) {
+// and logged the session out on the drifted kite ground. The
+// standing kite is no survival answer either - the shot cycle spends
+// half of every reload inside the melee range - so the fight is
+// dropped and the straight flight opens the ground. The critical-HP
+// logout (< 12%) stays armed above both.
+func TestKitePileUpTakesTheFlight(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45440)
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrLevel, Value: 10},
@@ -628,14 +630,22 @@ func TestKiteOwnsThePileUpAnswer(t *testing.T) {
     require.GreaterOrEqual(t, bot.SelfAttackerCount(),
         panicLogoutAttackers, "the pack arms the pile up gate")
     require.False(t, loop.settleHolding())
+    require.True(t, loop.kiteOwnsRetreat(),
+        "the bow owns the running fight")
+    require.True(t, loop.kiteFlightWanted(),
+        "the melee pack is fleeable")
 
     loop.tick()
+    require.Zero(t, loop.target,
+        "the unwinnable pile up drops the fight")
     require.True(t, loop.panicAt.IsZero(),
-        "the kite owns the pile up answer")
+        "the straight flight replaces the pile up run")
     require.Zero(t, game.logouts,
-        "the archer stays in the world and keeps kiting")
-    require.False(t, loop.kiteClickAt.IsZero(),
-        "the shot cycle owns the tick")
+        "the archer stays in the world and flies")
+    require.NotEmpty(t, game.walks,
+        "the straight flight answers the pile up")
+    require.Less(t, game.walks[0][0], int32(45000),
+        "the flight runs away from the pack")
 }
 
 // TestKiteFlightOwnsTheTargetlessPileUp pins the survival handoff of

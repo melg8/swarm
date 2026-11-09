@@ -165,3 +165,68 @@ func TestLosingFightStillEscapesTheCriticalHealth(t *testing.T) {
     require.True(t, loop.losingFight(),
         "the critical health flees whatever the fight state is")
 }
+
+// TestKiteKeepsThePickWhenThePackJoins pins the target focus of the
+// live kite fight: a fresh attacker no longer steals the pick while
+// the bow owns the fight. Switching the arrows to every new grunt
+// spread the damage across the social pack while each mob
+// out-regenerated it - the 2026-11-10 run-22 acceptance window spent
+// 131 seconds on a three-grunt pack and resolved no kill at all.
+func TestKiteKeepsThePickWhenThePackJoins(t *testing.T) {
+    bot := newTestBot()
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: true, Change: 1},
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 45440, Y: 50000, Name: "Keltir",
+    })
+    mobChasesSelf(bot, 7, 45440, -3500)
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000002, Attackable: true,
+        X: 45100, Y: 50000, Name: "Kaboo Orc Grunt",
+    })
+    mobChasesSelf(bot, 8, 45100, -3500)
+    loop := NewLoop(&fakeGame{}, bot)
+    loop.target = 7
+    loop.engageAt = time.Now()
+    loop.lastHit = time.Now().Add(-time.Minute)
+    require.False(t, bot.SelfFighting(7),
+        "the reload tail carries no fresh swing")
+    require.True(t, bot.SelfEngagedBy(7),
+        "the pick still chases the character")
+
+    loop.engage()
+    require.Equal(t, int32(7), loop.target,
+        "the live kite keeps the pick against the pack")
+}
+
+// TestKiteAnswersTheAddOnAPeacefulApproach pins the other half of
+// the focus rule: a peaceful pick the add caught on the approach is
+// engaged by neither side, so the nearer attacker still owns the
+// next swing.
+func TestKiteAnswersTheAddOnAPeacefulApproach(t *testing.T) {
+    bot := newTestBot()
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: true, Change: 1},
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 45440, Y: 50000, Name: "Keltir",
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000002, Attackable: true,
+        X: 45100, Y: 50000, Name: "Kaboo Orc Grunt",
+    })
+    mobChasesSelf(bot, 8, 45100, -3500)
+    loop := NewLoop(&fakeGame{}, bot)
+    loop.target = 7
+    loop.engageAt = time.Now()
+    loop.lastHit = time.Now().Add(-time.Minute)
+    require.False(t, bot.SelfEngagedBy(7),
+        "the peaceful pick engages nobody")
+
+    loop.engage()
+    require.Equal(t, int32(8), loop.target,
+        "the add owns the answer on the peaceful approach")
+}

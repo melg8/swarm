@@ -598,25 +598,54 @@ func (l *Loop) kiteOwnsRetreat() bool {
         !l.tracker.ObjectUsesBow(l.target)
 }
 
-// kiteFlightOwnsEscape reports whether the TARGETLESS straight flight
-// of the bow character owns the aggro answer: the kite layer is on,
-// the bow is in hand, no fight target is held (the losing verdict
-// dropped it) and the nearest attacker is not itself a bow (a bow
-// attacker closes the flight, see kiteFleeThreat). The pile up gate
-// of the tick stands down while it holds: the flight is the survival
-// answer the melee fan cannot give without the logout - the
-// 2026-11-10 acceptance run dropped a melee fight when a level 8
-// Kaboo Orc Archer joined, the grunt stayed the nearest chaser, and
-// the pile up gate would have replaced the straight run with the
-// zoned fan and its emergency logout. The critical-HP logout stays
-// armed above both.
-func (l *Loop) kiteFlightOwnsEscape() bool {
-    if !l.kite.Enabled || !l.bowEquipped() || l.target != 0 {
+// kiteFlightWanted reports whether the straight flight could own the
+// aggro answer right now: the kite layer is on, the bow is in hand
+// and the nearest attacker is a melee chaser (a bow attacker cannot
+// be outrun, see kiteFleeThreat). Unlike kiteFlightOwnsEscape the
+// fight target may still be held: the pile up gate reads it to
+// CONVERT the unwinnable standing kite into the flight (the target
+// is dropped on the same tick).
+func (l *Loop) kiteFlightWanted() bool {
+    if !l.kite.Enabled || !l.bowEquipped() {
         return false
     }
     attacker, ok := l.tracker.NearestAttacker()
 
     return ok && !l.tracker.ObjectUsesBow(attacker.ObjectID)
+}
+
+// kiteFlightOwnsEscape reports whether the TARGETLESS straight flight
+// of the bow character owns the aggro answer: the flight is wanted
+// and no fight target is held (the losing verdict dropped it). The
+// pile up gate of the tick stands down while it holds: the flight is
+// the survival answer the melee fan cannot give without the logout -
+// the 2026-11-10 acceptance run dropped a melee fight when a level 8
+// Kaboo Orc Archer joined, the grunt stayed the nearest chaser, and
+// the pile up gate would have replaced the straight run with the
+// zoned fan and its emergency logout. The critical-HP logout stays
+// armed above both.
+func (l *Loop) kiteFlightOwnsEscape() bool {
+    return l.target == 0 && l.kiteFlightWanted()
+}
+
+// dropFightForFlight hands the aggro answer to the straight bow
+// flight on this tick: the held fight target is dropped and skipped
+// (the fleeFromTarget contract) and the targetless flight walks the
+// away-ray. The pile up gate calls it when the standing kite turned
+// unwinnable - the shot cycle stands half of every reload inside the
+// melee range, so a pack that outnumbers the arrows grinds the
+// health down while the character waits for the bow cycle. The
+// 2026-11-10 acceptance run measured the death: four melee mobs kept
+// the character at 12-43 units through the kite, the health fell 64
+// -> 16 percent in 45 seconds and the session logged out at the
+// death.
+func (l *Loop) dropFightForFlight(now time.Time) {
+    if l.target != 0 {
+        l.fleeFromTarget(l.target, now)
+
+        return
+    }
+    l.fleeFromThreat(now)
 }
 
 // avoidBowTargets reports whether the hunt target search must fence

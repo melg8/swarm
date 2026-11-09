@@ -142,3 +142,23 @@ whatever range the chaser reached meanwhile.
 Code and tests written; the full suites and the lint gate are green.
 Next: the atomic commits, the 5-minute live confirmation with the new
 acceptance code, then the fragment archive.
+
+### 2026-11-10 - run 22: the pack focus and the pile-up flight
+
+- Run 22 (5 minutes, build d8bc1f71) failed `kills` and `survives`:
+  the character joined a social grunt pack, three fresh adds took
+  turns stealing the pick through the aggro-answer switch (the strict
+  `SelfFighting` view goes stale during every reload tail), the
+  damage spread across the pack while each mob out-regenerated it,
+  and the window resolved no kill in 131 seconds. The four-mob pack
+  then ground the health from 64 to 16 percent while the standing
+  kite held and the session relogged at the death.
+- The live kite fight now keeps its pick: the aggro-answer switch is
+  fenced off while the bow owns the fight and the pick is engaged by
+  either side. A peaceful pick on the approach is still given up to
+  the nearer attacker.
+- The unwinnable pile-up converts the standing kite into the
+  straight flight (`dropFightForFlight`): the shot cycle stands half
+  of every reload inside the melee range, so a pack the arrows cannot
+  out-damage is dropped and flown instead of held. The critical-HP
+  logout stays armed above it.
