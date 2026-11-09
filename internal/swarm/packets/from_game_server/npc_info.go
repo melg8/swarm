@@ -127,15 +127,9 @@ func ParseNpcInfoPacket(p *NpcInfoPacket, data []byte) error { //nolint:cyclop
     if err != nil {
         return fmt.Errorf("failed to read npc collision radius: %w", err)
     }
-    if err := reader.Skip(npcInfoHeightLead); err != nil {
-        return fmt.Errorf("not enough bytes for npc fields: %w", err)
-    }
-    p.RightHandItem, err = reader.ReadInt32()
+    p.RightHandItem, err = readNpcRightHandItem(reader)
     if err != nil {
-        return fmt.Errorf("failed to read npc right hand item: %w", err)
-    }
-    if err := reader.Skip(npcInfoEquipmentTail); err != nil {
-        return fmt.Errorf("not enough bytes for npc equipment: %w", err)
+        return err
     }
 
     var flags [5]int8
@@ -158,4 +152,22 @@ func ParseNpcInfoPacket(p *NpcInfoPacket, data []byte) error { //nolint:cyclop
     }
 
     return nil
+}
+
+// readNpcRightHandItem reads the equipment block after the collision
+// radius: the collision height, the right hand item id and the chest
+// and left hand ids. The right hand is the first int of the block.
+func readNpcRightHandItem(reader *packet.Reader) (int32, error) {
+    if err := reader.Skip(npcInfoHeightLead); err != nil {
+        return 0, fmt.Errorf("not enough bytes for npc fields: %w", err)
+    }
+    item, err := reader.ReadInt32()
+    if err != nil {
+        return 0, fmt.Errorf("failed to read npc right hand item: %w", err)
+    }
+    if err := reader.Skip(npcInfoEquipmentTail); err != nil {
+        return 0, fmt.Errorf("not enough bytes for npc equipment: %w", err)
+    }
+
+    return item, nil
 }
