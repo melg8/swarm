@@ -280,12 +280,41 @@ func (m *Manager) runSession(
 
     // The hunt loop always runs: with autonomy it hunts, shops and
     // learns on its own; without it executes the manual commands only
-    // (the web UI stays interactive either way).
+    // (the web UI stays interactive either way). The loop rides its
+    // OWN session context (see startSessionLoop): the supervisor
+    // context outlives every session, so a loop started on it would
+    // keep ticking against the closed game client after a relogin.
     loop := hunt.NewLoop(game, tracker)
     wireSessionLoop(m, loop, tracker, autonomous, logLine, hooks)
-    go loop.Run(ctx)
+    stopLoop := startSessionLoop(ctx, loop.Run)
+    defer stopLoop()
 
     return game.Run(ctx, char)
+}
+
+// startSessionLoop starts the hunt loop on a cancellable child of the
+// supervisor context and returns the stop function that cancels the
+// child and joins the loop goroutine. The supervisor reconnects with
+// its own long-lived context, so a loop started on it outlived the
+// session: the temp18 acceptance dump of 2026-11-09 showed the leaked
+// loops spamming "use of closed network connection" and doubling
+// every decision (the `step 33 of 12` counters next to the fresh
+// chain of the relogin). The stop runs on every session return path,
+// so the next session starts with exactly one loop.
+func startSessionLoop(
+    ctx context.Context, run func(context.Context),
+) func() {
+    sessionCtx, cancel := context.WithCancel(ctx)
+    done := make(chan struct{})
+    go func() {
+        defer close(done)
+        run(sessionCtx)
+    }()
+
+    return func() {
+        cancel()
+        <-done
+    }
 }
 
 // wireSessionLoop builds the hunt loop of one session: the logger

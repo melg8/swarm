@@ -176,3 +176,21 @@ escape working on the live round. The kills are slow and the
 character still dies/logs out in that pocket (HP 57 %, the
 relogin lands on the same cell and the same grunt re-aggros), so
 the acceptance-runner leak and the kite drought stay open.
+
+### 2026-11-09 - the acceptance runner loop rides the session context
+
+- `runSession` starts the hunt loop through `startSessionLoop`: the
+  loop gets a `context.WithCancel` child of the supervisor context,
+  and the deferred stop cancels it and joins the goroutine on every
+  session return path. The supervisor reconnects on its own
+  long-lived context, so the previous loop no longer survives the
+  relogin and ticks against the closed `GameClient`.
+- `runner_loop_test.go` pins both ends of the contract: the stop
+  cancels and joins (twice, harmlessly), and a parent cancel ends
+  the loop even without the stop call.
+- Verified: `go test ./internal/swarm/acceptance/ -count=1` (9.2 s),
+  `task lint:new` 0 issues, `task fmt:check` clean.
+- The temp18 acceptance dump evidence (226 closed-connection lines,
+  duplicated decisions, `step 33 of 12` next to `step 1 of 12`) is
+  recorded in the section above; the live re-check runs with a fresh
+  temp archer scenario.
