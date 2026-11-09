@@ -20,11 +20,9 @@ package hunt
 import (
     "bytes"
     "log"
-    "math"
     "testing"
     "time"
 
-    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -104,11 +102,11 @@ func TestKiteShotPacedDefersTheRetreatPastTheWindup(t *testing.T) {
     require.False(t, loop.kiteClickAt.IsZero(),
         "the shot broadcast must arm the deferred retreat")
     require.WithinDuration(t,
-        shotAt.Add(kiteWindupLead+loop.kiteWindupWindow()),
+        shotAt.Add(kiteWindupLead+loop.kiteWindupWindow(time.Now())),
         loop.kiteClickAt, 50*time.Millisecond,
         "the click waits the windup end plus the safety lead")
     require.WithinDuration(t,
-        shotAt.Add(loop.kiteWalkWindow()+loop.kite.ReengageDelay),
+        shotAt.Add(loop.kiteWalkWindow(time.Now())+loop.kite.ReengageDelay),
         loop.kiteClickUntil, 50*time.Millisecond,
         "the walk window ends at the shot disable end")
 
@@ -247,12 +245,9 @@ func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     trainMember(bot, 44800, 50000)
     mobHitsCharacterAt(bot, 45200)
-    nav := &fakeNavigator{}
-    // The whole circle answers walled: the gap ray has nowhere to
+    nav := &fakeNavigator{refuseClicks: true}
+    // The whole circle refuses the click: the gap ray has nowhere to
     // go.
-    nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
-        return false, nil
-    }
     loop.SetNavigator(nav)
     var logBuf bytes.Buffer
     loop.SetLogger(log.New(&logBuf, "", 0))
@@ -275,15 +270,10 @@ func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
 // the archer stands and shoots the way out instead of turning.
 func TestKiteShotPacedCorneredHoldsGround(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    nav := &fakeNavigator{}
-    // The pocket is sealed behind the character: only the narrow
-    // eastern corridor of the fight line stays clear, the whole
-    // straight away-ray to the west is walled - the old fan would
-    // have found side lanes it must no longer take.
-    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X > 45000 &&
-            math.Abs(float64(to.Y)-50000) < 100, nil
-    }
+    nav := &fakeNavigator{refuseClicks: true}
+    // The pocket is sealed behind the character: every straight
+    // away-ray click is refused - the old fan would have found side
+    // lanes it must no longer take.
     loop.SetNavigator(nav)
     loop.tick()
     require.Empty(t, game.walks,
@@ -452,4 +442,71 @@ func TestKiteDeferredWindowSpendsTheReuseTail(t *testing.T) {
         "the walk window ends at the disable end")
     require.LessOrEqual(t, time.Until(loop.kiteClickUntil),
         wantDisable, "the window is anchored at the shot, not the tick")
+}
+
+// TestKiteGaugeOutranksTheFormula pins the server-gauge timing of
+// the bow cycle (the 2026-11-09 live regression): the ATK_SPD
+// attribute is not rebroadcast after a relogin until the gear
+// changes, so the pAtkSpd formula saw zero and fell back to the 2 s
+// window while the server ran its real 2965 ms cycle. The RED
+// SetupGauge the server sends at every shot commit carries the exact
+// disable window - it outranks the formula, and its age bounds keep
+// a cycle of a fight that ended from pacing the next one.
+func TestKiteGaugeOutranksTheFormula(t *testing.T) {
+    bot, _, loop := kiteBowBot(t, 45440)
+    require.Zero(t, bot.SelfPAtkSpd(),
+        "the relogin scene carries no ATK_SPD broadcast")
+    now := time.Now()
+    require.Equal(t, kiteStepWindow, loop.kiteWalkWindow(now),
+        "without a gauge the formula falls back to the shipped window")
+    // The live gauge of the Short Bow kit: SetupGauge(RED, 2965).
+    cycle := 2965 * time.Millisecond
+    bot.ApplyShotGauge(cycle)
+    now = time.Now()
+    require.Equal(t, cycle, loop.kiteWalkWindow(now),
+        "the server gauge outranks the formula fallback")
+    require.Equal(t, cycle/2, loop.kiteWindupWindow(now),
+        "the windup is the first half of the server cycle")
+
+    // A stale gauge belongs to a fight that ended: the formula owns
+    // the window again.
+    bot.ApplyShotGaugeAt(cycle,
+        now.Add(-kiteGaugeMaxAge-time.Second))
+    require.Equal(t, kiteStepWindow, loop.kiteWalkWindow(now),
+        "a stale gauge must not pace a fresh fight")
+
+    // An absurd gauge is refused the same way the formula clamp
+    // refuses an absurd speed.
+    bot.ApplyShotGaugeAt(9*time.Second, now)
+    require.Equal(t, kiteStepWindow, loop.kiteWalkWindow(now),
+        "an out of range gauge falls back to the shipped window")
+}
+
+// TestKiteGaugeMovesTheClickToTheRealWindup pins the regression of
+// the 18:33:13 live failure: the formula fallback (no ATK_SPD after
+// the relogin) scheduled the retreat click at 1150 ms, 233 ms inside
+// the real 1482.5 ms windup, and the server answered ActionFailed
+// with no movement. The fresh RED gauge moves the click to the real
+// boundary without any pAtkSpd broadcast.
+func TestKiteGaugeMovesTheClickToTheRealWindup(t *testing.T) {
+    bot, _, loop := kiteBowBot(t, 45440)
+    shotAt := bot.SelfLastShotAt()
+    require.False(t, shotAt.IsZero(), "the scene committed a shot")
+    require.Zero(t, bot.SelfPAtkSpd())
+    cycle := 2965 * time.Millisecond
+    bot.ApplyShotGauge(cycle)
+    loop.tick()
+    require.False(t, loop.kiteClickAt.IsZero(),
+        "the fresh shot arms the deferred retreat")
+    require.WithinDuration(t,
+        shotAt.Add(cycle/2+kiteWindupLead),
+        loop.kiteClickAt, 50*time.Millisecond,
+        "the click waits the server windup, not the 2 s formula")
+    require.WithinDuration(t, shotAt.Add(cycle),
+        loop.kiteClickUntil, 50*time.Millisecond,
+        "the walk window ends at the server disable end")
+    // The old fallback would have fired inside the real windup.
+    require.Less(t, shotAt.Add(kiteStepWindow/2+kiteWindupLead),
+        loop.kiteClickAt,
+        "the formula click would land inside the server windup")
 }

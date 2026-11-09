@@ -101,7 +101,7 @@ func (l *Loop) kiteLedgerKind(now time.Time) kiteMotionKind {
     }
     if shotAt := l.tracker.SelfLastShotAt(); !shotAt.IsZero() {
         if clickAt := shotAt.Add(
-            l.kiteWindupWindow() + kiteWindupLead); now.Before(clickAt) {
+            l.kiteWindupWindow(now) + kiteWindupLead); now.Before(clickAt) {
             return kiteMotionWindup
         }
     }

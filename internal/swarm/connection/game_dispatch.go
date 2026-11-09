@@ -238,6 +238,8 @@ func (gc *GameClient) handlePlacementPacket(payload []byte) bool {
         gc.applyValidateLocation(payload)
     case statusUpdateID:
         gc.applyStatusUpdate(payload)
+    case setupGaugeID:
+        gc.applySetupGauge(payload)
     default:
         return false
     }

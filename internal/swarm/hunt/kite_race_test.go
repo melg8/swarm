@@ -160,7 +160,7 @@ func TestKiteRaceWindowScalesWithTheLeg(t *testing.T) {
     // The scaled window outranks the shot's own disable end: the
     // leg, not the cooldown, bounds the movement.
     require.True(t, loop.kiteWalkUntil.After(
-        shotAt.Add(loop.kiteWalkWindow())),
+        shotAt.Add(loop.kiteWalkWindow(time.Now()))),
         "the scaled leg window outranks the shot disable end")
 }
 

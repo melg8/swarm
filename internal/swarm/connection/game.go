@@ -132,6 +132,7 @@ const (
     dropItemID         = 0x16
     getItemID          = 0x17
     statusUpdateID     = 0x1A
+    setupGaugeID       = 0x85
     deleteObjectID     = 0x1E
     npcInfoID          = 0x22
     itemListID         = 0x27
@@ -204,6 +205,7 @@ type GameClient struct {
     spawnItem      fromgameserver.SpawnItemPacket
     getItem        fromgameserver.GetItemPacket
     statusUpd      fromgameserver.StatusUpdatePacket
+    setupGauge     fromgameserver.SetupGaugePacket
     attack         fromgameserver.AttackPacket
     attackStart    fromgameserver.AutoAttackStartPacket
     attackStop     fromgameserver.AutoAttackStopPacket
@@ -298,6 +300,7 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
         spawnItem:       *fromgameserver.NewSpawnItemPacket(),
         getItem:         *fromgameserver.NewGetItemPacket(),
         statusUpd:       *fromgameserver.NewStatusUpdatePacket(),
+        setupGauge:      *fromgameserver.NewSetupGaugePacket(),
         attack:          *fromgameserver.NewAttackPacket(),
         attackStart:     *fromgameserver.NewAutoAttackStartPacket(),
         attackStop:      *fromgameserver.NewAutoAttackStopPacket(),

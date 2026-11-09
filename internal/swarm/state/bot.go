@@ -132,7 +132,22 @@ type CharacterState struct {
     // weapon speed the server actually runs (issue #60, the third
     // round - the owner ask: the proper archering delays from the C1
     // Mobius formulas, not a fixed guess).
-    PAtkSpd     int32
+    PAtkSpd int32
+    // BowCycleAt and BowCycle record the RED SetupGauge broadcast of
+    // the played character (the packet carries no object id: it is
+    // sent only to the affected client). The server sends
+    // SetupGauge(RED, sAtk + reuse) the moment it commits a bow shot
+    // (Creature.doAttackHitByBow), so the max field is the exact
+    // disable window of the bow in milliseconds - the windup plus
+    // the reuse tail the character must stand through before the
+    // server accepts a move or a re-shot. The kite reads it instead
+    // of the pAtkSpd formula because the ATK_SPD attribute is not
+    // rebroadcast after a relogin until the gear changes (see
+    // docs/kite_timing_findings.md and the 2026-11-09 acceptance
+    // run: the formula windup fired the retreat click inside the
+    // real windup and the server answered ActionFailed).
+    BowCycleAt  time.Time
+    BowCycle    time.Duration
     CurrentLoad int32
     MaxLoad     int32
 }
@@ -181,6 +196,8 @@ func newCharacterState() CharacterState {
         LastLandedHitTarget: 0,
         LastSelfShotAt:      time.Time{},
         PAtkSpd:             0,
+        BowCycleAt:          time.Time{},
+        BowCycle:            0,
         CurrentLoad:         0,
         MaxLoad:             0,
     }
@@ -835,6 +852,18 @@ func (b *Bot) SelfPAtkSpd() int32 {
     defer b.mu.RUnlock()
 
     return b.char.PAtkSpd
+}
+
+// SelfBowCycle returns when the last RED SetupGauge of the played
+// character arrived and the bow disable window it announced (zero
+// values when no bow cycle was seen yet): the kite retreat reads it
+// as the server's own windup and reuse timing instead of the
+// pAtkSpd formula (see CharacterState.BowCycleAt).
+func (b *Bot) SelfBowCycle() (time.Time, time.Duration) {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.char.BowCycleAt, b.char.BowCycle
 }
 
 // SelfWalking reports whether the character is moving right now: the
@@ -2086,6 +2115,29 @@ func pawnDestination(m PawnMovement) (int32, int32) {
 // trailing target location doubles as a position update of it.
 func (b *Bot) ApplyAttack(a Attack) {
     b.ApplyAttackAt(a, time.Now())
+}
+
+// ApplyShotGauge records a bow shot cycle announced by the RED
+// SetupGauge packet: the max field of the packet is the full disable
+// window the server enforces from the shot commit, in milliseconds
+// (see CharacterState.BowCycleAt). A non positive cycle and a gauge
+// of any other color are ignored by the parser gate (IsBowCycle),
+// so the caller passes only bow cycles.
+func (b *Bot) ApplyShotGauge(cycle time.Duration) {
+    b.ApplyShotGaugeAt(cycle, time.Now())
+}
+
+// ApplyShotGaugeAt is the timestamped twin of ApplyShotGauge: the
+// repro scenes stage a gauge a controlled age in the past.
+func (b *Bot) ApplyShotGaugeAt(cycle time.Duration, at time.Time) {
+    if cycle <= 0 {
+        return
+    }
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    b.char.BowCycleAt = at
+    b.char.BowCycle = cycle
+    b.touch()
 }
 
 // ApplyAttackAt is the timestamped twin of ApplyAttack: the packet

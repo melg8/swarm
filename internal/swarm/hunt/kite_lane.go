@@ -8,18 +8,35 @@ package hunt
 // (split from kite.go in the round-17 refactor, the QA debt of the
 // file-size rule): the chaser bearings, the centroid and gap
 // directions, the terrain contract (the fight-anchor leash, the
-// geodata wall, the water) and the away half-plane guard. The owner
-// rule of the 2026-11-09 round keeps the retreat STRAIGHT - the
-// line directly away from the train and nothing else: no fan, no
-// camp deflection, no circling chord. A blocked straight lane holds
-// the ground and shoots (kiteHoldGround). The triggers, the shot
-// rhythm and the re-click ladder stay in kite.go.
+// water, the SERVER click validation) and the away half-plane
+// guard. The owner rule of the 2026-11-09 round keeps the retreat
+// STRAIGHT - the line directly away from the train and nothing
+// else: no fan, no camp deflection, no circling chord. The lane
+// battery tries the same straight ray at the full leg and the
+// progressively shorter hops before it holds (the live 17:43 dump:
+// the bot-side line of sight refused lanes the server accepts and
+// the cornered verdict fired on an open runway); a lane every
+// straight rung refuses still holds the ground and shoots
+// (kiteHoldGround). The triggers, the shot rhythm and the re-click
+// ladder stay in kite.go.
 
 import (
     "math"
     "sort"
 
     "github.com/melg8/swarm/internal/swarm/pathfind"
+)
+
+// kiteLaneRungCount bounds the straight-hop ladder of one retreat
+// resolution: the full leg, the three quartered shortenings and the
+// kiteMinStep floor (see kiteLaneRungs). A fixed count keeps the
+// resolution allocation free.
+const (
+    // kiteLaneRungCount bounds the straight-hop ladder of one retreat
+    // resolution: the full leg, the three quartered shortenings and
+    // the kiteMinStep floor (see kiteLaneRungs). A fixed count keeps
+    // the resolution allocation free.
+    kiteLaneRungCount = 5
 )
 
 func (l *Loop) kiteChaserBearings(
@@ -166,45 +183,91 @@ func (l *Loop) kiteTrainDirection(
     return sumX / sumLen, sumY / sumLen, false
 }
 
+// kiteLaneRungs resolves the straight-hop ladder of one retreat
+// resolution, longest first: the caller's leg, the three quartered
+// shortenings and the kiteMinStep floor. The lane battery walks the
+// rungs in order and takes the first the server accepts, so a
+// straight ray whose FAR end is walled still walks the reachable
+// prefix instead of holding - the live 17:43 dump measured the
+// "cornered" hold firing on a lane the geodata probe found wide open
+// at every probe distance, and the 17:44 fight repeated it: the
+// fixed fence and the strict sight gate answered the hold while the
+// server would have walked. The rungs never exceed the caller's leg
+// (the ring budget and the race length own the length) and never
+// fall under kiteMinStep (a shorter hop buys no distance and the
+// cornered hold is the honest answer). The ladder is a fixed array -
+// the resolution runs once per shot cycle and stays allocation free.
+
+func kiteLaneRungs(step float64, out [kiteLaneRungCount]float64) (
+    [kiteLaneRungCount]float64, int,
+) {
+    out[0] = step
+    count := 1
+    for _, share := range [kiteLaneRungCount - 2]float64{0.75, 0.5, 0.25} {
+        if length := step * share; length >= kiteMinStep &&
+            length < out[count-1] {
+            out[count] = length
+            count++
+        }
+    }
+    if kiteMinStep < out[count-1] {
+        out[count] = kiteMinStep
+        count++
+    }
+
+    return out, count
+}
+
 // kiteRetreatLane resolves the one retreat lane of a kite step: the
 // STRAIGHT ray the caller preferred (the centroid away-vector of the
 // train, the widest-gap bisector of an encircled one), at the
 // caller's step length (the race-aware leg of kiteStepLength, the
 // ring-budgeted leg of kiteStraightLeg). The owner rule of the
-// 2026-11-09 round removed the fan: when the straight lane is
-// blocked the archer holds the ground and shoots instead of turning
-// (a turn spends the distance the retreat just bought). The
-// endpoint still runs the terrain contract and the away half-plane
-// guard. Reports the endpoint and whether the straight lane walks.
+// 2026-11-09 round removed the fan: when no straight rung walks the
+// archer holds the ground and shoots instead of turning (a turn
+// spends the distance the retreat just bought). Each rung still runs
+// the terrain contract, the away half-plane guard and the SERVER
+// click validation; the first accepted rung names the endpoint.
+// Reports the endpoint and whether the straight lane walks.
 
 func (l *Loop) kiteRetreatLane(
     selfX, selfY, selfZ int32, prefX, prefY, awayX, awayY float64,
     step float64,
 ) (int32, int32, bool) {
-    endX := selfX + int32(math.Round(prefX*step))
-    endY := selfY + int32(math.Round(prefY*step))
+    var scratch [kiteLaneRungCount]float64
+    rungs, count := kiteLaneRungs(step, scratch)
+    for i := range count {
+        endX := selfX + int32(math.Round(prefX*rungs[i]))
+        endY := selfY + int32(math.Round(prefY*rungs[i]))
+        laneX, laneY, ok := l.kiteLaneResolve(
+            selfX, selfY, selfZ, endX, endY, awayX, awayY)
+        if ok {
+            return laneX, laneY, true
+        }
+    }
 
-    return l.kiteLaneResolve(
-        selfX, selfY, selfZ, endX, endY, awayX, awayY)
+    return 0, 0, false
 }
 
 // kiteTerrainLane resolves the TERRAIN contract of the retreat
-// endpoint: the fight-anchor leash, the degenerate length, the
-// geodata wall and the water. The terrain gates need the navigator -
-// without one (the no-geodata runtime, the plain unit scenes) the
-// leash alone fences the step.
+// endpoint: the fight-anchor leash, the degenerate length and the
+// water. The wall gate is the SERVER click validation of
+// kiteLaneResolve (the bot-side line of sight was stricter than the
+// server: the live 17:43 dump held a lane the server pathfinder
+// walks). Without a navigator (the no-geodata runtime, the plain
+// unit scenes) the leash alone fences the step.
 
 func (l *Loop) kiteTerrainLane(
     selfX, selfY, selfZ, endX, endY int32,
 ) (int32, int32, bool) {
     if l.target != 0 && l.kiteFightFor == l.target {
-        // The location-general leash (the round-14 redesign): the
-        // endpoint must stay inside the fight's own roam radius
-        // around the fight anchor - the live-observed ground the
-        // fight started on (see kiteResolveAndClick), not the
-        // generated hunting-square registry. A fight that starts
-        // anywhere on any map keeps its retreats on its own ground;
-        // the zone tables never gate the kite again.
+        // The straight-leg fence (the round-14 leash, the live-target
+        // re-anchor of the 2026-11-09 round): the endpoint must stay
+        // inside the fight's own roam radius around the fight anchor -
+        // the target's stand, re-read on every resolution (see
+        // kiteResolveAndClick). A fight that starts anywhere on any
+        // map keeps its retreats on its own ground; the zone tables
+        // never gate the kite again.
         if math.Hypot(float64(endX-l.kiteFightX),
             float64(endY-l.kiteFightY)) > kiteRoamRadius {
             return 0, 0, false
@@ -214,23 +277,8 @@ func (l *Loop) kiteTerrainLane(
     if math.Hypot(laneX, laneY) < 1 {
         return 0, 0, false
     }
-    if l.navigator == nil {
-        // No geodata runtime: the leash alone fences the step (the
-        // contract of the first kite round).
-        return endX, endY, true
-    }
-    from := pathfind.Vec3{
-        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ)}
-    to := pathfind.Vec3{X: float64(endX), Y: float64(endY),
-        Z: float64(selfZ)}
-    if sight, err := l.navigator.LineOfSight(from, to); err != nil ||
-        !sight {
-        // A wall (or an unreadable geodata) behind: the lane is a
-        // corridor the walk cannot take.
-        return 0, 0, false
-    }
-    if l.navigator.OverWater(float64(endX), float64(endY),
-        int16(selfZ)) {
+    if l.navigator != nil && l.navigator.OverWater(
+        float64(endX), float64(endY), int16(selfZ)) {
         // Water behind: swimming trades the bow for the paddle.
         return 0, 0, false
     }
@@ -240,10 +288,18 @@ func (l *Loop) kiteTerrainLane(
 
 // kiteLaneResolve resolves the retreat lane to its final endpoint
 // and reports whether the lane carries a step: the terrain contract
-// of kiteTerrainLane plus the away half-plane guard. The half-plane
-// gate guards the rounding and the callers that hand in a raw
-// candidate ray: a lane may run perpendicular to the away-ray, but
-// never fold back toward the chasing train.
+// of kiteTerrainLane, the away half-plane guard and the server click
+// validation. The half-plane gate guards the rounding and the callers
+// that hand in a raw candidate ray: a lane may run perpendicular to
+// the away-ray, but never fold back toward the chasing train. The
+// click validation rides the SERVER rules (pathfind.ValidateClick
+// ports Creature.moveToLocation and the GeoEngine correction): a
+// click the server collapses onto the walker is no lane, while a
+// partial result (the last legal cell of the line) IS a running click
+// and its validated point serves as the endpoint. The bot-side
+// LineOfSight is NOT the lane gate any more: it refuses corridors the
+// server walks (the live 17:43 dump held an open runway), and the
+// server validation is the contract the click lives under.
 
 func (l *Loop) kiteLaneResolve(
     selfX, selfY, selfZ, endX, endY int32,
@@ -262,6 +318,25 @@ func (l *Loop) kiteLaneResolve(
         // walk INTO the melee the kite exists to avoid.
         return 0, 0, false
     }
+    if l.navigator == nil {
+        return laneX, laneY, true
+    }
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ)}
+    to := pathfind.Vec3{X: float64(laneX), Y: float64(laneY),
+        Z: float64(selfZ)}
+    valid, runs := l.navigator.ValidateClick(from, to)
+    if !runs {
+        return 0, 0, false
+    }
+    validX := int32(math.Round(valid.X))
+    validY := int32(math.Round(valid.Y))
+    if math.Hypot(float64(validX-selfX),
+        float64(validY-selfY)) < 1 {
+        // The validated point collapsed onto the stand (a broken
+        // correction answer): no lane.
+        return 0, 0, false
+    }
 
-    return laneX, laneY, true
+    return validX, validY, true
 }

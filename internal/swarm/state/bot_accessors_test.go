@@ -6,6 +6,7 @@ package state
 
 import (
     "testing"
+    "time"
 
     "github.com/stretchr/testify/require"
 )
@@ -505,4 +506,28 @@ func TestApplyAutoAttackFlagsTrackSelfAndUnknown(t *testing.T) {
     // Unknown objects are ignored without an error.
     bot.ApplyAutoAttackStart(999)
     bot.ApplyAutoAttackStop(999)
+}
+
+// TestShotGaugeRecordsTheBowCycle pins the server-side bow cycle
+// store: the RED SetupGauge carries the exact disable window of the
+// shot it commits, and the kite retreat reads it through
+// SelfBowCycle. A non positive cycle is not a shot.
+func TestShotGaugeRecordsTheBowCycle(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    at, cycle := bot.SelfBowCycle()
+    require.True(t, at.IsZero())
+    require.Zero(t, cycle)
+
+    shotAt := time.Now()
+    bot.ApplyShotGaugeAt(2965*time.Millisecond, shotAt)
+    at, cycle = bot.SelfBowCycle()
+    require.True(t, at.Equal(shotAt))
+    require.Equal(t, 2965*time.Millisecond, cycle)
+
+    bot.ApplyShotGaugeAt(0, shotAt.Add(time.Second))
+    at, cycle = bot.SelfBowCycle()
+    require.True(t, at.Equal(shotAt),
+        "a non positive cycle must not replace the last shot")
+    require.Equal(t, 2965*time.Millisecond, cycle)
 }

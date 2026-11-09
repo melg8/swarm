@@ -21,7 +21,6 @@ import (
     "testing"
     "time"
 
-    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -179,13 +178,10 @@ func TestKiteSilentProbeHoldsTheGround(t *testing.T) {
 // shooting because there is no second lane to rotate onto.
 func TestKiteRefusedDeadEndHoldsTheGround(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
-    // Only the straight west lane of the race leg passes the line
-    // of sight.
-    nav := &fakeNavigator{}
-    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return int32(to.X) == 44278, nil
-    }
-    loop.SetNavigator(nav)
+    // The straight lane passes the server click validation (the fake
+    // navigator accepts every click); the refusal below is the LIVE
+    // answer - the server takes the click and answers ActionFailed.
+    loop.SetNavigator(&fakeNavigator{})
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the straight lane carried the step")

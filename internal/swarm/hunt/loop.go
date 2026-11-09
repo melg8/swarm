@@ -1727,7 +1727,8 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
         }
         if !l.panicAt.IsZero() ||
             (l.tracker.SelfAttackerCount() >= panicLogoutAttackers &&
-                !l.pileUpWinnable() && !l.settleHolding()) {
+                !l.pileUpWinnable() && !l.settleHolding() &&
+                !l.kiteOwnsRetreat()) {
             l.panicPileUpRun(time.Now())
 
             return
@@ -2098,7 +2099,18 @@ func (l *Loop) engage() {
     if l.target != 0 && !l.tracker.SelfFighting(l.target) {
         if attacker, ok := l.tracker.NearestAttacker(); ok &&
             attacker.ObjectID != l.target {
-            if !l.attackerEngageable(attacker.ObjectID) {
+            switch {
+            case !l.attackerEngageable(attacker.ObjectID) &&
+                l.kiteOwnsRetreat():
+                // The attacker outranks the character and the archer
+                // kite owns the retreat: keep the pick and let the
+                // straight lane answer. The melee flee fan is clamped
+                // to the CURRENT zone box (a kite retreat drifts
+                // across cell boundaries), and the 2026-11-09 live
+                // run logged the session out mid-kite exactly there;
+                // the kite threat scan already treats the add as the
+                // nearest threat that arms the next step.
+            case !l.attackerEngageable(attacker.ObjectID):
                 // The attacker outranks the character: the peaceful
                 // pick waits, the defense flow answers.
                 l.target = 0
@@ -2106,12 +2118,13 @@ func (l *Loop) engage() {
                 l.fleeFromThreat(now)
 
                 return
+            default:
+                l.logf("Hunt: %s aggroed on the approach, answering it "+
+                    "first", attacker.Name)
+                l.target = attacker.ObjectID
+                l.engageAt = now
+                l.clearBlindRecovery()
             }
-            l.logf("Hunt: %s aggroed on the approach, answering it "+
-                "first", attacker.Name)
-            l.target = attacker.ObjectID
-            l.engageAt = now
-            l.clearBlindRecovery()
         }
     }
     if l.target != 0 && !l.tracker.SelfEngagedBy(l.target) &&
@@ -2152,7 +2165,7 @@ func (l *Loop) engage() {
 
         return
     }
-    if l.target != 0 && l.losingFight() {
+    if l.target != 0 && l.losingFight() && !l.kiteOwnsRetreat() {
         // The fight turned into a death risk: the health fell under
         // the escape threshold or the target keeps a clear health
         // lead over a hurt character (the level gap pull of the
@@ -2161,7 +2174,11 @@ func (l *Loop) engage() {
         // kills, so the fight is dropped and the character runs.
         // It stays ahead of the blind recovery: an add grinding a
         // repositioning character must escalate into the flee, not
-        // into another detour segment.
+        // into another detour segment. The archer kite owns its own
+        // retreat while the bow fight is live (see kiteOwnsRetreat):
+        // dropping the target hands the melee flee fan a zone box
+        // the kite ground already left, and the critical-HP logout
+        // stays armed above both.
         l.fleeFromTarget(l.target, now)
 
         return
@@ -2345,6 +2362,28 @@ func (l *Loop) engage() {
     if l.kiteClickWalk(now) {
         return
     }
+    // The shot-paced kite of the archer (see kite.go, issue #60) and
+    // the proximity kite step of the same layer (issue #70): the
+    // character's own Attack broadcast is the server commit of the
+    // bow shot, so the retreat starts the moment the shot released,
+    // and a hostile that closed inside the retreat radius steps the
+    // character clear before the melee blows land. Both tick ahead
+    // of the SelfFighting branch: the strict fight flag goes stale
+    // after a few seconds of pure walking (fightingFreshWindow), so
+    // a long retreat leg stood the triggers down exactly when the
+    // next cycle needed them. The live-fight view keeps the own
+    // swing freshness, the target's own aggro and a train member
+    // holding the character, so an ordinary approach never fires the
+    // retreat. The shot trigger outranks the proximity one: the
+    // fresh shot is the earliest possible trigger of the same step.
+    if l.kiteFightLive() {
+        if l.kiteFromShot(now) {
+            return
+        }
+        if l.kiteFromTarget(now) {
+            return
+        }
+    }
     if l.tracker.SelfFighting(l.target) {
         if l.lureArmed() && l.lureTick(now) {
             return
@@ -2374,27 +2413,6 @@ func (l *Loop) engage() {
         // walk, no switch).
         if l.fightClearedRefusal() {
             l.engageAt = now
-        }
-        // The shot-paced kite of the archer (see kite.go, issue #60):
-        // the character's own Attack broadcast is the server commit of
-        // the bow shot, so the retreat starts the moment the shot
-        // released - the bow cooldown is spent walking instead of
-        // standing, and the chasing mob eats arrows instead of
-        // swings. It outranks the proximity kite: the fresh shot is
-        // the earliest possible trigger of the same step.
-        if l.kiteFromShot(now) {
-            return
-        }
-        // The kite step of the archer (see kite.go): a hostile that
-        // closed inside the retreat radius - the bow fight target or
-        // a chasing train member - steps the character clear
-        // before the melee blows land - the forced attack re-request
-        // resumes the shooting once the step window ends. It outranks
-        // the impending-add scan: the closing hostile is the concrete
-        // damage, the add scan runs on the next tick when the threat
-        // keeps its distance.
-        if l.kiteFromTarget(now) {
-            return
         }
         // The impending add: an aggressive neighbor about to
         // join the fight gets a step of clearance BEFORE its

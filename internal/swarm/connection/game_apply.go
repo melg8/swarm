@@ -11,6 +11,8 @@ package connection
 // into the state tracker.
 
 import (
+    "time"
+
     fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
     togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
     "github.com/melg8/swarm/internal/swarm/state"
@@ -264,6 +266,24 @@ func (gc *GameClient) applyStatusUpdate(payload []byte) {
             attrs = append(attrs, state.Attribute{ID: id, Value: value})
         })
         gc.tracker.ApplyStatusUpdate(gc.statusUpd.ObjectID, attrs)
+    }
+}
+
+// applySetupGauge parses SetupGauge and hands the bow cycle timing to
+// the tracker: the RED gauge is the bow shot commit, and its max is
+// the exact disable window the kite retreat plans against. Other
+// gauge colors (skill casts, the water breath, the mount feed) carry
+// no bow timing and are skipped by the parser gate.
+func (gc *GameClient) applySetupGauge(payload []byte) {
+    if err := fromgameserver.ParseSetupGaugePacket(
+        &gc.setupGauge, payload); err != nil {
+        gc.logger.Printf("Failed to parse setup gauge: %v", err)
+
+        return
+    }
+    if gc.tracker != nil && gc.setupGauge.IsBowCycle() {
+        gc.tracker.ApplyShotGauge(
+            time.Duration(gc.setupGauge.Max) * time.Millisecond)
     }
 }
 

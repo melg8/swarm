@@ -284,11 +284,14 @@ func TestKiteTrainMemberArmsTheRetreat(t *testing.T) {
         "a chasing train member inside the retreat radius must arm the kite")
     step := game.walks[0]
     // The step direction: straight away from the MEMBER on the x
-    // axis (self 45000, member 45200). The fight anchored on the
-    // TARGET's stand at 45440, so the opening ring budget is
-    // 972-440-50 = 482 west of the self, not away from the member's
-    // distance.
-    require.Equal(t, int32(44518), step[0])
+    // axis (self 45000, member 45200). The fight anchors on the
+    // NEAREST threat (the member - see kiteResolveAndClick), so the
+    // opening ring budget is 972-200-50 = 722 west of the self, not
+    // the target-anchored 482 the frozen-anchor design used (the
+    // 18:32 live run pinned why: a ring centered on the far target
+    // clamped the step to the 250 floor while the member ground the
+    // character).
+    require.Equal(t, int32(44278), step[0])
     require.Empty(t, game.forces,
         "the kite tick must not re-request the attack")
 }
@@ -342,7 +345,9 @@ func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
     // away(member) = (-127, -127)/179.6 -> the sum normalized. The
     // leg is the race step of the nearer threat (the member at 180:
     // 400 + 300*8, capped at the opening ring budget around the
-    // TARGET's stand - 972-240-50 = 682).
+    // NEAREST threat's stand - the member is closer than the target,
+    // so the anchor sits on the member: 972-179.6-50 = 742.4, see
+    // kiteResolveAndClick).
     sumX := -1.0 - 127.0/math.Hypot(127, 127)
     sumY := -127.0 / math.Hypot(127, 127)
     sumLen := math.Hypot(sumX, sumY)
@@ -350,8 +355,9 @@ func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
     if leg > kiteRaceStepMax {
         leg = kiteRaceStepMax
     }
+    memberDist := math.Hypot(127, 127)
     if budget := kiteRoamRadius*kiteRingLeashShare -
-        240 - kiteArrivalEpsilon/2; budget < leg {
+        memberDist - kiteArrivalEpsilon/2; budget < leg {
         leg = budget
     }
     require.InDelta(t, 45000+sumX/sumLen*leg, float64(step[0]), 1.0,

@@ -20,12 +20,10 @@ package hunt
 // pins the seam the slice tests cannot see from inside their layer.
 
 import (
-    "math"
     "testing"
     "time"
 
     "github.com/melg8/swarm/internal/swarm/gear"
-    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -116,18 +114,14 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
     selfSwingsAt(bot2, 45200)
     loop2.lastHit = time.Now().Add(-time.Minute)
     // A wall behind the retreat corners the archetype: the sealed
-    // pocket of the geodata (the away hemisphere walled, the
-    // wall-face wedges past the hemisphere edge walled too - only
-    // the narrow eastern corridor of the fight line stays clear,
-    // the same pocket the shot-paced corner test of
-    // kite_shot_test.go stages). The location-general leash of the
-    // round-14 redesign replaced the hunting-square zone read, so
-    // the corner must come from the terrain now.
-    nav := &fakeNavigator{}
-    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X > 45000 &&
-            math.Abs(float64(to.Y)-50000) < 100, nil
-    }
+    // pocket refuses every straight click, the same pocket the
+    // shot-paced corner test of kite_shot_test.go stages. The
+    // location-general leash of the round-14 redesign replaced the
+    // hunting-square zone read, so the corner must come from the
+    // terrain now - and the terrain gate is the SERVER click
+    // validation (the bot-side line of sight of the earlier rounds
+    // held lanes the server walks).
+    nav := &fakeNavigator{refuseClicks: true}
     loop2.SetNavigator(nav)
     // The fresh shot arms the deferred click, the aged click fires
     // into the walled hemisphere - the cornered hold answers.

@@ -177,18 +177,12 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
 // walk drags the archer INTO the melee range).
 func TestKiteCorneredHoldKeepsShooting(t *testing.T) {
     _, game, loop := kiteEdgeBot(t)
-    nav := &fakeNavigator{}
-    // The pocket is SEALED: the away hemisphere answers walled (the
-    // retreat candidates sit at or west of the character) and the
-    // wall-face wedges past the hemisphere edge - the lone-chaser
-    // escape rays of the round-12 ladder, 105-135 degrees off the
-    // away ray - sit outside the narrow eastern corridor the fight
-    // line keeps clear (the fight itself is honest, the pocket is
-    // not: the archer boxed itself in behind and to the sides).
-    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X > 45000 &&
-            math.Abs(float64(to.Y)-50000) < 100, nil
-    }
+    // The pocket is SEALED: the server-side click validation refuses
+    // every straight rung, so the away hemisphere is a wall the walk
+    // cannot cross (the live contract is the server answer, not the
+    // bot-side line of sight - the 2026-11-09 live dump held lanes
+    // the server walks).
+    nav := &fakeNavigator{refuseClicks: true}
     loop.SetNavigator(nav)
     var logBuf bytes.Buffer
     loop.SetLogger(log.New(&logBuf, "", 0))
@@ -243,14 +237,11 @@ func TestKiteWaterBehindHoldsGround(t *testing.T) {
 // spends the distance the retreat just bought.
 func TestKiteBlockedStraightLaneHoldsGround(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45440)
-    nav := &fakeNavigator{}
-    // The straight west lane is walled at the ring-budgeted
-    // endpoint; every other line of sight is open - the fan the old
-    // design had would have found them.
-    nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return int32(math.Round(to.X)) != 44518 ||
-            int32(math.Round(to.Y)) != 50000, nil
-    }
+    // The server refuses every straight rung: the lane is a genuine
+    // wall, so the archer holds instead of turning. (A lane whose far
+    // end alone is refused walks the shorter hop - see
+    // TestKiteBlockedFarEndTakesTheShorterHop.)
+    nav := &fakeNavigator{refuseClicks: true}
     loop.SetNavigator(nav)
     var logBuf bytes.Buffer
     loop.SetLogger(log.New(&logBuf, "", 0))
@@ -262,6 +253,79 @@ func TestKiteBlockedStraightLaneHoldsGround(t *testing.T) {
         "the hold is armed for the target")
     require.Equal(t, 1, bytes.Count(logBuf.Bytes(), []byte("cornered")),
         "the hold names itself exactly once per episode")
+}
+
+// TestKiteBlockedFarEndTakesTheShorterHop pins the straight-hop
+// ladder of the lane battery: when the server refuses the FAR end of
+// the straight ray, the same ray at the shorter rungs still walks -
+// the archer buys the distance it can instead of holding on an open
+// runway. The live 17:43/17:44 dumps measured the old cornered hold
+// firing while the lane was walkable, and this is the in-process twin:
+// the full race leg is refused, the three-quarter hop lands.
+func TestKiteBlockedFarEndTakesTheShorterHop(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45200)
+    nav := &fakeNavigator{}
+    nav.validateHook = func(
+        from, to pathfind.Vec3,
+    ) (pathfind.Vec3, bool) {
+        if int32(math.Round(to.X)) == 44278 {
+            // The far end of the opening 722-unit leg is walled.
+            return from, false
+        }
+
+        return to, true
+    }
+    loop.SetNavigator(nav)
+
+    tickPastTheWindup(loop)
+    require.Len(t, game.walks, 1,
+        "a far-end wall still walks the shorter straight hop")
+    ringRun := kiteRoamRadius*kiteRingLeashShare - 200 -
+        kiteArrivalEpsilon/2
+    rung := math.Round(ringRun * 0.75)
+    require.Equal(t, int32(45000-rung), game.walks[0][0],
+        "the ladder takes the three-quarter rung of the same ray")
+    require.Equal(t, int32(50000), game.walks[0][1],
+        "the shorter hop keeps the straight away-ray")
+    require.True(t, loop.kiteHeldAt.IsZero(),
+        "a walking shorter hop never arms the hold")
+}
+
+// TestKiteLiveTargetReAnchorsTheRing pins the 2026-11-09 live fix:
+// the fight anchor follows the TARGET on every retreat resolution.
+// The live 17:43 dump froze the anchor at the mob's first stand and
+// the 250-unit step then crossed the roam radius a few legs later -
+// the cornered hold fired with the mob 111 units away and the lane
+// open. A moved target re-anchors the ring around its live cell, so
+// the retreat keeps running instead of fencing itself off from the
+// fight.
+func TestKiteLiveTargetReAnchorsTheRing(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    // The fight ran two legs west; the stale anchor sits at the
+    // mob's ORIGINAL stand while the mob caught up to the character.
+    moveSelfTo(bot, 44000, 50000, -3500)
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 44100, Y: 50000, Name: "Keltir",
+    })
+    loop.kiteFightFor = 7
+    loop.kiteFightX, loop.kiteFightY = 45200, 50000
+
+    now := time.Now()
+    require.True(t, loop.kiteResolveAndClick(
+        now, now.Add(3*time.Second), 44000, 50000, -3500),
+        "a moved target must re-anchor the ring and walk, not hold")
+    require.Len(t, game.walks, 1)
+    require.Equal(t, int32(44100), loop.kiteFightX,
+        "the anchor follows the live target")
+    require.Equal(t, int32(50000), loop.kiteFightY,
+        "the anchor follows the live target")
+    require.Equal(t, int32(43178), game.walks[0][0],
+        "the leg budgets against the re-anchored ring")
+    require.Equal(t, int32(50000), game.walks[0][1],
+        "the leg keeps the straight away-ray")
+    require.True(t, loop.kiteHeldAt.IsZero(),
+        "the re-anchored lane never arms the hold")
 }
 
 // TestKiteHalfPlaneGuardRejectsTheFoldBack pins the away half-plane
@@ -414,4 +478,126 @@ func mobHitsCharacterAt(bot *state.Bot, x int32) {
         TargetIDs:   [state.AttackTargets]int32{100},
         TargetCount: 1,
     })
+}
+
+// TestKiteKeepsKitingPastTheStaleFightFlag pins the live-fight view
+// of the triggers (the 2026-11-09 acceptance run): a long retreat
+// leg spends seconds walking without a swing, the strict
+// SelfFighting flag goes stale after 3 s, and the old placement
+// inside that branch stood the whole kite layer down mid-retreat.
+// The triggers now read kiteFightLive - the own swing freshness OR
+// the target holding the character OR a train member chasing - so a
+// mob that keeps pursuing keeps the retreat running.
+func TestKiteKeepsKitingPastTheStaleFightFlag(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    // The last own swing and shot are 4 s old: past the 3 s fight
+    // freshness window.
+    bot.ApplyAttackAt(shotOf(45200), time.Now().Add(-4*time.Second))
+    // The mob keeps chasing: its server target is the character,
+    // which is the live engagement of the object side.
+    mobChasesSelf(bot, 7, 45200, -3500)
+    require.False(t, bot.SelfFighting(7),
+        "the strict fight view is stale after 4 s of walking")
+    require.True(t, bot.SelfEngagedBy(7),
+        "the mob still holds the character as its target")
+    require.True(t, loop.kiteFightLive(),
+        "the live-fight view keeps the engagement")
+
+    loop.tick()
+    require.Len(t, game.walks, 1,
+        "the stale strict flag must not stand the retreat down")
+    require.Less(t, game.walks[0][0], int32(45000),
+        "the retreat runs straight away from the chasing mob")
+}
+
+// TestKiteOwnsTheAddAnswer pins the aggro answer of a non
+// engageable add on a bow fight (the 2026-11-09 acceptance run: the
+// level 10 add outranked the level 7 archer, the old answer dropped
+// the fight and ran the melee flee fan, whose zone-clamped lanes
+// zeroed on the drifted kite ground and logged the session out).
+// The archer kite keeps the pick and the straight lane answers the
+// add instead.
+func TestKiteOwnsTheAddAnswer(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45440)
+    // The self at level 10, the add at level 15 (template 1000010):
+    // past the engage ceiling of level+2.
+    bot.ApplyStatusUpdate(100, []state.Attribute{
+        {ID: state.AttrLevel, Value: 10},
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000010, Attackable: true,
+        X: 45200, Y: 50000, Name: "High Orc",
+    })
+    mobChasesSelf(bot, 8, 45200, -3500)
+    // The own swing is stale, so the add gate runs ahead of the
+    // fight branch.
+    bot.ApplyAttackAt(shotOf(45440),
+        time.Now().Add(-4*time.Second))
+    require.False(t, loop.attackerEngageable(8))
+    require.True(t, loop.kiteOwnsRetreat())
+
+    loop.tick()
+    require.Equal(t, int32(7), loop.target,
+        "the kite keeps the pick instead of dropping the fight")
+    require.Zero(t, game.logouts,
+        "the melee flee fan must not own the kite retreat")
+    require.NotEmpty(t, game.walks,
+        "the straight lane answers the add")
+    require.Less(t, game.walks[0][0], int32(45000),
+        "the step runs away from the add")
+}
+
+// TestKiteOwnsThePileUpAnswer pins the pile up gate of the archer
+// fight: two attackers past the engage ceiling make the pile up
+// unwinnable, and the old unconditional arming ran the melee escape
+// and logged the session out on the drifted kite ground. While the
+// kite owns the retreat the arming stands down - the critical-HP
+// logout (< 12%) stays armed above it.
+func TestKiteOwnsThePileUpAnswer(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45440)
+    bot.ApplyStatusUpdate(100, []state.Attribute{
+        {ID: state.AttrLevel, Value: 10},
+    })
+    for i, objectID := range []int32{8, 9} {
+        x := int32(45100 + i*100)
+        bot.ApplyNpcInfo(state.NpcInfo{
+            ObjectID: objectID, TemplateID: 1000010,
+            Attackable: true, X: x, Y: 50000, Name: "High Orc",
+        })
+        mobChasesSelf(bot, objectID, x, -3500)
+    }
+    require.False(t, loop.pileUpWinnable(),
+        "the pack outranks the engage ceiling")
+    require.GreaterOrEqual(t, bot.SelfAttackerCount(),
+        panicLogoutAttackers, "the pack arms the pile up gate")
+    require.False(t, loop.settleHolding())
+
+    loop.tick()
+    require.True(t, loop.panicAt.IsZero(),
+        "the kite owns the pile up answer")
+    require.Zero(t, game.logouts,
+        "the archer stays in the world and keeps kiting")
+    require.False(t, loop.kiteClickAt.IsZero(),
+        "the shot cycle owns the tick")
+}
+
+// TestKiteOwnsTheLosingFight pins the losing-fight gate of the
+// archer: a hurt bow archer below the escape threshold would have
+// dropped the fight and fled through the melee fan, trading the
+// kiting distance for a clamped escape lane. The kite keeps the
+// fight and its own retreat; the critical-HP logout stays armed.
+func TestKiteOwnsTheLosingFight(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    hurtTo(bot, 20)
+    require.True(t, loop.losingFight(),
+        "20% health under the running fight is a loss verdict")
+    require.True(t, loop.kiteOwnsRetreat())
+
+    loop.tick()
+    require.Equal(t, int32(7), loop.target,
+        "the kite does not drop the fight")
+    require.Zero(t, game.logouts,
+        "20% health stays above the critical logout")
+    require.False(t, loop.kiteClickAt.IsZero(),
+        "the shot cycle arms the retreat instead of the flee")
 }

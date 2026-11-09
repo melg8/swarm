@@ -341,6 +341,12 @@ const (
     // and falls back to the shipped kiteStepWindow outside it.
     kiteWalkWindowFloor = 1 * time.Second
     kiteWalkWindowMax   = 5 * time.Second
+    // kiteGaugeMaxAge bounds how long a RED SetupGauge still counts
+    // as the bow cycle of the shot in flight: the server sends the
+    // gauge on every shot commit, so a live cycle always has a fresh
+    // one; a gauge older than this belongs to a fight that ended and
+    // the formula fallback owns the window.
+    kiteGaugeMaxAge = 10 * time.Second
     // kiteWindupLead is the safety lead the deferred retreat click
     // adds past the windup end before it goes out (issue #70, the
     // kite timing findings): the live ladder measured the accepted
@@ -547,6 +553,49 @@ func (l *Loop) kiteLayerGates(now time.Time) bool {
     return true
 }
 
+// kiteOwnsRetreat reports whether the archer kite owns the aggro
+// answer of the current fight: the kite layer is enabled, the
+// character holds a bow, a fight is selected and the enemy is not
+// itself an archer (a ranged enemy cannot be outrun - the same
+// weapon gate kiteLayerGates enforces). While it holds, the melee
+// escape machinery must stand down: its flee fan is clamped to the
+// CURRENT hunting zone, and the 2026-11-09 acceptance run measured
+// what that clamp does on a kite fight that drifted across a
+// cell boundary - every lane zeroed, the pile-up and losing-fight
+// answers dropped the fight and logged the session out mid-kite
+// (the Green Dryad cell center 37500,51095 against the character on
+// the Kaboo ground at 36056,50360 in the 18:33 dump). The kite's own
+// straight lane battery validates the real world instead of a zone
+// box, and the critical-HP logout (< 12%) stays armed above both.
+
+func (l *Loop) kiteOwnsRetreat() bool {
+    return l.kite.Enabled && l.target != 0 && l.bowEquipped() &&
+        !l.tracker.ObjectUsesBow(l.target)
+}
+
+// kiteFightLive reports whether a fight is actually live around the
+// character: the selected target is engaged by either side (the own
+// fresh swing or chase step, or the target holding the character as
+// its victim - SelfEngagedBy), or another mob already holds the
+// character as its target (a train member grinding the retreat).
+// The kite triggers read this instead of the strict SelfFighting
+// view: a long retreat leg spends seconds walking without a swing,
+// and the strict view went stale exactly then, standing the whole
+// kite layer down mid-cycle (the 2026-11-09 live run). An ordinary
+// approach to a peaceful pick is not a live fight and never fires
+// the retreat.
+
+func (l *Loop) kiteFightLive() bool {
+    if l.target == 0 {
+        return false
+    }
+    if l.tracker.SelfEngagedBy(l.target) {
+        return true
+    }
+
+    return l.tracker.SelfAttackerCount() > 0
+}
+
 // kiteStepAdmitted guards the kite step of one tick: the shared
 // layer gates must pass (see kiteLayerGates), the kite pacing must
 // have aged out (the step re-probe), and a fresh target resets the
@@ -644,7 +693,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !live {
         // No shot cycle owns the moment (the re-engage wait, a
         // chase without a broadcast): the ordinary full window.
-        until = now.Add(l.kiteWalkWindow() + l.kite.ReengageDelay)
+        until = now.Add(l.kiteWalkWindow(now) + l.kite.ReengageDelay)
     }
     if !l.kiteResolveAndClick(now, until, selfX, selfY, selfZ) {
         // The encircled or cornered hold answered (see
@@ -855,19 +904,37 @@ func (l *Loop) kiteStraightLeg(step float64, selfX, selfY int32) float64 {
 func (l *Loop) kiteResolveAndClick(
     now, until time.Time, selfX, selfY, selfZ int32,
 ) bool {
+    threatID, threatDist, threatOK := l.kiteThreat(selfX, selfY, selfZ)
     if l.kiteFightFor != l.target {
-        // The fight's own anchor (the round-14 location-general
-        // leash): the ground the fight runs on - re-anchored on the
-        // TARGET's stand by the round-18 QA audit (the old self
-        // anchor sat up to a bow radius behind the mob, so the
-        // opening leg budgeted past the leash and parked the
-        // character at the fence). The retreat leash
-        // (kiteTerrainLane) reads the anchor, and the straight leg
-        // lands on the ring instead of the fence. A vanished target
-        // falls back to the self position.
+        // A fresh fight: the anchor falls back to the self position
+        // until the threat position resolves below.
         l.kiteFightFor = l.target
         l.kiteFightX, l.kiteFightY = selfX, selfY
-        if tx, ty, _, tok := l.tracker.ObjectPosition(l.target); tok {
+    }
+    if threatOK {
+        if tx, ty, _, tok := l.tracker.ObjectPosition(threatID); tok {
+            // The live-threat re-anchor (the 2026-11-09 owner round):
+            // the threat MOVES while the fight runs, and a frozen
+            // anchor turns the roam ring into a fence behind the
+            // retreat. The live 17:43 dump decoded it: the shot stood
+            // 111 units from the mob, the clamped 250-unit endpoint
+            // read ~1404 from the fight's first stand, past the 1350
+            // roam radius, and the "cornered" hold answered a runway
+            // the geodata probe found open at every distance - the
+            // second failure at 17:44 repeated it. Re-reading the
+            // threat on EVERY resolution centers the ring on the
+            // fight it belongs to; a chaser that follows keeps the
+            // ring around itself, so the fence only holds back a
+            // retreat from a threat that stands its ground. The
+            // anchor follows the NEAREST threat (kiteThreat: the
+            // fight target or the nearest attacker), not just the
+            // selected target: a train member grinding the character
+            // at point blank with the target standing 873 units out
+            // (the 18:32 live run) clamped the step to the 250 floor
+            // around the far target - the ring must center on the
+            // danger that actually arms the step. A vanished threat
+            // keeps the last anchor (the fight is over or the
+            // broadcast lags).
             l.kiteFightX, l.kiteFightY = tx, ty
         }
     }
@@ -887,13 +954,12 @@ func (l *Loop) kiteResolveAndClick(
     // distance the retreat just bought, and the fights whose speeds
     // sit too close cannot afford it. The raw ray stays both the
     // preferred lane and the half-plane reference of the battery.
-    _, threatDist, threatOK := l.kiteThreat(selfX, selfY, selfZ)
+    // The race-aware leg length (kiteStepLength): the deficit to the
+    // re-shot floor at the resolution moment sizes the leg - one long
+    // straight walk to the floor, not a window-sized shuffle that
+    // ends short of it.
     stepLen := l.kite.Step
     if threatOK {
-        // The race-aware leg length (kiteStepLength): the deficit
-        // to the re-shot floor at the resolution moment sizes the
-        // leg - one long straight walk to the floor, not a
-        // window-sized shuffle that ends short of it.
         stepLen = l.kiteStepLength(threatDist)
     }
     laneLen := l.kiteStraightLeg(stepLen, selfX, selfY)
@@ -1054,14 +1120,14 @@ func (l *Loop) kiteShotPhase(
     if shotAt.IsZero() {
         return time.Time{}, time.Time{}, false
     }
-    until = shotAt.Add(l.kiteWalkWindow() + l.kite.ReengageDelay)
+    until = shotAt.Add(l.kiteWalkWindow(now) + l.kite.ReengageDelay)
     if now.After(until) {
         // The disable lapsed: the re-engage owns the moment, and a
         // retreat riding the dead cycle would hold its window for
         // nothing.
         return time.Time{}, time.Time{}, false
     }
-    clickAt = shotAt.Add(l.kiteWindupWindow() + kiteWindupLead)
+    clickAt = shotAt.Add(l.kiteWindupWindow(now) + kiteWindupLead)
 
     return clickAt, until, true
 }
@@ -1101,7 +1167,7 @@ func (l *Loop) kiteIssueWalk(
     if leg := math.Hypot(
         float64(stepX-selfX), float64(stepY-selfY)); leg > l.kite.Step {
         scaled := now.Add(time.Duration(
-            leg / l.kite.Step * float64(l.kiteWalkWindow())))
+            leg / l.kite.Step * float64(l.kiteWalkWindow(now))))
         if scaled.After(until) {
             until = scaled
         }
@@ -1130,28 +1196,59 @@ func (l *Loop) kiteIssueWalk(
 // rides the same pAtkSpd formula, clamps and fallback as
 // kiteWalkWindow - exactly its first half.
 
-func (l *Loop) kiteWindupWindow() time.Duration {
-    return l.kiteWalkWindow() / 2
+func (l *Loop) kiteWindupWindow(now time.Time) time.Duration {
+    return l.kiteWalkWindow(now) / 2
+}
+
+// kiteGaugeCycle returns the bow disable window the server announced
+// with its own RED SetupGauge, while the gauge is fresh enough to
+// belong to the shot cycle in flight: the exact timing the formula
+// only approximates. The ATK_SPD attribute is not rebroadcast after a
+// relogin until the gear changes, so the formula fell back to its 2 s
+// default while the server ran the real 1483 ms windup - the 18:33:13
+// retreat click landed 233 ms inside the windup and the server
+// answered ActionFailed (docs/kite_timing_findings.md). The gauge
+// carries no such gap: it arrives with every shot.
+
+func (l *Loop) kiteGaugeCycle(now time.Time) (time.Duration, bool) {
+    at, cycle := l.tracker.SelfBowCycle()
+    if at.IsZero() || cycle <= 0 || now.Before(at) ||
+        now.Sub(at) > kiteGaugeMaxAge {
+        return 0, false
+    }
+    if cycle < kiteWalkWindowFloor || cycle > kiteWalkWindowMax {
+        return 0, false
+    }
+
+    return cycle, true
 }
 
 // kiteWalkWindow resolves the movement window the kite walk owns:
 // the bow disable window the C1 server enforces between the shots -
 // timeAtk + reuse = 500000/pAtkSpd + reuseDelay*333/pAtkSpd
 // (Creature.calculateTimeBetweenAttacks and calculateReuseTime, the
-// reuseDelay of the bow family in the item data) - read from the
-// live pAtkSpd the StatusUpdate broadcasts (attr 0x12, the value
-// the acceptance dump shows as 337 for the Short Bow kit, giving
-// roughly (500000 + 1500*333)/337 = 2.97s - the "3 seconds to draw
-// shot" the owner measured by hand). The walk then spends the WHOLE
-// cooldown running (the owner ask of the third round: the proper
-// archering delays from the C1 Mobius formulas - if it is not
-// shooting it should be moving away from the target) instead of the
-// shipped fixed 2s that stood the character idle for the last
-// second of every reload. A missing or absurd pAtkSpd broadcast
-// falls back to the shipped kiteStepWindow (the walk contract
-// never depends on the packet being parsed).
+// reuseDelay of the bow family in the item data). The server's own
+// RED SetupGauge (SetupGauge(RED, sAtk + reuse) at the shot commit,
+// see Creature.doAttackHitByBow) outranks the formula whenever it is
+// fresh: it is the exact window the server runs, whatever the
+// client's pAtkSpd view says. The formula stays the fallback for a
+// cycle without a parsed gauge, read from the live pAtkSpd the
+// StatusUpdate broadcasts (attr 0x12, the value the acceptance dump
+// shows as 337 for the Short Bow kit, giving roughly (500000 +
+// 1500*333)/337 = 2.97s - the "3 seconds to draw shot" the owner
+// measured by hand). The walk then spends the WHOLE cooldown
+// running (the owner ask of the third round: the proper archering
+// delays from the C1 Mobius formulas - if it is not shooting it
+// should be moving away from the target) instead of the shipped
+// fixed 2s that stood the character idle for the last second of
+// every reload. A missing or absurd pAtkSpd broadcast falls back to
+// the shipped kiteStepWindow (the walk contract never depends on
+// the packet being parsed).
 
-func (l *Loop) kiteWalkWindow() time.Duration {
+func (l *Loop) kiteWalkWindow(now time.Time) time.Duration {
+    if cycle, ok := l.kiteGaugeCycle(now); ok {
+        return cycle
+    }
     spd := l.tracker.SelfPAtkSpd()
     if spd <= 0 {
         return kiteStepWindow
