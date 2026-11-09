@@ -510,8 +510,72 @@ func TestKiteKeepsKitingPastTheStaleFightFlag(t *testing.T) {
         "the retreat runs straight away from the chasing mob")
 }
 
-// TestKiteOwnsTheAddAnswer pins the aggro answer of a non
-// engageable add on a bow fight (the 2026-11-09 acceptance run: the
+// TestKiteAnswersTheMeleeAttacker pins the run-4 finding of the
+// 2026-11-09 round: the level 10 Kaboo Orc Fighter of the level 7
+// elven mass cell sits past the general pick ceiling (level+2), the
+// loot answer and the targetless pick fled it, the defensive flight
+// dragged the session across the map (the 130 chaser never falls
+// behind the 125 runner) and the archer spent the window shooting
+// nothing. The kite answer widens the ceiling to the melee attacker
+// it fights from the bow range: the targetless tick selects the
+// Fighter and the bow cycle owns the fight instead of the flight.
+func TestKiteAnswersTheMeleeAttacker(t *testing.T) {
+    bot := newTestBot()
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: true, Change: 1},
+    })
+    bot.ApplyStatusUpdate(100, []state.Attribute{
+        {ID: state.AttrLevel, Value: 7},
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000471, Attackable: true,
+        X: 45200, Y: 50000, Name: "Kaboo Orc Fighter",
+    })
+    mobChasesSelf(bot, 7, 45200, -3500)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.lastHit = time.Now().Add(-time.Minute)
+    level, ok := bot.ObjectLevel(7)
+    require.True(t, ok)
+    require.Equal(t, int32(10), level,
+        "the Fighter carries the level 10 of the live cell")
+    require.True(t, loop.attackerEngageable(7),
+        "the kite answers a melee attacker past the pick ceiling")
+
+    loop.tick()
+    require.Equal(t, int32(7), loop.target,
+        "the targetless pick answers the Fighter with the bow")
+    require.Equal(t, phaseEngage, loop.phase)
+    require.Zero(t, game.logouts,
+        "the defensive logout must not own the kite answer")
+
+    // The anti-archer rule of the round stays: a bow wielding
+    // attacker past the general ceiling is never a kite fight (a
+    // ranged enemy cannot be outrun), so the flight keeps it. The
+    // level sits inside the widened kite ceiling - the bow gate
+    // alone refuses it.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000471, Attackable: true,
+        X: 45200, Y: 50000, RightHandItem: 14, Name: "Kaboo Archer",
+    })
+    require.False(t, loop.attackerEngageable(8),
+        "no kite answer against a bow wielding enemy")
+
+    // And the widened ceiling keeps a real bound: a melee attacker
+    // six levels above the character is no bow fight either.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 9, TemplateID: 1000013, Attackable: true,
+        X: 45200, Y: 50000, Name: "High Orc",
+    })
+    level, ok = bot.ObjectLevel(9)
+    require.True(t, ok)
+    require.Equal(t, int32(13), level)
+    require.False(t, loop.attackerEngageable(9),
+        "a melee attacker past the kite slack keeps the flight")
+}
+
+// TestKiteOwnsTheAddAnswer pins the aggro answer of an add past the
+// KITE ceiling on a bow fight (the 2026-11-09 acceptance run: the
 // level 10 add outranked the level 7 archer, the old answer dropped
 // the fight and ran the melee flee fan, whose zone-clamped lanes
 // zeroed on the drifted kite ground and logged the session out).
@@ -519,13 +583,14 @@ func TestKiteKeepsKitingPastTheStaleFightFlag(t *testing.T) {
 // add instead.
 func TestKiteOwnsTheAddAnswer(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45440)
-    // The self at level 10, the add at level 15 (template 1000010):
-    // past the engage ceiling of level+2.
+    // The self at level 10, the add at level 16 (template 1000012):
+    // past the kite ceiling of level+5 (the +5 itself is engageable
+    // and covered by TestKiteAnswersTheMeleeAttacker).
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrLevel, Value: 10},
     })
     bot.ApplyNpcInfo(state.NpcInfo{
-        ObjectID: 8, TemplateID: 1000010, Attackable: true,
+        ObjectID: 8, TemplateID: 1000012, Attackable: true,
         X: 45200, Y: 50000, Name: "High Orc",
     })
     mobChasesSelf(bot, 8, 45200, -3500)

@@ -570,12 +570,16 @@ func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
 
 // attackerEngageable reports whether the character may answer the
 // attacker by fighting it: the mob level sits inside the engage
-// ceiling (the character level plus the slack) and the character is
-// healthy enough to press a fight - the winnable half of the aggro
-// answer. An unresolved template (level 0 or unknown) passes like
-// every level filter of the target search; an attacker above the
-// ceiling never becomes winnable and the defense flow answers
-// instead (the escape walk and, when the chase holds, the logout).
+// ceiling and the character is healthy enough to press a fight - the
+// winnable half of the aggro answer. The ceiling is the general pick
+// ceiling (the character level plus the slack), widened for a melee
+// attacker the archer kite answers (see kiteEngageLevelSlack): the
+// kite fights from the bow range and buys the distance back between
+// the shots, so the melee level ceiling is not its race. An
+// unresolved template (level 0 or unknown) passes like every level
+// filter of the target search; an attacker above the ceiling never
+// becomes winnable and the defense flow answers instead (the escape
+// walk and, when the chase holds, the logout).
 func (l *Loop) attackerEngageable(objectID int32) bool {
     if l.tracker.SelfHealthPercent() < reengageHealthPercent {
         return false
@@ -585,6 +589,11 @@ func (l *Loop) attackerEngageable(objectID int32) bool {
         return true
     }
     maxLevel := l.maxTargetLevel()
+    if l.kiteAnswersMelee(objectID) {
+        if kiteMax := l.kiteEngageLevelCeiling(); kiteMax > maxLevel {
+            maxLevel = kiteMax
+        }
+    }
 
     return maxLevel <= 0 || level <= maxLevel
 }
