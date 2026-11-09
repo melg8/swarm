@@ -144,8 +144,22 @@ archer-kite re-check.
   `TestEngageGateKeepsTheAttackingTarget`,
   `TestEngageGateDropsTheIdleSelection`.
 
+### 2026-11-09 - hunt: gate the add sidestep through the terrain
+
+- `avoidImpendingAdd` fans the sidestep: the straight away ray
+  first, then the 30 and 60 degree flanking rays each side.
+- `combatAvoidLane` resolves one candidate through the kite contract
+  (zone leash, degenerate length, geodata line of sight, water):
+  a walled, wet or out-of-leash lane never issues its click.
+- With every lane refused the fight holds the ground (no click into
+  the wall, the add scan retries at the step pace) and the paced
+  diagnostic names the walled pocket. The 14:03:16 dump clicked the
+  walled straight lane and froze; the add stayed on top.
+- Tests: `TestFightStepFansAroundTheWalledLane`,
+  `TestFightStepHoldsWhenEveryLaneIsWalled`.
+
 ## Status
 
-In progress: fixes 1-3 landed; fix 4 (terrain-gated add sidestep)
+In progress: fixes 1-4 landed; fix 5 (chaser closure-rate flee exit)
 next.
 

@@ -762,6 +762,11 @@ type Loop struct {
     // finished. The kite step of the archer (see kite.go) shares the
     // window: one movement owner per fight step.
     combatAvoidUntil time.Time
+    // combatAvoidHoldAt paces the walled-pocket diagnostic of the
+    // impending-add step (see avoidImpendingAdd): a fight whose every
+    // sidestep lane is walled, over water or outside the leash holds
+    // the ground, and the log names it once per period.
+    combatAvoidHoldAt time.Time
     // kiteAt paces the archer kite steps (see kite.go): one retreat
     // per period, the rest of the cycle stands and shoots.
     kiteAt time.Time
@@ -1400,6 +1405,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         combatAvoidScanAt:   time.Time{},
         combatAvoidAt:       time.Time{},
         combatAvoidUntil:    time.Time{},
+        combatAvoidHoldAt:   time.Time{},
         kiteWalkUntil:       time.Time{},
         kiteReclickAt:       time.Time{},
         fleeAt:              time.Time{},

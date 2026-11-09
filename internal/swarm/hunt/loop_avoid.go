@@ -29,6 +29,8 @@ package hunt
 import (
     "math"
     "time"
+
+    "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
 // The steering constants of the aggro-aware movement.
@@ -247,6 +249,17 @@ const (
     // and the swings resume through the forced attack re-request once
     // the step window ends.
     combatAvoidStep = 300.0
+    // combatAvoidFanStep and combatAvoidFanSteps shape the sidestep
+    // fan: a straight lane a wall, the water or the leash edge walls
+    // off tries the flanking lanes (30 and 60 degrees each side)
+    // before the step stands down - the same terrain contract the
+    // kite retreat lanes run (see kiteTerrainLane).
+    combatAvoidFanStep  = math.Pi / 6
+    combatAvoidFanSteps = 2
+    // combatAvoidHoldLogPeriod paces the walled-pocket diagnostic:
+    // a fight boxed in by the terrain holds the ground instead of
+    // clicking into a wall, one line per period keeps it readable.
+    combatAvoidHoldLogPeriod = 15 * time.Second
     // combatAvoidStepPeriod is the movement window the step owns: a
     // forced attack request interrupts a running walk server-side, so
     // the engage holds its re-requests until the step finished.
@@ -325,22 +338,95 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     if dist < 1 {
         return false
     }
-    stepX := int32(float64(selfX) + dx/dist*combatAvoidStep)
-    stepY := int32(float64(selfY) + dy/dist*combatAvoidStep)
-    if zone := l.zone(); zone != nil && !zone.Contains(stepX, stepY) {
-        // The straight step leaves the hunting square: the leash
-        // outranks the add.
-        return false
+    // The sidestep fans: the straight away lane first, then the
+    // flanking lanes each side - a wall, the water or the leash edge
+    // straight behind does not box the fight in while a step along
+    // the obstacle stays open (the 14:03:16 dump clicked the walled
+    // straight lane and froze, the add stayed on top of the
+    // character). Every candidate runs the same terrain contract the
+    // kite retreat lanes use (see combatAvoidLane).
+    baseX, baseY := dx/dist, dy/dist
+    for stepIdx := 0; stepIdx <= combatAvoidFanSteps; stepIdx++ {
+        angle := combatAvoidFanStep * float64(stepIdx)
+        for _, sign := range [2]int{1, -1} {
+            if stepIdx == 0 && sign < 0 {
+                // The straight lane is its own mirror.
+                continue
+            }
+            dirX, dirY := rotatePlanar(
+                baseX, baseY, float64(sign)*angle)
+            stepX, stepY, ok := l.combatAvoidLane(
+                selfX, selfY, selfZ, dirX, dirY)
+            if !ok {
+                continue
+            }
+            l.combatAvoidAt = now
+            l.combatAvoidUntil = now.Add(combatAvoidStepPeriod)
+            l.logger.Printf("Hunt: %s stalks the fight %d units out, "+
+                "stepping clear", threat.Name,
+                int(math.Round(dist)))
+            if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
+                l.logger.Printf("Hunt: combat avoid walk failed: %v", err)
+            }
+
+            return true
+        }
     }
+    // Every lane is walled, over water or outside the leash: the
+    // fight holds the ground instead of clicking into the obstacle
+    // (the refused click freezes the character and burns the avoid
+    // window). The hold paces itself like a step, so the scan does
+    // not re-run the full fan on every engage tick.
     l.combatAvoidAt = now
-    l.combatAvoidUntil = now.Add(combatAvoidStepPeriod)
-    l.logger.Printf("Hunt: %s stalks the fight %d units out, stepping clear",
-        threat.Name, int(math.Round(dist)))
-    if err := l.game.WalkTo(stepX, stepY, selfZ); err != nil {
-        l.logger.Printf("Hunt: combat avoid walk failed: %v", err)
+    if l.combatAvoidHoldAt.IsZero() ||
+        now.Sub(l.combatAvoidHoldAt) >= combatAvoidHoldLogPeriod {
+        l.combatAvoidHoldAt = now
+        l.logger.Printf("Hunt: %s stalks the fight %d units out and "+
+            "every sidestep lane is walled, holding the ground",
+            threat.Name, int(math.Round(dist)))
     }
 
-    return true
+    return false
+}
+
+// combatAvoidLane resolves one sidestep candidate through the terrain
+// contract of the running fight: the leash first (a step that would
+// leave the hunting square is skipped - the leash outranks the add),
+// then the degenerate length, the geodata wall and the water. The
+// gates mirror the kite retreat lanes (kiteTerrainLane); without a
+// navigator (the no-geodata runtime, the plain unit scenes) the leash
+// alone fences the step.
+func (l *Loop) combatAvoidLane(
+    selfX, selfY, selfZ int32, dirX, dirY float64,
+) (int32, int32, bool) {
+    stepX := int32(math.Round(float64(selfX) + dirX*combatAvoidStep))
+    stepY := int32(math.Round(float64(selfY) + dirY*combatAvoidStep))
+    if zone := l.zone(); zone != nil && !zone.Contains(stepX, stepY) {
+        return 0, 0, false
+    }
+    if math.Hypot(float64(stepX-selfX), float64(stepY-selfY)) < 1 {
+        return 0, 0, false
+    }
+    if l.navigator == nil {
+        return stepX, stepY, true
+    }
+    from := pathfind.Vec3{
+        X: float64(selfX), Y: float64(selfY), Z: float64(selfZ)}
+    to := pathfind.Vec3{
+        X: float64(stepX), Y: float64(stepY), Z: float64(selfZ)}
+    if sight, err := l.navigator.LineOfSight(from, to); err != nil ||
+        !sight {
+        // A wall (or an unreadable geodata) behind: the click would
+        // freeze on the server correction - the next lane serves.
+        return 0, 0, false
+    }
+    if l.navigator.OverWater(float64(stepX), float64(stepY),
+        int16(selfZ)) {
+        // Water behind: swimming trades the fight for the paddle.
+        return 0, 0, false
+    }
+
+    return stepX, stepY, true
 }
 
 // avoidDeepestThreat picks the scanned add with the deepest band

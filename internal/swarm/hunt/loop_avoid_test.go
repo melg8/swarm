@@ -418,6 +418,51 @@ func TestFightStepRespectsTheLeash(t *testing.T) {
     require.Empty(t, game.walks)
 }
 
+// TestFightStepFansAroundTheWalledLane pins the flanking half of the
+// sidestep: the straight away lane runs into a geodata wall, so the
+// step rides the next fan ray (30 degrees off) instead of clicking
+// into the wall - the 14:03:16 dump sent the straight click, the
+// server refused it and the add stayed on top of the character.
+func TestFightStepFansAroundTheWalledLane(t *testing.T) {
+    loop, game, logBuf := fightingScene(550)
+    nav := &fakeNavigator{}
+    nav.sightFunc = func(from, to pathfind.Vec3) (bool, error) {
+        // The straight west lane is walled, the flanking rays are
+        // clear.
+        if to.X < from.X && math.Abs(to.Y-from.Y) < 100 {
+            return false, nil
+        }
+
+        return true, nil
+    }
+    loop.SetNavigator(nav)
+    loop.tick()
+
+    require.Len(t, game.walks, 1, "the flanking lane still steps")
+    walk := game.walks[0]
+    require.Less(t, float64(walk[1]), 50000.0,
+        "the accepted lane is the southern flank ray")
+    require.NotEqual(t, int32(44700), walk[0],
+        "the walled straight lane never issues its click")
+    require.Contains(t, logBuf.String(), "stepping clear")
+}
+
+// TestFightStepHoldsWhenEveryLaneIsWalled pins the hold fallback: a
+// fight boxed in by the terrain sends no click at all (the server
+// would freeze it on the correction), names the walled pocket and
+// keeps the engage running.
+func TestFightStepHoldsWhenEveryLaneIsWalled(t *testing.T) {
+    loop, game, logBuf := fightingScene(550)
+    loop.SetNavigator(&fakeNavigator{blind: true})
+    loop.tick()
+
+    require.Empty(t, game.walks, "no click goes into the wall")
+    require.Contains(t, logBuf.String(),
+        "every sidestep lane is walled, holding the ground")
+    require.False(t, loop.combatAvoidAt.IsZero(),
+        "the hold paces itself like a step")
+}
+
 // TestFightStepSkipsAnotherDeck pins the 3D gate of the combat scan:
 // an add standing on another deck (700 units above the fight) cannot
 // fire its trigger across the gap, and the fight never steps for it.
