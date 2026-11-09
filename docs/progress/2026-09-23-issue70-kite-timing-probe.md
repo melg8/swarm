@@ -791,3 +791,78 @@ FAILURES - the next session's design:
   pins ride kiteWantChord (a near-twin of the implementation - the
   equidistant invariants and the turn side carry the independent
   weight); no pin asserts the arrival >= 480 under the parity model.
+
+## 2026-11-09, the round-19 continuous-circle round (the owner ask:
+## "the archer must run a wide circle, shoot, never stand")
+
+The round-19 live acceptance (`logs/acceptance/archer-kite-
+20261109-111905-21692-1.log`) measured ZERO kite steps over the
+whole 3 minute window: the character stood at 35271 50029 for 160
+seconds against a single Spore Fungus while the bow re-shot at 57
+units. The event feed named the mechanism exactly: "the chasers
+surround the bow fight on target 268439320, holding ground and
+shooting through the train" fired with only ONE mob on the field
+and no breakout suffix - the degenerate zero-bearing branch.
+
+THE PHANTOM ENCIRCLEMENT (the round-19 root cause): the encircle
+check folded "the summed unit vectors are shorter than one" into
+the train rule (`sumLen < kiteEncircleShare*count || sumLen < 1`).
+The unit vectors are reconstructed with cos/sin, and the triggered
+bearings measured `hypot(0.9999999999999998)` - one ulp under 1.
+The encircle share test passed (1 is not < 0.3), the ulp test
+fired, the gap resolver answered "no gap" for a single bearing,
+and the hold pinned the archer at melee for the whole window. The
+fix (kite_lane.go): only the EMPTY bearing list is the degenerate
+no-chaser scene; a single chaser always guards its away ray. The
+regression pin (TestKiteSingleChaserNeverEncircles) sweeps 72
+bearings plus the exact live bearing that measured the ulp.
+
+THE GEOMETRY OF THE CONTINUOUS CIRCLE (the QA P0s of the round-18
+audit, implemented this round):
+
+- THE ANCHOR IS THE MOB'S STAND (kiteResolveAndClick): the fight
+  circle, the leash and the turn side all read the mob position,
+  not the character's first-retreat cell. The old anchor sat up to
+  a bow radius behind the mob, so the opening leg ran past the
+  drift leash and parked the fight at the fence.
+- THE OPENING LEG BUDGETS AGAINST THE RING (kiteStraightLeg): the
+  race length caps at the 972-unit anchor ring minus the rounding
+  margin, so the first straight leg lands ON the circle the chords
+  keep instead of at the leash fence.
+- THE CHORD CARRIES ITS OWN LENGTH: the lane battery walks the
+  exact chord (the endpoint is the ring point), no leash recut.
+- THE ARRIVAL CHAINS THE PURSUIT (kiteReclickWalk): a stand within
+  kiteArrivalEpsilon completes the leg, clears the walk's
+  combatAvoidUntil hold and issues the next chord on the SAME tick
+  under the re-shot floor - the character never stands between the
+  legs of the race.
+- THE CELL-FOLLOW KEEPS THE TARGET (cellHunter.applyFollowing): a
+  fight crossing a hexagon boundary keeps its target; the old
+  apply path dropped it on every boundary the circle crossed.
+- THE SHOT-PACED CLICK stays as shipped (the windup end), the race
+  ledger keeps its two-stall backstop.
+
+THE WINDOWS CLOCK PINS (loop_los.go, found by the round-19 gate):
+the blind engage comparisons used strict Before/After and the
+Windows clock granularity stamps a refusal and the walk-completion
+re-anchor inside one clock tick - the round-59 repro tests flipped
+between the handoff and the switch. The equality now counts on the
+safe side of each question: a refusal stamped with the re-anchor
+belongs to the earlier attempt (the walk answered it), and a chase
+step stamped with the refusal counts as progress (the next refusal
+re-arms). Both changes are closed-form, no tolerance sleeps.
+
+THE ROUND-19 LIVE VERDICT (`logs/acceptance/archer-kite-
+20261109-113711-27044-1.log`, temp18, 3m6s): PASS 6/6 - armed, 61
+fight samples 80 percent ranged (max 540), 5 kite steps 0 cornered
+holds, min HP 73 percent, min 593 arrows. The position samples
+move 600-1500 units every 10 s (the continuous circle), the
+pursuit chain logged 12-step legs at 160-469 units, and the shots
+landed at 495/538/540/603 units - the one-shot-at-safe-distance
+cycle the owner asked for. No target drop, no hold line, no
+surround line.
+
+THE ROUND-19 GATES: `go test ./internal/swarm/hunt/ -run TestKite`
+green (89 s), the full hunt package green (157 s), the acceptance
+package green. Next: the fleet archer round (the five-cell audit)
+on this build, then the range contract closes.
