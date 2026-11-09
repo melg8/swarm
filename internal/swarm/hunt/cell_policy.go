@@ -1035,7 +1035,8 @@ func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
         return
     }
     if l.tracker.ZoneHasPickableWindowed(nil,
-        h.windowFloor(), l.maxTargetLevel(), l.activeSkips(now)) {
+        h.windowFloor(), l.maxTargetLevel(), l.activeSkips(now),
+        l.avoidBowTargets()) {
         h.emptySince = time.Time{}
 
         return

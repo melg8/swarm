@@ -160,7 +160,8 @@ func (b *Bot) NearestAttackable(
 func (b *Bot) NearestAttackableExcept(
     maxDistance float64, zone ZoneArea, skip []int32,
 ) (AttackTarget, bool) {
-    return b.nearestAttackable(maxDistance, zone, skip, 0, 0, false, nil)
+    return b.nearestAttackable(
+        maxDistance, zone, skip, 0, 0, false, false, nil)
 }
 
 // ZoneHasAttackable reports whether at least one living attackable
@@ -219,7 +220,7 @@ func (b *Bot) ZoneHasAttackableBelow(zone ZoneArea, maxLevel int32) bool {
 func (b *Bot) ZoneHasPickable(
     zone ZoneArea, maxLevel int32, skip []int32,
 ) bool {
-    return b.ZoneHasPickableWindowed(zone, 0, maxLevel, skip)
+    return b.ZoneHasPickableWindowed(zone, 0, maxLevel, skip, false)
 }
 
 // ZoneHasPickableWindowed extends ZoneHasPickable with the level
@@ -228,12 +229,18 @@ func (b *Bot) ZoneHasPickable(
 // whose only survivors sit below the floor reads empty for the
 // wait-or-move economy - the same way the ceiling reads the too-high
 // survivors. Zero disables the floor (an unresolved template passes
-// both bounds, matching the ceiling semantics).
+// both bounds, matching the ceiling semantics). avoidBows fences the
+// bow wielding mobs out like the pick itself when the caller asks
+// for it: a square whose only survivors are archers reads empty, so
+// the rotation moves the bot instead of leaving it in a ground it
+// will never initiate a fight on.
 func (b *Bot) ZoneHasPickableWindowed(
     zone ZoneArea, minLevel int32, maxLevel int32, skip []int32,
+    avoidBows bool,
 ) bool {
     _, ok := b.nearestAttackable(
-        math.MaxFloat64, zone, skip, minLevel, maxLevel, true, nil)
+        math.MaxFloat64, zone, skip, minLevel, maxLevel, true,
+        avoidBows, nil)
 
     return ok
 }
@@ -325,14 +332,19 @@ type BlockedTarget struct {
 func (b *Bot) NearestBlockedTargets(
     zone ZoneArea, maxLevel int32, skip []int32, limit int,
 ) []BlockedTarget {
-    return b.NearestBlockedTargetsWindowed(zone, 0, maxLevel, skip, limit)
+    return b.NearestBlockedTargetsWindowed(
+        zone, 0, maxLevel, skip, limit, false)
 }
 
 // NearestBlockedTargetsWindowed extends NearestBlockedTargets with the
 // level window floor of the spot hunting: a mob below the floor shows
-// its reason like the ones above the ceiling.
+// its reason like the ones above the ceiling. avoidBows adds the bow
+// wielding reason of the fences the pick itself applies when the
+// caller asked for it, so the diagnostic explains the archer the hunt
+// deliberately passed over.
 func (b *Bot) NearestBlockedTargetsWindowed(
     zone ZoneArea, minLevel int32, maxLevel int32, skip []int32, limit int,
+    avoidBows bool,
 ) []BlockedTarget {
     if limit <= 0 {
         return nil
@@ -357,7 +369,8 @@ func (b *Bot) NearestBlockedTargetsWindowed(
     for i := range scans {
         cand := &scans[i]
         reason := blockedReason(
-            scans, cand, b.world.cold, zone, minLevel, maxLevel, skip)
+            scans, cand, b.world.cold, zone, minLevel, maxLevel, skip,
+            avoidBows)
         if reason == "" {
             continue
         }
@@ -390,12 +403,13 @@ func (b *Bot) NearestBlockedTargetsWindowed(
 // blockedReason mirrors the rejection chain of the constrained target
 // search for one scan record and returns the human readable reason
 // (empty when the pick could take the mob). The order matches the
-// pick's own checks: the skip list, the level window, the zone
-// square, the social clan fence. The world cold half resolves the
-// names the reasons print; the caller must hold the read lock.
+// pick's own checks: the skip list, the level window, the bow fence,
+// the zone square, the social clan fence. The world cold half resolves
+// the names the reasons print; the caller must hold the read lock.
 func blockedReason(
     scans []npcScan, cand *npcScan, cold []objectCold,
     zone ZoneArea, minLevel int32, maxLevel int32, skip []int32,
+    avoidBows bool,
 ) string {
     if skipContains(skip, cand.objectID) {
         return "skipped by the engage"
@@ -407,6 +421,9 @@ func blockedReason(
     if maxLevel > 0 && cand.level > maxLevel && cand.level > 0 {
         return fmt.Sprintf("level %d above the ceiling %d",
             cand.level, maxLevel)
+    }
+    if avoidBows && cand.bowWielding {
+        return "bow wielder (the archer trade is avoided)"
     }
     if zone != nil && !zone.Contains(int32(math.Round(cand.x)),
         int32(math.Round(cand.y))) {
@@ -443,7 +460,7 @@ func (b *Bot) NearestAttackableConstrained(
     maxLevel int32, avoidSocial bool,
 ) (AttackTarget, bool) {
     return b.nearestAttackable(
-        maxDistance, zone, skip, 0, maxLevel, avoidSocial, nil)
+        maxDistance, zone, skip, 0, maxLevel, avoidSocial, false, nil)
 }
 
 // NearestAttackablePreferred extends NearestAttackableConstrained
@@ -452,12 +469,19 @@ func (b *Bot) NearestAttackableConstrained(
 // engage farms every species of the ground while tilting toward the
 // exp rich mobs when several candidates sit at a comparable range. A
 // nil (or empty) priority map keeps the plain nearest-first pick.
+// avoidBows fences the bow wielding mobs out of the pick: the ranged
+// trade is a break-even race a low level archer cannot afford with
+// the melee adds of the ground joining it, so a bow profile never
+// INITIATES on one (the defensive answer of an attacking archer runs
+// through the attacker scan, not this pick).
 func (b *Bot) NearestAttackablePreferred(
     maxDistance float64, zone ZoneArea, skip []int32,
     maxLevel int32, avoidSocial bool, priority map[int32]int32,
+    avoidBows bool,
 ) (AttackTarget, bool) {
     return b.nearestAttackable(
-        maxDistance, zone, skip, 0, maxLevel, avoidSocial, priority)
+        maxDistance, zone, skip, 0, maxLevel, avoidSocial, avoidBows,
+        priority)
 }
 
 // NearestAttackablePreferredWindowed extends the preferred pick with
@@ -465,15 +489,16 @@ func (b *Bot) NearestAttackablePreferred(
 // no adena at the character's level and never enter a fight the spot
 // economy would count as income. Zero disables the floor; an
 // unresolved template (level 0) passes both bounds like everywhere in
-// the target search.
+// the target search. avoidBows applies the bow fence of the preferred
+// pick (see NearestAttackablePreferred).
 func (b *Bot) NearestAttackablePreferredWindowed(
     maxDistance float64, zone ZoneArea, skip []int32,
     minLevel int32, maxLevel int32, avoidSocial bool,
-    priority map[int32]int32,
+    priority map[int32]int32, avoidBows bool,
 ) (AttackTarget, bool) {
     return b.nearestAttackable(
         maxDistance, zone, skip, minLevel, maxLevel,
-        avoidSocial, priority)
+        avoidSocial, avoidBows, priority)
 }
 
 // nearestAttackable is the shared target search core of the public
@@ -487,14 +512,15 @@ func (b *Bot) NearestAttackablePreferredWindowed(
 //nolint:cyclop // the zone, level, social and priority filters are one scan
 func (b *Bot) nearestAttackable(
     maxDistance float64, zone ZoneArea, skip []int32,
-    minLevel int32, maxLevel int32, avoidSocial bool,
+    minLevel int32, maxLevel int32, avoidSocial bool, avoidBows bool,
     priority map[int32]int32,
 ) (AttackTarget, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()
     if avoidSocial {
         return b.nearestAttackableSocial(
-            maxDistance, zone, skip, minLevel, maxLevel, priority)
+            maxDistance, zone, skip, minLevel, maxLevel, avoidBows,
+            priority)
     }
 
     //nolint:exhaustruct_v5 // zero value grows inside the loop
@@ -516,6 +542,9 @@ func (b *Bot) nearestAttackable(
             continue
         }
         if minLevel > 0 && obj.Level < minLevel && obj.Level > 0 {
+            continue
+        }
+        if avoidBows && obj.BowWielding {
             continue
         }
         x, y := projectedPosition(obj, nowNano)
@@ -553,7 +582,8 @@ func (b *Bot) nearestAttackable(
 // caller must hold the read lock.
 func (b *Bot) nearestAttackableSocial(
     maxDistance float64, zone ZoneArea, skip []int32,
-    minLevel int32, maxLevel int32, priority map[int32]int32,
+    minLevel int32, maxLevel int32, avoidBows bool,
+    priority map[int32]int32,
 ) (AttackTarget, bool) {
     //nolint:exhaustruct_v5 // zero value grows inside the loop
     best := AttackTarget{}
@@ -585,6 +615,9 @@ func (b *Bot) nearestAttackableSocial(
             continue
         }
         if minLevel > 0 && cand.level < minLevel && cand.level > 0 {
+            continue
+        }
+        if avoidBows && cand.bowWielding {
             continue
         }
         if zone != nil && !zone.Contains(
@@ -641,6 +674,7 @@ func (b *Bot) appendAttackableScans(
             templateID:    b.world.cold[i].TemplateID,
             clanHelpRange: obj.ClanHelpRange,
             clanMask:      obj.ClanMask,
+            bowWielding:   obj.BowWielding,
         })
     }
 
@@ -699,6 +733,7 @@ type npcScan struct {
     templateID    int32
     clanHelpRange int32
     clanMask      uint64
+    bowWielding   bool
 }
 
 // socialHelpersNear reports whether attacking the candidate would

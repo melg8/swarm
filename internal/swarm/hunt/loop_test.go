@@ -1285,6 +1285,50 @@ func TestLoopKeepsStandingWhenTheFarMobEntersTheEngageRadius(t *testing.T) {
         "the engage picks the target directly")
 }
 
+// TestArcherAvoidsInitiatingOnTheBowMob pins the archer fence of the
+// hunt pick: the bow profile (the kite layer on and the bow in hand)
+// takes the farther melee mob over the nearer archer. The standing
+// ranged trade is the trap the owner rule names - a ranged enemy
+// cannot be outrun and the equal DPS race turns lethal the moment a
+// melee add joins (the 2026-11-09 22:42 acceptance run: the level 8
+// Kaboo Orc Archer traded shots for a minute, a Grunt added and the
+// two-mob pile-up logged the session out at 52 percent health).
+func TestArcherAvoidsInitiatingOnTheBowMob(t *testing.T) {
+    bot := newTestBot()
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: true, Change: 1},
+    })
+    // The archer stands closer (700) than the melee grunt (1000).
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 45700, Y: 50000, RightHandItem: 14, Name: "Orc Archer",
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000002, Attackable: true,
+        X: 46000, Y: 50000, Name: "Orc Grunt",
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetHuntingZone(46000, 50000, 1300)
+    loop.lastHit = time.Now().Add(-time.Minute)
+
+    loop.tick()
+    require.Equal(t, []int32{8}, game.forces,
+        "the archer pick skips the bow mob and takes the melee one")
+
+    // A melee bot (no bow in hand) keeps picking the nearer archer:
+    // the fence belongs to the archer profile, not to every hunter.
+    bot.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 99, ItemID: 13, Equipped: false, Change: 1},
+    })
+    loop.target = 0
+    game.forces = nil
+    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.tick()
+    require.Equal(t, []int32{7}, game.forces,
+        "the melee profile still initiates on the archer")
+}
+
 func TestLoopLogsOutWhenTheFleeNeverShakesTheChase(t *testing.T) {
     bot := newTestBot()
     spawnMob(bot)

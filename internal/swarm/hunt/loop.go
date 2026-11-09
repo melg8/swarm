@@ -1595,7 +1595,7 @@ func (l *Loop) cellEnemiesVisible(now time.Time) bool {
     pick, ok := l.tracker.NearestAttackablePreferredWindowed(
         math.MaxFloat64, nil, l.activeSkips(now),
         l.minTargetLevel(), l.maxTargetLevel(), true,
-        l.zoneMobPriority)
+        l.zoneMobPriority, l.avoidBowTargets())
     if !ok {
         return false
     }
@@ -2195,7 +2195,7 @@ func (l *Loop) engage() {
 
         return
     }
-    if l.target != 0 && l.losingFight() && !l.kiteOwnsRetreat() {
+    if l.target != 0 && l.losingFight() {
         // The fight turned into a death risk: the health fell under
         // the escape threshold or the target keeps a clear health
         // lead over a hurt character (the level gap pull of the
@@ -2204,11 +2204,17 @@ func (l *Loop) engage() {
         // kills, so the fight is dropped and the character runs.
         // It stays ahead of the blind recovery: an add grinding a
         // repositioning character must escalate into the flee, not
-        // into another detour segment. The archer kite owns its own
-        // retreat while the bow fight is live (see kiteOwnsRetreat):
-        // dropping the target hands the melee flee fan a zone box
-        // the kite ground already left, and the critical-HP logout
-        // stays armed above both.
+        // into another detour segment. The archer kite answers with
+        // the straight flight (kiteFleeThreat) once the target is
+        // dropped - the targetless defensive flee has no fight
+        // cycle to run, and the zone-clamped melee fan is only its
+        // walled-lane fallback (the 2026-11-09 5-minute acceptance
+        // run measured the death the old kite exemption produced:
+        // the pursuit chain walked while two chasers glued at 14
+        // units, the health fell 100 -> 69 -> 32 -> 21 percent and
+        // the critical-HP logout never saw a tick under its 12
+        // percent line). The critical-HP logout stays armed above
+        // both.
         l.fleeFromTarget(l.target, now)
 
         return
@@ -2330,7 +2336,7 @@ func (l *Loop) engage() {
             pick, ok := l.tracker.NearestAttackablePreferredWindowed(
                 attackNearestRange, l.pickZone(), l.activeSkips(now),
                 l.minTargetLevel(), l.maxTargetLevel(), true,
-                l.zoneMobPriority)
+                l.zoneMobPriority, l.avoidBowTargets())
             if !ok {
                 if l.walkToFarTarget(now) {
                     return

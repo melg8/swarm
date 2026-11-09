@@ -304,6 +304,11 @@ type archerKiteSample struct {
     // fighting is true when the auto attack runs against a live
     // fight target (the swings are in flight).
     fighting bool
+    // walking is true when the character is in motion at the
+    // sample moment. A retreat leg legitimately opens the distance
+    // past the bow band while the chaser lags behind, so a walking
+    // sample cannot judge the standing fight radius.
+    walking bool
     // fightDist is the distance to the fight target, -1 when the
     // sample carries no fight.
     fightDist float64
@@ -360,7 +365,14 @@ func (w archerKiteWatch) fold(s archerKiteSample) archerKiteWatch {
         if s.fightDist >= archerKiteMeleeRadius+archerKiteRangedMargin {
             w.rangedSamples++
         }
-        if s.fightDist > w.maxFightDist {
+        // Only a standing sample judges the bow band: while the
+        // character walks a retreat leg the gap to the lagging
+        // chaser grows past the band by design, and latching that
+        // distance would fail the contract on the kite's own
+        // working distance (the 2026-11-09 5-minute run measured
+        // 796 units on a 780 ceiling while every retreat step was
+        // healthy).
+        if !s.walking && s.fightDist > w.maxFightDist {
             w.maxFightDist = s.fightDist
         }
     }
@@ -485,6 +497,7 @@ func archerKiteSampleOf(tracker *state.Bot) archerKiteSample {
     sample := archerKiteSample{
         online:    tracker.Status() == state.StatusOnline,
         dead:      tracker.SelfDead(),
+        walking:   tracker.SelfWalking(),
         fightDist: -1,
         hpPercent: -1,
         arrows:    -1,

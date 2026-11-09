@@ -398,14 +398,14 @@ func TestNearestAttackablePreferredAppliesThePriorityBias(t *testing.T) {
     // The rabbit (600 - 2x200 = 200) beats the gremlin (300).
     for _, avoidSocial := range []bool{false, true} {
         target, ok := bot.NearestAttackablePreferred(
-            1500, nil, nil, 0, avoidSocial, priority)
+            1500, nil, nil, 0, avoidSocial, priority, false)
         require.True(t, ok)
         require.Equal(t, int32(8), target.ObjectID)
     }
 
     // Without the priorities the nearer gremlin wins.
     target, ok := bot.NearestAttackablePreferred(
-        1500, nil, nil, 0, false, nil)
+        1500, nil, nil, 0, false, nil, false)
     require.True(t, ok)
     require.Equal(t, int32(7), target.ObjectID)
 
@@ -417,19 +417,60 @@ func TestNearestAttackablePreferredAppliesThePriorityBias(t *testing.T) {
     })
     bot.RemoveObject(8)
     target, ok = bot.NearestAttackablePreferred(
-        1500, nil, nil, 0, false, priority)
+        1500, nil, nil, 0, false, priority, false)
     require.True(t, ok)
     require.Equal(t, int32(7), target.ObjectID)
 
     // The search radius still bounds the pick in absolute units: a
     // preferred mob beyond maxDistance never enters the contest.
-    _, ok = bot.NearestAttackablePreferred(1000, nil, nil, 0, false, priority)
-    require.True(t, ok)
-    _, ok = bot.NearestAttackablePreferred(500, nil, nil, 0, false, priority)
+    _, ok = bot.NearestAttackablePreferred(
+        1000, nil, nil, 0, false, priority, false)
     require.True(t, ok)
     _, ok = bot.NearestAttackablePreferred(
-        300, nil, []int32{7}, 0, false, priority)
+        500, nil, nil, 0, false, priority, false)
+    require.True(t, ok)
+    _, ok = bot.NearestAttackablePreferred(
+        300, nil, []int32{7}, 0, false, priority, false)
     require.False(t, ok)
+}
+
+// TestNearestAttackablePreferredAvoidsBowWielders pins the archer
+// fence of the target search: a bow wielding npc never enters the
+// pick while avoidBows is set, the melee neighbor wins the contest
+// and the fence lifts for the default search (the defensive answer
+// of an attacking archer chooses its target elsewhere).
+func TestNearestAttackablePreferredAvoidsBowWielders(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    // An orc archer at 200 units and a melee grunt at 500.
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 7, TemplateID: 1000006, Attackable: true,
+        X: 45200, Y: 50000, Z: -3500, RightHandItem: 14,
+    })
+    spawnNpcInfo(bot, 8, 1000003, 45500)
+    require.True(t, bot.ObjectUsesBow(7))
+    require.False(t, bot.ObjectUsesBow(8))
+
+    // The plain search takes the nearer archer.
+    target, ok := bot.NearestAttackablePreferred(
+        1500, nil, nil, 0, false, nil, false)
+    require.True(t, ok)
+    require.Equal(t, int32(7), target.ObjectID)
+
+    // The bow fence skips it and takes the melee grunt.
+    target, ok = bot.NearestAttackablePreferred(
+        1500, nil, nil, 0, false, nil, true)
+    require.True(t, ok)
+    require.Equal(t, int32(8), target.ObjectID)
+
+    // A ground that holds only the archer reads empty under the
+    // fence: the zone rotation must move the bot, not stall it.
+    bot.RemoveObject(8)
+    _, ok = bot.NearestAttackablePreferred(
+        1500, nil, nil, 0, false, nil, true)
+    require.False(t, ok)
+    require.False(t, bot.ZoneHasPickableWindowed(nil, 0, 0, nil, true))
+    require.True(t, bot.ZoneHasPickableWindowed(nil, 0, 0, nil, false))
 }
 
 func TestNearestNpcByTemplatesPicksTheClosest(t *testing.T) {

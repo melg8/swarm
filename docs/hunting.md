@@ -433,6 +433,24 @@ established behavior, and an archer add in a mixed fight does not
 switch the layer off. A natural-weapon mob (right hand 0) is not an
 archer.
 
+The same owner rule fences the archers out of the INITIATION
+(`avoidBowTargets`, threaded into the constrained target search as
+`avoidBows`): a bow profile never picks a bow-wielding mob as a fresh
+hunt target, while an archer that attacks the character is still
+answered through the attacker scan (`attackerEngageable`, the
+defensive flow of the tick top). The fence exists because the
+standing trade is a break-even race a low level archer loses the
+moment a melee add joins: the 2026-11-09 22:42 acceptance run picked
+a level 8 Kaboo Orc Archer, traded 19-31 damage shots at 385 units
+for a minute (203 HP template against the 214 HP character kept
+alive by potions), then a Grunt added and the two-mob pile-up fired
+the emergency logout at 52 percent health - not a death, but a
+session drop the survives check counts as a failure. The fence also
+marks the skipped archer in the no-pick diagnostic ("bow wielder
+(the archer trade is avoided)") and makes an archer-only ground read
+empty, so the zone rotation moves the bot instead of leaving it in a
+square it will never initiate in.
+
 The state machine of one kite step (the tick ladder of the fighting
 branch, loop.go - the kite sits after the engage/reposition rungs and
 before the impending-add step):
@@ -922,6 +940,59 @@ kite steps, 0 cornered holds, the minimum HP at 78 percent and the
 minimum quiver at 593 arrows; run 6 reproduced the shot ->
 windup-end retreat -> pursuit chain -> re-shot cadence in the log.
 Both runs passed every check of the scenario.
+
+### The disengage of the losing fight (the run-7 finding)
+
+The lost-target gate of the tick top (`losingFight`: the health
+under `escapeHealthPercent`, 25, or a 25 percent health lead of the
+target over a hurt character) used to skip the archer kite
+(`!l.kiteOwnsRetreat()`), because at the time the drop handed the
+melee flee fan a zone box the kite ground had already left. The
+run-3 round then added the straight `kiteFleeThreat`, which answers
+exactly that scene, so the suppression became the death path: the
+5-minute run 7 of 2026-11-09 died at +223s inside a two-mob pile-up
+at the Green Dryad boundary with the HP falling 100 -> 69 -> 32 ->
+21 percent while the pursuit chain kept walking at 14-38 units and
+the critical-HP logout (12 percent) never saw a tick under its
+line. The gate now drops the fight for the kite too - the targetless
+flight is the escape, and the pile-up run and the critical-HP logout
+keep their own gates above it. The updated test
+(`TestKiteDisengagesTheLosingFight`) pins the drop and the straight
+flight at 20 percent health, no logout above 12 percent.
+
+### The standing-sample band verdict (the run-8 finding)
+
+The acceptance range check latches the farthest fight distance from
+the tracker samples, and a walking sample is not a standing fight:
+a retreat leg deliberately opens 700-900 units from the lagging
+chaser, so the run-8 window measured a 796 unit "fight" on a 780
+ceiling while every retreat step was healthy. `archerKiteSample`
+now carries the `walking` flag (`Bot.SelfWalking`) and `fold` only
+latches `maxFightDist` on a standing sample - the fight/ranged
+counts keep every sample. Run 9 (5 minutes, the bow fence of the
+next section) measured 107 fight samples, 71 percent ranged, the
+farthest STANDING fight at 527 units, 19 kite steps, 0 holds, the
+minimum HP at 61 percent and the minimum quiver at 590 arrows: all
+checks green.
+
+### The bow-mob pick fence (the run-9 finding)
+
+Run 9's first 5-minute attempt before the fence (the 22:42 window)
+died the safe way: the pick selected a Kaboo Orc Archer, the
+anti-archer gate kept the kite off (correct - a ranged enemy cannot
+be outrun), the standing trade ground the HP down through potions,
+a Grunt added at +57s and the two-mob pile-up fired the emergency
+logout at 52 percent health - a session drop the survives check
+counts as a failure (no death happened; the relogin landed alive).
+The pick fence of `avoidBowTargets` (see the enemy weapon gate
+above) keeps the archer profile initiating only on melee mobs and
+turned the same 5-minute ground green on the next run: 107 samples,
+71 percent ranged, 19 steps, 0 holds, min HP 61 percent, min arrows
+590.
+
+The acceptance band verdict reads standing samples only (see the
+previous section), so the walking legs the fence redirects cannot
+fail the range check.
 
 ## Hexagon cell hunting (hunt/cell*.go, hunt/cells_elven.go)
 

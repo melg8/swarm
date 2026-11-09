@@ -120,7 +120,9 @@ func TestArcherKiteChecksCoverTheStory(t *testing.T) {
 // TestArcherKiteFoldLatchesTheTelemetry pins the pure fold: the
 // ranged samples count only the fights beyond the melee radius, the
 // minimums latch down (never up), the arrow floor forms on the first
-// answer and the offline and death flags latch once.
+// answer and the offline and death flags latch once. A walking
+// sample still counts as a fight but never latches the bow band: the
+// retreat legs open the gap past the band by design.
 func TestArcherKiteFoldLatchesTheTelemetry(t *testing.T) {
     watch := newArcherKiteWatch()
     watch = watch.fold(archerKiteSample{
@@ -135,11 +137,18 @@ func TestArcherKiteFoldLatchesTheTelemetry(t *testing.T) {
         online: true, hpPercent: 71, arrows: 430,
         fighting: true, fightDist: 140,
     })
+    // A retreat leg: the character walks, the lagging chaser leaves
+    // the band. The sample counts as a fight and a ranged one, but
+    // the band ceiling stays at the standing 420.
+    watch = watch.fold(archerKiteSample{
+        online: true, hpPercent: 70, arrows: 430,
+        fighting: true, walking: true, fightDist: 796,
+    })
     watch = watch.fold(archerKiteSample{online: true, arrows: 430,
         hpPercent: -1})
 
-    require.Equal(t, 3, watch.fightSamples)
-    require.Equal(t, 2, watch.rangedSamples)
+    require.Equal(t, 4, watch.fightSamples)
+    require.Equal(t, 3, watch.rangedSamples)
     require.InDelta(t, 420.0, watch.maxFightDist, 0.01)
     require.InDelta(t, 64.0, watch.minHP, 0.01)
     require.Equal(t, int32(430), watch.minArrows)
@@ -310,10 +319,20 @@ func TestArcherKiteSampleOfReadsTheTracker(t *testing.T) {
         TargetCount: 1,
     })
     bot.ApplyAutoAttackStart(100)
+    // The character walks a retreat leg: the position stays at the
+    // spawn (the packet start point), the destination pulls away.
+    bot.ApplyMovement(state.Movement{
+        ObjectID: 100,
+        X:        archerKiteSpawnX, Y: archerKiteSpawnY,
+        Z:     archerKiteSpawnZ,
+        DestX: archerKiteSpawnX - 500, DestY: archerKiteSpawnY,
+        DestZ: archerKiteSpawnZ,
+    })
 
     sample := archerKiteSampleOf(bot)
     require.True(t, sample.online)
     require.False(t, sample.dead)
+    require.True(t, sample.walking, "the walk broadcast reads through")
     require.True(t, sample.bowWorn)
     require.True(t, sample.quiverWorn)
     require.True(t, sample.fighting)

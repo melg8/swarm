@@ -657,6 +657,26 @@ func (l *Loop) kiteOwnsRetreat() bool {
         !l.tracker.ObjectUsesBow(l.target)
 }
 
+// avoidBowTargets reports whether the hunt target search must fence
+// bow wielding mobs out: the archer profile (the kite layer is on
+// and the bow is in hand) never INITIATES a fight with an archer.
+// The owner rule says the kite never engages against a bow enemy (a
+// ranged enemy cannot be outrun, the standing trade is the only
+// answer), and that standing trade is a break-even race this low
+// level archer loses the moment a melee add joins - the 2026-11-09
+// 22:42 acceptance run picked a level 8 Kaboo Orc Archer, traded
+// shots at 385 units for a minute (26-31 damage per arrow against a
+// 203 HP template), then a Grunt added and the two-mob pile-up fired
+// the emergency logout at 52 percent health, failing the survives
+// check without a single death. Fencing the archers out of the PICK
+// keeps the ground on the melee orcs the kite is built for; an
+// archer that attacks the character is still answered through the
+// attacker scan (attackerEngageable, the defensive flow), never
+// through this pick.
+func (l *Loop) avoidBowTargets() bool {
+    return l.kite.Enabled && l.bowEquipped()
+}
+
 // kiteEngageLevelSlack is the level gap a kiteable melee attacker
 // may sit above the character: the general pick ceiling
 // (targetMaxLevelSlack) protects the MELEE trade, where the higher

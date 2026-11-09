@@ -646,23 +646,31 @@ func TestKiteOwnsThePileUpAnswer(t *testing.T) {
         "the shot cycle owns the tick")
 }
 
-// TestKiteOwnsTheLosingFight pins the losing-fight gate of the
-// archer: a hurt bow archer below the escape threshold would have
-// dropped the fight and fled through the melee fan, trading the
-// kiting distance for a clamped escape lane. The kite keeps the
-// fight and its own retreat; the critical-HP logout stays armed.
-func TestKiteOwnsTheLosingFight(t *testing.T) {
+// TestKiteDisengagesTheLosingFight pins the death-risk gate of the
+// archer: a hurt bow archer below the escape threshold drops the
+// fight and flies the straight defensive flight. The old exemption
+// (the kite kept the fight and its own retreat) measured the death
+// in the 2026-11-09 5-minute acceptance run: the pursuit chain
+// walked while two chasers glued at 14 units, the health fell 100 ->
+// 69 -> 32 -> 21 percent and the critical-HP logout never saw a
+// tick under its 12 percent line. The flight is the targetless
+// straight leg, not the zone-clamped melee fan; the critical-HP
+// logout stays armed above it.
+func TestKiteDisengagesTheLosingFight(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
+    mobChasesSelf(bot, 7, 45200, -3500)
     hurtTo(bot, 20)
     require.True(t, loop.losingFight(),
         "20% health under the running fight is a loss verdict")
     require.True(t, loop.kiteOwnsRetreat())
 
     loop.tick()
-    require.Equal(t, int32(7), loop.target,
-        "the kite does not drop the fight")
+    require.Zero(t, loop.target,
+        "the death risk drops the fight")
     require.Zero(t, game.logouts,
         "20% health stays above the critical logout")
-    require.False(t, loop.kiteClickAt.IsZero(),
-        "the shot cycle arms the retreat instead of the flee")
+    require.NotEmpty(t, game.walks,
+        "the straight flight answers the disengage")
+    require.Less(t, game.walks[0][0], int32(45000),
+        "the flight runs away from the chaser, not through the fan")
 }

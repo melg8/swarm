@@ -4014,7 +4014,8 @@ func (l *Loop) engagesOnZoneEntry() bool {
     }
     pick, ok := l.tracker.NearestAttackablePreferred(
         attackNearestRange, zone, l.activeSkips(now),
-        l.maxTargetLevel(), true, l.zoneMobPriority)
+        l.maxTargetLevel(), true, l.zoneMobPriority,
+        l.avoidBowTargets())
     if !ok {
         return false
     }
