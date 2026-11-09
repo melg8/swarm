@@ -140,6 +140,49 @@ func TestKiteRefusalNeverReClicksTheRefusedCell(t *testing.T) {
     }
 }
 
+// TestKiteBowRetryRefusalIsNotAttributedToTheClick pins the bow
+// retry guard: an attack request the server bounced through the bow
+// disable schedules notifyActionReadyToAct one second ahead
+// (Creature.canUseRangeWeapon), so its ActionFailed lands ~1.25 s
+// later with no client request inside the tight answer window - the
+// 14:06:50 dump of the round-19 run: request at 49.013, refusal at
+// 50.263, the healthy retreat click of that moment latched as
+// "refused by the server" and burned a fan candidate.
+func TestKiteBowRetryRefusalIsNotAttributedToTheClick(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    tickPastTheWindup(loop)
+    require.Len(t, game.walks, 1)
+
+    clickAt := loop.kiteReclickAt
+    bot.ApplyOtherRequestSent(
+        clickAt.Add(-kiteBowRetryLead + 100*time.Millisecond))
+    bot.ApplyActionFailed(clickAt.Add(10 * time.Millisecond))
+
+    require.False(t, loop.kiteClickRefused(),
+        "the bow retry chain owns the failure, not the click")
+    loop.tick()
+    require.False(t, loop.kiteWalkDead,
+        "the healthy endpoint keeps its verdict")
+}
+
+// TestKiteRetreatClickRefusalStillLatches pins the other side of the
+// guard: a refusal with no action request in the retry band belongs
+// to the click and latches the dead verdict exactly as before.
+func TestKiteRetreatClickRefusalStillLatches(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    tickPastTheWindup(loop)
+    require.Len(t, game.walks, 1)
+
+    clickAt := loop.kiteReclickAt
+    // The last action request predates the retry band: the failure
+    // answers the click.
+    bot.ApplyOtherRequestSent(clickAt.Add(-5 * time.Second))
+    bot.ApplyActionFailed(clickAt.Add(10 * time.Millisecond))
+
+    require.True(t, loop.kiteClickRefused(),
+        "a click refusal with no retry in flight still latches")
+}
+
 // TestKiteSilentProbeRotatesTheDeadEndpoint pins the silent probe:
 // a walk unanswered past the probe age (no ActionFailed, no movement
 // broadcast - the H-006 silent drop signature) names the endpoint

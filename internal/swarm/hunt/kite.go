@@ -419,6 +419,16 @@ const (
     // healthy endpoints away (the local acceptance round caught
     // exactly that cascade before the tightening).
     kiteRefusalAnswerWindow = 250 * time.Millisecond
+    // kiteBowRetryLead is the look-back band of the bow retry: an
+    // attack request the server refused during the bow disable
+    // schedules notifyActionReadyToAct one second ahead
+    // (Creature.canUseRangeWeapon), and the retry's ActionFailed
+    // lands with no client request inside the tight answer window -
+    // the 14:06:50 dump of the round-19 run shows the chain: the
+    // attack request at 49.013, the refusal at 50.263 (1.25 s, the
+    // schedule plus the tick granularity). An action request inside
+    // the band owns that failure, never the retreat click.
+    kiteBowRetryLead = 1350 * time.Millisecond
     // kiteBowReuseDelay is the reuse delay of the bow family the
     // fleet shoots (the C1 item data: the Short Bow and the D-grade
     // bows carry 1500, dist/game/data/stats/items - the value feeds
@@ -1544,9 +1554,25 @@ func (l *Loop) kiteClickRefused() bool {
     // (the Windows timer granularity - the live server answers inside
     // the same millisecond), so the correlation starts at the click
     // moment inclusive instead of strictly after it.
-    return !failedAt.Before(l.kiteReclickAt) &&
-        failedAt.Sub(l.kiteReclickAt) <= kiteRefusalAnswerWindow &&
-        !l.tracker.OtherRequestBetween(l.kiteReclickAt, failedAt)
+    if failedAt.Sub(l.kiteReclickAt) > kiteRefusalAnswerWindow {
+        return false
+    }
+    if failedAt.Before(l.kiteReclickAt) {
+        return false
+    }
+    if l.tracker.OtherRequestBetween(l.kiteReclickAt, failedAt) {
+        // An action request rides the answer window itself.
+        return false
+    }
+
+    // The bow retry chain: an attack request the server bounced
+    // through the bow disable answers ActionFailed about a second
+    // later (Creature.canUseRangeWeapon schedules the retry), far
+    // outside the tight window of the click. Attributing that chain
+    // to the retreat click latched a refusal on a healthy endpoint
+    // and rotated the lane away (the 14:06:50 dump).
+    return !l.tracker.OtherRequestBetween(
+        failedAt.Add(-kiteBowRetryLead), l.kiteReclickAt)
 }
 
 // kiteRotateDeadEndpoint rotates the dead endpoint of the ladder

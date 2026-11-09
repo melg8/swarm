@@ -173,8 +173,23 @@ archer-kite re-check.
 - Tests: `TestFleeLogsOutWhenTheChaserKeepsPace`,
   `TestEscapeClosureWatchdogReanchorsOnAnOpeningGap`.
 
+### 2026-11-09 - hunt: keep the bow retry out of the kite verdict
+
+- `kiteClickRefused` adds the retry look-back band
+  (`kiteBowRetryLead`, 1350 ms): an action request sent inside it owns
+  the `ActionFailed`, because the server schedules
+  `notifyActionReadyToAct` one second after a bounced attack request
+  (`Creature.canUseRangeWeapon`) and the retry's refusal lands far
+  outside the tight click window.
+- Evidence: the 14:06:50 dump of the failed run - attack request at
+  49.013, `ActionFailed` at 50.263, the retreat click of that moment
+  logged as "refused by the server" and a fan candidate burned; the
+  same click was accepted on the re-issue 250 ms later.
+- Tests: `TestKiteBowRetryRefusalIsNotAttributedToTheClick`,
+  `TestKiteRetreatClickRefusalStillLatches`.
+
 ## Status
 
-In progress: fixes 1-5 landed; fix 6 (bow-retry refusal
-misattribution) next.
+In progress: all six fixes landed; the package verification, the
+live `temp18` re-check and the push remain.
 
