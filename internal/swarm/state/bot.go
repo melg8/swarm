@@ -609,6 +609,14 @@ type Bot struct {
     // loop folds them back in on every fresh session, because an
     // emergency logout ends the loop instance that counted it.
     dangerSpots []DangerSpot
+    // deathCell names the hunting cell the last death regression
+    // left, deathCellAt the moment it happened. The cell heat lives
+    // in the per-session hunt loop, which the supervisor rebuilds on
+    // every relogin (see runBot); the tracker outlives the sessions,
+    // so the resume handoff of the next loop can refuse the deadly
+    // ground the login landed on until the heat cools.
+    deathCell   string
+    deathCellAt time.Time
     // metrics holds the lifetime statistics counters of the tracker
     // (see metrics.go): the kills, deaths, sessions, swings and
     // damage of the whole deployment history of the bot, surviving
@@ -1437,6 +1445,33 @@ func (b *Bot) DangerSpots(window time.Duration) []DangerSpot {
     }
 
     return spots
+}
+
+// SetDeathRegression records the hunting cell the loop regressed
+// away from after a death (the emergency logout counts as one
+// through the same cell note). The cell bookkeeping itself lives in
+// the per-session hunt loop, which the supervisor rebuilds on every
+// relogin; the tracker outlives the sessions, so the fresh loop
+// reads this record before it resumes a ground the login landed on
+// and refuses the deadly cell until the heat cools.
+func (b *Bot) SetDeathRegression(cellID string) {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    b.deathCell = cellID
+    b.deathCellAt = time.Now()
+    b.touch()
+}
+
+// DeathRegression returns the cell id of the last recorded death
+// regression and the moment it happened (an empty id when none was
+// recorded). The caller applies its own cool down window: the heat
+// of the cell decays with the death half-life, the record only
+// carries the fact.
+func (b *Bot) DeathRegression() (string, time.Time) {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.deathCell, b.deathCellAt
 }
 
 // SetEmergencyLogout records the honest reason of the intentional

@@ -69,6 +69,12 @@ const (
     // net for a ground that stays empty even when ripe (another
     // hunter's farm, a wiped spawn).
     cellStarveCooldown = 5 * time.Minute
+    // cellDeathRegressionWindow is how long the recorded death
+    // regression refuses the ground the login landed on: the death
+    // heat halves every cellDeathHalfLifeMin (cell_metrics.go), so
+    // half a half-life keeps the fresh bite off the resume handoff
+    // while a ground the character outgrew reopens on its own.
+    cellDeathRegressionWindow = 15 * time.Minute
     // cellWindowFloorSlack is the level distance below the character
     // that still pays full adena (mob level + 8, the C1 drop penalty
     // edge): mobs below the floor never enter a fight.
@@ -294,6 +300,7 @@ func (l *Loop) cellEvaluate(now time.Time) {
         if hunter.applyPinnedCell(l, level, now) {
             return
         }
+        skip := -1
         if x, y, _, ok := l.tracker.SelfPosition(); ok {
             hunter.selfX, hunter.selfY, hunter.selfKnown = x, y, true
             if ground, onGround := hunter.standingGround(x, y); onGround {
@@ -302,17 +309,35 @@ func (l *Loop) cellEvaluate(now time.Time) {
                 // re-contesting the economy - the position IS the
                 // intent (the emergency logout left it where the
                 // panic run ended, on the ground it had just walked
-                // to).
-                hunter.apply(l, ground, now)
+                // to). The handoff must not resurrect the ground
+                // that just killed the character: the per-cell heat
+                // dies with the loop instance, so the tracker record
+                // of the death regression outlives the relogin and
+                // refuses the resume until the heat cools.
                 cell := hunter.cells[ground]
-                l.logger.Printf("Hunt: level %d: resuming the "+
-                    "cell %s - the login landed on its ground",
-                    level, cell.Name)
+                if age, deadly := l.deathRegression(cell.ID, now); deadly {
+                    l.logger.Printf("Hunt: level %d: not resuming "+
+                        "the cell %s - the death regression stands "+
+                        "(%.0fs ago)", level, cell.Name,
+                        age.Seconds())
+                    skip = ground
+                } else {
+                    hunter.apply(l, ground, now)
+                    l.logger.Printf("Hunt: level %d: resuming the "+
+                        "cell %s - the login landed on its ground",
+                        level, cell.Name)
 
-                return
+                    return
+                }
             }
         }
-        best, _ := hunter.pickGlobal(-1, now)
+        best, _ := hunter.pickGlobal(skip, now)
+        if best < 0 {
+            // The registry holds no alternative (a single cell or a
+            // window that left only the deadly ground): standing
+            // there beats walking nowhere, the heat still prices it.
+            best, _ = hunter.pickGlobal(-1, now)
+        }
         if best >= 0 {
             hunter.apply(l, best, now)
             cell := hunter.cells[best]
@@ -433,6 +458,19 @@ func (h *cellHunter) followGround(l *Loop, now time.Time) {
     }
     ground := h.groundOf(x, y)
     if ground < 0 || ground == h.picked {
+        return
+    }
+    if _, deadly := l.deathRegression(h.cells[ground].ID, now); deadly {
+        // The character stands on the ground its last death
+        // regressed away from (a fresh login after the emergency
+        // logout keeps the panic run position): following it would
+        // undo the regression the economy just made. The record
+        // lives in the tracker because the loop instance does not
+        // survive the relogin.
+        h.followAt = now
+        l.logger.Printf("Hunt: not following the standing ground "+
+            "%s - the death regression stands", h.cells[ground].Name)
+
         return
     }
     if !cellEligible(h.cells[ground], h.level) ||
@@ -866,6 +904,25 @@ func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
     }
 }
 
+// deathRegression reports whether the cell carries a fresh death
+// regression recorded by the tracker (the per-cell heat itself dies
+// with the session's loop instance). The age is returned for the
+// caller's log; a lapsed record reopens the ground.
+func (l *Loop) deathRegression(
+    cellID string, now time.Time,
+) (time.Duration, bool) {
+    deadly, at := l.tracker.DeathRegression()
+    if deadly == "" || deadly != cellID {
+        return 0, false
+    }
+    age := now.Sub(at)
+    if age >= cellDeathRegressionWindow {
+        return 0, false
+    }
+
+    return age, true
+}
+
 // cellNoteDeath counts a hunting death against the current cell: the
 // death heat rises (the safety score of the ground decays with it,
 // per cell - never the whole band), and the regression re-pick fires
@@ -884,6 +941,12 @@ func (l *Loop) cellNoteDeath(now time.Time) {
     metric.deaths++
     metric.deathCount++
     metric.lastDeathAt = now
+    // The record survives the session: the supervisor rebuilds the
+    // loop on every relogin, and without it the fresh loop resumes
+    // the very ground the character just died on (the 14:03:18
+    // temp18 dump: 8 regressions overridden by 8 resumes in 10
+    // minutes). The emergency logout counts through the same note.
+    l.tracker.SetDeathRegression(cell.ID)
     l.logger.Printf("Hunt: death at the cell %s (heat %.1f)", cell.Name,
         metric.deaths)
     // The fresh heat crushed the score of the ground: re-pick when

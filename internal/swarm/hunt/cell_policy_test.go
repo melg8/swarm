@@ -323,6 +323,51 @@ func TestCellDeathHeatRegresses(t *testing.T) {
     require.InDelta(t, heatNow*0.5, heatLater, 1e-6)
 }
 
+// TestCellResumeRefusesTheDeathRegression pins the relogin handoff
+// gate: the fresh loop of the next session stands on the ground the
+// death regression left and must take the global alternative instead
+// of resurrecting the deadly cell (the 14:03:18 temp18 dump ran 8
+// regressions overridden by 8 resumes in ten minutes).
+func TestCellResumeRefusesTheDeathRegression(t *testing.T) {
+    bot := cellTestBot(t)
+    bot.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 46112, Y: 41500, Z: -3400,
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetHuntingCells(testCells())
+    t.Cleanup(func() {
+        if loop.cell != nil && loop.cell.leave != nil {
+            loop.cell.leave()
+        }
+    })
+    bot.SetDeathRegression("test-home")
+    loop.tick()
+    require.Equal(t, "test-rich", loop.zonePickedID,
+        "the deadly ground is not resumed")
+}
+
+// TestCellResumeKeepsTheStandingGround is the control of the gate: a
+// death regression of ANOTHER cell does not block the standing
+// handoff.
+func TestCellResumeKeepsTheStandingGround(t *testing.T) {
+    bot := cellTestBot(t)
+    bot.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 46112, Y: 41500, Z: -3400,
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetHuntingCells(testCells())
+    t.Cleanup(func() {
+        if loop.cell != nil && loop.cell.leave != nil {
+            loop.cell.leave()
+        }
+    })
+    bot.SetDeathRegression("test-rich")
+    loop.tick()
+    require.Equal(t, "test-home", loop.zonePickedID)
+}
+
 func TestCellTrustedZeroIncomeScoresZero(t *testing.T) {
     _, _, hunter := pickedCellLoop(t)
     // A starved ground (minutes of active time, no adena, no kills)

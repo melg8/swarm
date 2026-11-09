@@ -1115,3 +1115,26 @@ func TestLoginCooldownSpansSessions(t *testing.T) {
     bot.loginCooldownUntil = time.Now().Add(-time.Second)
     require.Zero(t, bot.LoginCooldownRemaining(), "a lapsed cooldown is zero")
 }
+
+// TestDeathRegressionSpansSessions pins the death regression record:
+// the per-cell heat dies with the session's hunt loop, so the tracker
+// carries the deadly cell across the relogin and the fresh loop
+// refuses to resume it.
+func TestDeathRegressionSpansSessions(t *testing.T) {
+    bot := NewBot("acc1")
+    cell, at := bot.DeathRegression()
+    require.Empty(t, cell)
+    require.True(t, at.IsZero())
+
+    before := time.Now()
+    bot.SetDeathRegression("elven-hex-104")
+    cell, at = bot.DeathRegression()
+    require.Equal(t, "elven-hex-104", cell)
+    require.False(t, at.Before(before))
+
+    bot.ResetSession()
+    cell, at = bot.DeathRegression()
+    require.Equal(t, "elven-hex-104", cell,
+        "the regression survives the session reset")
+    require.False(t, at.Before(before))
+}
