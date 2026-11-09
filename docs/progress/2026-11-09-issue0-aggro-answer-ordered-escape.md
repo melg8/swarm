@@ -108,3 +108,71 @@ Watch `logs/session-*.jsonl` of the running `temp10` bot for the
 `aggroed on the approach` line, an ordered escape (lanes at
 0/±45/±90 degrees, no fold back through the chaser) and the loot
 interrupt; then archive this fragment.
+
+## Live round 2026-11-09 13:13 (the temp18 acceptance dump)
+
+The dump came from the `archer-kite` acceptance scenario (bot
+`temp18`, `kind: acceptance`, PID 5168), build abde9178 - the fleet
+bots test1-test3 in the same process stayed healthy. Two independent
+problems show in the log
+(`logs/acceptance/archer-kite-20261109-131027-5168-3.log`).
+
+### The acceptance runner leaks one hunt loop per relogin
+
+`runSession` starts `go loop.Run(ctx)` on the SUPERVISOR context
+(`internal/swarm/acceptance/runner.go`, the line after
+`wireSessionLoop`), and `runSessionSupervised` reconnects with that
+same context. Every emergency logout/relogin therefore leaves the
+previous loop ticking against the closed `GameClient`.
+
+Evidence: 226 `use of closed network connection` lines, every
+decision printed twice after the 13:11:49 relogin (`target ... does
+not engage` and `is on us` pairs at 13:12:19/13:12:20 and later),
+two independent pursuit counters interleaved (`step 33 of 12` next
+to `step 1 of 12`, `step 93 of 12` later), and the same target
+declared dead at 13:11:49 and shot at two seconds later. The
+stale loops also overwrite the shared tracker diagnostics, so the
+dump mixes two loops' views (the target hp and the 0-damage swing
+of the dump are not trustworthy).
+
+Fix: per-session `context.WithCancel` plus a wait for the loop
+goroutine, exactly the `runBot` pattern of `cmd/swarm/main.go`.
+
+### The archer kite starves the bow in the walled pocket
+
+The level-7 archer (speed 144) fights a level-7 Kaboo Orc Grunt
+(speed 110) on the elven ground. The re-shot gate
+(`kiteReshotFloor = 480`) assumes the retreat can open 480 units
+before the next windup; the walled hemisphere and the repeated
+`clearance lane` breaks keep the achieved gap at 300-450, so the
+bot walks for a minute at a time and fires only when the cornered
+hold answers.
+
+Evidence: 600 arrows at 13:10:31, 594 at the 13:13:08 dump, about
+20 shots in the first 5.5 minutes against a ~3 s bow cycle; no shot
+between 13:12:05 and 13:13:08 (63 s of pursuit steps); `the pursuit
+race ... at parity (2 stalled windows)` repeatedly; 8 walled
+hemisphere breaks; `12 walks without a shot` crossed and continued
+by design (the round-14 always-run rule); the only damage in the
+drought comes from the 13:13:09/13:13:12 cornered hold (20 + 51).
+
+The 12 s `does not engage` timeout then drops the target (the
+`FightingTargetID` freshness lapses during the shot drought) and
+the aggro answer re-picks it, which is the 12-13 s `does not
+engage` -> `is on us` churn (13:11:02, :14, :27, :39).
+
+Fix direction: drive the cornered hold from the stall ledger (the
+gap not growing for N windows AND the hemisphere walled), not only
+from the full six-ray cone exhaustion; and keep the fight clock
+anchored while the target is still attacking the character instead
+of dropping it every 12 s.
+
+### The fixes of this task did fire
+
+`13:11:53 Kaboo Orc Grunt aggroed on the approach, answering it
+first` and `13:09:43 no escape lane opens from the chase, resetting
+the aggro via logout` are the new aggro answer and the ordered
+escape working on the live round. The kills are slow and the
+character still dies/logs out in that pocket (HP 57 %, the
+relogin lands on the same cell and the same grunt re-aggros), so
+the acceptance-runner leak and the kite drought stay open.
