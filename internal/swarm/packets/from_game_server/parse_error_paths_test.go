@@ -459,7 +459,9 @@ func buildNpcInfoData() []byte {
     data = putFloat64(data, 1.1)
     data = append(data, make([]byte, npcInfoAtkSpeedTail)...)
     data = putFloat64(data, 12)
-    data = append(data, make([]byte, npcInfoBodyTail)...)
+    data = append(data, make([]byte, npcInfoHeightLead)...)
+    data = putInt32(data, 0) // right hand: natural weapon
+    data = append(data, make([]byte, npcInfoEquipmentTail)...)
     data = append(data, 1, 0, 1, 0, 0) // running, dead flags
     data = append(data, utf16("Gremlin")...)
     data = append(data, utf16("")...)

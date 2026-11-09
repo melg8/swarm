@@ -24,9 +24,12 @@ const (
     // npcInfoAtkSpeedTail skips the attack speed multiplier between
     // the move multiplier and the collision radius.
     npcInfoAtkSpeedTail = 8
-    // npcInfoBodyTail skips the collision height and the equipment
-    // ints between the collision radius and the flag bytes.
-    npcInfoBodyTail = 20
+    // npcInfoHeightLead skips the collision height between the
+    // collision radius and the right hand equipment id.
+    npcInfoHeightLead = 8
+    // npcInfoEquipmentTail skips the chest and left hand equipment
+    // ids after the right hand weapon id.
+    npcInfoEquipmentTail = 8
 )
 
 // NpcInfoPacket describes one npc around the character.
@@ -34,7 +37,7 @@ const (
 // [objectId: 4][templateId: 4][isAttackable: 4][x: 4][y: 4][z: 4]
 // [heading: 4][unknown: 4][mAtkSpd: 4][pAtkSpd: 4][runSpd: 4][walkSpd: 4]
 // [swim/fly speeds: 32][moveMultiplier: 8][attackSpeedMultiplier: 8]
-// [collisionRadius: 8][collisionHeight: 8][equipment: 12]
+// [collisionRadius: 8][collisionHeight: 8][rhand: 4][chest: 4][lhand: 4]
 // [nameAbove: 1][running: 1][inCombat: 1][alikeDead: 1][summoned: 1]
 // [name: str][title: str].
 type NpcInfoPacket struct {
@@ -49,11 +52,14 @@ type NpcInfoPacket struct {
     WalkSpeed       int32
     MoveSpeedMult   float64
     CollisionRadius float64
-    Running         bool
-    InCombat        bool
-    Dead            bool
-    Name            string
-    Title           string
+    // RightHandItem is the template rhand item id: the weapon the
+    // npc carries (the elven sentinels carry the Elven Bow, id 276).
+    RightHandItem int32
+    Running       bool
+    InCombat      bool
+    Dead          bool
+    Name          string
+    Title         string
 }
 
 // NewNpcInfoPacket creates a zero valued packet ready for parsing.
@@ -70,6 +76,7 @@ func NewNpcInfoPacket() *NpcInfoPacket {
         WalkSpeed:       0,
         MoveSpeedMult:   0,
         CollisionRadius: 0,
+        RightHandItem:   0,
         Running:         false,
         InCombat:        false,
         Dead:            false,
@@ -120,8 +127,15 @@ func ParseNpcInfoPacket(p *NpcInfoPacket, data []byte) error { //nolint:cyclop
     if err != nil {
         return fmt.Errorf("failed to read npc collision radius: %w", err)
     }
-    if err := reader.Skip(npcInfoBodyTail); err != nil {
+    if err := reader.Skip(npcInfoHeightLead); err != nil {
         return fmt.Errorf("not enough bytes for npc fields: %w", err)
+    }
+    p.RightHandItem, err = reader.ReadInt32()
+    if err != nil {
+        return fmt.Errorf("failed to read npc right hand item: %w", err)
+    }
+    if err := reader.Skip(npcInfoEquipmentTail); err != nil {
+        return fmt.Errorf("not enough bytes for npc equipment: %w", err)
     }
 
     var flags [5]int8

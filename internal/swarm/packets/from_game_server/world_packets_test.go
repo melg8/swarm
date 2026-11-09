@@ -28,7 +28,9 @@ func TestParseNpcInfoPacket(t *testing.T) {
         data = putFloat64(data, 1.15) // move multiplier
         data = append(data, make([]byte, npcInfoAtkSpeedTail)...)
         data = putFloat64(data, 10) // collision radius
-        data = append(data, make([]byte, npcInfoBodyTail)...)
+        data = append(data, make([]byte, npcInfoHeightLead)...)
+        data = putInt32(data, 276) // right hand: Elven Bow
+        data = append(data, make([]byte, npcInfoEquipmentTail)...)
         data = append(data, 1, 1, 0, 1, 0) // flags: running, dead
         data = append(data, utf16("Keltir")...)
         data = append(data, utf16("")...)
@@ -46,6 +48,7 @@ func TestParseNpcInfoPacket(t *testing.T) {
         require.Equal(t, int32(165), p.RunSpeed)
         require.Equal(t, int32(55), p.WalkSpeed)
         require.InDelta(t, 1.15, p.MoveSpeedMult, 0.0001)
+        require.Equal(t, int32(276), p.RightHandItem)
         require.True(t, p.Running)
         require.False(t, p.InCombat)
         require.True(t, p.Dead)

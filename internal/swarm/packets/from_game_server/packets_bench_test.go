@@ -100,7 +100,9 @@ func buildNpcInfoPayload() []byte {
     data = putFloat64(data, 1.15)
     data = append(data, make([]byte, npcInfoAtkSpeedTail)...)
     data = putFloat64(data, 10)
-    data = append(data, make([]byte, npcInfoBodyTail)...)
+    data = append(data, make([]byte, npcInfoHeightLead)...)
+    data = putInt32(data, 14) // right hand: Bow
+    data = append(data, make([]byte, npcInfoEquipmentTail)...)
     data = append(data, 1, 1, 0, 0, 0)
     data = append(data, utf16("Keltir")...)
     data = append(data, utf16("Lv 1")...)
