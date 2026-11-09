@@ -458,12 +458,13 @@ before the impending-add step):
 - The admission (kiteStepAdmitted): the bow must be equipped and a
   fight target held; the shared movement window must be free (a
   running step or an impending-add walk owns it, combatAvoidUntil);
-  the kite pacing must have aged out (kiteStepPeriod, 3s - the cycle
-  spends the step window walking and the rest standing and shooting,
-  the period bounds the walking share from above); and the streak
-  limit must not be spent (kiteStreakLimit, 8 consecutive steps per
-  target - a fresh target resets the streak, the distance race of one
-  mob is not the race of the next).
+  and the kite pacing must have aged out (kiteStepPeriod, 3s - the
+  cycle spends the step window walking and the rest standing and
+  shooting, the period bounds the walking share from above). The
+  streak counter (kiteStreakLimit, 8 consecutive steps per target;
+  a fresh target resets it) is a DIAGNOSTIC threshold, never a
+  gate - the unwinnable-race line lands once per crossing and the
+  retreat keeps running.
 - The threat (kiteThreat): the fight target or the nearest projected
   attacker (the NearestAttacker scan), whichever sits closer - a mob
   on a deck the walk cannot reach (the z gap past deckReachableZ) is
@@ -481,12 +482,14 @@ before the impending-add step):
   and the 250 unit trigger margin absorbs the broadcast lag.
 - The lane (kiteRetreatLane): the STRAIGHT ray of kiteTrainDirection
   as the primary direction (the owner rule of the 2026-11-09 round).
-  The leg length is race-aware (kiteStepLength: the plain kiteStep
-  above the re-shot floor, the deficit bought back at the parity rate
-  under it, capped by kiteRaceStepMax) and ring-budgeted
-  (kiteStraightLeg: the endpoint stays on the ring - kiteRoamRadius *
-  kiteRingLeashShare = 972 units around the fight anchor, the
-  target's stand - with kiteMinStep as the shortest hop). The lane
+  The leg is the plain `kite.Step` (400) - the shot-cycle contract of
+  the same round removed the race-length formula: the walk is cut at
+  the bow disable end by the next shot, so a longer leg would only
+  name a longer line the character never finishes - and it is
+  ring-budgeted (kiteStraightLeg: the endpoint stays on the ring -
+  kiteRoamRadius * kiteRingLeashShare = 972 units around the fight
+  anchor, the target's stand - with kiteMinStep as the shortest hop).
+  The lane
   runs the gate battery (kiteLaneResolve): the fight leash
   (kiteRoamRadius around the anchor), the away half-plane (the lane
   unit's retreat component under kiteHalfPlaneSlack, -0.05), the
@@ -507,12 +510,15 @@ before the impending-add step):
   turn only spends the distance where there was no straight walk to
   spend.
 - The step: the window is stamped (combatAvoidUntil = now +
-  kiteStepWindow 2s + kiteReengageDelay 0, scaled up to the walked
-  leg by kiteIssueWalk), the streak counts up, the log line lands
-  ("kiting clear (step N of 8)"), and the walk issues. The forced
-  attack re-requests of the engage branch wait out the window - the
-  re-engage knob (kiteReengageDelay, 0 today: the window end IS the
-  re-engage) is pinned for the live tuning round of #29.
+  kiteWalkWindow + kiteReengageDelay 0 - the C1 bow disable window,
+  the fallback kiteStepWindow 2s), the streak counts up, the log line
+  lands ("kiting clear (step N of 8)"), and the walk issues. The
+  forced attack re-requests of the engage branch wait out the window -
+  the re-engage knob (kiteReengageDelay, 0 today: the window end IS the
+  re-engage) is pinned for the live tuning round of #29. The walk
+  window is NOT scaled by the leg length: the window end is the bow
+  disable end where the next shot owns the tick, whatever distance
+  the character covered meanwhile.
 
 The fallbacks, in the order the machine meets them:
 
@@ -558,7 +564,7 @@ are references, not copies):
 |---|---|---|
 | `kiteRetreatRadius` | 250.0 | the trigger distance and the inner edge of the optimal band |
 | `kiteStep` | 400.0 | the retreat length, sized so the distance after the step lands back inside the band |
-| `kiteStepWindow` | 2s | the movement window the step owns (the re-request pause) |
+| `kiteStepWindow` | 2s | the movement window fallback (the bow disable window of the live pAtkSpd wins) |
 | `kiteReengageDelay` | 0 | the hold between the walk end and the first re-request |
 | `kiteStepPeriod` | 3s | the step pacing - bounds the walking share of the cycle |
 | `kiteStreakLimit` | 8 | the consecutive step bound per target, then the fight |
@@ -566,7 +572,6 @@ are references, not copies):
 | `kiteEncircleShare` | 0.3 | the encirclement threshold (hold and shoot through) |
 | `kiteMinStep` | 250.0 | the shortest retreat hop the ring budget may leave |
 | `kiteRingLeashShare` | 0.72 | the straight leg's cap as a share of the roam radius (the 972 unit ring) |
-| `kiteRaceStepMax` | 1700.0 | the cap of the race leg (the roam radius of three bow engage radii) |
 | `kiteHalfPlaneSlack` | -0.05 | the away half-plane guard (no fold-back into the train) |
 | `kiteHoldLogPeriod` | 15s | the cornered hold diagnostic pacing |
 | `kiteShotWindow` | 700ms | the freshness window of the own-shot broadcast that arms the shot-paced retreat |
@@ -575,9 +580,7 @@ are references, not copies):
 | `kiteProbeElapsed` | 1.2s | the silent-verdict age of the walk (past the movement broadcast gate - the H-006 signature) |
 | `kiteRefusalAnswerWindow` | 1s | the round-trip window of the ActionFailed attribution |
 | `kiteBowReuseDelay` | 1500 | the reuse delay of the bow family (the C1 item data) feeding the walk window formula |
-| `kiteReshotFloor` | 480.0 | the distance the re-shot waits for: below it the retreat owns the cycle |
-| `kitePursuitContext` | 12s | the freshness bound of the pursuit chain (a respawned same-id mob starts its own) |
-| `kitePursuitStreakLimit` | 12 | the runaway diagnostic of the pursuit chain (never a stop) |
+| `kiteWindupLead` | 150ms | the safety lead past the windup end before the deferred retreat clicks |
 | `kiteEngageLevelSlack` | 5 | the level gap the kite answers a melee attacker above the character |
 
 ### The shot-paced retreat (issue #60)
@@ -640,15 +643,19 @@ The telemetry marker of the layer: the step line reads "shot
 released on <target>, hostile <id> holds <dist> units, kiting the
 reload".
 
-The telemetry anchors: the step line ("kiting clear (step") and the
-hold line ("holding ground and shooting") are the two markers the
-archer acceptance scenario counts (acceptance/archer_kite.go, the
-ranged farm contract of issue #28) - the scenario asserts the same
-contract this section documents: the fight samples stay at
-the bow radii (the ranged share of the samples), the kite lines
-narrate the retreats, the online status and the HP hold through the
-window, and the arrow stock never empties (the restock gates of the
-gear plan feed the quiver).
+The telemetry anchors: the step line ("kiting clear (step"), the
+shot-cycle line ("kiting the reload"), the hold line ("holding
+ground and shooting") and the kill line ("died, looting") are the
+markers the archer acceptance scenario counts
+(acceptance/archer_kite.go, the ranged farm contract of issue #28).
+The scenario asserts the same contract this section documents: the
+same-fight shot gaps sit inside the C1 bow cooldown (the shots
+follow the reload, not the old 20-30 s treadmill), the STANDING
+fight samples stay inside the bow band (the retreat legs
+legitimately open wider), the kite lines narrate repeated retreats,
+the fights resolve (one kill per two minutes at least), the online
+status and the HP hold through the window, and the arrow stock
+never empties (the restock gates of the gear plan feed the quiver).
 
 ### The re-click ladder of the kite walk (issues #60, rounds two and three)
 
@@ -755,7 +762,7 @@ parameter change of the round arrives with its before/after row.
 | kill rate | - | - | - |
 | death rate | - | - | - |
 
-### The straight race leg (issue #70, rounds 17-19; the 2026-11-09 owner rework)
+### The straight retreat leg (issue #70, rounds 17-19; the 2026-11-09 owner rework)
 
 The round-17/18 live verdicts replaced the window-sized shuffle with a
 continuous race the shot cycle rides (the full record lives in
@@ -766,12 +773,13 @@ when the chaser's speed sits close to the character's, a turn spends
 the distance the retreat just bought, so the leg runs straight away
 from the train and the archer shoots the moment the bow is ready.
 
-- The RACE leg (`kiteStepLength`): inside the re-shot floor (480) the
-  straight leg runs `kiteStep + (floor - dist) * kiteRaceFactor` - the
-  deficit bought back at the parity exchange rate of the chase - capped
-  at `kiteRaceStepMax` (1700). The leg arrives back AT the floor, so
-  the arrival shot (or the re-request at the window end) is the ONE
-  shot of the cycle, fired from the safe distance.
+- The LEG is the plain `kite.Step` (400): the shot-cycle contract of
+  the round removed the race-length formula (`kiteStepLength`, the
+  re-shot floor and the parity exchange rate). The walk is cut at the
+  bow disable end by the forced attack that fires the next shot, so a
+  longer leg would only name a line the character never finishes; the
+  400 unit endpoint keeps the line of the retreat and the arrival
+  geometry of a genuinely completed walk.
 - The STRAIGHT LANE (`kiteStraightLeg`): the leg direction is the
   away-ray of the whole chaser train and nothing else. The endpoint
   stays on the fight's ring - `kiteRoamRadius * kiteRingLeashShare` =
@@ -788,17 +796,17 @@ from the train and the archer shoots the moment the bow is ready.
   fence-edge hold). The opening straight leg budgets against the ring
   around the mob's stand (`kiteStraightLeg`), so the fight opens on
   the ring it keeps.
-- The WINDOW scales with the walked leg at the per-unit pace of the
-  bow disable formula (`kiteIssueWalk`): a 722-unit opening leg at the
-  Short Bow pAtkSpd 337 holds the movement ~5.4s, the fallback 2s
-  window giving ~3.6s - the leg runs to its endpoint before anything
-  else owns the movement.
+- The WINDOW is the bow disable window and NOT scaled by the walked
+  leg (`kiteIssueWalk`): the C1 formula at the live pAtkSpd (roughly
+  2.97s for the Short Bow at 337, the fallback 2s) ends exactly where
+  the forced attack fires the next shot, so the window end and the
+  re-shot are the same moment whatever distance the walk covered.
 - The ARRIVAL (`kiteReclickWalk`): a stand within `kiteArrivalEpsilon`
-  (100) of the endpoint completes the leg, the walk's own
-  `combatAvoidUntil` hold ends with it, and the tick hands over to the
-  arrival shot's own cycle - the next retreat re-arms at that shot's
-  broadcast, so the character walks the reload and shoots the moment
-  the bow allows. A mid-leg stand short of the endpoint re-bases the
+  (100) of the endpoint completes the leg and stops the re-clicks -
+  but the movement hold survives to the bow disable end: the forced
+  attack must not fire at the collapsed arrival range, because that
+  shot would commit its windup with the chaser standing on top of the
+  character. A mid-leg stand short of the endpoint re-bases the
   ladder onto the current cell and keeps pushing the SAME endpoint
   (the spam continues), and a dead endpoint holds the ground instead
   of turning.
@@ -814,42 +822,39 @@ The owner instruction of the round replaced the stop-and-shoot cycle
 with a continuous one: shoot, run - the moment the cooldown is back,
 shoot again - and the chaser must spend the reload tail closing the
 distance again instead of the archer standing through it. The round
-questioned the shipped layer AND the tests with it; the pieces below
-are what the live `archer-kite` scenario verified (runs 5 and 6 of
-2026-11-09, both green).
+questioned the shipped layer AND the tests with it; runs 5 and 6 of
+2026-11-09 verified the first shape, and the 5-minute runs that
+followed removed its last safe-distance gates.
 
-- The pursuit hold has NO stall exit. The old ledger
-  (`kitePursuitStallLimit` / `kitePursuitDeadlockSteps` /
-  `kitePursuitStallSlack`) stood the walk down after two stalled
-  windows on a spent budget and fired the bow from the hold; the
-  owner rule removed that standing answer even for a parity race (a
-  walk that opens nothing still trades the melee blows for
-  chase-cadence blows). The hold re-arms the straight leg at every
-  walk-window end and every leg arrival while the nearest hostile
-  still sits inside the re-shot floor (`kiteReshotFloor`, 480), and
-  the ONLY standing-shoot case left is a genuinely walled lane (the
-  cornered hold). The step counter resets on every fresh shot
-  broadcast (`kitePursuitCycle`) and on a walk outside the previous
-  chain's context; crossing `kitePursuitStreakLimit` (12) is a
-  runaway diagnostic in the log, not a stop.
-- The forced attack request defers to the retreat (`kiteDeferShot`,
-  the engage rung ahead of `AttackTarget`): with the nearest hostile
-  inside the re-shot floor and a retreat of THIS fight inside the
-  pursuit context (`kitePursuitContext`, 12 s), a request now would
-  commit the next shot at the collapsed range - the windup
-  standstill then hands the chaser the melee - so the tick runs the
-  leg instead. The first engage of a fresh fight keeps its attack
-  request (the bow must land the first shot before there is a reload
-  to run), and a cornered hold keeps its shot (a walled lane is the
-  one legitimate standing-shoot case).
+- The ONE shot per cycle is the contract. The shot broadcast arms the
+  deferred retreat (the click at the windup end, `kiteShotPhase`),
+  the walk banks the rest of the bow disable window, and the forced
+  attack request at the window end IS the next shot - at ANY range
+  the chaser reached meanwhile. The route is: shot -> windup-end
+  retreat click -> walk the reload tail -> forced attack at the
+  disable end -> the next broadcast arms the next retreat. There is
+  no re-shot floor, no safe-distance gate and no pursuit ledger any
+  more: the 5-minute acceptance run measured what they cost against
+  an equal-speed chaser (20-30 s between the shots, the mob
+  regenerating faster than the arrows, the fight never resolving and
+  the drift carrying the session into a level-15 zone).
+- The walk window is the bow disable window (`kiteWalkWindow`, the C1
+  formula on the live pAtkSpd, the fallback `kiteStepWindow` 2s), not
+  scaled by the leg. The arrival within `kiteArrivalEpsilon` stops the
+  re-click ladder but KEEPS the movement hold to the disable end: the
+  forced attack must not fire at the collapsed arrival range, and a
+  walk that never finished still spends the whole reload moving.
+- The cornered and encircled holds keep their shot (a walled lane is
+  the one legitimate standing-shoot case); the retire-click ladder
+  and its dead-endpoint verdicts stand the ladder down, and the next
+  shot cycle re-arms the retreat fresh.
 - The distance floor reads the CONSERVATIVE closed distance
   (`closedDistance`, `Bot.ObjectTrackOf`): the server broadcasts a
   chasing mob's `MoveToPawn` at a one to two second cadence, and the
   live acceptance measured a 512 unit raw gap against an actual 256.
   The bound assumes the chaser kept running at its FASTEST speed for
-  the whole age of its movement segment, so the floor decisions only
-  ever see a distance at or below the true gap - never a shot the
-  collapsed range did not afford.
+  the whole age of its movement segment, so the threat scans only
+  ever see a distance at or below the true gap.
 - The click validation rejects a partial run: a validated point that
   collapses onto a stand shorter than `kiteMinStep` (250) is no lane
   (the live run issued a 38 unit "walk" and stood through the next
@@ -938,7 +943,7 @@ temp18, the Kaboo Orc Grunt SW-5 cell, the logs under
 them beyond the melee radius, the farthest stand at 656 units, 6
 kite steps, 0 cornered holds, the minimum HP at 78 percent and the
 minimum quiver at 593 arrows; run 6 reproduced the shot ->
-windup-end retreat -> pursuit chain -> re-shot cadence in the log.
+windup-end retreat -> reload-tail walk -> re-shot cadence in the log.
 Both runs passed every check of the scenario.
 
 ### The disengage of the losing fight (the run-7 finding)
