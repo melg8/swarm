@@ -55,7 +55,7 @@ func kiteBowBot(t *testing.T, mobX int32) (*state.Bot, *fakeGame, *Loop) {
 // fight's own opening ring budget (the leash share of the roam radius
 // around the MOB'S stand minus the stand distance and the
 // cell-rounding guard - 972-200-50 = 722) caps the leg there: the
-// opening walk lands the character on the ring the chords circle
+// opening walk lands the character on the ring the fight keeps
 // instead of the old fence-edge pocket. The scene carries a fresh
 // shot, so the first tick arms the deferred retreat (the windup hold
 // of the issue #70 findings) and the aged tick fires it - the walk
@@ -180,79 +180,6 @@ func TestKiteWindowHoldsTheReRequests(t *testing.T) {
         "the pacing period bounds the steps to one per window")
 }
 
-// TestKiteReshotWaitsForTheRegainedDistance pins the pursuit hold
-// of the cycle end (issue #70, the max-range behavior): the walk
-// window closed on a hostile still inside the re-shot floor (the
-// 480 line - the next windup would drag a 110-speed chaser down to
-// melee from there), and the engage continues the retreat instead
-// of re-requesting the shot. A hostile beyond the floor answers the
-// affordable shot at once - the re-shot waits for the distance,
-// never starves.
-func TestKiteReshotWaitsForTheRegainedDistance(t *testing.T) {
-    bot, game, loop := kiteBowBot(t, 45200)
-    tickPastTheWindup(loop)
-    require.Len(t, game.walks, 1)
-
-    // The walk outlives the fighting stance freshness (3s from the
-    // last swing) AND the scaled movement window of the race leg
-    // (722 units at the per-unit pace of the bow window: 722/400 *
-    // the shipped 2s fallback = 3.61s): sleep past both so the tick
-    // lands in the honest post-walk state - stance lapsed, step
-    // window closed, the target still at 200 units (inside the 480
-    // floor).
-    time.Sleep(4 * time.Second)
-    loop.lastHit = time.Now().Add(-2 * time.Second)
-    loop.tick()
-    require.Empty(t, game.forces,
-        "the re-shot waits for the regained distance")
-    require.Len(t, game.walks, 2,
-        "the pursuit continues the retreat at the window end")
-
-    // The hostile opens past the floor: the affordable shot answers
-    // at the window end. The walk of the continuation lapses, the
-    // ladder stands down (the pursuit hold declines past the floor),
-    // and the character's own fight activity carries one tick past
-    // the engage-stuck gate before the stance lapses - then the
-    // ordinary re-request machinery owns the moment (the forces
-    // resume).
-    bot.ApplyNpcInfo(state.NpcInfo{
-        ObjectID: 7, TemplateID: 1000001, Attackable: true,
-        X: 45520, Y: 50000, Name: "Keltir",
-    })
-    time.Sleep(4 * time.Second)
-    selfSwingsAt(bot, 45520)
-    loop.tick()
-    require.Len(t, game.walks, 2,
-        "a hostile past the floor ends the pursuit chain")
-    require.Empty(t, game.forces,
-        "the fresh fight view holds the re-request one tick")
-    time.Sleep(3200 * time.Millisecond)
-    loop.lastHit = time.Now().Add(-2 * time.Second)
-    loop.tick()
-    require.Equal(t, []int32{7}, game.forces,
-        "the affordable shot resumes once the distance is back")
-}
-
-// TestKitePursuitHoldNeedsTheRetreatContext pins the approach guard
-// of the pursuit hold: a close hostile with no kite retreat behind
-// the moment (the approach phase of a fresh fight - no shot, no
-// walk) never triggers the continuation, the engage requests the
-// attack instead (the live fleet round of 2026-09-23 measured the
-// approach slot walking its cell empty without a single shot).
-func TestKitePursuitHoldNeedsTheRetreatContext(t *testing.T) {
-    _, game, loop := kiteBowBot(t, 45200)
-    // The stance freshness lapses (no fresh swings, the sleep carries
-    // the scene past it), the mob holds at 200 units - inside the
-    // re-shot floor, but no retreat of this fight ever ran.
-    time.Sleep(3200 * time.Millisecond)
-    loop.lastHit = time.Now().Add(-2 * time.Second)
-    loop.tick()
-    require.Equal(t, []int32{7}, game.forces,
-        "the approach requests the attack")
-    require.Empty(t, game.walks,
-        "no pursuit continuation without a kite retreat behind it")
-}
-
 // TestKiteLeashReadsTheFightAnchor pins the location-general leash
 // of the round-14 redesign: the retreat endpoint must stay inside
 // the fight's own roam radius around the FIGHT ANCHOR - the
@@ -287,7 +214,7 @@ func TestKiteLeashReadsTheFightAnchor(t *testing.T) {
 // TestKiteStreakLimitNeverStopsTheShuffle pins the round-14
 // always-run rule: the streak limit is a DIAGNOSTIC, not a stop - a
 // chaser at least as fast as the character never falls behind, but
-// the answer is the running circle (the melee damage the kite
+// the answer is the running straight line (the melee damage the kite
 // exists to avoid), never the standing "fight it out" trade. Past
 // the limit the proximity path keeps stepping. The fight freshness
 // rides the chase step (no shot committed): the shot-paced rhythm
@@ -423,7 +350,7 @@ func TestKiteDirectionWeighsTheWholeTrain(t *testing.T) {
     if leg > kiteRaceStepMax {
         leg = kiteRaceStepMax
     }
-    if budget := kiteRoamRadius*kiteCircleLeashShare -
+    if budget := kiteRoamRadius*kiteRingLeashShare -
         240 - kiteArrivalEpsilon/2; budget < leg {
         leg = budget
     }

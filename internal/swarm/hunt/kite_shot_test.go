@@ -14,7 +14,8 @@ package hunt
 // (plus the safety lead), then fires into the accepted move window
 // and the walk banks the reload tail. The tests pin the deferral
 // timing, the fire-time re-checks, the pursue band, the streak
-// exemption and the shared hold answers of the rhythm.
+// exemption and the shared hold answers of the rhythm (the straight
+// lane of the 2026-11-09 owner round holds the ground when blocked).
 
 import (
     "bytes"
@@ -228,7 +229,7 @@ func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
     // back at the parity rate, capped by the opening ring budget
     // around the target's stand (972-200-50 = 722) - the
     // perpendicular break marches that leg north.
-    require.InDelta(t, 50000+kiteRoamRadius*kiteCircleLeashShare-
+    require.InDelta(t, 50000+kiteRoamRadius*kiteRingLeashShare-
         kiteArrivalEpsilon/2-200,
         float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
@@ -237,21 +238,18 @@ func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
 }
 
 // TestKiteShotPacedEncircledGapBlockedHoldsGround pins the encircled
-// hold of the CLOSED pocket: the widest-gap ray, its whole fan AND
-// the anti-gap breakout cone stand walled (the sealed corner of the
-// mass cells), and the deferred click resolves to the hold ground
-// rule - the encircled archer stands and shoots the way out only
-// when the whole circle is shut. A pocket that walls the gap
-// hemisphere alone no longer holds: the breakout tier threads the
-// anti-gap cone instead (kite_breakout_test.go pins that half).
+// hold of the CLOSED pocket: the widest-gap ray is walled, and the
+// straight design has no fan and no breakout cone to fall back on
+// (the owner rule of the 2026-11-09 round) - the deferred click
+// resolves to the hold ground rule and the encircled archer stands
+// and shoots the way out.
 func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     trainMember(bot, 44800, 50000)
     mobHitsCharacterAt(bot, 45200)
     nav := &fakeNavigator{}
-    // The whole circle answers walled: the gap hemisphere (north of
-    // the chaser line) AND the anti-gap breakout cone (south of it)
-    // - the sealed pocket.
+    // The whole circle answers walled: the gap ray has nowhere to
+    // go.
     nav.sightFunc = func(_, _ pathfind.Vec3) (bool, error) {
         return false, nil
     }
@@ -267,22 +265,21 @@ func TestKiteShotPacedEncircledGapBlockedHoldsGround(t *testing.T) {
         "an encircled archer in a sealed pocket stops retreating")
     require.Equal(t, int32(7), loop.kiteHeldFor,
         "the encircled hold is armed for the target")
-    require.Contains(t, logBuf.String(), "the pocket breakout: the "+
-        "cone refused",
-        "the hold diagnostic names the breakout refusal")
+    require.Contains(t, logBuf.String(), "surround the bow fight",
+        "the hold diagnostic names the surrounding train")
 }
 
 // TestKiteShotPacedCorneredHoldsGround pins the corner answer of the
-// rhythm: a wall behind the retreat blocks every lane of the away
-// hemisphere, and the deferred click resolves to the cornered hold
-// at its fire moment - the archer stands and shoots the way out.
+// rhythm: a wall behind the retreat blocks the straight lane, and the
+// deferred click resolves to the cornered hold at its fire moment -
+// the archer stands and shoots the way out instead of turning.
 func TestKiteShotPacedCorneredHoldsGround(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     nav := &fakeNavigator{}
-    // The sealed pocket: the away hemisphere walled, and the
-    // wall-face wedges past the hemisphere edge (the lone-chaser
-    // escape rays of the round-12 ladder) walled too - only the
-    // narrow eastern corridor of the fight line stays clear.
+    // The pocket is sealed behind the character: only the narrow
+    // eastern corridor of the fight line stays clear, the whole
+    // straight away-ray to the west is walled - the old fan would
+    // have found side lanes it must no longer take.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
         return to.X > 45000 &&
             math.Abs(float64(to.Y)-50000) < 100, nil

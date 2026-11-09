@@ -13,15 +13,15 @@ import "time"
 // audit. The ledger samples the motion state of the current fight
 // once per loop tick and books every second into exactly one bucket:
 //
-//   - MOVING: the character walks (the retreat, the pursuit chain,
-//     the shove - any walk of the fight).
+//   - MOVING: the character walks (the retreat, the re-click ladder
+//     recovery - any walk of the fight).
 //   - WINDUP: the character stands inside the bow windup of its own
 //     shot - the ~1.5 s standstill the SERVER forces (a
 //     MoveToLocation inside it is saved and replayed at the cycle
 //     end, see docs/kite_timing_findings.md); the only standing the
 //     kite spec allows.
 //   - HOLD: the character stands on a cornered/encircled hold
-//     verdict (kiteHoldGround) - the pocket tiers found no lane.
+//     verdict (kiteHoldGround) - the straight lane found no walk.
 //   - IDLE: the character stands in the fight with no verdict - the
 //     unattributed standing the redesign exists to shrink (an
 //     unanswered engage, a lost tick, a recovery pause).
@@ -89,12 +89,12 @@ func (l *Loop) kiteLedgerTick(now time.Time) {
 
 // kiteLedgerKind names the motion bucket of the current moment: a
 // walking character is MOVING whatever walks it (the ladder, the
-// pursuit chain - the oracle cannot split the walker, the fight's
-// walks own the kite window by contract), a standing one inside the
-// windup of its own fresh shot is WINDUP (the server-forced
-// standstill), a standing one on a fresh hold verdict is HOLD, and
-// everything else is IDLE - the unattributed standing the summary
-// names.
+// re-click recovery - the oracle cannot split the walker, the
+// fight's walks own the kite window by contract), a standing one
+// inside the windup of its own fresh shot is WINDUP (the
+// server-forced standstill), a standing one on a fresh hold verdict
+// is HOLD, and everything else is IDLE - the unattributed standing
+// the summary names.
 func (l *Loop) kiteLedgerKind(now time.Time) kiteMotionKind {
     if l.tracker.SelfWalking() {
         return kiteMotionMoving

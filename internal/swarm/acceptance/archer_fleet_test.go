@@ -96,8 +96,8 @@ func TestFleetSpawnZFallback(t *testing.T) {
 
 // The geometry knobs of the synthetic kite streams: the retreat
 // length (the hunt's kiteStep), the mob's trailing gap at the fight
-// start and the curving bend of the improved stream (the hunt's
-// kiteCurveStep).
+// start and the bend of the improved stream (a synthetic spiral the
+// acceptance fold must track; the live straight kite keeps bend 0).
 const (
     fleetStreamStep  = 400.0
     fleetStreamTrail = 250.0
@@ -113,11 +113,11 @@ const (
 // - so the away-ray of every retreat points from the mob's position
 // and the direction gate confirms the orbit chords the way the live
 // fight produces them. The heading bends -bend every cycle (the
-// curving circle of the improved kite) or stays fixed at bend 0
-// (the straight runaway that marches off the farm point). The
-// answer carries the character's position after the last retreat so
-// the caller chains the next fight or a between-fights cell hop
-// onto it.
+// synthetic spiral the fold diagnostics are exercised on) or stays
+// fixed at bend 0 (the straight runaway that marches off the farm
+// point). The answer carries the character's position after the last
+// retreat so the caller chains the next fight or a between-fights
+// cell hop onto it.
 func fleetKiteCycles(
     base time.Time, cycle, retreatLag time.Duration,
     fightDist float64, fight int32, start [2]int32,

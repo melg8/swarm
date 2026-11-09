@@ -798,18 +798,6 @@ type Loop struct {
     // end) and the forced attack re-request fires the moment the
     // window lapses.
     kiteClickUntil time.Time
-    // kiteCurveFor is the fight the curving retreat circle belongs
-    // to (see kiteCurveDirection, kite.go): a fresh target starts
-    // its own circle - the opening straight retreat first, the
-    // tangential bearing of the fixed turn side after.
-    kiteCurveFor int32
-    // kiteCurved reports whether the fight spent its opening
-    // straight retreat (an issued walk alone spends it - see
-    // kiteIssueWalk; a cornered or refused retreat spends nothing).
-    kiteCurved bool
-    // kiteCurveSign is the turn side of the current fight's circle
-    // (+1 counterclockwise, -1 clockwise; see kiteCurveSide).
-    kiteCurveSign float64
     // kiteFor is the fight the kite streak counts for (the hunt
     // target): a fresh target resets the streak (kiteStreak). The
     // armed threat may be a train member - the streak still counts
@@ -819,8 +807,8 @@ type Loop struct {
     // target: crossing kiteStreakLimit names the unwinnable race
     // (a chaser at least as fast as the character) in the log - a
     // DIAGNOSTIC since the round-14 always-run redesign, the
-    // retreat keeps running on the fight's own circle (the
-    // standing "fight it out" answer is gone).
+    // retreat keeps running straight (the standing "fight it out"
+    // answer is gone).
     kiteStreak int
     // kiteHeldFor is the target the cornered hold belongs to (see
     // kite.go): the hold of one target never paces another.
@@ -848,50 +836,11 @@ type Loop struct {
     // re-click would only fight the re-engage for the movement. The
     // zero value disarms the ladder.
     kiteWalkUntil time.Time
-    // kitePursuitFor names the fight the last kite retreat served
-    // and kitePursuitAt stamps the walk that served it: the pursuit
-    // hold of the engage tail (see kite.go) continues a walk only
-    // behind a FRESH retreat of the same fight - a close hostile of
-    // the approach phase (no shot, no retreat behind it) must never
-    // trigger the continuation, the engage requests the attack
-    // instead (the live fleet round of 2026-09-23 measured the
-    // approach slot walking away from its cell without a single
-    // shot until the window ran out). The stamp expires the
-    // context: the Mobius respawn re-uses the object id (the killed
-    // mob returns under the same id), so the ownership alone would
-    // let a stale context of the PREVIOUS fight answer the approach
-    // of the respawned one - the continuation chain re-stamps every
-    // walk (~1.5 s cadence), anything older is another fight's
-    // history.
-    kitePursuitFor int32
-    kitePursuitAt  time.Time
-    // The pursuit ledger of the current shot cycle (see
-    // kitePursuitHold): the continuation chain owns its budget
-    // apart from the proximity streak - the race it runs is the
-    // re-shot's own (each new shot re-arms the whole race), so a
-    // shared flat counter cuts the honest distance race short (the
-    // round-11 fleet audit measured the flat 8 bound biting one
-    // step short of the re-shot floor). kitePursuitSteps counts the
-    // continuations issued since the last shot; kitePursuitDist is
-    // the threat distance at the last accounting; kitePursuitStall
-    // counts the CONSECUTIVE walks that opened no distance (the
-    // unwinnable race); kitePursuitWalkOpen marks the walk whose
-    // window-end accounting is still owed - a cornered hold re-probe
-    // between the walks never mints a stall (the hold pause is not a
-    // lost race step, the pocket cells survive their holds on
-    // exactly that). The ledger resets whole on every fresh shot
-    // cycle (kiteArmClick) and on any walk issued outside the
-    // previous chain's context (kiteIssueWalk - a new fight or the
-    // respawned same-id target starts its own race).
-    kitePursuitSteps    int
-    kitePursuitDist     float64
-    kitePursuitStall    int
-    kitePursuitWalkOpen bool
     // kiteFightFor/X/Y anchor the current fight's own ground (the
-    // round-14 location-general redesign): the self position at the
-    // fight's FIRST retreat resolution (see kiteResolveAndClick,
-    // kite.go). The retreat leash (kiteTerrainLane) and the curve
-    // turn side (kiteCurveSide) read the anchor INSTEAD of the
+    // round-14 location-general redesign): the position of the
+    // fight target at the fight's FIRST retreat resolution (see
+    // kiteResolveAndClick, kite.go). The retreat leash
+    // (kiteTerrainLane) reads the anchor INSTEAD of the
     // hunting-square registry, so the kite works on any map, any
     // ground, with or without a zone registry - the generated
     // elven/dion tables own the target economy alone, never the
@@ -937,24 +886,8 @@ type Loop struct {
     kiteReclicks int
     // kiteWalkDead latches the dead-endpoint verdict of the current
     // walk (the refusal evidence or the silent probe set it): one
-    // diagnostic line per walk, the rotation follows the latch.
+    // diagnostic line per walk, the hold follows the latch.
     kiteWalkDead bool
-    // kiteWalkDeadCells carries the cells the rotation already named
-    // dead (the server refused the click or it stayed silent through
-    // the probe) and kiteWalkDeadCount the live prefix of it: the
-    // rotation resolves the next fan lane skipping the whole set - a
-    // refused cell never starts a walk, re-clicking it changes
-    // nothing. The array covers every candidate of the away
-    // hemisphere (the straight ray plus the fan).
-    kiteWalkDeadCells [1 + 2*kiteFanSteps][2]int32
-    kiteWalkDeadCount int
-    // kiteDeadFor is the fight the dead-cell memory belongs to: the
-    // memory persists across the walk cycles of one target (the
-    // terrain does not change between the shots - the later cycles
-    // start on a lane that already proved walkable instead of paying
-    // the probe tax on the same dead straight cell every cycle) and
-    // resets on the target change.
-    kiteDeadFor int32
     // kiteBearings is the scratch of the retreat direction: the
     // planar bearings of the chaser train the last resolution
     // collected (kiteTrainDirection fills it every call - the
@@ -2530,18 +2463,6 @@ func (l *Loop) engage() {
         return
     }
     if l.lureArmed() && l.lureTick(now) {
-        return
-    }
-    // The pursuit hold of the kite (see kite.go, issue #70): a
-    // lapsed retreat window whose hostile still holds inside the
-    // re-shot floor continues the retreat instead of re-requesting
-    // the shot the windup standstill would pay for - the re-shot
-    // waits for the regained distance (the max-range behavior of
-    // the issue). A non-kite fight never enters: the hold's own
-    // gates carry the profile, the bow and the floor checks, and
-    // the lure stays first-authoritative for its moment.
-    if selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition(); selfOK &&
-        l.kitePursuitHold(now, selfX, selfY, selfZ) {
         return
     }
     if err := l.game.AttackTarget(l.target); err != nil {

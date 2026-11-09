@@ -5,17 +5,16 @@
 package hunt
 
 // The re-click ladder of the kite walk (issue #60, the rounds two
-// and three, reworked leg-long in round 17): the acceptance dump of
-// the third round named the dominant dead-click mechanism - the
-// server answers specific kite destination cells with an instant
-// bare ActionFailed while the rotated fan lanes walk fine. The tests
-// pin the ladder: the paced re-issue, the refusal-evidence rotation
-// (at once, no probe wait), the silent probe rotation, the
-// refused-cell memory (a refused cell is never re-clicked), the
-// click bound, the leg-scaled walk window (the C1 disable formula
-// on the live pAtkSpd at the per-unit pace of the race leg) and the
-// stand-down paths (the leg completed at the endpoint, the window
-// expired, nothing left to rotate onto).
+// and three, reworked leg-long in round 17; the straight-lane hold of
+// the 2026-11-09 owner round): the acceptance dump of the third
+// round named the dominant dead-click mechanism - the server answers
+// specific kite destination cells with an instant bare ActionFailed.
+// The tests pin the ladder: the paced re-issue, the refusal-evidence
+// verdict, the silent probe, the click bound, the leg-scaled walk
+// window (the C1 disable formula on the live pAtkSpd at the
+// per-unit pace of the race leg) and the stand-down paths (the leg
+// completed at the endpoint, the window expired, the dead endpoint
+// holds the ground instead of rotating).
 
 import (
     "math"
@@ -62,17 +61,19 @@ func TestKiteReclickLadderReissuesTheDeadClick(t *testing.T) {
         "a re-click inside the broadcast gate aims the same endpoint")
 }
 
-// TestKiteRefusalRotatesAtTheProbeAge pins the refusal-evidence
-// rotation: the server answered the kite click with ActionFailed
-// (the instant refusal the third-round acceptance dump shows - the
+// TestKiteRefusalHoldsAtTheProbeAge pins the refusal-evidence
+// verdict: the server answered the kite click with ActionFailed (the
+// instant refusal the third-round acceptance dump shows - the
 // MoveToLocation handler refuses specific destination cells). The
-// verdict latches at once, the ROTATION lands at the probe age -
-// the age gate separates a genuine click refusal from the straggler
-// refusals of the server AI's own attack retries (the bow disable
-// path answers ActionFailed at a one-second cadence while the
-// character stands), and a young walk keeps its endpoint so the
-// movement broadcast of a healthy click still clears the ladder.
-func TestKiteRefusalRotatesAtTheProbeAge(t *testing.T) {
+// verdict latches at once, but the spam keeps hitting the endpoint
+// while the walk is young - the age gate separates a genuine click
+// refusal from the straggler refusals of the server AI's own attack
+// retries (the bow disable path answers ActionFailed at a one-second
+// cadence while the character stands) and the movement broadcast of
+// a healthy click still gets its chance. At the probe age the
+// straight design has no second lane: the ladder stands down and the
+// hold keeps the bow shooting.
+func TestKiteRefusalHoldsAtTheProbeAge(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
@@ -86,58 +87,23 @@ func TestKiteRefusalRotatesAtTheProbeAge(t *testing.T) {
     require.Len(t, game.walks, 2,
         "the young walk re-clicks its endpoint")
     require.Equal(t, game.walks[0], game.walks[1],
-        "no rotation before the probe age")
+        "no hold before the probe age")
     require.True(t, loop.kiteWalkDead,
         "the refusal evidence latched the dead verdict")
 
-    // The walk ages past the probe: the rotation lands. At the
-    // opening ring length (722, the leash share of the roam radius
-    // around the mob's stand minus the stand distance and the
-    // rounding guard) the +-45 degree fan candidates stay well
-    // inside the roam fence, so the rotation steps onto the +45
-    // degree candidate - the first fan lane off the dead straight
-    // ray.
+    // The walk ages past the probe: the hold lands. The straight
+    // design has no fan to rotate onto (the owner rule of the
+    // 2026-11-09 round), so the ladder clears and the archer keeps
+    // shooting from where it stands.
     ageKiteReclick(loop)
     ageKiteWalkIssue(loop)
     loop.tick()
-    require.Len(t, game.walks, 3)
-    require.NotEqual(t, game.walks[1], game.walks[2],
-        "the refused endpoint rotated onto the fan lane")
-    // The +45 degree fan candidate at the straight-leg length,
-    // recomputed from first principles (the deficit 280 capped at
-    // the opening ring budget 972-200-50 = 722).
-    leg := math.Min(
-        kiteStep+(kiteReshotFloor-200)*kiteRaceFactor, kiteRaceStepMax)
-    leg = math.Min(leg,
-        kiteRoamRadius*kiteCircleLeashShare-200-kiteArrivalEpsilon/2)
-    fanX, fanY := rotatePlanar(-1, 0, kiteFanStep)
-    require.Equal(t, [3]int32{
-        45000 + int32(math.Round(fanX*leg)),
-        50000 + int32(math.Round(fanY*leg)), -3500}, game.walks[2],
-        "the rotation takes the +45 degree fan candidate")
-}
-
-// TestKiteRefusalNeverReClicksTheRefusedCell pins the refused-cell
-// memory: consecutive refusals rotate through the fan candidates and
-// never fold back onto a cell the server already refused.
-func TestKiteRefusalNeverReClicksTheRefusedCell(t *testing.T) {
-    _, game, loop := kiteBowBot(t, 45200)
-    tickPastTheWindup(loop)
-    require.Len(t, game.walks, 1)
-
-    refused := map[[2]int32]bool{}
-    for i := range 4 {
-        loop.tracker.ApplyActionFailed(time.Now())
-        ageKiteReclick(loop)
-        ageKiteWalkIssue(loop)
-        loop.tick()
-        require.Len(t, game.walks, 2+i,
-            "each aged refusal rotates and re-clicks")
-        endpoint := [2]int32{game.walks[1+i][0], game.walks[1+i][1]}
-        require.False(t, refused[endpoint],
-            "the rotation never re-clicks a refused cell: %v", endpoint)
-        refused[[2]int32{game.walks[i][0], game.walks[i][1]}] = true
-    }
+    require.Len(t, game.walks, 2,
+        "the refused endpoint is not rotated onto a fan lane")
+    require.True(t, loop.kiteWalkUntil.IsZero(),
+        "the ladder stood down at the probe age")
+    require.Equal(t, int32(7), loop.kiteHeldFor,
+        "the dead endpoint arms the hold for the target")
 }
 
 // TestKiteBowRetryRefusalIsNotAttributedToTheClick pins the bow
@@ -183,46 +149,38 @@ func TestKiteRetreatClickRefusalStillLatches(t *testing.T) {
         "a click refusal with no retry in flight still latches")
 }
 
-// TestKiteSilentProbeRotatesTheDeadEndpoint pins the silent probe:
-// a walk unanswered past the probe age (no ActionFailed, no movement
+// TestKiteSilentProbeHoldsTheGround pins the silent probe: a walk
+// unanswered past the probe age (no ActionFailed, no movement
 // broadcast - the H-006 silent drop signature) names the endpoint
-// dead and rotates the same way the refusal evidence does.
-func TestKiteSilentProbeRotatesTheDeadEndpoint(t *testing.T) {
+// dead, stands the ladder down and holds the ground for the bow.
+func TestKiteSilentProbeHoldsTheGround(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
-    // The click stayed silent through the broadcast gate window.
-    // The rotation lands on the +45 degree fan candidate: at the
-    // opening ring length (722, the leash share of the roam radius
-    // around the mob's stand minus the stand distance and the
-    // rounding guard) the diagonal candidates stay well inside the
-    // roam fence, the first fan lane off the dead straight ray.
+    // The click stayed silent through the broadcast gate window. The
+    // straight design has no fan to rotate onto, so the ladder
+    // clears and the hold owns the cycle.
     ageKiteReclick(loop)
     ageKiteWalkIssue(loop)
     loop.tick()
-    require.Len(t, game.walks, 2)
-    require.True(t, loop.kiteWalkDead, "the silent probe latched")
-    require.NotEqual(t, game.walks[0], game.walks[1],
-        "the silent endpoint rotated onto the fan lane")
-    leg := math.Min(
-        kiteStep+(kiteReshotFloor-200)*kiteRaceFactor, kiteRaceStepMax)
-    leg = math.Min(leg,
-        kiteRoamRadius*kiteCircleLeashShare-200-kiteArrivalEpsilon/2)
-    fanX, fanY := rotatePlanar(-1, 0, kiteFanStep)
-    require.Equal(t, [3]int32{
-        45000 + int32(math.Round(fanX*leg)),
-        50000 + int32(math.Round(fanY*leg)), -3500}, game.walks[1])
+    require.Len(t, game.walks, 1,
+        "the silent endpoint is not rotated onto a fan lane")
+    require.True(t, loop.kiteWalkUntil.IsZero(),
+        "the ladder stood down at the probe age")
+    require.Equal(t, int32(7), loop.kiteHeldFor,
+        "the silent endpoint arms the hold for the target")
 }
 
-// TestKiteRefusalWithNoLaneLeftStandsDown pins the cornered answer
-// of the rotation: when every candidate of the away hemisphere is
-// refused or blocked, the ladder stands down - the last re-click
-// does not grind a dead transport, the hold answer owns the cycle.
-func TestKiteRefusalWithNoLaneLeftStandsDown(t *testing.T) {
+// TestKiteRefusedDeadEndHoldsTheGround pins the cornered answer of
+// the dead click: once the straight endpoint is refused and the walk
+// ages past the probe, the ladder stands down - the last re-click
+// does not grind a dead transport, and the hold answer keeps the bow
+// shooting because there is no second lane to rotate onto.
+func TestKiteRefusedDeadEndHoldsTheGround(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     // Only the straight west lane of the race leg passes the line
-    // of sight; every fan candidate is walled.
+    // of sight.
     nav := &fakeNavigator{}
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
         return int32(to.X) == 44278, nil
@@ -234,16 +192,17 @@ func TestKiteRefusalWithNoLaneLeftStandsDown(t *testing.T) {
     require.Equal(t, [3]int32{44278, 50000, -3500}, game.walks[0])
 
     // The straight cell got refused and the walk aged past the
-    // probe: the rotation has no alternative lane (the fans are
-    // walled) and the verdict is old enough to trust - the ladder
-    // stands down.
+    // probe: the verdict is old enough to trust - the ladder stands
+    // down and the hold owns the cycle.
     loop.tracker.ApplyActionFailed(time.Now())
     ageKiteWalkIssue(loop)
     loop.tick()
     require.Len(t, game.walks, 1,
-        "a rotation with no lane left sends no re-click")
+        "a dead straight endpoint sends no fan re-click")
     require.True(t, loop.kiteWalkUntil.IsZero(),
         "the ladder stood down")
+    require.Equal(t, int32(7), loop.kiteHeldFor,
+        "the hold owns the cycle after the dead click")
 }
 
 // TestKiteYoungWalkSurvivesAStragglerRefusal pins the straggler

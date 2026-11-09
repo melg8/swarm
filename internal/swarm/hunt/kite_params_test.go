@@ -123,7 +123,7 @@ func TestKiteParamsReengageDelayHoldsTheReRequest(t *testing.T) {
     loop.tick()
     require.Len(t, game.walks, 1)
     scaled := time.Duration(
-        (kiteRoamRadius*kiteCircleLeashShare - 200 -
+        (kiteRoamRadius*kiteRingLeashShare - 200 -
             kiteArrivalEpsilon/2) /
             kiteStep * float64(kiteStepWindow))
     require.WithinDuration(t,

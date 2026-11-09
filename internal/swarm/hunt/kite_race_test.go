@@ -5,20 +5,21 @@
 package hunt
 
 // The race legs of the archer kite (issue #70, the round-17
-// redesign): the old fixed 400-unit retreat step never reached the
-// re-shot floor - the walk window equaled the shot cycle, so the
-// character stopped at the endpoint exactly when the server's re-shot
-// was ready, and the armed stance fired it at the collapsed range
-// (the "second shot of the cycle" the owner named). The redesign
-// buys the whole deficit back in ONE leg (kiteStepLength), scales
-// the movement window to the leg (kiteIssueWalk), keeps the re-click
-// ladder alive for the WHOLE leg (kiteReclickWalk - a mid-leg silent
-// drop re-clicks the endpoint from wherever the character stands),
-// and gates the chase-stall watchdog on the window (loop.go - the
-// mid-leg drop never walks the archer back INTO the mob). These pins
-// are the round-17 contract record: the step formula, the
-// equidistant chord of the circling fights, the window scaling, the
-// ladder recovery and the arrival stand-down.
+// redesign; the straight-lane rework of the 2026-11-09 owner round):
+// the old fixed 400-unit retreat step never reached the re-shot
+// floor - the walk window equaled the shot cycle, so the character
+// stopped at the endpoint exactly when the server's re-shot was
+// ready, and the armed stance fired it at the collapsed range (the
+// "second shot of the cycle" the owner named). The design buys the
+// whole deficit back in ONE straight leg (kiteStepLength), scales
+// the movement window to the leg (kiteIssueWalk), keeps the
+// re-click ladder alive for the WHOLE leg (kiteReclickWalk - a
+// mid-leg silent drop re-clicks the endpoint from wherever the
+// character stands), and gates the chase-stall watchdog on the
+// window (loop.go - the mid-leg drop never walks the archer back
+// INTO the mob). These pins are the race contract record: the step
+// formula, the ring budget, the window scaling, the ladder recovery
+// and the arrival stand-down.
 
 import (
     "math"
@@ -88,14 +89,14 @@ func TestKiteRaceStepLengthBuysBackTheFloor(t *testing.T) {
     // around the fight anchor (the mob's stand) - minus the rounding
     // guard (kiteArrivalEpsilon's half keeps the int32 cell rounding
     // of the endpoint from crossing the ring the battery enforces),
-    // never under the shove tier. Before the fight anchored the step
-    // rides unchanged.
+    // never under the short hop of kiteMinStep. Before the fight
+    // anchored the step rides unchanged.
     require.InDelta(t, kiteRaceStepMax,
         loop.kiteStraightLeg(kiteRaceStepMax, 45000, 50000), 0.001,
         "the unanchored fight keeps the raw race leg")
     loop.kiteFightFor = 7
     loop.kiteFightX, loop.kiteFightY = 45200, 50000
-    ring := kiteRoamRadius * kiteCircleLeashShare
+    ring := kiteRoamRadius * kiteRingLeashShare
     require.InDelta(t, ring-200-kiteArrivalEpsilon/2,
         loop.kiteStraightLeg(kiteRaceStepMax, 45000, 50000), 0.001,
         "the fresh anchor caps the opening leg at the ring budget")
@@ -105,9 +106,9 @@ func TestKiteRaceStepLengthBuysBackTheFloor(t *testing.T) {
     require.InDelta(t, kiteStep,
         loop.kiteStraightLeg(kiteStep, 45200, 50000), 0.001,
         "a step that fits the ring budget rides unchanged")
-    require.InDelta(t, kiteShoveStep,
+    require.InDelta(t, kiteMinStep,
         loop.kiteStraightLeg(kiteRaceStepMax, 44200, 50000), 0.001,
-        "a stand at the ring keeps the shove tier of room")
+        "a stand at the ring keeps the short hop of room")
 
     // The duel half: a live attacker 500 out (past the floor) keeps
     // the rhythm moving and answers with the plain step.
@@ -118,58 +119,6 @@ func TestKiteRaceStepLengthBuysBackTheFloor(t *testing.T) {
         "the ranged duel keeps the rhythm moving")
     require.Equal(t, [3]int32{44600, 50000, -3500}, game.walks[0],
         "a hostile past the floor answers with the plain 400 step")
-}
-
-// TestKiteRaceChordKeepsTheCircleRadius pins the equidistant
-// property of the curving legs (kiteCurveDirection, reworked round
-// 17): once the fight anchored and the character left the anchor
-// cell, the retreat endpoint lands ON the anchor circle - exactly
-// the circle's radius away from the anchor - swung on the fight's
-// fixed turn side. The character keeps the SAME distance to the
-// point it kites around: the owner's circling spec, exactly.
-func TestKiteRaceChordKeepsTheCircleRadius(t *testing.T) {
-    bot, game, loop := kiteBowBot(t, 45200)
-    tickPastTheWindup(loop)
-    require.Len(t, game.walks, 1,
-        "the opening retreat anchors the fight and spends the "+
-            "straight leg")
-
-    // The character stands 600 west of the anchor, the mob chases
-    // behind on the circling path (north): the second retreat
-    // resolves on the anchor circle.
-    selfX, selfY := kiteChaseBehindOnTheCircle(bot, loop)
-    tickPastTheWindup(loop)
-    require.Len(t, game.walks, 2,
-        "the second retreat of the anchored fight must issue")
-    chord := game.walks[1]
-
-    // The leg at the stand: the deficit 280 bought back at the
-    // parity rate, capped at the absolute cap - the chord path does
-    // not leash (the endpoint lands on the ring by construction,
-    // here growing the 800 radius to the ring's 972).
-    leg := math.Min(
-        kiteStep+(kiteReshotFloor-200)*kiteRaceFactor,
-        kiteRaceStepMax)
-    wantX, wantY, radiusTarget := kiteWantChord(
-        45200, 50000, selfX, selfY, leg)
-    require.InDelta(t, wantX, float64(chord[0]), 1.0,
-        "the endpoint is the chord point of the anchor circle")
-    require.InDelta(t, wantY, float64(chord[1]), 1.0,
-        "the endpoint is the chord point of the anchor circle")
-    // The KEY pin: the endpoint lands on the circle the leg needs
-    // (the ring here, grown from the 800 mid-leg radius), so the
-    // chord never leaves the circle it kites around.
-    require.InDelta(t, radiusTarget,
-        math.Hypot(float64(chord[0]-45200), float64(chord[1]-50000)),
-        1.0,
-        "the chord endpoint keeps the circle radius to the anchor")
-    require.InDelta(t, kiteRoamRadius*kiteCircleLeashShare,
-        radiusTarget, 0.001,
-        "the deep leg grows the circle to the leash share ring")
-    // The curve side: the counterclockwise turn side of the west
-    // radius swings the endpoint south of the stand.
-    require.Less(t, chord[1], selfY,
-        "the endpoint lands on the fight's turn side of the radius")
 }
 
 // TestKiteRaceWindowScalesWithTheLeg pins the window scaling of
@@ -321,37 +270,9 @@ func TestKiteOpeningAnchorsOnTheMobStand(t *testing.T) {
         float64(game.walks[0][0]-loop.kiteFightX),
         float64(game.walks[0][1]-loop.kiteFightY))
     require.InDelta(t,
-        kiteRoamRadius*kiteCircleLeashShare-kiteArrivalEpsilon/2,
+        kiteRoamRadius*kiteRingLeashShare-kiteArrivalEpsilon/2,
         radius, 1.0,
         "the opening leg lands on the ring the chords circle")
-}
-
-// TestKiteArrivalChainsThePursuit pins the arrival chain of the
-// round-19 fix: a leg that completes under the re-shot floor issues
-// the next pursuit leg on the SAME tick - the character never stands
-// between the legs of the race, and the movement hold of the finished
-// walk no longer blocks the continuation.
-func TestKiteArrivalChainsThePursuit(t *testing.T) {
-    bot, game, loop := kiteBowBot(t, 45200)
-    tickPastTheWindup(loop)
-    require.Len(t, game.walks, 1)
-
-    // The server lands the character on the endpoint; the mob chases
-    // behind on the circling path (300 south - inside the 480
-    // re-shot floor).
-    moveSelfTo(bot, 44278, 50000, -3500)
-    bot.ApplyNpcInfo(state.NpcInfo{
-        ObjectID: 7, TemplateID: 1000001, Attackable: true,
-        X: 44278, Y: 49700, Name: "Keltir",
-    })
-    loop.tick()
-    require.Len(t, game.walks, 2,
-        "the arrival chains the next leg on the same tick")
-    require.False(t, loop.kiteWalkUntil.IsZero(),
-        "the chained leg owns a fresh walk window")
-    require.True(t, loop.combatAvoidUntil.After(time.Now()),
-        "the finished walk's hold ended with the walk; the new leg "+
-            "armed its own")
 }
 
 // TestKiteRaceStallWatchdogRespectsTheWalkWindow pins the

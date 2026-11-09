@@ -5,13 +5,14 @@
 package hunt
 
 // The kite edge cases of the archer fight (issue #19, the third
-// slice of #13): the retreat direction weighs the whole chaser train
-// (the centroid away-vector), a surrounding train holds ground and
-// shoots through it, the cornered kite keeps firing the bow (never a
-// weapon switch, never an idle stutter), the retreat lane prefers
-// the open backward lanes over the blocked corridors and re-plans a
-// dead end at the next probe, and a camp on the lane deflects it onto
-// the tangent ray instead of waking the mob.
+// slice of #13; the straight-lane rules of the 2026-11-09 owner
+// round): the retreat direction weighs the whole chaser train (the
+// centroid away-vector), a surrounding train takes the widest gap
+// until the whole straight ray is walled, the cornered kite keeps
+// firing the bow (never a weapon switch, never an idle stutter), a
+// blocked straight lane HOLDS the ground instead of turning, a
+// neighboring camp no longer bends the retreat, and the away
+// half-plane guard still rejects the fold-back.
 
 import (
     "bytes"
@@ -92,7 +93,7 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
         kiteStep+(kiteReshotFloor-math.Hypot(141, 141))*kiteRaceFactor,
         kiteRaceStepMax)
     leg = math.Min(leg,
-        kiteRoamRadius*kiteCircleLeashShare-200-kiteArrivalEpsilon/2)
+        kiteRoamRadius*kiteRingLeashShare-200-kiteArrivalEpsilon/2)
     step := game.walks[0]
     require.InDelta(t, 45000+dirX*leg, float64(step[0]), 1.0,
         "the step direction is the centroid away-vector of the train")
@@ -138,7 +139,7 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
     // escape marches that leg north.
     require.InDelta(t, 45000.0, float64(step[0]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
-    require.InDelta(t, 50000+kiteRoamRadius*kiteCircleLeashShare-
+    require.InDelta(t, 50000+kiteRoamRadius*kiteRingLeashShare-
         kiteArrivalEpsilon/2-200,
         float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
@@ -235,40 +236,32 @@ func TestKiteWaterBehindHoldsGround(t *testing.T) {
         "the hold must be armed")
 }
 
-// TestKiteDeadEndLaneRePlansOnTheFan pins the lane quality rule: a
-// retreat whose straight lane is closed ahead (the wall grew, a door
-// shut) re-plans onto the open 45 degree lane in the same resolution,
-// never a walk into the dead end and never a stand. The scene keeps
-// the opening retreat (no chord yet): the straight away-ray is off, so
-// the battery fans to the southwest candidate at the same opening ring
-// length.
-func TestKiteDeadEndLaneRePlansOnTheFan(t *testing.T) {
+// TestKiteBlockedStraightLaneHoldsGround pins the owner rule of the
+// 2026-11-09 round: the retreat is the STRAIGHT away-ray and nothing
+// else. A wall on that ray is not re-planned onto a side candidate -
+// the archer holds the ground and keeps shooting, because a turn
+// spends the distance the retreat just bought.
+func TestKiteBlockedStraightLaneHoldsGround(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45440)
     nav := &fakeNavigator{}
-    // The straight west lane is walled; every other line of sight is
-    // open.
+    // The straight west lane is walled at the ring-budgeted
+    // endpoint; every other line of sight is open - the fan the old
+    // design had would have found them.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
         return int32(math.Round(to.X)) != 44518 ||
             int32(math.Round(to.Y)) != 50000, nil
     }
     loop.SetNavigator(nav)
+    var logBuf bytes.Buffer
+    loop.SetLogger(log.New(&logBuf, "", 0))
 
-    // The first probe: the straight lane is blocked, the southwest
-    // fan carries the step at the opening ring length
-    // (972-440-50 = 482).
     tickPastTheWindup(loop)
-    require.Len(t, game.walks, 1,
-        "the dead end must re-plan, not stall the retreat")
-    bent := game.walks[0]
-    fanX, fanY := rotatePlanar(-1, 0, kiteFanStep)
-    require.InDelta(t,
-        float64(45000+int32(math.Round(fanX*482))),
-        float64(bent[0]), 1.0,
-        "the re-plan bends onto the half-open fan lane")
-    require.InDelta(t,
-        float64(50000+int32(math.Round(fanY*482))),
-        float64(bent[1]), 1.0,
-        "the re-plan bends onto the half-open fan lane")
+    require.Empty(t, game.walks,
+        "a blocked straight lane must hold, never bend the retreat")
+    require.Equal(t, int32(7), loop.kiteHeldFor,
+        "the hold is armed for the target")
+    require.Equal(t, 1, bytes.Count(logBuf.Bytes(), []byte("cornered")),
+        "the hold names itself exactly once per episode")
 }
 
 // TestKiteHalfPlaneGuardRejectsTheFoldBack pins the away half-plane
@@ -340,30 +333,25 @@ func TestKiteGapDirectionPicksTheWidestGap(t *testing.T) {
     require.False(t, ok, "no bearings leave no gap")
 }
 
-// TestKiteCampDeflectsTheRetreatLane pins the camp rule: a retreat
-// lane that would steer the train through a neighboring camp (an
-// idle aggressive mob inside its on-sight trigger circle) deflects
-// onto the tangent ray of that circle - the kite borrows the
-// aggro-aware steering of the transit walks instead of waking the
-// mob onto the fight.
-func TestKiteCampDeflectsTheRetreatLane(t *testing.T) {
+// TestKiteCampDoesNotBendTheStraightRetreat pins the removal of the
+// camp deflection (the owner rule of the 2026-11-09 round): an idle
+// aggressive camp beside the lane no longer bends the retreat onto a
+// tangent ray. The archer runs the straight away-ray - the camp is
+// accepted as the price of the straight line, because a side step
+// spends the distance the shot just bought.
+func TestKiteCampDoesNotBendTheStraightRetreat(t *testing.T) {
     bot, game, loop := kiteEdgeBot(t)
-    // The camp sits 424 units southwest, inside its 600 unit trigger
-    // margin on the straight west retreat line (the closest point of
-    // the lane clears it by 300 only).
+    // The camp sits 424 units southwest, well inside its trigger
+    // margin on the straight west retreat line.
     kiteCampMob(bot, 9, 44700, 49700)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
-        "the camp must deflect the retreat, not cancel it")
-
-    // The side-step of the camp circle (the character starts inside
-    // the margin): perpendicular to the self-to-threat axis, on the
-    // side the straight lane leaned to - the northwest ray.
+        "the camp must not cancel the straight retreat")
     step := game.walks[0]
-    require.InDelta(t, 45000-kiteStep*math.Sqrt2/2, float64(step[0]), 1.0,
-        "the lane deflects onto the camp circle side-step")
-    require.InDelta(t, 50000+kiteStep*math.Sqrt2/2, float64(step[1]), 1.0,
-        "the lane deflects onto the camp circle side-step")
+    require.InDelta(t, 44278.0, float64(step[0]), 1.0,
+        "the retreat keeps the straight west ray")
+    require.InDelta(t, 50000.0, float64(step[1]), 1.0,
+        "the retreat keeps the straight west ray")
 }
 
 // TestKiteSingleChaserNeverEncircles pins the round-19 live fix: a
