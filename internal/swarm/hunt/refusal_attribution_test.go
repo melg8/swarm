@@ -57,4 +57,15 @@ func TestRefusalEvidenceAttributesOnlyTheClicksOwnAnswer(t *testing.T) {
     bot.ApplyOtherRequestSent(base.Add(20 * time.Second))
     require.True(t, loop.refusalEvidence(),
         "a request sent after the arrival keeps the attribution")
+
+    // The coarse Windows clock stamps the click, the action request
+    // and the arrival inside one tick: a request on either window
+    // boundary still owns the answer (the conservative reading skips
+    // the attribution).
+    bot.ApplyOtherRequestSent(base.Add(8 * time.Second))
+    require.False(t, loop.refusalEvidence(),
+        "a request on the click boundary owns the answer")
+    bot.ApplyOtherRequestSent(base.Add(9 * time.Second))
+    require.False(t, loop.refusalEvidence(),
+        "a request on the arrival boundary owns the answer")
 }

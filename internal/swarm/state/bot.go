@@ -2567,11 +2567,19 @@ func (b *Bot) ApplyOtherRequestSent(at time.Time) {
 // that request instead of the click - attributing it to the click
 // would latch a refusal that never happened (the equip refusals of
 // the gear swaps ride the walk clicks exactly this way).
+//
+// The window bounds are INCLUSIVE: the coarse Windows clock stamps
+// the walk click, the action request and the arrival inside one
+// timer tick, so an exclusive comparison reads the same-tick request
+// as outside the window and attributes its answer to the click (the
+// TestSendPacketAttributesOnlyTheAnsweredRequests failure of the
+// 2026-11-09 host). A request on either boundary may own the answer,
+// and the conservative reading skips the attribution.
 func (b *Bot) OtherRequestBetween(after, before time.Time) bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
 
-    return b.otherRequestAt.After(after) && b.otherRequestAt.Before(before)
+    return !b.otherRequestAt.Before(after) && !b.otherRequestAt.After(before)
 }
 
 // EventSink receives every recorded event with its timestamp. The
