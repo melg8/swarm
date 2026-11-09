@@ -462,23 +462,32 @@ before the impending-add step):
   packet ones - the projected scan serves only the nearest chaser,
   and the 250 unit trigger margin absorbs the broadcast lag.
 - The lane (kiteRetreatLane): the STRAIGHT ray of kiteTrainDirection
-  and nothing else (the owner rule of the 2026-11-09 round). The leg
-  length is race-aware (kiteStepLength: the plain kiteStep above the
-  re-shot floor, the deficit bought back at the parity rate under it,
-  capped by kiteRaceStepMax) and ring-budgeted (kiteStraightLeg: the
-  endpoint stays on the ring - kiteRoamRadius * kiteRingLeashShare =
-  972 units around the fight anchor, the target's stand - with
-  kiteMinStep as the shortest hop). The lane runs the gate battery
-  (kiteLaneResolve): the fight leash (kiteRoamRadius around the
-  anchor), the away half-plane (the lane unit's retreat component
-  under kiteHalfPlaneSlack, -0.05), and the terrain gates that need
-  the navigator - a wall behind (the geodata line of sight) or water
+  as the primary direction (the owner rule of the 2026-11-09 round).
+  The leg length is race-aware (kiteStepLength: the plain kiteStep
+  above the re-shot floor, the deficit bought back at the parity rate
+  under it, capped by kiteRaceStepMax) and ring-budgeted
+  (kiteStraightLeg: the endpoint stays on the ring - kiteRoamRadius *
+  kiteRingLeashShare = 972 units around the fight anchor, the
+  target's stand - with kiteMinStep as the shortest hop). The lane
+  runs the gate battery (kiteLaneResolve): the fight leash
+  (kiteRoamRadius around the anchor), the away half-plane (the lane
+  unit's retreat component under kiteHalfPlaneSlack, -0.05), the
+  minimum useful hop (a validated point that collapses shorter than
+  kiteMinStep is no lane) and the terrain gates that need the
+  navigator - a wall behind (the geodata line of sight) or water
   behind (the OverWater oracle) closes the lane; without a navigator
   (the no-geodata runtime) the leash alone fences the step. The old
   fan, the camp deflection and the circling chord are GONE: a turn
   spends the distance the retreat just bought, and the fights whose
-  speeds sit too close cannot afford it. A blocked straight lane
-  holds the ground and shoots.
+  speeds sit too close cannot afford it. When EVERY rung of the
+  preferred ray is walled, the corner-only escape battery
+  (kiteLaneEscapeAngles) walks the closest straight bearing the
+  terrain offers - +-22.5, 45, 67.5 and 90 degrees from the away-ray,
+  all still inside the away half-plane - and a scene every angle
+  refuses holds the ground and shoots. The escape never replaces a
+  walking direct rung and never fans wide of the perpendicular: a
+  turn only spends the distance where there was no straight walk to
+  spend.
 - The step: the window is stamped (combatAvoidUntil = now +
   kiteStepWindow 2s + kiteReengageDelay 0, scaled up to the walked
   leg by kiteIssueWalk), the streak counts up, the log line lands
@@ -518,8 +527,10 @@ The fallbacks, in the order the machine meets them:
   refused (the click validation collapses, a mob body sits on the
   click point) surfaces through the re-click ladder - the spam keeps
   the endpoint until the probe age, then the hold owns the cycle.
-  The straight design has no second lane to rotate onto: a turn
-  would spend the distance the retreat just bought.
+  The ladder keeps pushing the SAME endpoint: the corner-only escape
+  angles belong to the lane battery of a NEW walk, not to the click
+  retries - a live turn per click would spend the distance the
+  retreat just bought.
 
 The knobs of kite.go as pinned on main (the tuning round of #29
 adjusts the first four from live measurements; the band edges above
@@ -546,6 +557,10 @@ are references, not copies):
 | `kiteProbeElapsed` | 1.2s | the silent-verdict age of the walk (past the movement broadcast gate - the H-006 signature) |
 | `kiteRefusalAnswerWindow` | 1s | the round-trip window of the ActionFailed attribution |
 | `kiteBowReuseDelay` | 1500 | the reuse delay of the bow family (the C1 item data) feeding the walk window formula |
+| `kiteReshotFloor` | 480.0 | the distance the re-shot waits for: below it the retreat owns the cycle |
+| `kitePursuitContext` | 12s | the freshness bound of the pursuit chain (a respawned same-id mob starts its own) |
+| `kitePursuitStreakLimit` | 12 | the runaway diagnostic of the pursuit chain (never a stop) |
+| `kiteEngageLevelSlack` | 5 | the level gap the kite answers a melee attacker above the character |
 
 ### The shot-paced retreat (issue #60)
 
@@ -774,6 +789,139 @@ from the train and the archer shoots the moment the bow is ready.
   the follow is bookkeeping, not a travel reset. The round-19 live log
   measured the old `apply` dropping the fight target twice inside 40s
   on every cell boundary the kite crossed.
+
+### The continuous retreat (the 2026-11-09 owner round, issue #0)
+
+The owner instruction of the round replaced the stop-and-shoot cycle
+with a continuous one: shoot, run - the moment the cooldown is back,
+shoot again - and the chaser must spend the reload tail closing the
+distance again instead of the archer standing through it. The round
+questioned the shipped layer AND the tests with it; the pieces below
+are what the live `archer-kite` scenario verified (runs 5 and 6 of
+2026-11-09, both green).
+
+- The pursuit hold has NO stall exit. The old ledger
+  (`kitePursuitStallLimit` / `kitePursuitDeadlockSteps` /
+  `kitePursuitStallSlack`) stood the walk down after two stalled
+  windows on a spent budget and fired the bow from the hold; the
+  owner rule removed that standing answer even for a parity race (a
+  walk that opens nothing still trades the melee blows for
+  chase-cadence blows). The hold re-arms the straight leg at every
+  walk-window end and every leg arrival while the nearest hostile
+  still sits inside the re-shot floor (`kiteReshotFloor`, 480), and
+  the ONLY standing-shoot case left is a genuinely walled lane (the
+  cornered hold). The step counter resets on every fresh shot
+  broadcast (`kitePursuitCycle`) and on a walk outside the previous
+  chain's context; crossing `kitePursuitStreakLimit` (12) is a
+  runaway diagnostic in the log, not a stop.
+- The forced attack request defers to the retreat (`kiteDeferShot`,
+  the engage rung ahead of `AttackTarget`): with the nearest hostile
+  inside the re-shot floor and a retreat of THIS fight inside the
+  pursuit context (`kitePursuitContext`, 12 s), a request now would
+  commit the next shot at the collapsed range - the windup
+  standstill then hands the chaser the melee - so the tick runs the
+  leg instead. The first engage of a fresh fight keeps its attack
+  request (the bow must land the first shot before there is a reload
+  to run), and a cornered hold keeps its shot (a walled lane is the
+  one legitimate standing-shoot case).
+- The distance floor reads the CONSERVATIVE closed distance
+  (`closedDistance`, `Bot.ObjectTrackOf`): the server broadcasts a
+  chasing mob's `MoveToPawn` at a one to two second cadence, and the
+  live acceptance measured a 512 unit raw gap against an actual 256.
+  The bound assumes the chaser kept running at its FASTEST speed for
+  the whole age of its movement segment, so the floor decisions only
+  ever see a distance at or below the true gap - never a shot the
+  collapsed range did not afford.
+- The click validation rejects a partial run: a validated point that
+  collapses onto a stand shorter than `kiteMinStep` (250) is no lane
+  (the live run issued a 38 unit "walk" and stood through the next
+  cycle). A genuine shorter hop cannot pass the rung ladder anyway -
+  it floors at `kiteMinStep`.
+- The angular escape is the corner-only fallback of the straight
+  rule (`kiteLaneEscapeAngles`): when EVERY rung of the preferred
+  away-ray is walled, the battery walks the closest straight bearing
+  the terrain offers - +-22.5, 45, 67.5 and 90 degrees, all inside
+  the away half-plane - and a scene every angle refuses stays the
+  cornered hold. The live 2026-11-09 spot (34792, 49416) measured
+  the direct west ray walled at every length while the south, east
+  and north rays stood open at 250-900 units; a hard hold stood the
+  archer at melee for the whole fight. The primary retreat is never
+  bent, never fans wide of the perpendicular and never folds back
+  toward the train.
+
+### The defensive flight of the archer (the run-3 finding)
+
+The defensive aggro answer (`fleeFromThreat`) used to open with the
+melee fan, whose escape lanes are clamped to the CURRENT hunting
+zone box. A kite fight drifts across the cell boundaries, and the
+run-3 acceptance dump measured the failure exactly: the fan walked a
+competent 700 units while the parity chaser kept pace at 38, the
+closure watchdog (`fleeLogoutAfter` / the `escapeNotOpening` probe)
+named the held gap, and the session logged out MID-KITE with the bow
+healthy and the quiver full.
+
+The flight (`kiteFleeThreat`) hooks in first: a bow in hand, the
+kite enabled and a melee attacker holding the character make the
+flee fly the same straight away-ray the fight cycle uses
+(`kiteTrainDirection`), walked at the full escape segment
+(`escapeWalkDistance`, 700) through the shared walk seam - its own
+window, the re-click ladder of the dead transports and the stand-up
+guard. A targetless flee has no pursuit continuation (the hold is a
+no-op with target 0), so the flight IS the continuation: a lapsed
+window reports free and the next straight leg issues on the same
+tick.
+
+The flight deliberately bypasses the fan's budgets (the closure
+watchdog and the logout after): the straight run IS the designed
+archer answer, and a mob that keeps pace with it is outlasted by the
+server's own attack timeout (`AttackableAI` `MAX_ATTACK_TIMEOUT`,
+two minutes without a landed hit, then the aggro clears and the mob
+teleports home) instead of the session logout. The critical-HP
+logout of the tick top stays armed above both.
+
+The fan stays the fallback of the scenes the flight refuses: a
+melee weapon in hand, a bow-wielding attacker (a ranged enemy cannot
+be outrun - the owner rule of the round), a disabled kite profile,
+another deck (the swings cannot land, the straight lane crosses the
+geodata wall), no attacker bearing yet, and a genuinely walled lane
+(the flight holds for one kite period and re-probes, the fan owns
+the ticks in between). The flight line reads "<mob> holds the bow
+flee at N units, kiting clear"; the walled lane logs "no straight
+bow flee lane opens from the chase, the fan owns the next kite
+period".
+
+### The kite engage ceiling (the run-4 acceptance finding)
+
+The general pick ceiling (`targetMaxLevelSlack`, character level
+plus two) protects the MELEE trade: the higher level lands more and
+takes less. The kite fights from the bow range and buys the distance
+back between the shots, so the melee ceiling is not its race. The
+elven mass cells put a level 10 Kaboo Orc Fighter (template 20471)
+on the level 7 ground (`elven-hex-104`, band 7-10), and the run-4
+acceptance dump measured the general ceiling refusing exactly that
+attacker: the loot answer and the targetless pick fled it, the
+defensive flight dragged the session across the map (a 130 chaser
+never falls behind the 125 runner) and the archer spent the whole
+window shooting nothing (2 fight samples, no ranged sample).
+
+`kiteEngageLevelSlack` (5) widens the ceiling of the ANSWER
+(`attackerEngageable` through `kiteAnswersMelee` /
+`kiteEngageLevelCeiling`) for a melee attacker the archer kite
+fights: the level 7 archer engages the level 10 Fighter and the
+level 12 mob, and the widened ceiling stays a real bound (a melee
+attacker six levels above keeps the flight). A bow-wielding
+attacker is never a kite answer - the anti-archer gate refuses it at
+every level, so the general +2 ceiling keeps it out and the flight
+answers.
+
+The live evidence of the round (`SWARM_ARCHER_KITE_MINUTES=2`,
+temp18, the Kaboo Orc Grunt SW-5 cell, the logs under
+`logs/acceptance/`): run 5 measured 51 fight samples, 78 percent of
+them beyond the melee radius, the farthest stand at 656 units, 6
+kite steps, 0 cornered holds, the minimum HP at 78 percent and the
+minimum quiver at 593 arrows; run 6 reproduced the shot ->
+windup-end retreat -> pursuit chain -> re-shot cadence in the log.
+Both runs passed every check of the scenario.
 
 ## Hexagon cell hunting (hunt/cell*.go, hunt/cells_elven.go)
 
