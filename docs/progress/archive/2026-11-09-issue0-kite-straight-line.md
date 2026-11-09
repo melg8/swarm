@@ -1,4 +1,4 @@
-# The straight-line kite: shot, retreat, re-shoot (status: in progress)
+# The straight-line kite: shot, retreat, re-shoot (status: complete)
 
 Started 2026-11-09, branch feature/kite-range-contract, issue #0
 (the owner instruction, no board issue).
@@ -66,12 +66,29 @@ character's, a turn wastes the distance the retreat just bought.
   re-click ladder, the race-leg section rewritten to the straight
   design.
 
-Next: run the gates (`task fmt`, the hunt package tests,
-`task lint`, `task prepush`), commit and push, then an optional short
-`temp18` live re-check of the straight cycle.
+### 2026-11-09 - verification and the live re-check
+
+- Gates green: `go test ./internal/swarm/hunt` (107s),
+  `go test ./internal/swarm/acceptance` (9s), `task lint` (0
+  issues), `task prepush` (build, vet, lint --new, whitespace, the
+  touched packages' tests).
+- Live `temp18` archer-kite run (2 minutes, login 127.0.0.3:2106,
+  build 26c3a416): the straight cycle fires - 4 kite steps and 2
+  cornered holds, the shot lines and the "kiting the reload tail"
+  lines land, the ledger books 11.3s moving of 37.3s. The scenario
+  verdict still fails on the two PRE-EXISTING issues of this host:
+  the mean fight distance sits under the bow radii after the holds,
+  and the hunt's own pile-up emergency logout drops the session
+  inside the window. The same two failures appear in the 16:30 and
+  16:40 runs of the pre-straight build, so the rewrite did not
+  introduce them; the live contract itself needs its own round on
+  this deployment.
+
+Next: none for this task - the fragment archives with this round.
 
 ## Status
 
-The code and docs rewrite is complete in the working tree. Remaining:
-the verification gates, the atomic commits, the push and the short
-live check.
+Complete. The straight kite is committed and pushed on
+`feature/kite-range-contract` (90e63a2f, 26c3a416); the gates are
+green and the live re-check shows the straight cycle firing. The
+scenario's two remaining live failures pre-date this round.
