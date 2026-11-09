@@ -242,7 +242,11 @@ func (r *probeRecorder) firstMoveAfter(
     }
     fails := 0
     for _, at := range r.fails {
-        if at.After(mark) && (first.IsZero() || at.Before(first)) {
+        // The failure may carry the SAME coarse clock stamp as the
+        // move (the Windows timer granularity - the live server
+        // answers inside one millisecond), so the window closes
+        // inclusively at the first move.
+        if at.After(mark) && (first.IsZero() || !at.After(first)) {
             fails++
         }
     }

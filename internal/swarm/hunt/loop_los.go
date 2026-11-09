@@ -75,9 +75,13 @@ func (l *Loop) blindEngageBlocked(now time.Time) bool {
         return false
     }
     cannotSeeAt := l.tracker.SelfCannotSeeTargetAt()
-    if cannotSeeAt.Before(l.engageAt) {
-        // The answer belongs to an earlier attempt: the current
-        // engage started after the obstruction was last reported.
+    if !cannotSeeAt.After(l.engageAt) {
+        // The answer belongs to an earlier attempt, the current
+        // engage started at or after the obstruction was last
+        // reported. The equality counts as earlier: the walk
+        // completion re-anchors the clock AFTER the refusal it
+        // answered, and the Windows clock granularity can stamp both
+        // inside one millisecond.
         return false
     }
     if now.Sub(cannotSeeAt) > cannotSeeFreshWindow {
@@ -143,7 +147,11 @@ func (l *Loop) fightClearedRefusal() bool {
         return false
     }
 
-    return l.tracker.SelfCombatActiveAt().After(
+    // The equality counts as progressed: a chase step issued in the
+    // same clock tick as the refusal is still newer activity (the
+    // Windows timer granularity cannot order the two, and the next
+    // refusal re-arms the recovery if the sight line stays closed).
+    return !l.tracker.SelfCombatActiveAt().Before(
         l.tracker.SelfCannotSeeTargetAt())
 }
 

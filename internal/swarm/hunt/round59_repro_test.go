@@ -274,7 +274,7 @@ func TestReproRound59EngageClockHoldsPastRefusal(t *testing.T) {
     anchored := time.Now()
     loop.tick()
 
-    require.True(t, loop.engageAt.After(anchored),
+    require.False(t, loop.engageAt.Before(anchored),
         "a fight that progressed past the refusal re-anchors the clock")
     require.True(t, loop.losAt.IsZero(),
         "the progressed fight never arms the blind recovery")
