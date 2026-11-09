@@ -58,11 +58,16 @@ func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
 
 // fleeFromThreat walks the character away from the nearest living
 // threat (the chasing mob of a fled fight, an aggressive pull it
-// never selected): one paced segment per call, straight away from the
-// threat when the escape point stays inside the zone and toward
-// the zone center when it does not (the center direction leashes
-// the chasers near their spawns). A sitting character stands up
-// first - the server refuses move requests while it sits.
+// never selected): one paced segment per call along the ordered
+// escape lane fan (see escapeWalkDestination), never toward the
+// threat and never through the zone center the mob may hold. A
+// sitting character stands up first - the server refuses move
+// requests while it sits. Two guards end a dead escape instead of
+// running it forever: no open lane at all (the cornered or walled
+// pocket) and a window that moved less than escapeNoProgressDistance
+// (the silent H-006 click drop, a walk pinned against the terrain).
+// Both reset the aggro through the emergency logout - the user rule
+// "relog when the fight cannot be won".
 func (l *Loop) fleeFromThreat(now time.Time) {
     if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
         return
@@ -83,11 +88,33 @@ func (l *Loop) fleeFromThreat(now time.Time) {
 
         return
     }
+    if l.escapeStalled(now) {
+        // The clicks went out but the character did not travel:
+        // the dead escape of H-006 or a terrain pin. Standing in
+        // the blows outlasts nothing - the session resets.
+        l.logf("Hunt: the escape moved less than %.0f units in "+
+            "%.0fs, resetting the aggro via logout",
+            escapeNoProgressDistance, escapeNoProgressWindow.Seconds())
+        l.emergencyLogout()
+
+        return
+    }
     if !l.standUpGuarded(now) {
         return
     }
     moveX, moveY, moveZ, ok := l.escapeWalkDestination()
     if !ok {
+        if _, _, hasThreat := l.threatPosition(); hasThreat {
+            // Every ordered lane is clamped to nothing or folds
+            // toward the threat: a cornered character with the
+            // chase still on it. The walk would not open distance,
+            // the relog resets the aggro instead.
+            l.logf("Hunt: no escape lane opens from the chase, " +
+                "resetting the aggro via logout")
+            l.emergencyLogout()
+
+            return
+        }
         // The blows landed but no mob stands around anymore:
         // the under attack window closes on its own in seconds.
         return
@@ -95,12 +122,20 @@ func (l *Loop) fleeFromThreat(now time.Time) {
     if err := l.game.WalkTo(moveX, moveY, moveZ); err != nil {
         l.logf("Hunt: escape walk failed: %v", err)
     }
+    l.noteEscapeWalk(now)
 }
 
 // escapeWalkDestination plans one escape segment away from the nearest
-// threat: straight away from it while the point stays inside the
-// zone, toward the zone center when it does not (the center
-// direction leashes the chasers near their spawns).
+// threat as an ORDERED lane fan: the straight away ray first, then the
+// 45 and 90 degree lanes each side of it. Every candidate is clamped
+// along its own ray into the hunting square, so an escape that would
+// leave the ground stops on the safe inner margin instead of turning
+// toward the zone center - the old center fallback ran the character
+// back through the chasing mob whenever the straight away point left
+// the square, the reported 180 degree flips. No candidate points into
+// the far side of the away hemisphere, so the run always opens
+// distance; the first lane with a usable length wins, which keeps the
+// direction stable between ticks while the geometry does.
 func (l *Loop) escapeWalkDestination() (int32, int32, int32, bool) {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
@@ -110,28 +145,134 @@ func (l *Loop) escapeWalkDestination() (int32, int32, int32, bool) {
     if !hasThreat {
         return 0, 0, 0, false
     }
-    dx := float64(selfX - threatX)
-    dy := float64(selfY - threatY)
-    dist := math.Hypot(dx, dy)
+    awayX := float64(selfX - threatX)
+    awayY := float64(selfY - threatY)
+    dist := math.Hypot(awayX, awayY)
     if dist <= 1 {
         return 0, 0, 0, false
     }
-    moveX := int32(float64(selfX) + dx/dist*escapeWalkDistance)
-    moveY := int32(float64(selfY) + dy/dist*escapeWalkDistance)
-    zone := l.zone()
-    if zone != nil && !zone.Contains(moveX, moveY) {
-        // The straight escape leaves the hunting square: run
-        // toward the center instead.
-        dx = float64(zone.CX - selfX)
-        dy = float64(zone.CY - selfY)
-        if centerDist := math.Hypot(dx, dy); centerDist > 1 {
-            frac := math.Min(1, escapeWalkDistance/centerDist)
-            moveX = int32(float64(selfX) + dx*frac)
-            moveY = int32(float64(selfY) + dy*frac)
+    awayX /= dist
+    awayY /= dist
+    var rays [1 + 2*escapeFanSteps][2]float64
+    rays[0] = [2]float64{awayX, awayY}
+    count := 1
+    for step := 1; step <= escapeFanSteps; step++ {
+        angle := escapeFanStep * float64(step)
+        for _, sign := range [2]float64{1, -1} {
+            rays[count][0], rays[count][1] =
+                rotatePlanar(awayX, awayY, sign*angle)
+            count++
         }
     }
+    for _, ray := range rays[:count] {
+        reach := l.escapeLaneReach(selfX, selfY, ray[0], ray[1])
+        if reach < escapeMinLane {
+            continue
+        }
+        moveX := selfX + int32(math.Round(ray[0]*reach))
+        moveY := selfY + int32(math.Round(ray[1]*reach))
 
-    return moveX, moveY, selfZ, true
+        return moveX, moveY, selfZ, true
+    }
+
+    return 0, 0, 0, false
+}
+
+// escapeLaneReach returns the length of one escape lane along its
+// unit ray: the full escapeWalkDistance, clamped at the inner margin
+// of the hunting square. A nil zone (the legacy no-leash mode) never
+// clamps, and a lane with no room past the margin reports zero.
+func (l *Loop) escapeLaneReach(
+    selfX, selfY int32, dirX, dirY float64,
+) float64 {
+    zone := l.zone()
+    if zone == nil {
+        return escapeWalkDistance
+    }
+    reach := math.Min(escapeWalkDistance, escapeSlabExit(
+        float64(selfX), dirX,
+        float64(zone.CX-zone.Half)+escapeZoneMargin,
+        float64(zone.CX+zone.Half)-escapeZoneMargin))
+    reach = math.Min(reach, escapeSlabExit(
+        float64(selfY), dirY,
+        float64(zone.CY-zone.Half)+escapeZoneMargin,
+        float64(zone.CY+zone.Half)-escapeZoneMargin))
+    if reach < 0 {
+        return 0
+    }
+
+    return reach
+}
+
+// escapeSlabExit returns the distance from the origin along one axis
+// direction to the inner boundary of the slab [lo, hi]. A direction
+// parallel to the slab never clamps; an origin already past the
+// boundary has no room at all (a negative reach).
+func escapeSlabExit(origin, dir, lo, hi float64) float64 {
+    switch {
+    case dir > 1e-9:
+        return (hi - origin) / dir
+    case dir < -1e-9:
+        return (lo - origin) / dir
+    default:
+        return math.Inf(1)
+    }
+}
+
+// escapeStalled reports whether the escape stopped moving: less than
+// escapeNoProgressDistance covered since the anchor inside
+// escapeNoProgressWindow. It only measures episodes that issued a
+// walk (escapeWalkAt), so the stand-up settle of a sitting character
+// never reads as a stall; it re-anchors every accepted window, so a
+// long run keeps measuring rolling progress, while a walk transport
+// that silently drops the clicks (H-006) or a run pinned against the
+// terrain names itself inside one window. The caller logs the session
+// out; clearEscapeAnchor ends the observation with the flee episode.
+func (l *Loop) escapeStalled(now time.Time) bool {
+    if l.escapeWalkAt.IsZero() || l.escapeAnchorAt.IsZero() {
+        return false
+    }
+    x, y, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    if now.Sub(l.escapeAnchorAt) < escapeNoProgressWindow {
+        return false
+    }
+    moved := math.Hypot(
+        float64(x-l.escapeAnchorX), float64(y-l.escapeAnchorY))
+    if moved < escapeNoProgressDistance {
+        return true
+    }
+    l.escapeAnchorAt = now
+    l.escapeAnchorX, l.escapeAnchorY = x, y
+
+    return false
+}
+
+// noteEscapeWalk starts the no-progress window of an issued escape
+// segment: the first walk of the episode anchors the window at the
+// spot it was issued from, later walks leave the running window
+// alone (its own anchor measures the progress).
+func (l *Loop) noteEscapeWalk(now time.Time) {
+    l.escapeWalkAt = now
+    if !l.escapeAnchorAt.IsZero() {
+        return
+    }
+    x, y, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return
+    }
+    l.escapeAnchorAt = now
+    l.escapeAnchorX, l.escapeAnchorY = x, y
+}
+
+// clearEscapeAnchor ends the no-progress observation with the flee
+// episode: the next escape starts a fresh window.
+func (l *Loop) clearEscapeAnchor() {
+    l.escapeAnchorAt = time.Time{}
+    l.escapeAnchorX, l.escapeAnchorY = 0, 0
+    l.escapeWalkAt = time.Time{}
 }
 
 // threatPosition returns the position of the mob the escape runs
@@ -308,6 +449,7 @@ func (l *Loop) emergencyLogoutWithReason(reason string) {
     }
     l.tracker.SetLoginCooldown(panicLogoutPause)
     l.panicAt = time.Time{}
+    l.clearEscapeAnchor()
     if err := l.game.RequestLogout(); err != nil {
         l.logf("Hunt: logout request failed: %v", err)
     }

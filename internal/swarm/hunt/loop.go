@@ -266,6 +266,33 @@ const (
     fleeSkipDelay = 2 * time.Minute
     // escapeWalkDistance is one escape segment of the flee flow.
     escapeWalkDistance = 700.0
+    // escapeFanStep is the angular spacing of the ordered escape
+    // lane fan: the away ray first, then the lanes each side of it.
+    // The run picks the first open lane of the order instead of
+    // flipping between two opposite points through the chaser (the
+    // reported 180 degree flips that ran the character back into
+    // the mob it fled).
+    escapeFanStep = math.Pi / 4
+    // escapeFanSteps bounds the fan on each side of the away ray
+    // (2: the 45 and 90 degree lanes).
+    escapeFanSteps = 2
+    // escapeZoneMargin keeps an escape endpoint off the exact square
+    // edge: the server rounds the move coordinates, and the next
+    // segment must still plan from inside the square.
+    escapeZoneMargin = 60.0
+    // escapeMinLane is the shortest escape segment worth a click: a
+    // lane clamped shorter sits on the square edge and the walk
+    // would read as a stall.
+    escapeMinLane = 150.0
+    // escapeNoProgressWindow is the wall clock window of the escape
+    // no-progress watchdog: a flee that moved less than
+    // escapeNoProgressDistance inside it is not an escape at all.
+    escapeNoProgressWindow = 3 * time.Second
+    // escapeNoProgressDistance is the planar distance the escape
+    // must open per window. The accept rate of the server side walk
+    // is hundreds of units per second, so a healthy escape clears it
+    // by an order of magnitude.
+    escapeNoProgressDistance = 120.0
     // noTargetPatience is the idle time before a targetless hunter
     // patrols toward the zone center: entering a zone engages the
     // first mob in reach, and only an empty radius keeps the
@@ -944,6 +971,20 @@ type Loop struct {
     // the session logs out to reset the aggro instead of running
     // forever. A recovered health or a fresh fight clears it.
     fleeSince time.Time
+    // escapeAnchorAt/X/Y anchor the escape no-progress watchdog: the
+    // spot and the moment the current observation window opened. A
+    // window that lapses with less than escapeNoProgressDistance
+    // covered names a dead escape (the H-006 silent drop, a walk
+    // with no accepted segment) and logs the session out instead of
+    // standing in the blows. Every accepted window re-anchors.
+    escapeAnchorAt time.Time
+    escapeAnchorX  int32
+    escapeAnchorY  int32
+    // escapeWalkAt stamps the last escape walk issued in the current
+    // episode: the no-progress window only opens with an issued walk,
+    // so the stand-up settle of a sitting character is never
+    // mistaken for a stalled escape.
+    escapeWalkAt time.Time
     // panicAt marks the armed pile up run (the loop run between
     // the social pile up and its deferred logout): zero while no
     // pile up forced one, otherwise the moment the pack was
@@ -1363,6 +1404,10 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         kiteReclickAt:       time.Time{},
         fleeAt:              time.Time{},
         fleeSince:           time.Time{},
+        escapeAnchorAt:      time.Time{},
+        escapeAnchorX:       0,
+        escapeAnchorY:       0,
+        escapeWalkAt:        time.Time{},
         panicAt:             time.Time{},
         panicX:              0,
         panicY:              0,
@@ -1914,6 +1959,7 @@ func (l *Loop) recoverFromDeath() {
         l.noTargetSince = time.Time{}
         l.fleeAt = time.Time{}
         l.fleeSince = time.Time{}
+        l.clearEscapeAnchor()
         // The village restart lands next to the shops and the cooldown
         // a recent finished trip armed must not hold the sale back:
         // otherwise the revived character walks to the farm spot with
@@ -2079,6 +2125,37 @@ func (l *Loop) engage() {
 
         return
     }
+    // The aggro answer of the approach: a mob that aggros while the
+    // character walks to a pick must not wait for the pick to start
+    // fighting - the walk would drag the chase into a second
+    // opponent while the swings keep landing unanswered (the
+    // reported peaceful pick fights). It runs ahead of the stuck
+    // timeout, the losing-fight verdict and the blind recovery: an
+    // add grinding a repositioning character outranks all three,
+    // and the switch below re-anchors the engage clock on the mob
+    // that actually attacks. The selected pick holding the character
+    // as its own target no longer suppresses the answer: the pick is
+    // the attack target, the mob that just joined is a different
+    // object, and the nearer attacker owns the next swing.
+    if l.target != 0 && !l.tracker.SelfFighting(l.target) {
+        if attacker, ok := l.tracker.NearestAttacker(); ok &&
+            attacker.ObjectID != l.target {
+            if !l.attackerEngageable(attacker.ObjectID) {
+                // The attacker outranks the character: the peaceful
+                // pick waits, the defense flow answers.
+                l.target = 0
+                l.engageAt = time.Time{}
+                l.fleeFromThreat(now)
+
+                return
+            }
+            l.logf("Hunt: %s aggroed on the approach, answering it "+
+                "first", attacker.Name)
+            l.target = attacker.ObjectID
+            l.engageAt = now
+            l.clearBlindRecovery()
+        }
+    }
     if l.target != 0 && !l.tracker.SelfFighting(l.target) &&
         !l.engageAt.IsZero() && now.Sub(l.engageAt) > engageStuckTimeout &&
         !l.blindRecoveryArmed(now) {
@@ -2136,35 +2213,6 @@ func (l *Loop) engage() {
 
         return
     }
-    // The aggro answer of the approach: a mob that aggros while the
-    // character walks to a pick must not wait for the pick to start
-    // fighting - the walk would drag the chase into a second
-    // opponent while the swings keep landing unanswered (the
-    // reported peaceful pick fights). A selected target that
-    // already holds the character as its own target IS the aggro
-    // answer (the first strike pick, the mob that noticed the
-    // approach first): the switch would only shuffle two identical
-    // fights, so it stays.
-    if l.target != 0 && !l.tracker.SelfFighting(l.target) &&
-        !l.tracker.ObjectTargetsSelf(l.target) {
-        if attacker, ok := l.tracker.NearestAttacker(); ok &&
-            attacker.ObjectID != l.target {
-            if !l.attackerEngageable(attacker.ObjectID) {
-                // The attacker outranks the character: the peaceful
-                // pick waits, the defense flow answers.
-                l.target = 0
-                l.engageAt = time.Time{}
-                l.fleeFromThreat(now)
-
-                return
-            }
-            l.logf("Hunt: %s aggroed on the approach, answering it "+
-                "first", attacker.Name)
-            l.target = attacker.ObjectID
-            l.engageAt = now
-            l.clearBlindRecovery()
-        }
-    }
     // The spawn settle of the fresh session (see settle.go): the
     // protected character holds the spot and regenerates before the
     // first move, then opens with the first strike. It runs before
@@ -2185,6 +2233,7 @@ func (l *Loop) engage() {
             // The health recovered and the blows stopped: the flee
             // episode is over, a future escape gets a fresh budget.
             l.fleeSince = time.Time{}
+            l.clearEscapeAnchor()
         }
         if hurt && l.tracker.SelfUnderAttack() {
             l.fleeFromThreat(now)
@@ -2346,6 +2395,7 @@ func (l *Loop) engage() {
         // A running fight ends the flee episode: the character
         // answered instead of running, the escape budget resets.
         l.fleeSince = time.Time{}
+        l.clearEscapeAnchor()
         // The fresh fight also re-anchors the engage clock: the
         // stuck timeout measures from the last real fight
         // activity, not from the original pick - a slow but
@@ -2472,22 +2522,32 @@ func (l *Loop) engage() {
 }
 
 // losingFight reports whether the running fight turned into a death
-// risk: the character fell under the escape threshold, or it dropped
-// below the re-engage health while the target keeps a clear health
-// lead (a level gap pull, an add that joined a social pack). A
-// target that is nearly finished does not count as losing - the
-// kill is one swing away and fleeing drops its loot.
+// risk: the character fell under the escape threshold, or a RUNNING
+// fight dropped below the re-engage health while the target keeps a
+// clear health lead (a level gap pull, an add that joined a social
+// pack). The percent-gap rule needs the confirmed fight: before the
+// first swing the target health is simply its full bar, and treating
+// the untouched bar as a lead fled winnable aggroed mobs five seconds
+// after the answer (the reported flee at 56 percent while the mob sat
+// at 100). A target that is nearly finished does not count as losing
+// - the kill is one swing away and fleeing drops its loot.
 func (l *Loop) losingFight() bool {
     selfHP := l.tracker.SelfHealthPercent()
-    if selfHP >= reengageHealthPercent {
-        return false
-    }
     targetHP := l.tracker.ObjectHealthPercent(l.target)
     if targetHP >= 0 && targetHP < escapeTargetBeatenPercent {
         return false
     }
     if selfHP < escapeHealthPercent {
         return true
+    }
+    if !l.tracker.SelfFighting(l.target) {
+        // The fight has not started (the approach, the first attack
+        // request of the aggro answer): only the critical health
+        // above flees, the engaged mob gets its fight.
+        return false
+    }
+    if selfHP >= reengageHealthPercent {
+        return false
     }
 
     return targetHP >= 0 && targetHP-selfHP > losingFightGap

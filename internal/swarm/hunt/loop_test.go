@@ -1160,10 +1160,13 @@ func TestLoopEscapesTheLevelGapFight(t *testing.T) {
 
     // The mob keeps 90 percent of its health while the character sank
     // to 45: the gap fight is a death risk even above the panic
-    // threshold, the escape opens early. The mob fights back, so the
+    // threshold, the escape opens early. The gap rule needs the
+    // CONFIRMED fight (the untouched target bar is not a lead): the
+    // self swing stages the running fight. The mob fights back, so the
     // escape direction measures against its blows.
     loop.target = 7
     bot.ApplySelfTarget(7)
+    selfSwingsAt(bot, 45600)
     bot.ApplyStatusUpdate(7, []state.Attribute{
         {ID: state.AttrCurHP, Value: 90},
         {ID: state.AttrMaxHP, Value: 100},
