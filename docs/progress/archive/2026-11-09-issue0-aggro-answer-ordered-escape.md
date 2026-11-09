@@ -1,4 +1,4 @@
-# The aggro answer and the ordered escape (status: in progress)
+# The aggro answer and the ordered escape (status: complete)
 
 Started 2026-11-09, branch feature/kite-range-contract, issue #0 (the
 owner report, no board issue yet).
@@ -91,23 +91,15 @@ Root causes found in the code:
 
 ## Status
 
-In progress: the code and its unit tests are committed (the loot
-interrupt, the aggro answer together with the ordered escape); the
-full hunt suite (156 s) and the full `golangci-lint run ./...` are
-green, `task fmt:check` passes. The live round on the running stack
-with a `temp*` account is the remaining step. First live attempt
-(12:18) burned the login server IP ban with a wrong password guess
-(`temp10` already existed with password `temp`): the only failure was
-the ban, no hunt evidence came out of it. The account was re-launched
-with the right password and reconnects on the backoff until the
-900 s ban lapses, then the journal watch starts.
+Complete. The aggro answer, the pre-fight rule and the ordered
+escape shipped in 94b96bac; the live round of 2026-11-09 13:13
+confirmed them firing and surfaced the two follow-ups recorded
+below, both fixed, tested and live-checked in this round (the
+closing evidence sits in the last section of the fragment).
 
 ## Next step
 
-Watch `logs/session-*.jsonl` of the running `temp10` bot for the
-`aggroed on the approach` line, an ordered escape (lanes at
-0/±45/±90 degrees, no fold back through the chaser) and the loot
-interrupt; then archive this fragment.
+None: the fragment archives with this commit.
 
 ## Live round 2026-11-09 13:13 (the temp18 acceptance dump)
 
@@ -223,3 +215,26 @@ the acceptance-runner leak and the kite drought stay open.
 - Live re-check of the walled-pocket branch is still pending; the
   fragment stays active until the temp archer run confirms the
   `lost ... standing to shoot` line and the shot resumes.
+
+## Live round 2026-11-09 13:55 (the closing re-check)
+
+The archer-kite scenario re-ran on the fixed build
+(`SWARM_ARCHER_KITE_MINUTES=2`, temp18, standalone acceptance CLI,
+log `logs/acceptance/archer-kite-20261109-135558-26360-1.log`):
+
+- **Verdict PASSED after 2m6s, 6 of 6 checks** (the 13:13 run of
+  the old build passed 4 of 6, the survival check failed).
+- **The stall exit fires and the bow resumes**: `the pursuit race
+  on 268439311 is at parity (2 stalled windows), checking the walk
+  budget` + `the pursuit race on 268439311 is lost after 4 walks,
+  standing to shoot` at +52.3 s, and `lost after 7 walks, standing
+  to shoot` at +92.5 s; `shot released on 268439311` lands 0.25 s
+  after each exit (123 and 141 units - the cornered stand-to-shoot
+  the fix exists for). Eight shots in the window, the 63 s drought
+  is gone.
+- **No session loss in the window**: zero `session lost`, zero
+  `use of closed network connection` lines (the 13:13 dump had
+  229), and the run shut down cleanly - the stop side of the
+  per-session loop join is exercised live. The reconnect side is
+  pinned by `runner_loop_test.go`; the scenario survived at min
+  HP 62 percent, so no emergency relogin fired this time.
