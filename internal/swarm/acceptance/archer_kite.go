@@ -151,13 +151,16 @@ func archerKiteTimeout() time.Duration {
 }
 
 // The archer kite check ids: the narrative of the contract - the
-// type armed the bow, the fight stays at the bow radii, the kite
-// steps answer the closing mobs, the bot survives the window and
-// the quiver never runs dry.
+// type armed the bow, the shots follow the bow cooldown, the
+// standing fight stays inside the bow band, the kite steps answer
+// the closing mobs, the fights resolve, the bot survives the window
+// and the quiver never runs dry.
 const (
     checkArcherKiteArmed    = "armed"
+    checkArcherKiteCadence  = "cadence"
     checkArcherKiteRange    = "range"
     checkArcherKiteRetreats = "retreats"
+    checkArcherKiteKills    = "kills"
     checkArcherKiteSurvives = "survives"
     checkArcherKiteQuiver   = "quiver"
 )
@@ -176,13 +179,23 @@ func archerKiteChecks() []Check {
             Done:  false, Detail: "",
         },
         {
+            ID:    checkArcherKiteCadence,
+            Label: "shoots as soon as the bow is ready",
+            Done:  false, Detail: "",
+        },
+        {
             ID:    checkArcherKiteRange,
-            Label: "fights at the bow radii",
+            Label: "fights stay inside the bow band",
             Done:  false, Detail: "",
         },
         {
             ID:    checkArcherKiteRetreats,
             Label: "retreats when the mobs close",
+            Done:  false, Detail: "",
+        },
+        {
+            ID:    checkArcherKiteKills,
+            Label: "the fights resolve",
             Done:  false, Detail: "",
         },
         {
@@ -202,28 +215,38 @@ func archerKiteChecks() []Check {
 // originals are unexported in the hunt package; the values are the
 // contract the scenario observes, the comments name their source).
 const (
-    // archerKiteMeleeRadius is the melee engage radius (hunt
-    // userEngageRadius): a fight sample beyond it is a ranged
-    // sample.
-    archerKiteMeleeRadius = 150.0
     // archerKiteBowBand is the bow stall radius (hunt
     // userBowStallRadius): a healthy standing bow fight stays
-    // inside it.
+    // inside it. The band is the drift fence of the range check,
+    // NOT a ranged-majority demand: the shot-cycle contract of the
+    // 2026-11-09 round deliberately fights at melee between the
+    // shots (the windup standstill lets the chaser close), so the
+    // range verdict only rejects a fight that ran past the stall
+    // radius.
     archerKiteBowBand = 650.0
-    // archerKiteRangedMargin lifts the ranged sample boundary over
-    // the melee radius: the broadcast lag of the last-known
-    // positions moves the observed distance by tens of units.
-    archerKiteRangedMargin = 50.0
     // archerKiteBandSlack widens the bow band ceiling for the same
     // broadcast lag (a sample one hop behind a running mob).
     archerKiteBandSlack = 130.0
     // archerKiteMinFightSamples is the evidence floor: the range
     // verdict only forms once the window observed enough fights.
     archerKiteMinFightSamples = 5
-    // archerKiteRangedShare is the ranged half of the verdict: at
-    // least half the fight samples must sit beyond the melee
-    // radius (a cornered hold is the honest edge, not the norm).
-    archerKiteRangedShare = 2
+    // archerKiteShotGap is the healthy same-fight gap between two
+    // self shot broadcasts: the C1 bow disable window on the live
+    // pAtkSpd (~2.97 s at 337) plus the tick and broadcast slack.
+    // The old safe-distance gate measured 20-30 s gaps against the
+    // same-speed chasers; the shot-cycle contract fires the next
+    // shot at the disable end whatever range the chase reached.
+    archerKiteShotGap = 4 * time.Second
+    // archerKiteMinShotGaps is the evidence floor of the cadence
+    // verdict: a 5-minute window of a running fight measured ~35
+    // same-fight gaps, the floor keeps the verdict open on a window
+    // that barely fought.
+    archerKiteMinShotGaps = 6
+    // archerKiteFastGapPermille is the majority share of the
+    // same-fight gaps that must sit inside archerKiteShotGap: three
+    // quarters leaves room for the first shot of a re-engage while
+    // the treadmill (20-30 s) fails every gap.
+    archerKiteFastGapPermille = 750
     // archerKiteMinKiteSteps is the retreat evidence floor: a
     // repeated pattern, not a single blip.
     archerKiteMinKiteSteps = 2
@@ -232,6 +255,20 @@ const (
     // of the killing range.
     archerKiteHPFloor = 10.0
 )
+
+// archerKiteMinKills is the kill floor of the window: the shot
+// cycle exists to RESOLVE fights (the safe-distance treadmill fired
+// arrows while the mob regenerated and killed nothing), so a window
+// that resolves no fight fails regardless of the movement telemetry.
+// The floor scales at one kill per two minutes, never under one.
+func archerKiteMinKills(window time.Duration) int {
+    kills := int(window / (2 * time.Minute))
+    if kills < 1 {
+        kills = 1
+    }
+
+    return kills
+}
 
 // The kite log line markers of the hunt loop (kite.go): the step
 // lines narrate every retreat hop - the proximity step ("kiting
@@ -248,14 +285,16 @@ const (
 // archerKiteLog wraps the test log line callback with the kite
 // telemetry counter: every hunt log line still flows to the test
 // log (and through it to the botlog run file), while the wrapper
-// counts the kite step and hold lines the session goroutine emits.
-// The counter is mutex-guarded because the monitor goroutine reads
-// it while the session goroutine writes it.
+// counts the kite step, hold, shot-cycle retreat and kill lines the
+// session goroutine emits. The counter is mutex-guarded because the
+// monitor goroutine reads it while the session goroutine writes it.
 type archerKiteLog struct {
-    mu    sync.Mutex
-    next  func(string)
-    steps int
-    holds int
+    mu     sync.Mutex
+    next   func(string)
+    steps  int
+    holds  int
+    reload int
+    kills  int
 }
 
 // newArcherKiteLog arms the wrapper around the base log line
@@ -272,19 +311,30 @@ func (l *archerKiteLog) line(line string) {
         strings.Contains(line, kiteShotMark) {
         l.steps++
     }
+    if strings.Contains(line, kiteShotMark) {
+        // The shot-cycle retreat line: the deferred click at the
+        // windup end of the just-released shot.
+        l.reload++
+    }
     if strings.Contains(line, kiteHoldMark) {
         l.holds++
+    }
+    if strings.Contains(line, "Hunt: target") &&
+        strings.Contains(line, "died, looting") {
+        l.kills++
     }
     l.mu.Unlock()
     l.next(line)
 }
 
 // counts reads the kite telemetry counters.
-func (l *archerKiteLog) counts() (steps int, holds int) {
+func (l *archerKiteLog) counts() (
+    steps, holds, reloads, kills int,
+) {
     l.mu.Lock()
     defer l.mu.Unlock()
 
-    return l.steps, l.holds
+    return l.steps, l.holds, l.reload, l.kills
 }
 
 // archerKiteSample is one monitor observation of the live tracker:
@@ -319,23 +369,36 @@ type archerKiteSample struct {
     // quiver stack plus the bagged spare piles), -1 before the
     // first inventory answer.
     arrows int32
+    // shotAt is the timestamp of the last self Attack broadcast,
+    // zero before the first shot of the session.
+    shotAt time.Time
+    // fightTarget is the auto-attack target at the sample moment,
+    // zero when no fight runs.
+    fightTarget int32
 }
 
 // archerKiteWatch is the latched observation state of the window:
 // the monitor folds one sample per period into it and the verdicts
 // read the accumulated evidence.
 type archerKiteWatch struct {
-    bowSeen       bool
-    quiverSeen    bool
-    fightSamples  int
-    rangedSamples int
-    maxFightDist  float64
-    kiteSteps     int
-    kiteHolds     int
-    minHP         float64
-    minArrows     int32
-    sawOffline    bool
-    died          bool
+    bowSeen      bool
+    quiverSeen   bool
+    fightSamples int
+    maxFightDist float64
+    shotCount    int
+    shotGaps     int
+    fastShotGaps int
+    lastShot     time.Time
+    lastShotFor  int32
+    reloadTails  int
+    kills        int
+    minKills     int
+    kiteSteps    int
+    kiteHolds    int
+    minHP        float64
+    minArrows    int32
+    sawOffline   bool
+    died         bool
 }
 
 // newArcherKiteWatch arms the watch with the neutral start state:
@@ -362,9 +425,6 @@ func (w archerKiteWatch) fold(s archerKiteSample) archerKiteWatch {
     }
     if s.fighting && s.fightDist >= 0 {
         w.fightSamples++
-        if s.fightDist >= archerKiteMeleeRadius+archerKiteRangedMargin {
-            w.rangedSamples++
-        }
         // Only a standing sample judges the bow band: while the
         // character walks a retreat leg the gap to the lagging
         // chaser grows past the band by design, and latching that
@@ -376,6 +436,13 @@ func (w archerKiteWatch) fold(s archerKiteSample) archerKiteWatch {
             w.maxFightDist = s.fightDist
         }
     }
+    // The shot cadence of the fight: a fresh self Attack broadcast
+    // inside the same fight target records the gap from the previous
+    // one. A target switch starts a new chain (the walk to the next
+    // mob is not a slow shot), and the freshly killed target reads
+    // zero before the next pick lands - both break the chain, never
+    // fake a gap.
+    w = w.foldShot(s)
     if s.hpPercent >= 0 && s.hpPercent < w.minHP {
         w.minHP = s.hpPercent
     }
@@ -388,15 +455,46 @@ func (w archerKiteWatch) fold(s archerKiteSample) archerKiteWatch {
     return w
 }
 
+// foldShot latches one fresh self Attack broadcast into the cadence
+// chain of the watch: the same-fight gap counts between the previous
+// shot and the fresh one, a target switch or a vanished target starts
+// a new chain. The pure half of the shot evidence.
+func (w archerKiteWatch) foldShot(
+    s archerKiteSample,
+) archerKiteWatch {
+    if s.shotAt.IsZero() || !s.shotAt.After(w.lastShot) {
+        return w
+    }
+    w.shotCount++
+    if !w.lastShot.IsZero() && s.fightTarget != 0 &&
+        s.fightTarget == w.lastShotFor {
+        gap := s.shotAt.Sub(w.lastShot)
+        w.shotGaps++
+        if gap <= archerKiteShotGap {
+            w.fastShotGaps++
+        }
+    }
+    w.lastShot = s.shotAt
+    if s.fightTarget != 0 {
+        w.lastShotFor = s.fightTarget
+    }
+
+    return w
+}
+
 // archerKiteVerdicts is the per-check outcome of the watch: done
 // carries the pass state, detail narrates the evidence.
 type archerKiteVerdicts struct {
     armed    bool
     armedD   string
-    ranged   bool
-    rangedD  string
+    cadence  bool
+    cadenceD string
+    band     bool
+    bandD    string
     retreats bool
     retreatD string
+    kills    bool
+    killsD   string
     survives bool
     surviveD string
     quiver   bool
@@ -404,20 +502,30 @@ type archerKiteVerdicts struct {
 }
 
 // verdicts reads the latched evidence into the check outcomes. The
-// range verdict only forms on the evidence floor: a window without
-// fights holds the check open (the detail says why), a window of
-// fights inside the band with the ranged majority passes it, a
-// window of melee samples (the archer tanking instead of kiting)
-// fails it. The quiver verdict holds from the first inventory
-// answer: the stock never emptied. The survival verdict is the
-// conjunction of the online hold, the death flag and the HP floor.
+// cadence verdict only forms past its evidence floor: the majority
+// of the same-fight shot gaps must sit inside the C1 bow cooldown
+// (a treadmill window fires every 20-30 s and fails every gap). The
+// band verdict only judges STANDING fight samples and only forms on
+// its own floor - it is a drift fence, not a ranged-majority
+// demand. The retreat and kill verdicts read the log counters and
+// the scaled kill floor. The quiver verdict holds from the first
+// inventory answer: the stock never emptied. The survival verdict
+// is the conjunction of the online hold, the death flag and the HP
+// floor.
 func (w archerKiteWatch) verdicts() archerKiteVerdicts {
+    floor := w.minKills
+    if floor < 1 {
+        floor = 1
+    }
     v := archerKiteVerdicts{
         armedD: "no bow in hand yet",
-        rangedD: fmt.Sprintf("%d fight samples so far",
+        cadenceD: fmt.Sprintf("%d shot gaps so far",
+            w.shotGaps),
+        bandD: fmt.Sprintf("%d fight samples so far",
             w.fightSamples),
         retreatD: fmt.Sprintf("%d kite steps, %d holds observed",
             w.kiteSteps, w.kiteHolds),
+        killsD:   fmt.Sprintf("%d kills of %d wanted", w.kills, floor),
         surviveD: "the window is running",
         quiverD:  "the inventory is not known yet",
     }
@@ -427,21 +535,27 @@ func (w archerKiteWatch) verdicts() archerKiteVerdicts {
         v.armedD = "the bow is worn, the quiver is on"
     }
 
+    if w.shotGaps >= archerKiteMinShotGaps {
+        share := w.fastShotGaps * 100 / w.shotGaps
+        v.cadence = w.fastShotGaps*1000 >=
+            w.shotGaps*archerKiteFastGapPermille
+        v.cadenceD = fmt.Sprintf(
+            "%d shots, %d%% of the gaps inside the %.0fs cooldown",
+            w.shotCount, share, archerKiteShotGap.Seconds())
+    }
+
     if w.fightSamples >= archerKiteMinFightSamples {
-        inBand := w.maxFightDist <= archerKiteBowBand+archerKiteBandSlack
-        ranged := w.rangedSamples*archerKiteRangedShare >=
-            w.fightSamples
-        v.ranged = inBand && ranged
-        share := 0
-        if w.fightSamples > 0 {
-            share = w.rangedSamples * 100 / w.fightSamples
-        }
-        v.rangedD = fmt.Sprintf(
-            "%d samples, %d%% ranged, max %.0f units",
-            w.fightSamples, share, w.maxFightDist)
+        v.band = w.maxFightDist <= archerKiteBowBand+archerKiteBandSlack
+        v.bandD = fmt.Sprintf("%d standing samples, max %.0f units",
+            w.fightSamples, w.maxFightDist)
     }
 
     v.retreats = w.kiteSteps >= archerKiteMinKiteSteps
+    v.retreatD = fmt.Sprintf(
+        "%d kite steps (%d shot-cycle), %d holds observed",
+        w.kiteSteps, w.reloadTails, w.kiteHolds)
+
+    v.kills = w.kills >= floor
 
     if w.sawOffline || w.died {
         reason := "the character died"
@@ -501,6 +615,7 @@ func archerKiteSampleOf(tracker *state.Bot) archerKiteSample {
         fightDist: -1,
         hpPercent: -1,
         arrows:    -1,
+        shotAt:    tracker.SelfLastShotAt(),
     }
     if kind, ok := tracker.SelfWeaponKind(); ok && kind == "BOW" {
         sample.bowWorn = true
@@ -522,6 +637,7 @@ func archerKiteSampleOf(tracker *state.Bot) archerKiteSample {
         }
     }
     target := snapshot.Diagnostics.FightingTargetID
+    sample.fightTarget = target
     if target != 0 && snapshot.Diagnostics.AutoAttacking {
         sample.fighting = true
         x, y, _, ok := tracker.SelfPosition()
@@ -554,6 +670,7 @@ func archerKiteMonitor(
     done chan<- archerKiteWatch,
 ) {
     watch := newArcherKiteWatch()
+    watch.minKills = archerKiteMinKills(time.Until(deadline))
     defer func() {
         done <- watch
         close(done)
@@ -563,7 +680,9 @@ func archerKiteMonitor(
             return
         }
         watch = watch.fold(archerKiteSampleOf(tracker))
-        watch.kiteSteps, watch.kiteHolds = kiteLog.counts()
+        steps, holds, reloads, kills := kiteLog.counts()
+        watch.kiteSteps, watch.kiteHolds = steps, holds
+        watch.reloadTails, watch.kills = reloads, kills
         applyArcherKiteVerdicts(test, watch.verdicts())
         if time.Now().After(deadline) {
             test.appendLog("acceptance: the archer kite window " +
@@ -583,8 +702,10 @@ func archerKiteMonitor(
 // scenario from the verdicts of the watch.
 func applyArcherKiteVerdicts(test *Test, v archerKiteVerdicts) {
     test.updateCheck(checkArcherKiteArmed, v.armed, v.armedD)
-    test.updateCheck(checkArcherKiteRange, v.ranged, v.rangedD)
+    test.updateCheck(checkArcherKiteCadence, v.cadence, v.cadenceD)
+    test.updateCheck(checkArcherKiteRange, v.band, v.bandD)
     test.updateCheck(checkArcherKiteRetreats, v.retreats, v.retreatD)
+    test.updateCheck(checkArcherKiteKills, v.kills, v.killsD)
     test.updateCheck(checkArcherKiteSurvives, v.survives,
         v.surviveD)
     test.updateCheck(checkArcherKiteQuiver, v.quiver, v.quiverD)
@@ -678,33 +799,50 @@ func archerKiteAwaitOutcome(
     verdicts := watch.verdicts()
     applyArcherKiteVerdicts(test, verdicts)
     test.appendLog("acceptance: the kite telemetry - " +
-        fmt.Sprintf("%d kite steps, %d cornered holds, %d fight "+
-            "samples (%d ranged), min HP %.0f%%, min arrows %d",
-            watch.kiteSteps, watch.kiteHolds, watch.fightSamples,
-            watch.rangedSamples, math.Round(watch.minHP),
-            watch.minArrows))
+        fmt.Sprintf("%d shots, %d shot gaps (%d inside the "+
+            "cooldown), %d kite steps (%d shot-cycle), %d holds, "+
+            "%d kills, %d fight samples, min HP %.0f%%, min "+
+            "arrows %d",
+            watch.shotCount, watch.shotGaps, watch.fastShotGaps,
+            watch.kiteSteps, watch.reloadTails, watch.kiteHolds,
+            watch.kills, watch.fightSamples,
+            math.Round(watch.minHP), watch.minArrows))
 
-    var broken []string
-    if !verdicts.armed {
-        broken = append(broken, "the bow never armed")
-    }
-    if !verdicts.ranged {
-        broken = append(broken, "the fight left the bow radii")
-    }
-    if !verdicts.retreats {
-        broken = append(broken, "the kite never stepped")
-    }
-    if !verdicts.survives {
-        broken = append(broken, "the survival broke: "+
-            verdicts.surviveD)
-    }
-    if !verdicts.quiver {
-        broken = append(broken, "the quiver ran dry")
-    }
+    broken := archerKiteBroken(verdicts)
     if len(broken) > 0 {
         return errors.New("the archer kite contract failed: " +
             strings.Join(broken, "; "))
     }
 
     return nil
+}
+
+// archerKiteBroken names every failed half of the archer contract in
+// the narrative order of the checks. The split keeps the scenario
+// teardown readable and the verdict mapping in one place.
+func archerKiteBroken(v archerKiteVerdicts) []string {
+    var broken []string
+    if !v.armed {
+        broken = append(broken, "the bow never armed")
+    }
+    if !v.cadence {
+        broken = append(broken, "the shots left the bow cooldown")
+    }
+    if !v.band {
+        broken = append(broken, "the fight left the bow band")
+    }
+    if !v.retreats {
+        broken = append(broken, "the kite never stepped")
+    }
+    if !v.kills {
+        broken = append(broken, "the fights never resolved")
+    }
+    if !v.survives {
+        broken = append(broken, "the survival broke: "+v.surviveD)
+    }
+    if !v.quiver {
+        broken = append(broken, "the quiver ran dry")
+    }
+
+    return broken
 }

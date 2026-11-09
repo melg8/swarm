@@ -33,7 +33,8 @@ func TestArcherKiteDefinition(t *testing.T) {
         require.NotNil(t, def.Scenario)
         for _, needle := range []string{
             "36000 50229 -3456", "level 7", "archer type",
-            "bow radii", "arrow stock never empties", "#28",
+            "bow cooldown", "one kill per two minutes",
+            "arrow stock never empties", "#28",
         } {
             require.Contains(t, def.Description, needle)
         }
@@ -101,7 +102,7 @@ func TestArcherKiteItemsMatchTheKit(t *testing.T) {
 }
 
 // TestArcherKiteChecksCoverTheStory pins the check list: the world
-// entry plus the five contract checks in the narrative order.
+// entry plus the seven contract checks in the narrative order.
 func TestArcherKiteChecksCoverTheStory(t *testing.T) {
     checks := archerKiteChecks()
     ids := make([]string, 0, len(checks))
@@ -111,49 +112,76 @@ func TestArcherKiteChecksCoverTheStory(t *testing.T) {
         require.False(t, check.Done)
     }
     require.Equal(t, []string{
-        checkOnline, checkArcherKiteArmed, checkArcherKiteRange,
-        checkArcherKiteRetreats, checkArcherKiteSurvives,
+        checkOnline, checkArcherKiteArmed, checkArcherKiteCadence,
+        checkArcherKiteRange, checkArcherKiteRetreats,
+        checkArcherKiteKills, checkArcherKiteSurvives,
         checkArcherKiteQuiver,
     }, ids)
 }
 
 // TestArcherKiteFoldLatchesTheTelemetry pins the pure fold: the
-// ranged samples count only the fights beyond the melee radius, the
 // minimums latch down (never up), the arrow floor forms on the first
 // answer and the offline and death flags latch once. A walking
 // sample still counts as a fight but never latches the bow band: the
-// retreat legs open the gap past the band by design.
+// retreat legs open the gap past the band by design. The shot cadence
+// chains the own Attack broadcasts of the SAME target and breaks on
+// a target switch or a shot whose target already vanished.
 func TestArcherKiteFoldLatchesTheTelemetry(t *testing.T) {
+    base := time.Date(2026, 11, 10, 12, 0, 0, 0, time.UTC)
     watch := newArcherKiteWatch()
     watch = watch.fold(archerKiteSample{
         online: true, hpPercent: 87, arrows: 540,
         fighting: true, fightDist: 420,
+        shotAt: base, fightTarget: 7,
     })
     watch = watch.fold(archerKiteSample{
         online: true, hpPercent: 64, arrows: 470,
         fighting: true, fightDist: 260,
+        shotAt: base.Add(3 * time.Second), fightTarget: 7,
     })
     watch = watch.fold(archerKiteSample{
         online: true, hpPercent: 71, arrows: 430,
         fighting: true, fightDist: 140,
+        shotAt: base.Add(6 * time.Second), fightTarget: 7,
     })
     // A retreat leg: the character walks, the lagging chaser leaves
-    // the band. The sample counts as a fight and a ranged one, but
-    // the band ceiling stays at the standing 420.
+    // the band. The sample counts as a fight, but the band ceiling
+    // stays at the standing 420.
     watch = watch.fold(archerKiteSample{
         online: true, hpPercent: 70, arrows: 430,
         fighting: true, walking: true, fightDist: 796,
+        shotAt: base.Add(9 * time.Second), fightTarget: 7,
     })
     watch = watch.fold(archerKiteSample{online: true, arrows: 430,
         hpPercent: -1})
 
     require.Equal(t, 4, watch.fightSamples)
-    require.Equal(t, 3, watch.rangedSamples)
     require.InDelta(t, 420.0, watch.maxFightDist, 0.01)
+    require.Equal(t, 4, watch.shotCount)
+    require.Equal(t, 3, watch.shotGaps)
+    require.Equal(t, 3, watch.fastShotGaps)
     require.InDelta(t, 64.0, watch.minHP, 0.01)
     require.Equal(t, int32(430), watch.minArrows)
     require.False(t, watch.sawOffline)
     require.False(t, watch.died)
+
+    // A target switch starts a fresh chain: the first shot at the
+    // new mob is not a slow shot of the old fight.
+    watch = watch.fold(archerKiteSample{
+        online: true, fighting: true, fightDist: 400,
+        hpPercent: -1, arrows: -1,
+        shotAt: base.Add(12 * time.Second), fightTarget: 8,
+    })
+    require.Equal(t, 5, watch.shotCount)
+    require.Equal(t, 3, watch.shotGaps)
+    // A shot whose target already vanished breaks the chain too: the
+    // fresh pick must not inherit the dead fight's gap.
+    watch = watch.fold(archerKiteSample{
+        online: true, hpPercent: -1, arrows: -1,
+        shotAt: base.Add(15 * time.Second),
+    })
+    require.Equal(t, 6, watch.shotCount)
+    require.Equal(t, 3, watch.shotGaps)
 
     watch = watch.fold(archerKiteSample{
         online: false, dead: true, hpPercent: -1, arrows: -1,
@@ -169,56 +197,80 @@ func TestArcherKiteFoldLatchesTheTelemetry(t *testing.T) {
 }
 
 // TestArcherKiteVerdictsPinTheContract pins the verdict table of the
-// pure evaluation: the honest kite window passes every check, a
-// window of melee samples fails the range verdict, a dry quiver
-// fails the stock verdict and a death fails the survival verdict.
+// pure evaluation: the honest kite window passes every check, the
+// treadmill cadence and the chase beyond the band fail their own
+// verdicts, a dry quiver fails the stock verdict, no kill fails the
+// resolution verdict and a death fails the survival verdict.
 func TestArcherKiteVerdictsPinTheContract(t *testing.T) {
     // The honest kite window: the bow and the quiver worn, six
-    // fight samples of which four ranged, all inside the bow band,
-    // three kite steps, the HP floor never breached, the stock
-    // never dry.
+    // standing fight samples inside the bow band, eight shots whose
+    // seven same-fight gaps all sit inside the cooldown, six
+    // shot-cycle retreats, two kills of the floor, the HP floor
+    // never breached, the stock never dry.
     honest := archerKiteWatch{
         bowSeen: true, quiverSeen: true,
-        fightSamples: 6, rangedSamples: 4, maxFightDist: 480,
-        kiteSteps: 3, kiteHolds: 1, minHP: 55, minArrows: 380,
+        fightSamples: 6, maxFightDist: 480,
+        shotCount: 8, shotGaps: 7, fastShotGaps: 7, reloadTails: 6,
+        kills: 2, minKills: 2,
+        kiteSteps: 8, kiteHolds: 1, minHP: 55, minArrows: 380,
     }
     verdicts := honest.verdicts()
     require.True(t, verdicts.armed)
-    require.True(t, verdicts.ranged)
+    require.True(t, verdicts.cadence)
+    require.True(t, verdicts.band)
     require.True(t, verdicts.retreats)
+    require.True(t, verdicts.kills)
     require.True(t, verdicts.survives)
     require.True(t, verdicts.quiver)
+    require.Contains(t, verdicts.cadenceD, "100%")
 
-    // The melee tank: the archer took the melee trades instead of
-    // kiting (every sample below the melee radius) - the range
-    // verdict fails, the rest of the contract still reads.
-    melee := honest
-    melee.rangedSamples = 1
-    verdicts = melee.verdicts()
-    require.False(t, verdicts.ranged)
-    require.True(t, verdicts.retreats)
+    // The treadmill: most same-fight gaps run 20-30 seconds (the
+    // old safe-distance gate) - the cadence verdict fails while the
+    // band verdict still reads.
+    treadmill := honest
+    treadmill.fastShotGaps = 5
+    verdicts = treadmill.verdicts()
+    require.False(t, verdicts.cadence)
+    require.True(t, verdicts.band)
+    require.Contains(t, verdicts.cadenceD, "71%")
 
-    // The chase beyond the band: the fight ran past the stall
-    // radius - the range verdict fails.
+    // The cadence evidence floor: a window of three gaps holds the
+    // verdict open (not failed, undecided).
+    earlyCadence := honest
+    earlyCadence.shotGaps = 3
+    earlyCadence.fastShotGaps = 3
+    verdicts = earlyCadence.verdicts()
+    require.False(t, verdicts.cadence)
+    require.Contains(t, verdicts.cadenceD, "3 shot gaps")
+
+    // The chase beyond the band: the standing fight ran past the
+    // stall radius - the band verdict fails.
     chase := honest
     chase.maxFightDist = archerKiteBowBand + archerKiteBandSlack + 1
     verdicts = chase.verdicts()
-    require.False(t, verdicts.ranged)
+    require.False(t, verdicts.band)
+    require.True(t, verdicts.cadence)
 
-    // The evidence floor: a window of two fights holds the range
-    // verdict open (not failed, undecided).
-    early := honest
-    early.fightSamples = 2
-    early.rangedSamples = 2
-    verdicts = early.verdicts()
-    require.False(t, verdicts.ranged)
-    require.Contains(t, verdicts.rangedD, "2 fight samples")
+    // The band evidence floor: a window of two standing samples
+    // holds the verdict open.
+    earlyBand := honest
+    earlyBand.fightSamples = 2
+    verdicts = earlyBand.verdicts()
+    require.False(t, verdicts.band)
+    require.Contains(t, verdicts.bandD, "2 fight samples")
 
     // The static archer: no kite steps - the retreat verdict fails.
     standing := honest
     standing.kiteSteps = 1
     verdicts = standing.verdicts()
     require.False(t, verdicts.retreats)
+
+    // The unresolved window: the shots flew but no fight ended.
+    unresolved := honest
+    unresolved.kills = 1
+    verdicts = unresolved.verdicts()
+    require.False(t, verdicts.kills)
+    require.Contains(t, verdicts.killsD, "1 kills of 2 wanted")
 
     // The dry quiver: the stock hit zero.
     dry := honest
@@ -248,9 +300,10 @@ func TestArcherKiteVerdictsPinTheContract(t *testing.T) {
 }
 
 // TestArcherKiteLogCountsTheKiteLines pins the log wrapper: the kite
-// step and hold lines of the hunt loop count, the ordinary hunt
-// lines and the mirrored session lines do not, and every line still
-// reaches the wrapped callback.
+// step and hold lines of the hunt loop count, the shot-cycle retreat
+// line counts as both a retreat and a reload tail, the kill line
+// counts, the ordinary hunt lines and the mirrored session lines do
+// not, and every line still reaches the wrapped callback.
 func TestArcherKiteLogCountsTheKiteLines(t *testing.T) {
     var seen []string
     kiteLog := newArcherKiteLog(func(line string) {
@@ -260,23 +313,31 @@ func TestArcherKiteLogCountsTheKiteLines(t *testing.T) {
         "on 7, kiting clear (step 1 of 8)")
     kiteLog.line("Hunt: hostile 7 closed to 240 units of the fight " +
         "on 7, kiting clear (step 2 of 8)")
+    kiteLog.line("Hunt: the windup on 7 ended (hostile 7 at 320 " +
+        "units), kiting the reload tail")
+    kiteLog.line("Hunt: shot released on 7, hostile 7 holds 300 " +
+        "units, kiting the reload tail")
     kiteLog.line("Hunt: no walkable retreat lane on target 7 " +
         "(cornered), holding ground and shooting the bow")
     kiteLog.line("Hunt: the chasers surround the bow fight on " +
         "target 7, holding ground and shooting through the train")
-    kiteLog.line("Hunt: target 7 selected, engaging")
+    kiteLog.line("Hunt: target 7 died, looting")
+    kiteLog.line("Hunt: target 8 selected, engaging")
     kiteLog.line("acceptance: entered the world")
 
-    steps, holds := kiteLog.counts()
-    require.Equal(t, 2, steps)
+    steps, holds, reloads, kills := kiteLog.counts()
+    require.Equal(t, 4, steps, "two steps and two shot-cycle lines")
     require.Equal(t, 2, holds)
-    require.Len(t, seen, 6, "every line flows to the wrapped log")
+    require.Equal(t, 2, reloads)
+    require.Equal(t, 1, kills)
+    require.Len(t, seen, 9, "every line flows to the wrapped log")
 }
 
 // TestArcherKiteSampleOfReadsTheTracker pins the live extraction:
 // the worn bow and quiver answer the armed check, the fight distance
-// reads the self position against the fight target, the health
-// percentage and the arrow stock sum the worn and the bagged piles.
+// reads the self position against the fight target, the shot stamp
+// and the fight target feed the cadence chain, the health percentage
+// and the arrow stock sum the worn and the bagged piles.
 func TestArcherKiteSampleOfReadsTheTracker(t *testing.T) {
     bot := state.NewBot(archerKiteAccount)
     bot.SetCharacter(archerKiteAccount, 100, 18,
@@ -337,6 +398,9 @@ func TestArcherKiteSampleOfReadsTheTracker(t *testing.T) {
     require.True(t, sample.quiverWorn)
     require.True(t, sample.fighting)
     require.InDelta(t, 300.0, sample.fightDist, 1.0)
+    require.False(t, sample.shotAt.IsZero(),
+        "the self Attack broadcast stamps the shot")
+    require.Equal(t, int32(7), sample.fightTarget)
     require.InDelta(t, 50.0, sample.hpPercent, 1.0)
     require.Equal(t, int32(530), sample.arrows,
         "the worn quiver and the bagged pile sum")

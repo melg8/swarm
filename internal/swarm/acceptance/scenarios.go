@@ -185,14 +185,18 @@ func Definitions() []TestDef {
                 "bot farms the window (SWARM_ARCHER_KITE_MINUTES, " +
                 "default the 10 minute smoke) under the kiting " +
                 "contract - the engage requests start the shots " +
-                "inside the bow range, the closing orcs arm the " +
-                "kite steps and the cornered holds keep shooting " +
-                "the bow. Pass: the bow is worn with the quiver " +
-                "on, the fight telemetry stays at the bow radii " +
-                "(the majority of the fight samples beyond the " +
-                "melee radius, none past the stall radius), the " +
-                "kite log lines narrate repeated retreats, the bot " +
-                "stays online the window with the HP never " +
+                "inside the bow range, every shot broadcast arms " +
+                "the windup-end retreat and the reload-tail walk, " +
+                "the forced attack at the bow disable end fires " +
+                "the next shot, and the closing orcs never stop " +
+                "the rhythm. Pass: the bow is worn with the quiver " +
+                "on, the same-fight shot gaps sit inside the C1 " +
+                "bow cooldown (the shots follow the reload), the " +
+                "standing fight samples stay inside the bow band " +
+                "(the retreat legs may open wider), the kite log " +
+                "lines narrate repeated retreats, the fights " +
+                "resolve (one kill per two minutes at least), the " +
+                "bot stays online the window with the HP never " +
                 "bottoming, and the arrow stock never empties " +
                 "(issue #28, the acceptance half of the archer " +
                 "support).",

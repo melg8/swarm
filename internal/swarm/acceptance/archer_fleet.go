@@ -1159,7 +1159,7 @@ func fleetVerdict(
     }
     steps, holds := 0, 0
     for _, bot := range bots {
-        botSteps, botHolds := bot.log.counts()
+        botSteps, botHolds, _, _ := bot.log.counts()
         steps += botSteps
         holds += botHolds
     }
