@@ -902,16 +902,54 @@ two minutes without a landed hit, then the aggro clears and the mob
 teleports home) instead of the session logout. The critical-HP
 logout of the tick top stays armed above both.
 
-The fan stays the fallback of the scenes the flight refuses: a
-melee weapon in hand, a bow-wielding attacker (a ranged enemy cannot
-be outrun - the owner rule of the round), a disabled kite profile,
-another deck (the swings cannot land, the straight lane crosses the
-geodata wall), no attacker bearing yet, and a genuinely walled lane
-(the flight holds for one kite period and re-probes, the fan owns
-the ticks in between). The flight line reads "<mob> holds the bow
-flee at N units, kiting clear"; the walled lane logs "no straight
-bow flee lane opens from the chase, the fan owns the next kite
-period".
+The fan never answers an ARMED bow character - the kite layer enabled
+and the bow in hand (the `kiteLayerArmed` guard of `fleeFromThreat`).
+A melee weapon in hand or a disabled kite profile keeps the plain
+fan: those are the melee answers, not the archer's. The zone-clamped
+lanes also logged a healthy 99 percent flight out 30 s after it left
+the cell box (the run-24 acceptance dump), so the archer's refusal
+answers never fall through to them. A flight tick the layer refuses
+(a bow attacker, another deck, no bearing yet) is answered by the
+hunt's standing trade, a walled lane is held by the flight itself,
+and only the critical-HP logout (< 12 percent) still resets the
+session.
+
+The flight geometry around the refusal:
+
+- The bow windup owns the first click (`kiteFlightMovable`): the
+  server SAVES a move issued inside the windup and replays it at the
+  disable end (`PlayerAI.setIntentionMoveTo`), and the escape stall
+  watchdog read the saved seconds as a dead click (the run-24 +131 s
+  reset at 99 percent health). The flight issues its first leg on the
+  accepted side of the cycle and arms nothing on a deferred click.
+- A walled away half-plane gets a breakout attempt before the hold:
+  the back half-plane - the ground behind the character, THROUGH the
+  chaser's bearing - is walked when the away ray and its corner
+  escapes all refuse. The run-24 flight ended in a north-west pocket
+  whose open ground lay back south-east through the train.
+- A full pocket holds the ground and re-probes at the kite period,
+  KEEPING the ticks (the flight owns the defensive answer end to
+  end); the diagnostic lands once per hold episode. The flight line
+  reads "<mob> holds the bow flee at N units, kiting clear"; the
+  breakout logs "the away lane from <mob> is walled, breaking out
+  through the open back lane"; the full pocket logs "no straight bow
+  flee lane opens from the chase" without handing the fan a tick.
+
+The fight side of the same round:
+
+- A bow-wielding add invalidates the fight: `HasBowAttackerBesides`
+  turns the losing verdict on before the nearly-dead exemption, the
+  pick is dropped and the straight flight owns the escape (a ranged
+  add outranges the retreat, so its reload-tail fire is free damage).
+  The targetless answer does not re-adopt a just-fled attacker and
+  keeps flying while a bow add is present.
+- An unwinnable pile up converts the STANDING kite into the flight
+  (`dropFightForFlight`): the shot cycle spends half of every reload
+  inside the melee range, so a pack the arrows cannot out-damage is
+  dropped and flown. The kill window (`pileUpKillWindowPercent`, 30)
+  is the exception: a target one or two arrows from death keeps the
+  fight, because the flight throws the kill away - the run-24 dump
+  dropped a 24 percent grunt for a 30 s flight into the pocket.
 
 ### The kite engage ceiling (the run-4 acceptance finding)
 

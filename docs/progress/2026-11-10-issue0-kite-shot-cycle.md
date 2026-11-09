@@ -226,3 +226,11 @@ acceptance code, then the fragment archive.
 - Next: the `docs/hunting.md` update (the bow add rule, the pile-up
   conversion and its kill window, the windup-wait flight, the
   breakout and the fan removal) and the fragment archive.
+
+### 2026-11-10 - the docs pass
+
+- `docs/hunting.md`'s defensive flight section now documents the fan
+  removal, the windup-wait first click, the back half-plane breakout,
+  the full-pocket hold that keeps the ticks, the bow add rule, the
+  pile-up conversion and the kill window. The targetless hold log line
+  no longer claims the fan owns the next period.
