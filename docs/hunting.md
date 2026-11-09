@@ -415,6 +415,23 @@ watchdogs, not the kite). The band edges are pinned as references on
 purpose: the outer edge IS the engage radius the fight fights with, a
 copy of it in kite.go would drift.
 
+The enemy weapon gate (the owner rule of the 2026-11-09 round): the
+kite never engages against an archer. A ranged enemy cannot be
+outrun - the retreat spends the character's bow cooldown on walking
+while the enemy keeps shooting - so the standing trade is the answer,
+the same hold the cornered fight follows. The NpcInfo equipment block
+names the enemy template right-hand item id (the first int of the
+`[rhand][chest][lhand]` group after the collision height), the
+tracker resolves its weapon family through the generated item stats
+(`npcdata.ItemGearStats`, the `BOW` family) and `kiteLayerGates`
+closes every layer when the fight target carries a bow: the elven
+sentinels Kendell and Starden (the Elven Bow, item 276) and the Kaboo
+Orc Archer (the plain Bow, item 14) are the live cases. The gate
+reads the fight target alone: a melee-target fight keeps the
+established behavior, and an archer add in a mixed fight does not
+switch the layer off. A natural-weapon mob (right hand 0) is not an
+archer.
+
 The state machine of one kite step (the tick ladder of the fighting
 branch, loop.go - the kite sits after the engage/reposition rungs and
 before the impending-add step):

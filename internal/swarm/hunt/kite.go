@@ -123,7 +123,15 @@ package hunt
 // The behavior arms itself on the weapon in hand (bowEquipped): no
 // config, no class check - whatever bot ends up holding a bow (the
 // planned archer type of the config launch, a lured guard round)
-// kites its fights.
+// kites its fights. The enemy weapon gate (the owner rule of the
+// 2026-11-09 round) narrows it: the layer never arms against an
+// archer fight target. The NpcInfo equipment block names the enemy
+// template rhand item, the state resolves the weapon family
+// (state.Bot.ObjectUsesBow) and a bow-wielding enemy closes every
+// kite layer - a ranged opponent cannot be outrun, the retreat only
+// spends the bow cooldown on walking while the enemy keeps shooting,
+// so the standing archer trade answers it (the same hold rule the
+// cornered fight follows).
 
 import (
     "math"
@@ -644,6 +652,15 @@ func (l *Loop) kiteLayerGates(now time.Time) bool {
     // standing-archer baseline of issue #29) never arms the layer,
     // whatever the bow and the fight report.
     if !l.kite.Enabled || !l.bowEquipped() || l.target == 0 {
+        return false
+    }
+    // The enemy weapon gate (the owner rule): against an archer the
+    // kite never engages. A ranged enemy cannot be outrun - the
+    // retreat spends the bot's bow cooldown on walking while the
+    // enemy keeps shooting - so the standing archer trade is the
+    // answer, exactly like the cornered hold. The fight still runs
+    // through the ordinary attack machinery; only the retreat is off.
+    if l.tracker.ObjectUsesBow(l.target) {
         return false
     }
     if now.Before(l.combatAvoidUntil) {

@@ -122,6 +122,42 @@ func TestKiteIsBowOnly(t *testing.T) {
     }
 }
 
+// TestKiteRefusesTheArcherEnemy pins the enemy weapon gate (the
+// owner rule of the 2026-11-09 round): a bow wielding fight target
+// closes every kite layer - the proximity step and the shot-paced
+// retreat alike. A ranged enemy cannot be outrun, the retreat only
+// spends the bow cooldown on walking while the enemy keeps shooting,
+// so the standing archer trade is the answer. The melee-target
+// scenes above remain the positive control.
+func TestKiteRefusesTheArcherEnemy(t *testing.T) {
+    archerTarget := state.NpcInfo{
+        ObjectID: 7, TemplateID: 1007218, Attackable: true,
+        X: 45200, Y: 50000, RightHandItem: 276, Name: "Kendell",
+    }
+
+    t.Run("proximity layer", func(t *testing.T) {
+        bot, game, loop := kiteBowBotChaseFresh(t, 45200)
+        bot.ApplyNpcInfo(archerTarget)
+
+        loop.tick()
+        require.Empty(t, game.walks,
+            "the archer enemy must never arm the proximity step")
+        require.Empty(t, game.forces,
+            "the standing fight keeps the attack, no retreat")
+    })
+
+    t.Run("shot paced layer", func(t *testing.T) {
+        bot, game, loop := kiteBowBot(t, 45200)
+        bot.ApplyNpcInfo(archerTarget)
+
+        loop.tick()
+        require.Empty(t, game.walks,
+            "the archer enemy must never arm the shot-paced step")
+        require.True(t, loop.kiteClickAt.IsZero(),
+            "the shot broadcast must not arm the deferred retreat")
+    })
+}
+
 // TestKiteWindowHoldsTheReRequests pins the movement window contract:
 // while the kite step owns the tick (the walk runs), the engage holds
 // its forced attack re-requests even after the fighting stance lapsed
