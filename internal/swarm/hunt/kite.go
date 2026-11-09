@@ -313,24 +313,38 @@ const (
     kitePursuitContext = 12 * time.Second
     // kitePursuitStreakLimit is the runaway DIAGNOSTIC threshold of
     // the pursuit chain (issue #70, the round-14 always-run
-    // redesign): the old "the chain cannot walk forever - the
-    // standing fight keeps the damage on" backstop is GONE (the
-    // standing trade is the melee damage the kite exists to avoid;
-    // the fight-anchor leash and the curving circle bound the
-    // drift instead), so the counter now only names the
-    // never-resolving chain in the log while the chain keeps
-    // running - the mob's own home leash ends a truly unwinnable
-    // chase, the affordable re-shot ends a winnable one.
+    // redesign): the counter names the never-resolving chain in the
+    // log while the chain keeps running - the stall exit
+    // (kitePursuitDeadlockSteps) owns the stop of a chain whose
+    // windows stop paying, and a chain that keeps OPENING distance
+    // still runs out its race (the fight-anchor leash and the
+    // curving circle bound the drift, the mob's own home leash ends
+    // a truly unwinnable chase, the affordable re-shot ends a
+    // winnable one).
     kitePursuitStreakLimit = 12
-    // kitePursuitStallLimit is the unwinnable-race DIAGNOSTIC
-    // threshold: a chaser at least as fast as the character never
-    // falls behind (the walk ends where it started, distance-wise).
-    // The round-14 redesign removed the old "two stalled windows -
-    // stand and fight" answer: the moving chase trades the melee
-    // blows for chase-cadence blows at worst and keeps every
-    // future shot affordable, so the ledger only names the parity
-    // race in the log now.
+    // kitePursuitStallLimit is the unwinnable-race threshold: a
+    // chaser at least as fast as the character never falls behind
+    // (the walk ends where it started, distance-wise), and two
+    // consecutive windows without a gain name the parity race in the
+    // ledger. Two stalled windows alone keep the chain walking (the
+    // moving chase trades the melee blows for chase-cadence blows at
+    // worst), but a chain that ALSO spent its walk budget on a
+    // walled pocket is not racing anything: the stall exit stands
+    // the walk down and the bow fires from the hold (the temp18
+    // acceptance dump of 2026-11-09: the archer never crossed 447
+    // units in the walled elven pocket, 33 walks and 63 seconds
+    // without a shot, while a same-level grunt kept it in melee).
     kitePursuitStallLimit = 2
+    // kitePursuitDeadlockSteps is the walk budget of the stall exit,
+    // counted whole (the opening walk of the shot cycle plus every
+    // continuation). A chain that spent it and still sees stalled
+    // windows holds the ground and shoots: the cornered archetype
+    // answer reaches the bow one bow cycle after the race stopped
+    // paying, instead of walking the pocket for a minute. A chain
+    // that OPENS distance never reaches the exit - the ledger clears
+    // on every gain - so the healthy race still runs its full course
+    // to the 480-unit re-shot floor.
+    kitePursuitDeadlockSteps = 4
     // kitePursuitStallSlack is the progress bar of one pursuit
     // window: a walk must open at least this much distance on the
     // nearest threat to count as progress. The honest elven-ground
@@ -1672,21 +1686,47 @@ func (l *Loop) kitePursuitHold(
             l.kitePursuitStall = 0
         }
         if l.kitePursuitStall == kitePursuitStallLimit {
-            // The diagnostic crossing (once per crossing): the race
-            // is at parity, the chain keeps running anyway - see
-            // kitePursuitStallLimit, the round-14 always-run rule.
+            // The parity crossing (once per crossing): two windows
+            // in a row opened no distance. The walk budget of
+            // kitePursuitDeadlockSteps decides below whether the
+            // chain is still worth running.
             l.logf("Hunt: the pursuit race on %d is at parity "+
-                "(%d stalled windows), running the chase out",
+                "(%d stalled windows), checking the walk budget",
                 l.target, l.kitePursuitStall)
         }
         l.kitePursuitWalkOpen = false
         l.kitePursuitDist = dist
     }
+    if l.kitePursuitStall >= kitePursuitStallLimit &&
+        l.kitePursuitSteps+1 >= kitePursuitDeadlockSteps {
+        // The stall exit: the chain spent its walk budget (the
+        // opening walk plus the continuations) and the last windows
+        // opened no distance - walking on only repeats the walled
+        // pocket shuffle while the chaser stays glued to the bow
+        // (the temp18 acceptance dump: 33 walks and 63 seconds
+        // without a shot in the elven pocket). The hold ground
+        // answer of the cornered archetype owns the fight from
+        // here: the walk clears with this tick and the forced
+        // attack re-request fires the bow. The pursuit context is
+        // spent until the next shot cycle re-establishes it
+        // (kiteIssueWalk), so the same tick's second hold probe
+        // cannot re-arm the walk the exit just stood down.
+        l.logf("Hunt: the pursuit race on %d is lost after %d "+
+            "walks, standing to shoot", l.target,
+            l.kitePursuitSteps+1)
+        l.kitePursuitFor = 0
+        l.kitePursuitSteps = 0
+        l.kitePursuitStall = 0
+        l.kitePursuitWalkOpen = false
+        l.kitePursuitDist = 0
+
+        return false
+    }
     if l.kitePursuitSteps == kitePursuitStreakLimit {
         // The diagnostic crossing (once per crossing): the chain
-        // never resolved yet, the walk keeps going - the
-        // fight-anchor leash and the circle bound the drift (see
-        // kitePursuitStreakLimit, the round-14 always-run rule).
+        // never resolved in this many walks yet it still opens
+        // distance, so the race keeps running - the stall exit
+        // above owns the chain that stopped paying.
         l.logf("Hunt: the pursuit chain on %d ran %d walks "+
             "without a shot, holding the course",
             l.target, l.kitePursuitSteps)

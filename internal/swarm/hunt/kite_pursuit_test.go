@@ -16,46 +16,72 @@ import (
 // audit): the continuation chain owns its budget apart from the
 // proximity streak - a per-shot-cycle ledger that counts only the
 // COMPLETED walks (the cornered hold re-probe between the walks
-// never mints a stall), stops the unwinnable parity race after two
-// stalled windows and the never-resolving chain at the flat
-// backstop, and expires with the pursuit context (the respawned
-// same-id target never inherits the chain of its predecessor). The
-// tests below pin the four gates one by one on the standard kite
-// scene (the lapse dance of pursuitWindowLapse carries each scaled
-// walk window of the race leg out - leg/400 * the bow window, the
-// 662 leg of the 260-unit mob holds it for ~3.3s - and lands the
-// arrival shot of the leg the way the live server does).
+// never mints a stall), stands the walk down when the race spent
+// its walk budget with two stalled windows behind it (the stall
+// exit the temp18 acceptance dump of 2026-11-09 forced: 33 walks
+// and 63 seconds without a shot in the walled elven pocket), and
+// expires with the pursuit context (the respawned same-id target
+// never inherits the chain of its predecessor). The tests below pin
+// the gates one by one on the standard kite scene (the lapse dance
+// of pursuitWindowLapse carries each scaled walk window of the race
+// leg out - leg/400 * the bow window, the 662 leg of the 260-unit
+// mob holds it for ~3.3s - and lands the arrival shot of the leg
+// the way the live server does).
 
 // pursuitWindowLapse ages the scene past the scaled walk window of
 // the race leg (662/400 * the 2s fallback = 3.31s), lands the
 // ARRIVAL SHOT of the leg (the server's auto re-shot the armed
 // stance fires the moment the walk ends - the live fight view rides
 // those shots through a chain the fake mob never swings into) and
-// hands the tick back: the shared dance of every pursuit test (the
-// window end is the only moment the hold owns the tick, the stance
-// lapse is what the live post-walk state looks like).
+// hands the tick back: the shared dance of the every-window tests
+// (the window end is the only moment the hold owns the tick, the
+// stance lapse is what the live post-walk state looks like).
 func pursuitWindowLapse(bot *state.Bot, loop *Loop, mobX int32) {
-    time.Sleep(4 * time.Second)
-    loop.lastHit = time.Now().Add(-2 * time.Second)
+    agePursuitWindow(loop)
     selfSwingsAt(bot, mobX)
     loop.tick()
 }
 
-// TestKitePursuitStallRunsTheParityRace pins the round-14
-// always-run rule of the progress ledger: the fake mob never closes
-// the gap the walks open (the tracker keeps it at the stand it
-// spawned on), so every continuation window ends where it started,
-// distance-wise - the parity race the stall ledger names. The scene
-// holds the mob at 260 units (the pursuit-only band: at or beyond
-// the 250 RetreatRadius the proximity path stays quiet, under the
-// 480 re-shot floor the pursuit hold owns the tick - at 200 the
+// agePursuitWindow ages the scene past the walk window: the walk
+// leg outlasts the 2s window (see pursuitWindowLapse), and the
+// forced attack pacing gate needs the last request backdated.
+func agePursuitWindow(loop *Loop) {
+    time.Sleep(4 * time.Second)
+    loop.lastHit = time.Now().Add(-2 * time.Second)
+}
+
+// pursuitWindowLapseQuiet ages the scene past the walk window
+// WITHOUT landing the arrival shot - the droughted state the stall
+// exit exists for: the live race spent its last shot long before the
+// window end, so the fight view is stale and the stand-to-shoot
+// forced attack below the fight branch owns the tick (a fresh swing
+// would route the tick into the fighting branch, where the shot
+// trigger arms the next retreat instead). The engage clock re-anchors
+// here the way the live chase steps re-anchor it: the fake mob never
+// moves and the scene never fights in the branch, so without the
+// stamp the 12s stuck timeout drops the target before the stall exit
+// runs.
+func pursuitWindowLapseQuiet(loop *Loop) {
+    agePursuitWindow(loop)
+    loop.engageAt = time.Now()
+    loop.tick()
+}
+
+// TestKitePursuitStallStandsToShoot pins the stall exit of the
+// progress ledger: the fake mob never closes the gap the walks open
+// (the tracker keeps it at the stand it spawned on), so every
+// continuation window ends where it started, distance-wise. A chain
+// that spent its walk budget (the opening walk plus the
+// continuations) with the race still stalled stands the walk down
+// and hands the tick to the forced attack - the bow fires from the
+// hold instead of walking the pocket forever (the temp18 acceptance
+// dump of 2026-11-09: 33 walks and 63 seconds without a shot). The
+// scene holds the mob at 260 units (the pursuit-only band: at or
+// beyond the 250 RetreatRadius the proximity path stays quiet, under
+// the 480 re-shot floor the pursuit hold owns the tick - at 200 the
 // proximity path would intercept the post-window tick before the
-// hold ever runs). The stall counter still books the parity - the
-// DIAGNOSTIC the crossing log rides - but the chain KEEPS WALKING:
-// the old "two stalled windows - stand and fight" answer is gone
-// (the standing trade is the melee damage the kite exists to
-// avoid; the moving chase outwaits the mob's home leash).
-func TestKitePursuitStallRunsTheParityRace(t *testing.T) {
+// hold ever runs).
+func TestKitePursuitStallStandsToShoot(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45260)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
@@ -80,22 +106,37 @@ func TestKitePursuitStallRunsTheParityRace(t *testing.T) {
     require.Empty(t, game.forces)
 
     // Window 3: the second consecutive stall names the parity race
-    // in the ledger - and the chain keeps running anyway (the
-    // always-run rule: no standing trade answer exists anymore).
+    // in the ledger. The chain still has the tail of its walk
+    // budget, so the continuation issues once more.
     pursuitWindowLapse(bot, loop, 45260)
     require.Len(t, game.walks, 4,
-        "the parity race keeps running - the standing trade is gone")
+        "the parity crossing alone does not stop the chain")
     require.Equal(t, 2, loop.kitePursuitStall,
         "the parity still books in the ledger")
     require.Empty(t, game.forces,
         "the re-shot still waits for the regained distance")
+
+    // Window 4: the budget is spent and the race still stalled -
+    // the stall exit stands the walk down and the forced attack
+    // re-request owns the tick: the bow fires from the hold. This
+    // lapse lands NO arrival shot (the drought the exit exists
+    // for): the stale fight view lets the tick past the fighting
+    // branch to the forced attack, exactly like the live race whose
+    // last shot went out a minute ago.
+    pursuitWindowLapseQuiet(loop)
+    require.Len(t, game.walks, 4,
+        "the lost race must not issue another walk")
+    require.Equal(t, []int32{7}, game.forces,
+        "the forced attack re-request fires the bow from the hold")
+    require.Zero(t, loop.kitePursuitFor,
+        "the chain is spent until the next shot cycle re-arms it")
 }
 
 // TestKitePursuitProgressResetsTheStallLedger pins the progress
 // semantics: a walk that OPENS the distance clears the stall ledger
 // (the honest race must run its full course to the re-shot floor),
-// and only CONSECUTIVE stalls stop the chain - a stall that follows
-// a gain starts its own count.
+// and only CONSECUTIVE stalls inside the spent walk budget stop the
+// chain - a stall that follows a gain starts its own count.
 func TestKitePursuitProgressResetsTheStallLedger(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45260)
     tickPastTheWindup(loop)
@@ -129,23 +170,25 @@ func TestKitePursuitProgressResetsTheStallLedger(t *testing.T) {
     require.Empty(t, game.forces)
 }
 
-// TestKitePursuitStreakNeverBoundsTheChain pins the round-14
-// always-run rule of the runaway ledger: a chain that never
-// resolves (the oscillating chase keeps resetting the stall ledger
-// without ever reaching the re-shot floor) keeps walking past the
-// old budget - the fight-anchor leash and the curving circle bound
-// the drift, the standing trade answer is gone.
-func TestKitePursuitStreakNeverBoundsTheChain(t *testing.T) {
+// TestKitePursuitStreakAloneNeverBoundsTheChain pins the split
+// between the two ledgers: the streak counter (walks without a
+// shot) is a DIAGNOSTIC and never stops a chain on its own - the
+// stall exit (kitePursuitDeadlockSteps) owns the chain whose windows
+// stopped paying, so a chain that keeps opening distance still runs
+// out its race whatever the streak holds.
+func TestKitePursuitStreakAloneNeverBoundsTheChain(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45260)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
 
-    // The chain spent the old budget without a single shot cycle
-    // resolving it - the walk keeps going anyway.
+    // The chain carries the full streak budget, but the current
+    // window has no accounting behind it (the opening walk never
+    // mints a stall): the continuation issues and the walk keeps
+    // running.
     loop.kitePursuitSteps = kitePursuitStreakLimit
     pursuitWindowLapse(bot, loop, 45260)
     require.Len(t, game.walks, 2,
-        "the runaway chain keeps running - the standing trade is gone")
+        "the streak alone never bounds the chain")
     require.Empty(t, game.forces,
         "the re-shot still waits for the regained distance")
 }

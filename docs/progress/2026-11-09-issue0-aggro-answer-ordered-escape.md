@@ -194,3 +194,32 @@ the acceptance-runner leak and the kite drought stay open.
   duplicated decisions, `step 33 of 12` next to `step 1 of 12`) is
   recorded in the section above; the live re-check runs with a fresh
   temp archer scenario.
+
+### 2026-11-09 - the pursuit stall exit stands the lost race down
+
+- `kitePursuitDeadlockSteps = 4` (the opening walk plus three
+  continuations) is the walk budget of the pursuit chain. When two
+  consecutive windows opened no distance (`kitePursuitStallLimit`)
+  and the budget is spent, `kitePursuitHold` logs
+  `the pursuit race on N is lost after K walks, standing to shoot`,
+  clears the ledger and the pursuit context, and returns false - the
+  forced attack re-request fires the bow from the hold instead of
+  walking the walled pocket for another minute. The next shot's own
+  cycle re-establishes the context through `kiteIssueWalk`.
+- A chain that OPENS distance still runs its full course to the
+  480-unit re-shot floor: every gain clears the stall ledger, so the
+  healthy race (round 19) is untouched.
+- Tests: `TestKitePursuitStallStandsToShoot` now runs the fourth
+  lapse quietly (no arrival shot: the stale fight view lets the tick
+  reach the stand-to-shoot forced attack, and the engage clock is
+  re-anchored the way the live chase steps do so the 12 s stuck
+  timeout cannot preempt the hold); `TestKitePursuitStreakAloneNever-
+  BoundsTheChain` pins the split between the streak diagnostic and
+  the stall exit; the progress test keeps its full-course assertion.
+- Verified: `go test ./internal/swarm/hunt/ -run TestKite` (66 s),
+  `go test ./internal/swarm/hunt/ -count=1` (161 s),
+  `go test ./internal/swarm/acceptance/ -count=1` (9 s),
+  `task lint:new` 0 issues, `task fmt:check` clean.
+- Live re-check of the walled-pocket branch is still pending; the
+  fragment stays active until the temp archer run confirms the
+  `lost ... standing to shoot` line and the shot resumes.
