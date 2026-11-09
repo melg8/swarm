@@ -855,25 +855,17 @@ type Loop struct {
     // the previous cycle never inherit into the new one. The zero
     // value precedes the first shot.
     kitePursuitShot time.Time
-    // The pursuit ledger of the current shot cycle (see
-    // kitePursuitHold): the continuation chain owns its budget
-    // apart from the proximity streak - the race it runs is the
-    // re-shot's own. kitePursuitSteps counts the continuations
-    // issued since the last shot; kitePursuitDist is the threat
-    // distance at the last accounting; kitePursuitStall counts the
-    // CONSECUTIVE walks that opened no distance (the unwinnable
-    // race); kitePursuitWalkOpen marks the walk whose window-end
-    // accounting is still owed - a cornered hold re-probe between
-    // the walks never mints a stall (the hold pause is not a lost
-    // race step, the pocket cells survive their holds on exactly
-    // that). The ledger resets whole on every fresh shot cycle and
-    // on any walk issued outside the previous chain's context
+    // kitePursuitSteps counts the continuation walks issued since
+    // the last shot (see kitePursuitHold): crossing
+    // kitePursuitStreakLimit names the runaway chain in the log
+    // while the walk keeps running (the owner rule of the
+    // 2026-11-09 round - a walled lane is the only standing-shoot
+    // case, a slow race never stops the retreat itself). The counter
+    // resets on every fresh shot cycle (kitePursuitCycle) and on any
+    // walk issued outside the previous chain's context
     // (kiteIssueWalk - a new fight or the respawned same-id target
     // starts its own race).
-    kitePursuitSteps    int
-    kitePursuitDist     float64
-    kitePursuitStall    int
-    kitePursuitWalkOpen bool
+    kitePursuitSteps int
     // kiteFightFor/X/Y anchor the current fight's own ground (the
     // round-14 location-general redesign): the position of the
     // fight target at the fight's FIRST retreat resolution (see
@@ -2519,6 +2511,17 @@ func (l *Loop) engage() {
         return
     }
     if l.lureArmed() && l.lureTick(now) {
+        return
+    }
+    // The archer kite owns the re-shot: a live bow fight whose
+    // retreat already ran keeps running while the hostile holds
+    // inside the re-shot floor, instead of committing the next shot
+    // at the collapsed range (see kiteDeferShot, kite.go - the owner
+    // rule of the 2026-11-09 round: shoot only from the safe
+    // distance, run the reload). The cornered fight keeps its shot
+    // through the hold, and the first engage of a fresh fight keeps
+    // its attack request (no retreat stands behind it yet).
+    if l.kiteDeferShot(now) {
         return
     }
     if err := l.game.AttackTarget(l.target); err != nil {

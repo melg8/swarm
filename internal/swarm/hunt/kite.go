@@ -55,6 +55,16 @@ package hunt
 //     bought - exactly the waste the owner measured on the fights
 //     whose speeds sit too close. A blocked straight lane holds the
 //     ground and shoots; it never bends the retreat.
+//   - the defensive flight (the run-3 finding of the same round):
+//     the melee flee machinery owns the aggro answer of a fight the
+//     bot cannot win, and its fan is clamped to the CURRENT hunting
+//     zone - a kite fight drifts across the cell boundaries, the fan
+//     collapses to nothing, and the closure watchdog logged the
+//     session out MID-KITE with the bow healthy and the quiver full.
+//     The bow answer is the same straight away-ray the fight cycle
+//     runs (kiteFleeThreat), walked at the full escape segment and
+//     paced by the kite geometry; the fan stays the fallback of a
+//     genuinely walled lane.
 //
 // The honest limits of the layer, by the edge cases the issue names:
 //   - the chaser positions of the DIRECTION scan are the raw
@@ -412,41 +422,16 @@ const (
     kitePursuitContext = 12 * time.Second
     // kitePursuitStreakLimit is the runaway DIAGNOSTIC threshold of
     // the pursuit chain: the counter names the never-resolving chain
-    // in the log while the chain keeps running. The stall exit
-    // (kitePursuitDeadlockSteps) owns the stop of a chain whose
-    // windows stop paying, and a chain that keeps OPENING distance
-    // still runs out its race (the fight-anchor leash bounds the
-    // drift, the mob's own home leash ends a truly unwinnable chase,
-    // the affordable re-shot ends a winnable one).
+    // in the log while the chain keeps running. The owner rule of
+    // the 2026-11-09 round removed the old stall exit ("stand the
+    // walk down and shoot"): the chaser that reached point blank
+    // between the shots must spend the time closing the distance
+    // again, so a walled lane is the ONLY standing-shoot case and
+    // the chain never stops itself for the race being slow. The
+    // fight-anchor leash bounds the drift, the mob's own home leash
+    // ends a truly unwinnable chase, the affordable re-shot ends a
+    // winnable one.
     kitePursuitStreakLimit = 12
-    // kitePursuitStallLimit is the unwinnable-race threshold: a
-    // chaser at least as fast as the character never falls behind
-    // (the walk ends where it started, distance-wise), and two
-    // consecutive windows without a gain name the parity race in the
-    // ledger. Two stalled windows alone keep the chain walking (the
-    // moving chase trades the melee blows for chase-cadence blows at
-    // worst), but a chain that ALSO spent its walk budget on a
-    // walled pocket is not racing anything: the stall exit stands
-    // the walk down and the bow fires from the hold.
-    kitePursuitStallLimit = 2
-    // kitePursuitDeadlockSteps is the walk budget of the stall exit,
-    // counted whole (the opening walk of the shot cycle plus every
-    // continuation). A chain that spent it and still sees stalled
-    // windows holds the ground and shoots: the cornered archetype
-    // answer reaches the bow one bow cycle after the race stopped
-    // paying, instead of walking a walled pocket for a minute. A
-    // chain that OPENS distance never reaches the exit - the ledger
-    // clears on every gain - so the healthy race still runs its full
-    // course to the re-shot floor.
-    kitePursuitDeadlockSteps = 4
-    // kitePursuitStallSlack is the progress bar of one pursuit
-    // window: a walk must open at least this much distance on the
-    // nearest threat to count as progress. The honest elven-ground
-    // race gains ~45 units a window (the 125-vs-110 speed margin
-    // over the ~3 s walk window); the slack sits well under it so
-    // the winning cells never stall, while a parity crawl slower
-    // than half the honest gain reads as the stall it is.
-    kitePursuitStallSlack = 20.0
 )
 
 // KiteParams is the tunable block of the kite fight (owner issue
@@ -532,33 +517,84 @@ func (l *Loop) SetKiteParams(p KiteParams) {
 // would drift from the radii the fight actually fights with - and
 // the kiteStep length is sized against both edges.
 
+// closedDistance bounds how close a chaser may stand NOW from the
+// distance of its last movement broadcast: the server sends a
+// chasing mob's MoveToPawn at a one to two second cadence, so the
+// raw gap can lag a whole close-in behind the live mob (the
+// 2026-11-09 live acceptance run measured a 512 unit raw gap against
+// an actual 256). The bound assumes the chaser kept running for the
+// whole age of its movement segment at its fastest speed, so the
+// result is never above the true gap - the floor decisions of the
+// kite may only ever UNDER-estimate the distance, never fire a shot
+// the collapsed range did not afford.
+
+func closedDistance(
+    dist float64, age time.Duration, speed float64,
+) float64 {
+    if age <= 0 || speed <= 0 {
+        return dist
+    }
+    closed := dist - age.Seconds()*speed
+    if closed < 0 {
+        return 0
+    }
+
+    return closed
+}
+
+// kiteClosedDistance applies the conservative closure bound to one
+// object: the raw distance of the object's last movement broadcast,
+// aged by the movement segment start and shortened by the fastest
+// speed it can run. A standing object, an object without a movement
+// stamp and a scene without the track all answer the raw distance
+// unchanged.
+
+func (l *Loop) kiteClosedDistance(
+    now time.Time, objectID int32, dist float64,
+) float64 {
+    track, ok := l.tracker.ObjectTrackOf(objectID)
+    if !ok || !track.Moving || track.MovedAt.IsZero() {
+        return dist
+    }
+
+    return closedDistance(dist, now.Sub(track.MovedAt), track.Speed)
+}
+
 // kiteThreat locates the hostile that arms the kite step: the fight
 // target or the nearest train member - a living mob that already
 // chases the character (its server target is the character, the
-// projected NearestAttacker scan reads it, see scans.go) - whichever
-// sits closer. A mob on a deck the walk cannot reach (the z gap past
+// NearestAttacker scan reads it, see scans.go) - whichever sits
+// closer. A mob on a deck the walk cannot reach (the z gap past
 // deckReachableZ, the same test the pick uses) is no melee threat.
-// Returns the threat identity for the logs and its ground distance
-// to the character (the retreat DIRECTION weighs the whole train
-// through kiteTrainDirection, so the position itself has no reader).
+// The distance is the CONSERVATIVE closed distance of the moment
+// (kiteClosedDistance): a chaser whose movement broadcast lags may
+// have closed a whole second's run already, and every floor decision
+// reads this number. Returns the threat identity for the logs and
+// its closed ground distance to the character (the retreat
+// DIRECTION weighs the whole train through kiteTrainDirection, so
+// the position itself has no reader).
 
 func (l *Loop) kiteThreat(
-    selfX, selfY, selfZ int32,
+    now time.Time, selfX, selfY, selfZ int32,
 ) (id int32, dist float64, ok bool) {
+    consider := func(candidate int32, x, y int32) {
+        raw := math.Hypot(
+            float64(selfX-x), float64(selfY-y))
+        closed := l.kiteClosedDistance(now, candidate, raw)
+        if !ok || closed < dist {
+            id, dist, ok = candidate, closed, true
+        }
+    }
     if tx, ty, _, tok := l.tracker.ObjectPosition(l.target); tok {
-        dx := float64(selfX) - float64(tx)
-        dy := float64(selfY) - float64(ty)
-        id, dist, ok = l.target, math.Hypot(dx, dy), true
+        consider(l.target, tx, ty)
     }
     if attacker, aok := l.tracker.NearestAttacker(); aok &&
         attacker.ObjectID != l.target {
-        if attacker.Z == 0 ||
-            math.Abs(float64(attacker.Z-selfZ)) <= deckReachableZ {
-            dx := float64(selfX) - float64(attacker.X)
-            dy := float64(selfY) - float64(attacker.Y)
-            adist := math.Hypot(dx, dy)
-            if !ok || adist < dist {
-                id, dist, ok = attacker.ObjectID, adist, true
+        if track, tok := l.tracker.ObjectTrackOf(
+            attacker.ObjectID); tok {
+            if track.Z == 0 ||
+                math.Abs(float64(track.Z-selfZ)) <= deckReachableZ {
+                consider(attacker.ObjectID, track.X, track.Y)
             }
         }
     }
@@ -619,6 +655,170 @@ func (l *Loop) kiteLayerGates(now time.Time) bool {
 func (l *Loop) kiteOwnsRetreat() bool {
     return l.kite.Enabled && l.target != 0 && l.bowEquipped() &&
         !l.tracker.ObjectUsesBow(l.target)
+}
+
+// kiteEngageLevelSlack is the level gap a kiteable melee attacker
+// may sit above the character: the general pick ceiling
+// (targetMaxLevelSlack) protects the MELEE trade, where the higher
+// level lands more and takes less, while the kite fights from the
+// bow range and buys the distance back between the shots. The elven
+// mass cells put a level 10 Kaboo Orc Fighter on the level 7 ground
+// (elven-hex-104 band 7-10); the run-3/run-4 acceptance dumps of the
+// 2026-11-09 round measured the general ceiling refusing exactly
+// that attacker - the loot answer and the targetless pick fled it,
+// the defensive flight dragged the session (a 130 chaser against the
+// 125 runner never falls behind) and the archer spent the window
+// shooting nothing. The cap stays a real bound: a wider gap stops
+// the hit and damage flow the bow needs to win.
+const kiteEngageLevelSlack = 5
+
+// kiteAnswersMelee reports whether the archer kite answers the
+// object as a fight: the layer is enabled, the bow is in hand and
+// the object is not a bow wielder (the owner rule of the round - no
+// kiting against bow users, a ranged enemy cannot be outrun and the
+// standing trade answers it). The kitable answer widens the level
+// ceiling of attackerEngageable (see kiteEngageLevelSlack).
+func (l *Loop) kiteAnswersMelee(objectID int32) bool {
+    return l.kite.Enabled && l.bowEquipped() &&
+        !l.tracker.ObjectUsesBow(objectID)
+}
+
+// kiteEngageLevelCeiling is the level ceiling of the kite answer:
+// the character level plus kiteEngageLevelSlack. An unknown
+// character level keeps the general pick ceiling (its zero means
+// unfenced).
+func (l *Loop) kiteEngageLevelCeiling() int32 {
+    level := l.tracker.SelfLevel()
+    if level <= 0 {
+        return 0
+    }
+
+    return level + kiteEngageLevelSlack
+}
+
+// kiteFleeBusy reports whether the defensive flight's own movement
+// state already owns the tick: a live walk window (the re-click
+// ladder keeps it, and the tick stays with the walk whatever the
+// ladder answered) or a movement hold another step armed. A lapsed
+// window stands itself down and reports free so the next straight
+// leg issues on this very tick - a targetless flee has no pursuit
+// continuation (kitePursuitHold is a no-op with target 0), the flight
+// IS the continuation.
+func (l *Loop) kiteFleeBusy(now time.Time) bool {
+    if !l.kiteWalkUntil.IsZero() {
+        if now.After(l.kiteWalkUntil) {
+            l.kiteWalkClear()
+        } else {
+            l.kiteReclickWalk(now)
+
+            return true
+        }
+    }
+
+    return now.Before(l.combatAvoidUntil)
+}
+
+// kiteFleeHeld reports whether the last flight leg found no lane: the
+// hold paces the re-probe at the kite period and yields the ticks in
+// between to the melee fan (the cornered answer of the escape flow).
+// Only the targetless hold (kiteHeldFor == 0) belongs to the flight -
+// a fight hold of a live target names its own fight.
+func (l *Loop) kiteFleeHeld(now time.Time) bool {
+    return l.kiteHeldFor == 0 && !l.kiteHeldAt.IsZero() &&
+        now.Sub(l.kiteHeldAt) < l.kite.StepPeriod
+}
+
+// kiteFleeThreat answers a defensive flee with the STRAIGHT bow
+// flight (the run-3 finding of the 2026-11-09 round): the melee flee
+// machinery (fleeFromThreat) fans its escape lanes inside the CURRENT
+// hunting zone, and a kite fight drifts across the cell boundaries -
+// the run-3 acceptance dump measured the fan walking a competent
+// 700 units while the parity chaser kept pace at 38, then the
+// closure watchdog named the held gap and the session logged out
+// MID-KITE with the bow healthy and the quiver full. The archer's own
+// answer is the straight away-ray of the train (kiteTrainDirection,
+// the same geometry every kite layer runs) walked at the full escape
+// segment (escapeWalkDistance): the flight is armed by the DEFENSIVE
+// flee instead of the fight cycle, owns the movement through its
+// walk window (the forced attack waits it out) and keeps re-running
+// the re-click ladder for the dead transports. A walled lane (the
+// cornered scene, the OverWater ray, the server click refusal at
+// every rung and every escape angle) stamps the flight hold for one
+// kite period and hands the ticks to the fan - the melee escape's own
+// cornered answer, never a standing archer. A bow-wielding attacker
+// closes the flight (a ranged enemy cannot be outrun - the owner rule
+// of the round), exactly like every kite layer.
+//
+// The flight deliberately bypasses the fan's budgets (fleeLogoutAfter
+// and the escapeNotOpening closure probe): the straight run IS the
+// designed archer answer, and a mob that keeps pace with it is
+// outlasted by the server's own attack timeout (AttackableAI
+// MAX_ATTACK_TIMEOUT, two minutes without a landed hit, then the
+// aggro clears and the mob teleports home) instead of the session
+// logout. The critical-HP logout of the tick top stays armed above
+// both. Reports whether the flight spent the tick.
+func (l *Loop) kiteFleeThreat(now time.Time) bool {
+    if !l.kite.Enabled || !l.bowEquipped() {
+        return false
+    }
+    attacker, ok := l.tracker.NearestAttacker()
+    if !ok || l.tracker.ObjectUsesBow(attacker.ObjectID) {
+        return false
+    }
+    if l.kiteFleeBusy(now) {
+        return true
+    }
+    if l.kiteFleeHeld(now) {
+        return false
+    }
+    if !l.standUpGuarded(now) {
+        // The stand request (or the server side stand settle) owns
+        // the tick: the first walk must land on a movable character.
+        return true
+    }
+    selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
+    if !selfOK {
+        return false
+    }
+    if attacker.Z != 0 &&
+        math.Abs(float64(attacker.Z-selfZ)) > deckReachableZ {
+        // Another deck: its swings cannot land and the straight lane
+        // crosses the geodata wall - the fan owns this chase.
+        return false
+    }
+    dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
+    if dirX == 0 && dirY == 0 {
+        // No chaser bearing to run from (the attacker targets the
+        // character but its position has not broadcast yet): the fan
+        // answers this tick.
+        return false
+    }
+    until := now.Add(l.kiteWalkWindow(now) + l.kite.ReengageDelay)
+    stepX, stepY, found := l.kiteRetreatLane(
+        selfX, selfY, selfZ, dirX, dirY, dirX, dirY,
+        escapeWalkDistance)
+    if !found {
+        // Every straight rung of the away-ray is walled (and the
+        // angular escape found no bearing inside the away half-plane):
+        // the flight holds for one kite period and re-probes, the fan
+        // owns the ticks in between.
+        l.kiteHoldGround(now, encircled)
+
+        return false
+    }
+    l.kiteHeldAt = time.Time{}
+    l.kiteIssueWalk(now, until, selfX, selfY, selfZ, stepX, stepY)
+    l.noteEscapeWalk(now)
+    l.fleeSince = time.Time{}
+    l.logger.Printf("Hunt: %s holds the bow flee at %d units, "+
+        "kiting clear (step %d)", attacker.Name,
+        int(math.Round(math.Hypot(
+            float64(selfX-attacker.X),
+            float64(selfY-attacker.Y)))),
+        int(math.Round(math.Hypot(
+            float64(stepX-selfX), float64(stepY-selfY)))))
+
+    return true
 }
 
 // kiteFightLive reports whether a fight is actually live around the
@@ -715,7 +915,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !selfOK {
         return false
     }
-    threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
+    threatID, dist, ok := l.kiteThreat(now, selfX, selfY, selfZ)
     if !ok || dist >= l.kite.RetreatRadius || dist < 1 {
         return false
     }
@@ -830,7 +1030,7 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
     if !selfOK {
         return false
     }
-    threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
+    threatID, dist, ok := l.kiteThreat(now, selfX, selfY, selfZ)
     if !ok || l.kiteThreatBeyondThePursue(threatID, dist) || dist < 1 {
         return false
     }
@@ -874,9 +1074,8 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
 // kitePursuitCycle opens the pursuit ledger of a fresh shot cycle:
 // every own Attack broadcast starts its own distance race - the
 // re-shot is released only after the retreat regained the re-shot
-// floor (or the race spent its walk budget) - so the steps, the
-// stalls and the open walk of the previous cycle never inherit into
-// the new one. The stamp makes the reset idempotent across the ticks
+// floor - so the steps of the previous cycle never inherit into the
+// new one. The stamp makes the reset idempotent across the ticks
 // that still catch the same broadcast (the shot trigger runs for the
 // whole freshness window): only a NEW shot rewrites the ledger.
 
@@ -886,9 +1085,6 @@ func (l *Loop) kitePursuitCycle(shotAt time.Time) {
     }
     l.kitePursuitShot = shotAt
     l.kitePursuitSteps = 0
-    l.kitePursuitDist = 0
-    l.kitePursuitStall = 0
-    l.kitePursuitWalkOpen = false
 }
 
 // kiteStepLength resolves the retreat leg length the moment arms
@@ -973,7 +1169,7 @@ func (l *Loop) kiteStraightLeg(step float64, selfX, selfY int32) float64 {
 func (l *Loop) kiteResolveAndClick(
     now, until time.Time, selfX, selfY, selfZ int32,
 ) bool {
-    threatID, threatDist, threatOK := l.kiteThreat(selfX, selfY, selfZ)
+    threatID, threatDist, threatOK := l.kiteThreat(now, selfX, selfY, selfZ)
     if l.kiteFightFor != l.target {
         // A fresh fight: the anchor falls back to the self position
         // until the threat position resolves below.
@@ -1137,7 +1333,7 @@ func (l *Loop) kiteClickWalk(now time.Time) bool {
     if !selfOK {
         return false
     }
-    threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
+    threatID, dist, ok := l.kiteThreat(now, selfX, selfY, selfZ)
     if !ok || l.kiteThreatBeyondThePursue(threatID, dist) || dist < 1 {
         // The hostile left the pursue band (or the chase dissolved):
         // the retreat has nothing to retreat from - the stall
@@ -1251,15 +1447,12 @@ func (l *Loop) kiteIssueWalk(
         // The walk starts a fresh pursuit chain: a new fight, or
         // the previous chain's context expired before this walk
         // (the respawned same-id target of the Mobius ground). The
-        // pursuit ledger must not carry the old race's stalls into
-        // the new one (the shot-cycle reset of kitePursuitCycle
-        // covers the re-shot path; this seam covers the
-        // proximity-first fights and the post-respawn walks that
-        // re-arm the context without a shot in between).
+        // chain counter must not carry the old race into the new
+        // one (the shot-cycle reset of kitePursuitCycle covers the
+        // re-shot path; this seam covers the proximity-first fights
+        // and the post-respawn walks that re-arm the context without
+        // a shot in between).
         l.kitePursuitSteps = 0
-        l.kitePursuitStall = 0
-        l.kitePursuitWalkOpen = false
-        l.kitePursuitDist = 0
     }
     l.kitePursuitFor = l.target
     l.kitePursuitAt = now
@@ -1593,19 +1786,18 @@ func (l *Loop) kiteReclickVerdict(
 // through the ordinary lane resolution, so the chaser spends the
 // reload tail closing the distance again instead of the archer
 // standing through it - and the re-shot fires from the regained
-// floor, never at the range the windup collapsed. The chain carries
-// its OWN budget apart from the proximity streak: the progress
-// ledger (kitePursuitSteps/Stall/Dist/WalkOpen) resets on every
-// fresh shot cycle (kitePursuitCycle), counts only the COMPLETED
-// walks (a cornered hold re-probe never mints a stall - the pocket
-// cells survive their holds on exactly that), and stops the chain
-// two stalled windows in a row (the unwinnable parity race) or at
-// the flat backstop (the oscillating chase that resets the stall
-// ledger forever). The first moment the hostile clears the floor -
-// or the ledger, the context or the lane battery stops the chase -
-// the walk stands down and the re-request fires the affordable shot
-// from the opened distance. Reports whether the tick spent the
-// continuation.
+// floor, never at the range the windup collapsed. The chain has NO
+// stall exit: the owner rule removed the standing answer even for a
+// parity race (a walk that opens nothing still trades the melee
+// blows for chase-cadence blows), so the ONLY standing case left is
+// a genuinely walled lane, where the lane battery answers the hold.
+// The step counter resets on every fresh shot cycle
+// (kitePursuitCycle) and on a walk outside the previous context;
+// crossing kitePursuitStreakLimit is the runaway diagnostic, not a
+// stop. The first moment the hostile clears the floor - or the
+// context, the gates or the lane battery stops the chase - the walk
+// stands down and the re-request fires the affordable shot from the
+// opened distance. Reports whether the tick spent the continuation.
 
 func (l *Loop) kitePursuitHold(
     now time.Time, selfX, selfY, selfZ int32,
@@ -1625,68 +1817,18 @@ func (l *Loop) kitePursuitHold(
         // its cell empty).
         return false
     }
-    threatID, dist, ok := l.kiteThreat(selfX, selfY, selfZ)
+    threatID, dist, ok := l.kiteThreat(now, selfX, selfY, selfZ)
     if !ok || dist >= kiteReshotFloor || dist < 1 {
         // The shot is affordable (or the scene is degenerate): the
-        // re-request owns the tick. The walk the ledger still owes
-        // ends on the WON race here - the arming of the re-shot's
-        // own cycle clears the ledger whole (kitePursuitCycle).
-        return false
-    }
-    if l.kitePursuitWalkOpen {
-        // A pursuit-issued walk spent its window: the progress
-        // accounting it owed runs now. The comparison is the
-        // distance at THIS window end against the distance at the
-        // walk's own issue - the walk opened the gap or it did not.
-        // A hold re-probe never reaches here (no walk issued behind
-        // it, the flag stays down): the cornered pause between the
-        // walks is not a lost race step.
-        if dist <= l.kitePursuitDist+kitePursuitStallSlack {
-            l.kitePursuitStall++
-        } else {
-            l.kitePursuitStall = 0
-        }
-        if l.kitePursuitStall == kitePursuitStallLimit {
-            // The parity crossing (once per crossing): two windows
-            // in a row opened no distance. The walk budget of
-            // kitePursuitDeadlockSteps decides below whether the
-            // chain is still worth running.
-            l.logf("Hunt: the pursuit race on %d is at parity "+
-                "(%d stalled windows), checking the walk budget",
-                l.target, l.kitePursuitStall)
-        }
-        l.kitePursuitWalkOpen = false
-        l.kitePursuitDist = dist
-    }
-    if l.kitePursuitStall >= kitePursuitStallLimit &&
-        l.kitePursuitSteps+1 >= kitePursuitDeadlockSteps {
-        // The stall exit: the chain spent its walk budget and the
-        // last windows opened no distance - walking on only repeats
-        // the walled pocket shuffle while the chaser stays glued to
-        // the bow (the temp18 acceptance dump: 33 walks and 63
-        // seconds without a shot in the elven pocket). The hold
-        // ground answer of the cornered archetype owns the fight
-        // from here: the walk clears with this tick and the forced
-        // attack re-request fires the bow. The pursuit context is
-        // spent until the next shot cycle re-establishes it, so the
-        // same tick's proximity probe cannot re-arm the walk the
-        // exit just stood down.
-        l.logf("Hunt: the pursuit race on %d is lost after %d "+
-            "walks, standing to shoot", l.target,
-            l.kitePursuitSteps+1)
-        l.kitePursuitFor = 0
-        l.kitePursuitSteps = 0
-        l.kitePursuitStall = 0
-        l.kitePursuitWalkOpen = false
-        l.kitePursuitDist = 0
-
+        // re-request owns the tick. The arming of the re-shot's own
+        // cycle clears the step counter (kitePursuitCycle).
         return false
     }
     if l.kitePursuitSteps == kitePursuitStreakLimit {
         // The diagnostic crossing (once per crossing): the chain
-        // never resolved in this many walks yet it still opens
-        // distance, so the race keeps running - the stall exit
-        // above owns the chain that stopped paying.
+        // ran this many walks without resolving, the race keeps
+        // running - the owner rule stands the walk down only on a
+        // walled lane.
         l.logf("Hunt: the pursuit chain on %d ran %d walks "+
             "without a shot, holding the course",
             l.target, l.kitePursuitSteps)
@@ -1698,12 +1840,52 @@ func (l *Loop) kitePursuitHold(
         return false
     }
     l.kitePursuitSteps++
-    l.kitePursuitDist = dist
-    l.kitePursuitWalkOpen = true
     l.logger.Printf("Hunt: hostile %d holds %d units at the walk "+
         "end, the pursuit continues the retreat (step %d of %d)",
         threatID, int(math.Round(dist)), l.kitePursuitSteps,
         kitePursuitStreakLimit)
+
+    return true
+}
+
+// kiteDeferShot gates the forced attack re-request of a live bow
+// fight whose retreat already ran: with the nearest hostile still
+// inside the re-shot floor, a request now would commit the next shot
+// at the collapsed range (the windup standstill hands the chaser the
+// melee), so the tick goes to the retreat instead - the same answer
+// the pursuit hold gives a lapsed walk. The deferral belongs to a
+// fight a kite retreat ACTUALLY served in the pursuit context: the
+// first engage of a fresh fight keeps its attack request (the bow
+// must land the first shot before there is a reload to run), and a
+// cornered fight keeps its shot through the hold - a genuinely
+// blocked lane is the one legitimate standing-shoot case. Reports
+// whether the tick issued the retreat and the caller must not
+// request the attack.
+
+func (l *Loop) kiteDeferShot(now time.Time) bool {
+    if !l.kiteLayerGates(now) || !l.kiteFightLive() {
+        return false
+    }
+    if l.kitePursuitFor != l.target ||
+        now.Sub(l.kitePursuitAt) > kitePursuitContext {
+        return false
+    }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    threatID, dist, ok := l.kiteThreat(now, selfX, selfY, selfZ)
+    if !ok || dist < 1 || dist >= kiteReshotFloor {
+        return false
+    }
+    until := now.Add(l.kiteWalkWindow(now) + l.kite.ReengageDelay)
+    if !l.kiteResolveAndClick(now, until, selfX, selfY, selfZ) {
+        // The cornered hold answered: the bow fires from the hold.
+        return false
+    }
+    l.logger.Printf("Hunt: hostile %d holds %d units on %d, holding "+
+        "the re-shot and running the retreat", threatID,
+        int(math.Round(dist)), l.target)
 
     return true
 }
@@ -1746,11 +1928,18 @@ func (l *Loop) kiteHoldGround(now time.Time, surrounded bool) {
         l.kiteHeldAt.IsZero() ||
         now.Sub(l.kiteHeldAt) >= kiteHoldLogPeriod
     if fresh {
-        if surrounded {
+        switch {
+        case l.target == 0:
+            // The targetless hold belongs to the defensive flight
+            // (kiteFleeThreat): a walled lane hands the ticks to the
+            // melee fan for one kite period before the re-probe.
+            l.logger.Printf("Hunt: no straight bow flee lane opens " +
+                "from the chase, the fan owns the next kite period")
+        case surrounded:
             l.logger.Printf("Hunt: the chasers surround the bow "+
                 "fight on target %d, holding ground and shooting "+
                 "through the train", l.target)
-        } else {
+        default:
             l.logger.Printf("Hunt: no walkable retreat lane on "+
                 "target %d (cornered), holding ground and shooting "+
                 "the bow", l.target)

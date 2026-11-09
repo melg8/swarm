@@ -218,17 +218,47 @@ func kiteLaneRungs(step float64, out [kiteLaneRungCount]float64) (
     return out, count
 }
 
-// kiteRetreatLane resolves the one retreat lane of a kite step: the
+// kiteLaneEscapeAngles is the blocked-lane escape order of the
+// retreat battery: the preferred away-ray first, then the smallest
+// turns inside the away half-plane, both ways (22.5, 45, 67.5 and 90
+// degrees). The owner rule of the 2026-11-09 round keeps the retreat
+// STRAIGHT and removed the old fan; the angular escape is the
+// corner-only fallback for the live 2026-11-09 acceptance spot
+// (34792, 49416): the direct away-ray west was walled at every
+// length while the south, east and north rays stood open at 250-900,
+// so a hard "hold the ground" answer stood the archer at melee for
+// the whole fight. The escape never folds back toward the train (the
+// half-plane guard), never fans wide of the perpendicular and never
+// replaces the preferred ray: it only walks the closest straight
+// bearing the terrain actually offers.
+var kiteLaneEscapeAngles = [9]float64{
+    0,
+    math.Pi / 8,  // 22.5 degrees clockwise from the away-ray
+    -math.Pi / 8, // 22.5 degrees counterclockwise
+    math.Pi / 4,  // 45
+    -math.Pi / 4,
+    3 * math.Pi / 8, // 67.5
+    -3 * math.Pi / 8,
+    math.Pi / 2, // the perpendicular
+    -math.Pi / 2,
+}
+
+// kiteRetreatLane resolves the retreat lane of a kite step: the
 // STRAIGHT ray the caller preferred (the centroid away-vector of the
 // train, the widest-gap bisector of an encircled one), at the
 // caller's step length (the race-aware leg of kiteStepLength, the
 // ring-budgeted leg of kiteStraightLeg). The owner rule of the
-// 2026-11-09 round removed the fan: when no straight rung walks the
-// archer holds the ground and shoots instead of turning (a turn
-// spends the distance the retreat just bought). Each rung still runs
-// the terrain contract, the away half-plane guard and the SERVER
-// click validation; the first accepted rung names the endpoint.
-// Reports the endpoint and whether the straight lane walks.
+// 2026-11-09 round keeps the primary retreat straight: when a rung
+// of the preferred ray walks, that rung is the lane, and the ray is
+// never bent by a fan or a chord (a turn spends the distance the
+// retreat just bought). Only when EVERY rung of the preferred ray is
+// blocked does the battery walk the escape angles (see
+// kiteLaneEscapeAngles) - the nearest straight bearing the terrain
+// offers, still inside the away half-plane - and a scene every angle
+// refuses stays the cornered hold (the archer stands and shoots).
+// Each rung runs the terrain contract, the away half-plane guard and
+// the SERVER click validation; the first accepted rung names the
+// endpoint. Reports the endpoint and whether a lane walks.
 
 func (l *Loop) kiteRetreatLane(
     selfX, selfY, selfZ int32, prefX, prefY, awayX, awayY float64,
@@ -236,13 +266,19 @@ func (l *Loop) kiteRetreatLane(
 ) (int32, int32, bool) {
     var scratch [kiteLaneRungCount]float64
     rungs, count := kiteLaneRungs(step, scratch)
-    for i := range count {
-        endX := selfX + int32(math.Round(prefX*rungs[i]))
-        endY := selfY + int32(math.Round(prefY*rungs[i]))
-        laneX, laneY, ok := l.kiteLaneResolve(
-            selfX, selfY, selfZ, endX, endY, awayX, awayY)
-        if ok {
-            return laneX, laneY, true
+    for _, angle := range kiteLaneEscapeAngles {
+        rayX, rayY := prefX, prefY
+        if angle != 0 {
+            rayX, rayY = rotatePlanar(prefX, prefY, angle)
+        }
+        for i := range count {
+            endX := selfX + int32(math.Round(rayX*rungs[i]))
+            endY := selfY + int32(math.Round(rayY*rungs[i]))
+            laneX, laneY, ok := l.kiteLaneResolve(
+                selfX, selfY, selfZ, endX, endY, awayX, awayY)
+            if ok {
+                return laneX, laneY, true
+            }
         }
     }
 
@@ -332,9 +368,14 @@ func (l *Loop) kiteLaneResolve(
     validX := int32(math.Round(valid.X))
     validY := int32(math.Round(valid.Y))
     if math.Hypot(float64(validX-selfX),
-        float64(validY-selfY)) < 1 {
-        // The validated point collapsed onto the stand (a broken
-        // correction answer): no lane.
+        float64(validY-selfY)) < kiteMinStep {
+        // The validated point collapsed onto a partial run shorter
+        // than the shortest useful hop: a 38 unit "walk" buys no
+        // distance and spends a whole reload window (the live
+        // 2026-11-09 acceptance run issued exactly one and stood
+        // through the next cycle), so the lane battery treats it as
+        // no lane. A genuinely shorter hop cannot pass the rung
+        // ladder anyway (kiteLaneRungs floors at kiteMinStep).
         return 0, 0, false
     }
 
