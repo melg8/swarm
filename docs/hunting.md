@@ -400,8 +400,9 @@ the re-request shoots again from the opened distance. The cycle -
 stand, shoot, step clear, shoot - trades a slice of damage speed for a
 melee uptime the mob cannot pay. The layer landed in slices: the core
 step (#18, PR #15), the edge cases - the train centroid, the cornered
-hold, the lane fan (#19, PR #25), the archetype composition (#21, PR
-#31).
+hold, the lane fan of the early design (#19, PR #25; the fan retired
+by the straight-lane rule of the 2026-11-09 round), the archetype
+composition (#21, PR #31).
 
 The radii of the ranged fight (hunt/loop.go): the melee swing range
 sits around 150 units and the chasers run 120+ units per second, so
@@ -454,63 +455,71 @@ before the impending-add step):
   SelfAttackers member within kiteTrainScanRange (800) on a reachable
   deck, each chaser weighing one unit. A train whose away vectors
   cancel (the summed length under kiteEncircleShare, 0.3, of its
-  count - chasers stand on every side) has no direction at all: too
-  wide to outrun, the archer holds ground and shoots through it. The
-  chaser positions are the raw last-known packet ones - the projected
-  scan serves only the nearest chaser, and the 250 unit trigger
-  margin absorbs the broadcast lag.
-- The lane (kiteRetreatLane): the straight away-ray of kiteStep (400
-  units) first, then the fan candidates at 45 and 90 degrees each
-  side (kiteFanStep pi/4, kiteFanSteps 2 - the open backward lanes
-  over the blocked corridors, widening symmetrically). Every
-  candidate runs the full gate battery (kiteLaneResolve): the camp
-  deflection bends the endpoint onto the tangent ray of the first
-  idle-aggressive threat circle the straight segment would wake (the
-  same geometry as the transit steering of loop_avoid.go, minus its
-  destination exemption - a retreat meets no mob on purpose; the
-  chasers themselves never deflect the lane, they already hold the
-  character), the zone leash rejects an endpoint outside the hunting
-  square, the away half-plane rejects any deflection that folded back
-  toward the train (the lane unit's retreat component under
-  kiteHalfPlaneSlack, -0.05), and the terrain gates need the
-  navigator - a wall behind (the geodata line of sight) or water
+  count - chasers stand on every side) has no centroid direction: the
+  WIDEST-GAP bisector takes the step instead (kiteGapDirection - the
+  perpendicular break of a two-mob line opens the distance to both
+  chasers at once). The chaser positions are the raw last-known
+  packet ones - the projected scan serves only the nearest chaser,
+  and the 250 unit trigger margin absorbs the broadcast lag.
+- The lane (kiteRetreatLane): the STRAIGHT ray of kiteTrainDirection
+  and nothing else (the owner rule of the 2026-11-09 round). The leg
+  length is race-aware (kiteStepLength: the plain kiteStep above the
+  re-shot floor, the deficit bought back at the parity rate under it,
+  capped by kiteRaceStepMax) and ring-budgeted (kiteStraightLeg: the
+  endpoint stays on the ring - kiteRoamRadius * kiteRingLeashShare =
+  972 units around the fight anchor, the target's stand - with
+  kiteMinStep as the shortest hop). The lane runs the gate battery
+  (kiteLaneResolve): the fight leash (kiteRoamRadius around the
+  anchor), the away half-plane (the lane unit's retreat component
+  under kiteHalfPlaneSlack, -0.05), and the terrain gates that need
+  the navigator - a wall behind (the geodata line of sight) or water
   behind (the OverWater oracle) closes the lane; without a navigator
-  (the no-geodata runtime) the leash alone fences the step.
+  (the no-geodata runtime) the leash alone fences the step. The old
+  fan, the camp deflection and the circling chord are GONE: a turn
+  spends the distance the retreat just bought, and the fights whose
+  speeds sit too close cannot afford it. A blocked straight lane
+  holds the ground and shoots.
 - The step: the window is stamped (combatAvoidUntil = now +
-  kiteStepWindow 2s + kiteReengageDelay 0), the streak counts up, the
-  log line lands ("kiting clear (step N of 8)"), and the walk issues.
-  The forced attack re-requests of the engage branch wait out the
-  window - the re-engage knob (kiteReengageDelay, 0 today: the window
-  end IS the re-engage) is pinned for the live tuning round of #29.
+  kiteStepWindow 2s + kiteReengageDelay 0, scaled up to the walked
+  leg by kiteIssueWalk), the streak counts up, the log line lands
+  ("kiting clear (step N of 8)"), and the walk issues. The forced
+  attack re-requests of the engage branch wait out the window - the
+  re-engage knob (kiteReengageDelay, 0 today: the window end IS the
+  re-engage) is pinned for the live tuning round of #29.
 
 The fallbacks, in the order the machine meets them:
 
 - The encircled train: the centroid cancelled, every step direction
-  walks INTO a chaser - the archer holds ground and shoots through
-  the train ("the chasers surround the bow fight ..., holding ground
-  and shooting through the train"), the pile up and losing fight
+  walks INTO a chaser - the widest-gap bisector still names the
+  straight ray of the widest opening, and only when that whole ray
+  is walled does the archer hold ground and shoot through the train
+  ("the chasers surround the bow fight ..., holding ground and
+  shooting through the train"), the pile up and losing fight
   machinery still owning a train that outdamages the standing fight.
-- The cornered hold: no walkable lane in the whole away hemisphere -
-  a wall, water, the leash or a failed fan. The archetype rule
-  answers: the archer stops retreating and KEEPS SHOOTING the bow at
-  melee range ("no walkable retreat lane ... (cornered), holding
-  ground and shooting the bow"). The hold re-probes at the kite
-  pacing, not every tick - a failed probe never becomes the idle
-  stutter - and the diagnostic lands once per hold episode
-  (kiteHoldLogPeriod, 15s): a standing fight that names itself stays
-  diagnosable. The hunt loop's watchdogs stay quiet through it: the
-  stuck timeout only owns a fight that never started (the cornered
-  fight runs), and the chase stall watchdog only owns the stretches
-  beyond 650 (the cornered fight sits at ~150).
-- The streak limit: a chaser at least as fast as the character never
-  falls behind, and past 8 steps the archer stops shuffling THIS
-  target and fights it out - the losing fight machinery (the panic
-  run) still owns the death risk.
+- The cornered hold: no walkable straight lane - a wall, water, the
+  leash or a refused endpoint. The archetype rule answers: the
+  archer stops retreating and KEEPS SHOOTING the bow at melee range
+  ("no walkable retreat lane ... (cornered), holding ground and
+  shooting the bow"). The hold re-probes at the kite pacing, not
+  every tick - a failed probe never becomes the idle stutter - and
+  the diagnostic lands once per hold episode (kiteHoldLogPeriod,
+  15s): a standing fight that names itself stays diagnosable. The
+  hunt loop's watchdogs stay quiet through it: the stuck timeout
+  only owns a fight that never started (the cornered fight runs),
+  and the chase stall watchdog only owns the stretches beyond 650
+  (the cornered fight sits at ~150).
+- The streak limit: crossing 8 steps names the unwinnable distance
+  race in the log, but the retreat keeps running straight - the
+  answer to a chaser at least as fast as the character is never the
+  standing fight (it was the melee damage the kite exists to avoid).
+  The losing fight machinery (the panic run) still owns the death
+  risk separately.
 - The refused walk: a retreat the gates cleared but the server
   refused (the click validation collapses, a mob body sits on the
-  click point) surfaces through the ordinary move-start watchdogs -
-  the kite re-probes on its pacing and picks the next fan candidate
-  then.
+  click point) surfaces through the re-click ladder - the spam keeps
+  the endpoint until the probe age, then the hold owns the cycle.
+  The straight design has no second lane to rotate onto: a turn
+  would spend the distance the retreat just bought.
 
 The knobs of kite.go as pinned on main (the tuning round of #29
 adjusts the first four from live measurements; the band edges above
@@ -526,7 +535,9 @@ are references, not copies):
 | `kiteStreakLimit` | 8 | the consecutive step bound per target, then the fight |
 | `kiteTrainScanRange` | 800.0 | the chaser scan band of the retreat direction |
 | `kiteEncircleShare` | 0.3 | the encirclement threshold (hold and shoot through) |
-| `kiteFanStep` / `kiteFanSteps` | pi/4 / 2 | the lane fan - the 45 and 90 degree candidates each side |
+| `kiteMinStep` | 250.0 | the shortest retreat hop the ring budget may leave |
+| `kiteRingLeashShare` | 0.72 | the straight leg's cap as a share of the roam radius (the 972 unit ring) |
+| `kiteRaceStepMax` | 1700.0 | the cap of the race leg (the roam radius of three bow engage radii) |
 | `kiteHalfPlaneSlack` | -0.05 | the away half-plane guard (no fold-back into the train) |
 | `kiteHoldLogPeriod` | 15s | the cornered hold diagnostic pacing |
 | `kiteShotWindow` | 700ms | the freshness window of the own-shot broadcast that arms the shot-paced retreat |
@@ -571,9 +582,9 @@ the shot cadence of the issue #60 dump):
   uses.
 
 The layer (kiteFromShot) shares the whole step machinery with the
-proximity path - the train direction, the camp deflection, the
-leash, the wall and the water gates, the cornered and encircled
-holds, the movement window - and differs in three rules:
+proximity path - the straight train direction, the leash, the wall
+and the water gates, the cornered and encircled holds, the movement
+window - and differs in three rules:
 
 - The trigger: the shot broadcast inside kiteShotWindow (700ms - the
   loop ticks four times a second, the broadcast stays catchable for
@@ -621,8 +632,8 @@ cycle was the problem, not the lane.
 The third-round acceptance dump named the dominant dead-click
 mechanism exactly: the server answers SOME destination cells with an
 instant bare ActionFailed (the send and the answer land the same
-millisecond) while the rotated fan lane a few cells aside walks
-fine. The MoveToLocation handler refusal family is the source (the
+millisecond) while a lane a few cells aside walks fine. The
+MoveToLocation handler refusal family is the source (the
 Mobius C1 packet handler runs `isCompletelyBlocked` on the
 destination cell - among other checks - BEFORE any movement starts),
 and the bot's own geodata reads the dump's refused cells open (the
@@ -633,9 +644,11 @@ answers:
 
 - The destination-cell refusal (the dominant one, the dump
   evidence): the server refuses the cell outright - a refused cell
-  never starts a walk, clicking it again changes nothing. The
-  rotation onto the next fan candidate is the answer, and the
-  ActionFailed answer of the click is the trigger.
+  never starts a walk, and under the straight-lane rule of the
+  2026-11-09 owner round there is no fan to rotate onto. The spam
+  keeps the endpoint while the walk is younger than the broadcast
+  gate, then the dead verdict stands the ladder down and the hold
+  keeps the bow shooting.
 - The stance transition swallow (the round-two theory): the click
   lands ~250ms after the own Attack broadcast while the server side
   ATTACK intention of the just-committed shot is still tearing down.
@@ -652,20 +665,24 @@ still stands on the issue cell - the SelfWalking tracker flag is the
 oracle, the issue cell the baseline - the click goes out again every
 kiteReclickPeriod (250ms, the tick cadence; a re-click inside the
 once-per-second broadcast gate just re-aims the same endpoint
-server-side, the click is not wasted). The moment the refusal
-evidence lands (kiteClickRefused - the ActionFailed answer the
-server gave the last click, correlated by the send time the same way
-the town walker's refusalEvidence runs), the dead endpoint rotates
-onto the next fan candidate AT ONCE: no probe wait, no pacing wait.
-The refused cell joins the refused-cell set (kiteWalkDeadCells) and
-the lane battery (kiteRetreatLaneSkipping) resolves the next
-walkable lane skipping the whole set - a refused cell is never
-re-clicked. The silent probe stays as the H-006 fallback: a walk
-unanswered past kiteProbeElapsed rotates the same way. A rotation
-with nothing left (an encircled train, every candidate refused or
-blocked) stands the ladder down - the cornered hold owns the answer.
-The ladder also stands down when the walk runs (the movement
-broadcast), the character leaves the issue cell, or the window ends.
+server-side, the click is not wasted). The refusal evidence
+(kiteClickRefused - the ActionFailed answer the server gave the last
+click, correlated by the send time the same way the town walker's
+refusalEvidence runs) latches the dead verdict at once, but the spam
+keeps going while the walk is younger than kiteProbeElapsed: the age
+gate separates a genuine click refusal from the straggler refusals
+of the server AI's own attack retries (the bow disable path answers
+ActionFailed at a one-second cadence while the character stands) and
+gives the movement broadcast of a healthy click its chance. The
+silent probe is the H-006 fallback: a walk unanswered past the same
+age names the endpoint dead. Either verdict past the age stands the
+ladder down - the hold owns the cycle, the straight design has no
+second lane to rotate onto, and the next shot cycle re-arms the
+retreat fresh. The ladder also stands down when the walk runs (the
+movement broadcast), the leg completes within kiteArrivalEpsilon of
+the endpoint, the character re-bases on a fresh standing cell
+mid-leg (the spam continues against the SAME endpoint), or the
+window ends (the forced attack re-request owns the tick).
 
 The walk WINDOW itself is the bow-aware one now (kiteWalkWindow -
 the third-round ask: the proper archering delays from the C1 Mobius
@@ -686,13 +703,12 @@ absurd pAtkSpd broadcast falls back to the shipped kiteStepWindow
 
 The dump markers the ladder adds, and what each names: the refusal
 verdict line ("the kite walk click on target ... was refused by the
-server") followed by the walk starting on the rotated endpoint names
-the destination-cell refusal working as designed; the silent probe
-line ("never started the movement") with nothing ever moving across
-the whole ladder names the H-006 silent drop; the rotation line
-("rotating the kite retreat ... onto the lane") is the second marker
-of the pair; the "no walkable retreat lane left" line names the
-cornered-by-refusal answer.
+server") past the probe age names the destination-cell refusal and
+the hold that follows it; the silent probe line ("never started the
+movement") with nothing ever moving across the whole ladder names
+the H-006 silent drop; the hold line ("no walkable retreat lane ...
+(cornered), holding ground and shooting the bow") names the
+cornered-by-refusal answer of the straight design.
 
 The measured numbers of the live tuning round (issue #29: the kited
 archer against the standing-archer baseline - a bow bot with the kite
@@ -706,11 +722,16 @@ parameter change of the round arrives with its before/after row.
 | kill rate | - | - | - |
 | death rate | - | - | - |
 
-### The continuous circle (issue #70, rounds 17-19)
+### The straight race leg (issue #70, rounds 17-19; the 2026-11-09 owner rework)
 
 The round-17/18 live verdicts replaced the window-sized shuffle with a
 continuous race the shot cycle rides (the full record lives in
-`docs/progress/2026-09-23-issue70-kite-timing-probe.md`):
+`docs/progress/2026-09-23-issue70-kite-timing-probe.md`). The
+2026-11-09 owner round removed the turning geometry of that design
+(the circle, the chords, the camp deflection, the pocket breakouts):
+when the chaser's speed sits close to the character's, a turn spends
+the distance the retreat just bought, so the leg runs straight away
+from the train and the archer shoots the moment the bow is ready.
 
 - The RACE leg (`kiteStepLength`): inside the re-shot floor (480) the
   straight leg runs `kiteStep + (floor - dist) * kiteRaceFactor` - the
@@ -718,20 +739,22 @@ continuous race the shot cycle rides (the full record lives in
   at `kiteRaceStepMax` (1700). The leg arrives back AT the floor, so
   the arrival shot (or the re-request at the window end) is the ONE
   shot of the cycle, fired from the safe distance.
-- The CIRCLE (`kiteCurveDirection`): every later retreat aims the
-  CHORD of the fight's anchor circle - the endpoint sits exactly the
-  ring radius from the anchor, swung the fight's fixed turn side, so
-  the character stays equidistant from the point it kites around. The
-  ring is `kiteRoamRadius * kiteCircleLeashShare` = 972 units; the
-  chord NEVER leashes (it lands on the ring by construction) and the
-  lane battery walks the exact chord length.
+- The STRAIGHT LANE (`kiteStraightLeg`): the leg direction is the
+  away-ray of the whole chaser train and nothing else. The endpoint
+  stays on the fight's ring - `kiteRoamRadius * kiteRingLeashShare` =
+  972 units around the anchor, the tallest hop the leash leaves capped
+  by `kiteMinStep` (250) as the shortest - and the lane battery
+  resolves the leash, the away half-plane, the geodata wall and the
+  water gate against it. A blocked straight lane holds the ground:
+  the owner rule of the 2026-11-09 round admits no fan, no deflection
+  and no circling chord.
 - The ANCHOR is the MOB'S STAND (`kiteResolveAndClick`), not the
   character's first-retreat cell: the reopening live audit measured the
   self anchor parking the fight at the 1500-unit drift leash, where
-  every chord pointed inward and the away half-plane refused it (the
+  every lane pointed inward and the away half-plane refused it (the
   fence-edge hold). The opening straight leg budgets against the ring
-  around the mob's stand (`kiteStraightLeg`), so the fight opens on the
-  circle it keeps.
+  around the mob's stand (`kiteStraightLeg`), so the fight opens on
+  the ring it keeps.
 - The WINDOW scales with the walked leg at the per-unit pace of the
   bow disable formula (`kiteIssueWalk`): a 722-unit opening leg at the
   Short Bow pAtkSpd 337 holds the movement ~5.4s, the fallback 2s
@@ -739,10 +762,13 @@ continuous race the shot cycle rides (the full record lives in
   else owns the movement.
 - The ARRIVAL (`kiteReclickWalk`): a stand within `kiteArrivalEpsilon`
   (100) of the endpoint completes the leg, the walk's own
-  `combatAvoidUntil` hold ends with it, and under the re-shot floor the
-  next pursuit chord issues on the SAME tick - the character never
-  stands between the legs of the race. At or beyond the floor the
-  stand-down hands the tick to the arrival shot's own cycle.
+  `combatAvoidUntil` hold ends with it, and the tick hands over to the
+  arrival shot's own cycle - the next retreat re-arms at that shot's
+  broadcast, so the character walks the reload and shoots the moment
+  the bow allows. A mid-leg stand short of the endpoint re-bases the
+  ladder onto the current cell and keeps pushing the SAME endpoint
+  (the spam continues), and a dead endpoint holds the ground instead
+  of turning.
 - The CELL-FOLLOW (`cellHunter.applyFollowing`): a fight that crosses a
   hexagon boundary keeps its target when the held ground follows it -
   the follow is bookkeeping, not a travel reset. The round-19 live log
