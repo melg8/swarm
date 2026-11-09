@@ -573,6 +573,8 @@ func TestCellFollowGroundSwitch(t *testing.T) {
     loop.cellEvaluate(now)
     require.Equal(t, "test-rich", loop.zonePickedID,
         "the held ground follows the fight into the neighbor")
+    require.Equal(t, int32(300), loop.target,
+        "the follow switch keeps the running fight target")
     require.Equal(t, 1, globalCellHub.occupancy("test-rich"))
     require.Equal(t, 0, globalCellHub.occupancy("test-home"))
     // The left ground starts its ripeness clock: the rotation holds

@@ -444,7 +444,7 @@ func (h *cellHunter) followGround(l *Loop, now time.Time) {
     left := h.cells[h.picked].Name
     h.foldVisit(h.picked)
     h.markCleared(h.cells[h.picked].ID, now)
-    h.apply(l, ground, now)
+    h.applyFollowing(l, ground, now)
     l.logger.Printf("Hunt: the fight crossed into %s (was %s), "+
         "following the ground", h.cells[ground].Name, left)
 }
@@ -738,6 +738,24 @@ func (h *cellHunter) ringEligible(now time.Time) bool {
 // while the walk answers nothing.
 func (h *cellHunter) apply(l *Loop, index int, now time.Time) {
     l.dropAttackTarget("the ground rotation owns the way")
+    h.applyGround(l, index, now)
+}
+
+// applyFollowing switches the hunter onto the ground a RUNNING fight
+// stands on (see followGround): the follow is bookkeeping, not a
+// travel route change - the fight target stays selected. Dropping it
+// would unselect the server target on every cell boundary the kite
+// crosses (the measured round-19 archer run: two drops inside 40 s,
+// each restarting the engagement mid-kite) while the very ground
+// switch was driven by that target's own position.
+func (h *cellHunter) applyFollowing(l *Loop, index int, now time.Time) {
+    h.applyGround(l, index, now)
+}
+
+// applyGround moves the cell economy state to the given ground: the
+// shared body of apply and applyFollowing, which differ only in the
+// target-register ownership of the switch.
+func (h *cellHunter) applyGround(l *Loop, index int, now time.Time) {
     if h.picked >= 0 && h.picked < len(h.metrics) {
         h.foldVisit(h.picked)
     }

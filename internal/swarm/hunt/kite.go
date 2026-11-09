@@ -454,11 +454,11 @@ const (
     kiteRaceStepMax = 1700.0
     // kiteCircleMinRadius is the anchor-circle radius under which
     // the curving retreat keeps the straight away-ray: the opening
-    // legs of a fight sit on (or near) the anchor cell itself - the
-    // anchor IS the self position at the first retreat resolution -
-    // and a chord of a near-zero circle folds straight through the
-    // farm point. The circle takes over once the opening legs
-    // carried the fight onto its own ring.
+    // legs of a fight sit near the anchor cell itself (the anchor
+    // is the mob's stand, and the shot range puts the character a
+    // few hundred units out), and a chord of a near-zero circle
+    // folds straight through the farm point. The circle takes over
+    // once the opening legs carried the fight onto its own ring.
     kiteCircleMinRadius = 300.0
     // kiteCircleArcHalf caps the half-arc the circle chord
     // subtends (45 degrees, a 90 degree endpoint swing): past it
@@ -467,21 +467,18 @@ const (
     // correction slower than it spends safety.
     kiteCircleArcHalf = math.Pi / 4
     // kiteCircleLeashShare caps the anchor-circle radius as a share
-    // of the roam radius. The round-17 live verdict sized it: the
-    // circle at 0.92 (1242 units) carried the full 1700-unit race
-    // chord, but the fight drift - the character's displacement
-    // from the MOB'S STAND, not the anchor - adds the engage offset
-    // (the anchor sits a bow radius from the mob's stand) and broke
-    // the audit's 1500-unit drift leash at 1591-1712 on three of
-    // five slots, while the shove tier's 250-unit bursts off the
-    // 1242 ring crossed the 1350 roam fence and left the pack
-    // cells' surrounds at the hold. The 0.72 share (972 units)
-    // keeps every fence: the drift worst case 972+500 = 1472 stays
-    // inside 1500, the shove worst case 972+250 = 1222 stays inside
-    // 1350, and the chord at the cap (1.41 * 972 = 1370) still
-    // carries the typical race deficit (~163 * 8 + 400 = 1704 is
-    // the deep-collapse cap; the pursuit continuation chains the
-    // remainder the shorter chord cannot buy in one leg).
+    // of the roam radius, and the same share caps the OPENING
+    // straight leg (kiteStraightLeg lands it on the ring): the ring
+    // is the circle the fight keeps, the fence is the emergency
+    // margin between the ring and the roam radius, and an endpoint
+    // in between would leave the chord pointing inward - the
+    // fence-edge pocket of the round-18 QA audit (the chord refused
+    // by the away half-plane, the fan walled by the leash, the
+    // hold). The round-17 live verdict sized the share at 0.72 (972
+    // units): the audit drift leash is 1500 from the MOB'S STAND
+    // (now the anchor itself), and the ring at 972 keeps the whole
+    // circle - the shove tier's 250-unit bursts included - inside
+    // both fences.
     kiteCircleLeashShare = 0.72
     // kiteArrivalEpsilon is the arrival radius of the leg-long
     // re-click ladder (round 17): a stand within this distance of
@@ -878,16 +875,14 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
 // and the windup standstill of that shot hands the chaser the
 // melee. The race leg arrives at the floor, so the arrival shot (or
 // the re-request at the window end) is the ONE shot of the cycle,
-// fired from the safe distance. The leash budget caps the straight
-// legs: the endpoint of a straight step must stay inside the roam
-// radius around the fight anchor, and a fight already at the leash
-// edge keeps at least the shove tier of room (the circle chord of
-// the curving legs lands equidistant by construction and never
-// needs the budget).
+// fired from the safe distance. The FORMULA carries no leash: the
+// straight legs budget against the opening ring and the circle chords
+// land on the anchor ring by construction (see kiteStraightLeg and
+// kiteCurveDirection) - the round-18 QA audit measured the old
+// self-anchored budget collapsing the leg to the 250 shove floor at
+// the fence, the shuffle that never regained the floor.
 
-func (l *Loop) kiteStepLength(
-    dist float64, selfX, selfY int32,
-) float64 {
+func (l *Loop) kiteStepLength(dist float64) float64 {
     if dist >= kiteReshotFloor {
         return l.kite.Step
     }
@@ -895,23 +890,35 @@ func (l *Loop) kiteStepLength(
     if step > kiteRaceStepMax {
         step = kiteRaceStepMax
     }
-    if l.kiteFightFor == l.target {
-        // The leash budget of the straight legs: the worst-case ray
-        // runs the radius straight out, so the anchor distance plus
-        // the step must stay inside the roam fence. The margin
-        // (kiteArrivalEpsilon's half) keeps the int32 cell rounding
-        // of the endpoint from crossing the fence the battery
-        // enforces - a 1350-budget step rounded onto 1351 reads
-        // walled, and the round-17 live log measured the rotation
-        // cascade that follows (the refused clicks, the fan folds,
-        // the hold).
-        anchorDist := math.Hypot(
-            float64(selfX-l.kiteFightX),
-            float64(selfY-l.kiteFightY))
-        if budget := kiteRoamRadius - anchorDist -
-            kiteArrivalEpsilon/2; budget < step {
-            step = math.Max(kiteShoveStep, budget)
-        }
+
+    return step
+}
+
+// kiteStraightLeg budgets a STRAIGHT leg against the opening ring: the
+// endpoint of the away-ray must stay inside the fight's ring - the
+// leash share of the roam radius around the fight anchor (the MOB'S
+// stand, see kiteResolveAndClick) - so the opening retreat lands the
+// character where the chords circle: outside the ring every chord
+// points inward and the half-plane guard refuses it (the fence-edge
+// pocket of the round-18 QA audit), inside it the equidistant endpoint
+// stays reachable. A stand already at the ring keeps at least the
+// shove tier of room. The margin (kiteArrivalEpsilon's half) keeps the
+// int32 cell rounding of the endpoint from crossing the ring the
+// battery enforces - a ring-budget step rounded onto the ring plus one
+// reads past the circle, and the round-17 live log measured the
+// rotation cascade that follows (the refused clicks, the fan folds,
+// the hold). Reports the step unchanged before the fight anchored.
+
+func (l *Loop) kiteStraightLeg(step float64, selfX, selfY int32) float64 {
+    if l.kiteFightFor != l.target {
+        return step
+    }
+    anchorDist := math.Hypot(
+        float64(selfX-l.kiteFightX), float64(selfY-l.kiteFightY))
+    ring := kiteRoamRadius * kiteCircleLeashShare
+    if budget := ring - anchorDist -
+        kiteArrivalEpsilon/2; budget < step {
+        step = math.Max(kiteShoveStep, budget)
     }
 
     return step
@@ -938,14 +945,24 @@ func (l *Loop) kiteResolveAndClick(
 ) bool {
     if l.kiteFightFor != l.target {
         // The fight's own anchor (the round-14 location-general
-        // leash): the self position at the FIRST retreat resolution
-        // of this target is the live-observed farm point the whole
-        // fight circles - the retreat leash (kiteTerrainLane) and
-        // the curve turn side (kiteCurveSide) read it instead of
-        // the hunting-square registry, so the kite runs on any
-        // ground, mapped or not.
+        // leash): the ground the fight circles - the round-18 QA
+        // audit re-anchored it on the MOB'S STAND. The old anchor
+        // (the self position at the first retreat resolution) sat
+        // up to a bow radius behind the mob, so the opening leg
+        // budgeted past 1500 from the mob's stand and parked the
+        // character at the leash fence, where every chord pointed
+        // inward and the battery refused it (the measured
+        // fence-edge pocket). The mob's stand is where the fight
+        // really runs: the retreat leash (kiteTerrainLane), the
+        // curve center (kiteCurveDirection) and the turn side
+        // (kiteCurveSide) all read it, and the opening leg lands on
+        // the ring instead of the fence. A vanished target falls
+        // back to the self position.
         l.kiteFightFor = l.target
         l.kiteFightX, l.kiteFightY = selfX, selfY
+        if tx, ty, _, tok := l.tracker.ObjectPosition(l.target); tok {
+            l.kiteFightX, l.kiteFightY = tx, ty
+        }
     }
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
     if encircled && dirX == 0 && dirY == 0 {
@@ -975,16 +992,24 @@ func (l *Loop) kiteResolveAndClick(
         // to the re-shot floor at the resolution moment sizes the
         // leg - one long continuous walk to the floor, not a
         // window-sized shuffle that ends short of it.
-        stepLen = l.kiteStepLength(threatDist, selfX, selfY)
+        stepLen = l.kiteStepLength(threatDist)
     }
     prefX, prefY := dirX, dirY
+    laneLen := l.kiteStraightLeg(stepLen, selfX, selfY)
     if !encircled {
-        prefX, prefY = l.kiteCurveDirection(
+        curveX, curveY, curveLen, handled := l.kiteCurveDirection(
             dirX, dirY, selfX, selfY, stepLen)
+        if handled {
+            prefX, prefY, laneLen = curveX, curveY, curveLen
+        } else {
+            // The straight leg (the opening retreat of the fight):
+            // the away-ray endpoint budgets against the opening ring.
+            laneLen = l.kiteStraightLeg(stepLen, selfX, selfY)
+        }
     }
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
         selfX, selfY, selfZ, prefX, prefY, dirX, dirY,
-        stepLen, l.kiteDeadCellsFor())
+        laneLen, l.kiteDeadCellsFor())
     if !found {
         // The hemisphere sweep is walled (the raw away-ray of a
         // normal train, the gap ray of an encircled one): BEFORE the
@@ -1222,42 +1247,45 @@ func (l *Loop) kiteShotPhase(
 // OPENING retreat of a fight runs the straight away-ray (the panic
 // retreat opens the distance at once), every later one aims the
 // CHORD of the fight's anchor circle - the endpoint sits exactly the
-// circle's radius away from the FIGHT ANCHOR (the live-observed
-// ground the fight started on, see kiteResolveAndClick), swung the
-// fight's fixed turn side, so the character keeps the SAME distance
-// to the point it kites around: the owner's equidistant circling
-// spec, exactly. The chord carries the race leg (kiteStepLength)
-// when the circle has the room for it: the radius grows to the
-// length the leg needs (capped by the leash share), the half-arc
-// caps at kiteCircleArcHalf (a 90 degree endpoint swing - past it
-// the chord folds toward the chase half-plane the battery guards),
-// and a leg the capped circle cannot carry walks the shorter chord
-// anyway (the pursuit continuation re-arms the remainder). The
-// turn side is the fight's own constant (kiteCurveSide picks it
-// once: toward the FIGHT ANCHOR when the first retreat anchored the
-// fight, a fixed side otherwise). The advance to the curved steps
-// belongs to the issued walk alone (kiteIssueWalk): a cornered or
-// refused retreat spends nothing, the opening straight step stays
-// armed until a walk really goes out. The degenerate scenes - no
-// anchor, the opening radius under kiteCircleMinRadius, a chord
-// that degenerates to a point - keep the straight away-ray: the
-// circle owns the fight only where the fight really runs on one.
+// circle's radius away from the FIGHT ANCHOR (the MOB'S stand, see
+// kiteResolveAndClick), swung the fight's fixed turn side, so the
+// character keeps the SAME distance to the point it kites around:
+// the owner's equidistant circling spec, exactly. The chord carries
+// the race leg (kiteStepLength) when the circle has the room for it:
+// the radius grows to the length the leg needs (capped by the leash
+// share), the half-arc caps at kiteCircleArcHalf (a 90 degree
+// endpoint swing - past it the chord folds toward the chase
+// half-plane the battery guards), and a leg the capped circle cannot
+// carry walks the shorter chord anyway (the pursuit continuation
+// re-arms the remainder). The turn side is the fight's own constant
+// (kiteCurveSide picks it once: toward the FIGHT ANCHOR when the
+// first retreat anchored the fight, a fixed side otherwise). The
+// advance to the curved steps belongs to the issued walk alone
+// (kiteIssueWalk): a cornered or refused retreat spends nothing, the
+// opening straight step stays armed until a walk really goes out. The
+// degenerate scenes - no anchor, the opening radius under
+// kiteCircleMinRadius, a chord that degenerates to a point - keep the
+// straight away-ray: the circle owns the fight only where the fight
+// really runs on one. Reports the preferred ray, the CHORD LENGTH
+// (the distance from the character to the designed endpoint - the
+// lane battery must walk exactly it, or the endpoint leaves the
+// ring) and whether the chord took the preference.
 
 func (l *Loop) kiteCurveDirection(
     dirX, dirY float64, selfX, selfY int32, step float64,
-) (float64, float64) {
+) (float64, float64, float64, bool) {
     if l.kiteCurveFor != l.target {
         l.kiteCurveFor = l.target
         l.kiteCurved = false
         l.kiteCurveSign = l.kiteCurveSide(dirX, dirY, selfX, selfY)
     }
     if !l.kiteCurved {
-        return dirX, dirY
+        return dirX, dirY, step, false
     }
     if l.kiteFightFor != l.target || step < 1 {
         // No anchored circle (or a degenerate leg): the straight
         // away-ray serves the step.
-        return dirX, dirY
+        return dirX, dirY, step, false
     }
     toSelfX := float64(selfX - l.kiteFightX)
     toSelfY := float64(selfY - l.kiteFightY)
@@ -1265,7 +1293,7 @@ func (l *Loop) kiteCurveDirection(
     if radius < kiteCircleMinRadius {
         // The opening legs still sit on the anchor cell: a chord of
         // a near-zero circle folds straight through the farm point.
-        return dirX, dirY
+        return dirX, dirY, step, false
     }
     // The circle the chord lands on: the current radius, grown to
     // the length the leg needs (the chord of the half-arc cap
@@ -1296,11 +1324,12 @@ func (l *Loop) kiteCurveDirection(
     endY := float64(l.kiteFightY) + swingY*radiusTarget
     prefX := endX - float64(selfX)
     prefY := endY - float64(selfY)
-    if size := math.Hypot(prefX, prefY); size >= 1 {
-        return prefX / size, prefY / size
+    chord := math.Hypot(prefX, prefY)
+    if chord < 1 {
+        return dirX, dirY, step, false
     }
 
-    return dirX, dirY
+    return prefX / chord, prefY / chord, chord, true
 }
 
 // kiteCurveSide picks the turn side of a fight's circle once: the
@@ -1486,7 +1515,11 @@ func (l *Loop) kiteClickRefused() bool {
     }
     failedAt := l.tracker.LastActionFailed()
 
-    return failedAt.After(l.kiteReclickAt) &&
+    // The failure may carry the SAME coarse clock stamp as the click
+    // (the Windows timer granularity - the live server answers inside
+    // the same millisecond), so the correlation starts at the click
+    // moment inclusive instead of strictly after it.
+    return !failedAt.Before(l.kiteReclickAt) &&
         failedAt.Sub(l.kiteReclickAt) <= kiteRefusalAnswerWindow &&
         !l.tracker.OtherRequestBetween(l.kiteReclickAt, failedAt)
 }
@@ -1519,12 +1552,15 @@ func (l *Loop) kiteRotateDeadEndpoint(
     // a coverage sweep of the whole hemisphere, the circle owns
     // the fresh retreat preference alone - a rotation that clung
     // to the curved ray would sweep only the three candidates left
-    // of its fan. The rotation keeps the leg LENGTH race-aware:
-    // the live threat at the rotation moment sizes the step.
+    // of its fan. The rotation keeps the leg LENGTH race-aware and
+    // budgets it against the roam fence: the live threat at the
+    // rotation moment sizes the step, the straight lean of a
+    // direction-centered sweep can run the anchor radius out.
     stepLen := l.kite.Step
     if _, threatDist, threatOK := l.kiteThreat(
         selfX, selfY, selfZ); threatOK {
-        stepLen = l.kiteStepLength(threatDist, selfX, selfY)
+        stepLen = l.kiteStraightLeg(
+            l.kiteStepLength(threatDist), selfX, selfY)
     }
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
         selfX, selfY, selfZ, dirX, dirY, dirX, dirY,
@@ -1753,12 +1789,17 @@ func (l *Loop) kiteReclickWalk(now time.Time) bool {
         float64(selfX-l.kiteWalkX),
         float64(selfY-l.kiteWalkY)) <= kiteArrivalEpsilon {
         // The leg completed: the character stands on (or within a
-        // cell's throw of) the endpoint. The ladder stands down,
-        // the window's remainder belongs to the arrival shot's own
-        // cycle (the shot-paced rhythm re-arms the next leg).
+        // cell's throw of) the endpoint. The movement gate of the
+        // walk ends WITH the walk (the round-19 live log measured
+        // the 0.7-1.5 s stand the old window remainder left between
+        // the legs), and the pursuit continuation re-arms at once:
+        // under the re-shot floor the next chord issues on THIS
+        // tick, so the archer never stops between the legs of the
+        // race; at or beyond the floor the stand-down hands the
+        // tick to the arrival shot's own cycle.
         l.kiteWalkClear()
 
-        return false
+        return l.kitePursuitHold(now, selfX, selfY, selfZ)
     }
     if selfX != l.kiteWalkBaseX || selfY != l.kiteWalkBaseY {
         // A fresh standing episode: the character left the last
@@ -1890,11 +1931,21 @@ func (l *Loop) kiteDeadCellsFor() [][2]int32 {
 // stay (they name the walk of record for the diagnostics), the gate
 // (kiteWalkUntil), the issue stamp, the click count and the probe
 // latch reset - the next kite step arms the ladder whole through
-// kiteIssueWalk. The dead-cell memory STAYS: it belongs to the
-// target, not the walk, and the next cycle of the same fight skips
-// the cells the server already refused.
+// kiteIssueWalk. The movement hold the walk itself armed
+// (combatAvoidUntil equal to the walk window) ends with it: the
+// arrival chain and the arrival shot need the gate open on the very
+// tick the leg completes (the round-19 live log measured the hold
+// surviving the arrival and standing the archer through the window
+// remainder). A hold of any other owner - the deferred click of a
+// live shot cycle, an impending-add step - keeps its own window. The
+// dead-cell memory STAYS: it belongs to the target, not the walk, and
+// the next cycle of the same fight skips the cells the server
+// already refused.
 
 func (l *Loop) kiteWalkClear() {
+    if l.combatAvoidUntil.Equal(l.kiteWalkUntil) {
+        l.combatAvoidUntil = time.Time{}
+    }
     l.kiteWalkUntil = time.Time{}
     l.kiteWalkIssuedAt = time.Time{}
     l.kiteReclicks = 0

@@ -124,9 +124,10 @@ func TestKiteShotPacedDefersTheRetreatPastTheWindup(t *testing.T) {
         "the step keeps the character's deck")
     // The step runs straight away from the target at the RACE
     // length: the mob 440 out owes a deficit of 40 to the re-shot
-    // floor, so the leg runs 400 + 40*8 = 720 (well under the fresh
-    // anchor's 1300 leash budget).
-    require.Equal(t, int32(44280), step[0],
+    // floor, so the formula runs 400 + 40*8 = 720, capped by the
+    // opening ring budget around the mob's stand
+    // (972-440-50 = 482).
+    require.Equal(t, int32(44518), step[0],
         "the step runs straight away from the target at the race length")
     require.Equal(t, selfY, step[1])
     require.True(t, loop.kiteClickAt.IsZero(),
@@ -224,9 +225,11 @@ func TestKiteShotPacedEncircledTrainBreaksThroughTheGap(t *testing.T) {
     require.InDelta(t, 45000.0, float64(step[0]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
     // The gap bisector at the RACE length: the deficit 280 bought
-    // back at the parity rate caps at the fresh anchor's 1300 leash
-    // budget - the perpendicular break marches the whole leg north.
-    require.InDelta(t, 50000+kiteRoamRadius-kiteArrivalEpsilon/2,
+    // back at the parity rate, capped by the opening ring budget
+    // around the target's stand (972-200-50 = 722) - the
+    // perpendicular break marches that leg north.
+    require.InDelta(t, 50000+kiteRoamRadius*kiteCircleLeashShare-
+        kiteArrivalEpsilon/2-200,
         float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
     require.True(t, loop.kiteHeldAt.IsZero(),
@@ -450,6 +453,6 @@ func TestKiteDeferredWindowSpendsTheReuseTail(t *testing.T) {
     require.WithinDuration(t, shotAt.Add(wantDisable),
         loop.kiteClickUntil, 50*time.Millisecond,
         "the walk window ends at the disable end")
-    require.Less(t, time.Until(loop.kiteClickUntil),
+    require.LessOrEqual(t, time.Until(loop.kiteClickUntil),
         wantDisable, "the window is anchored at the shot, not the tick")
 }

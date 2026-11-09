@@ -23,11 +23,11 @@ import (
 // tests below pin the four gates one by one on the standard kite
 // scene (the lapse dance of pursuitWindowLapse carries each scaled
 // walk window of the race leg out - leg/400 * the bow window, the
-// 1300 leg of the 260-unit mob holds it for 6.5s - and lands the
+// 662 leg of the 260-unit mob holds it for ~3.3s - and lands the
 // arrival shot of the leg the way the live server does).
 
 // pursuitWindowLapse ages the scene past the scaled walk window of
-// the race leg (1300/400 * the 2s fallback = 6.5s), lands the
+// the race leg (662/400 * the 2s fallback = 3.31s), lands the
 // ARRIVAL SHOT of the leg (the server's auto re-shot the armed
 // stance fires the moment the walk ends - the live fight view rides
 // those shots through a chain the fake mob never swings into) and
@@ -35,7 +35,7 @@ import (
 // window end is the only moment the hold owns the tick, the stance
 // lapse is what the live post-walk state looks like).
 func pursuitWindowLapse(bot *state.Bot, loop *Loop, mobX int32) {
-    time.Sleep(7000 * time.Millisecond)
+    time.Sleep(4 * time.Second)
     loop.lastHit = time.Now().Add(-2 * time.Second)
     selfSwingsAt(bot, mobX)
     loop.tick()

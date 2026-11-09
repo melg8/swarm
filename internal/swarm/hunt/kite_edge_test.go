@@ -79,8 +79,9 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
     // The centroid direction, recomputed from first principles:
     // away(target) = (-1, 0), away(member) = (-141, -141)/199.4. The
     // leg is the race step of the nearer threat (the member at 199.4:
-    // 400 + the deficit * 8, capped at the fresh anchor's 1300 leash
-    // budget - the deficit leg is far past it).
+    // 400 + the deficit * 8, capped at the opening ring budget
+    // around the target's stand - 972-200-50 = 722- the deficit leg
+    // is far past it).
     ax, ay := -1.0, 0.0
     bx := -141.0 / math.Hypot(141, 141)
     by := -141.0 / math.Hypot(141, 141)
@@ -90,7 +91,8 @@ func TestKiteTrainBendsTheRetreatToTheCentroid(t *testing.T) {
     leg := math.Min(
         kiteStep+(kiteReshotFloor-math.Hypot(141, 141))*kiteRaceFactor,
         kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius-kiteArrivalEpsilon/2)
+    leg = math.Min(leg,
+        kiteRoamRadius*kiteCircleLeashShare-200-kiteArrivalEpsilon/2)
     step := game.walks[0]
     require.InDelta(t, 45000+dirX*leg, float64(step[0]), 1.0,
         "the step direction is the centroid away-vector of the train")
@@ -131,12 +133,13 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
     // target, pi to the member) spans the northern half-plane and
     // its bisector is the perpendicular ray - the deterministic
     // first-widest answer, no coin flip between the two halves. The
-    // leg is the race step (the deficit 280 capped at the fresh
-    // anchor's 1300 leash budget), so the perpendicular escape
-    // marches the whole leg north.
+    // leg is the race step capped at the opening ring budget around
+    // the target's stand (972-200-50 = 722), so the perpendicular
+    // escape marches that leg north.
     require.InDelta(t, 45000.0, float64(step[0]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
-    require.InDelta(t, 50000+kiteRoamRadius-kiteArrivalEpsilon/2,
+    require.InDelta(t, 50000+kiteRoamRadius*kiteCircleLeashShare-
+        kiteArrivalEpsilon/2-200,
         float64(step[1]), 1.0,
         "the gap bisector runs perpendicular to the chaser line")
     // The perpendicular escape opens the distance to BOTH chasers.
@@ -232,56 +235,38 @@ func TestKiteWaterBehindHoldsGround(t *testing.T) {
         "the hold must be armed")
 }
 
-// TestKiteDeadEndLaneRePlansAtTheNextProbe pins the lane quality
-// rule: a retreat whose straight lane closes ahead (the wall grew, a
-// door shut) re-plans onto the open 45 degree lane at the very next
-// probe - one hop later, never a walk into the dead end. The scene
-// sizes the race leg mid-band (a mob at 440: the deficit 40 buys the
-// 720 leg, well under the fresh anchor's 1300 leash budget) so the
-// diagonal fan candidate fits the roam fence - the full-budget leg
-// of a 200-unit mob leaves the 45 degree lanes no room (the
-// 1300*sqrt(2) diagonal overshoots the fence by the cell rounding).
-func TestKiteDeadEndLaneRePlansAtTheNextProbe(t *testing.T) {
-    bot, game, loop := kiteBowBot(t, 45440)
+// TestKiteDeadEndLaneRePlansOnTheFan pins the lane quality rule: a
+// retreat whose straight lane is closed ahead (the wall grew, a door
+// shut) re-plans onto the open 45 degree lane in the same resolution,
+// never a walk into the dead end and never a stand. The scene keeps
+// the opening retreat (no chord yet): the straight away-ray is off, so
+// the battery fans to the southwest candidate at the same opening ring
+// length.
+func TestKiteDeadEndLaneRePlansOnTheFan(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45440)
     nav := &fakeNavigator{}
-    loop.SetNavigator(nav)
-
-    // The first probe: the straight west lane is open, the step
-    // takes it (the race leg: 400 + 40*8 = 720 out).
-    tickPastTheWindup(loop)
-    require.Len(t, game.walks, 1)
-    require.Equal(t, [3]int32{44280, 50000, -3500}, game.walks[0],
-        "the straight away lane is the lane of record")
-
-    // The next probe cycle: the pacing windows aged out, the fight
-    // view refreshed, and the straight lane now answers blocked (the
-    // corridor ahead closed - the dead end the character walked
-    // into). The second retreat of the fight keeps the straight
-    // preference (the character never left the anchor cell, so the
-    // circle owns no radius yet - kiteCurveDirection keeps the raw
-    // away-ray under kiteCircleMinRadius).
-    loop.combatAvoidUntil = time.Time{}
-    loop.kiteAt = time.Now().Add(-kiteStepPeriod)
-    selfSwingsAt(bot, 45440)
+    // The straight west lane is walled; every other line of sight is
+    // open.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return int32(math.Round(to.X)) != 44280 ||
+        return int32(math.Round(to.X)) != 44518 ||
             int32(math.Round(to.Y)) != 50000, nil
     }
+    loop.SetNavigator(nav)
 
+    // The first probe: the straight lane is blocked, the southwest
+    // fan carries the step at the opening ring length
+    // (972-440-50 = 482).
     tickPastTheWindup(loop)
-    require.Len(t, game.walks, 2,
+    require.Len(t, game.walks, 1,
         "the dead end must re-plan, not stall the retreat")
-    bent := game.walks[1]
-    // The fan candidate inside the away half-plane: the preferred
-    // straight ray blocked, the +45 degree lane (southwest of the
-    // west away-ray) carries the re-plan at the same race length.
+    bent := game.walks[0]
     fanX, fanY := rotatePlanar(-1, 0, kiteFanStep)
     require.InDelta(t,
-        float64(45000+int32(math.Round(fanX*720))),
+        float64(45000+int32(math.Round(fanX*482))),
         float64(bent[0]), 1.0,
         "the re-plan bends onto the half-open fan lane")
     require.InDelta(t,
-        float64(50000+int32(math.Round(fanY*720))),
+        float64(50000+int32(math.Round(fanY*482))),
         float64(bent[1]), 1.0,
         "the re-plan bends onto the half-open fan lane")
 }
@@ -379,6 +364,55 @@ func TestKiteCampDeflectsTheRetreatLane(t *testing.T) {
         "the lane deflects onto the camp circle side-step")
     require.InDelta(t, 50000+kiteStep*math.Sqrt2/2, float64(step[1]), 1.0,
         "the lane deflects onto the camp circle side-step")
+}
+
+// TestKiteSingleChaserNeverEncircles pins the round-19 live fix: a
+// lone chaser is a plain train whatever its bearing. The encircle
+// rule used to fold "the summed unit vectors are shorter than one"
+// into the encirclement check, and the trigonometric sum of a single
+// bearing can land one ulp under 1 (cos/sin never reconstruct the
+// unit length exactly) - the round-19 acceptance held ground with
+// one mob on the field twice. Only the EMPTY bearing list is the
+// degenerate no-chaser scene; every non-empty list guards the away
+// ray.
+func TestKiteSingleChaserNeverEncircles(t *testing.T) {
+    bot, _, loop := kiteBowBot(t, 45200)
+
+    // The exact live bearing that measured hypot 0.9999999999999998
+    // (the round-19 hold on the Spore Fungus fight): the away vector
+    // points back along the bearing, never an encirclement.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 35216, Y: 50013, Name: "Spore Fungus",
+    })
+    dirX, dirY, encircled := loop.kiteTrainDirection(35271, 50029, -3515)
+    require.False(t, encircled,
+        "the measured live single-chaser bearing must not encircle")
+    require.InDelta(t, -math.Cos(-2.858497), dirX, 0.01,
+        "the away vector of the single chaser")
+    require.InDelta(t, -math.Sin(-2.858497), dirY, 0.01,
+        "the away vector of the single chaser")
+
+    // The whole circle of lone bears: every bearing guards its away
+    // ray, none reads as a surrounding train.
+    const radius = 200.0
+    for step := range 72 {
+        angle := float64(step) * 2 * math.Pi / 72
+        mobX := int32(45000 + radius*math.Cos(angle))
+        mobY := int32(50000 + radius*math.Sin(angle))
+        bot.ApplyNpcInfo(state.NpcInfo{
+            ObjectID: 7, TemplateID: 1000001, Attackable: true,
+            X: mobX, Y: mobY, Name: "Keltir",
+        })
+        dirX, dirY, encircled := loop.kiteTrainDirection(
+            45000, 50000, -3500)
+        require.False(t, encircled,
+            "one chaser at bearing %d is never an encirclement", step)
+        require.InDelta(t, -math.Cos(angle), dirX, 0.02,
+            "the away ray of the lone chaser at bearing %d", step)
+        require.InDelta(t, -math.Sin(angle), dirY, 0.02,
+            "the away ray of the lone chaser at bearing %d", step)
+    }
 }
 
 // mobHitsCharacterAt models the attack broadcast of the target mob:

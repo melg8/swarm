@@ -80,12 +80,13 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
     require.Len(t, game.walks, 1,
         "the archer profile with a worn bow must kite the closed mob")
     step := game.walks[0]
-    // The race leg of the round-17 redesign: the deficit 280 bought
-    // back at the parity rate caps at the fresh anchor's 1300 leash
-    // budget - the kite steps the whole leg away from the closed
-    // mob.
-    require.Equal(t, int32(43700), step[0],
-        "the kite steps away from the closed mob at the race length")
+    // The opening straight leg of the round-18 anchor redesign: the
+    // race length 2640 would run past the fight ring, so the leg
+    // budgets against the 972 ring around the mob's stand - the
+    // remaining 722 (minus the rounding margin) lands the character
+    // on the circle the chords keep.
+    require.Equal(t, int32(44278), step[0],
+        "the kite steps away from the closed mob onto the anchor ring")
     require.Empty(t, game.forces,
         "the kite tick must not re-request the attack")
     require.Equal(t, int32(7), loop.kiteFor,

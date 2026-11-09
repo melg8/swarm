@@ -144,23 +144,23 @@ func TestKiteRotationExhaustedBreaksOut(t *testing.T) {
     mobHitsCharacterAt(bot, 45200)
     nav := &fakeNavigator{}
     // Only two lanes answer open: the straight west lane of the gap
-    // fan at the RACE length (the 1300 deficit cap of the fresh
-    // anchor - the initial retreat) and the straight south ray of
-    // the breakout ladder (the ordinary 400 weave) - everything
-    // else is walled.
+    // fan at the opening ring length (the 722 leg around the target's
+    // stand - the initial retreat) and the straight south ray of the
+    // breakout ladder (the ordinary 400 weave) - everything else is
+    // walled.
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return to.X == 43700 ||
+        return to.X == 44278 ||
             (to.X == 45000 && to.Y == 49600), nil
     }
     loop.SetNavigator(nav)
 
     // The opening retreat takes the open west lane of the fan (the
     // -90 degree candidate around the northern gap bisector, the
-    // full race leg out).
+    // ring-budget leg out).
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the open fan lane carried the opening retreat")
-    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[0])
+    require.Equal(t, [3]int32{44278, 50000, -3500}, game.walks[0])
 
     // The west cell got refused and the walk aged past the probe:
     // the hemisphere sweep (the dead west cell skipped, every other

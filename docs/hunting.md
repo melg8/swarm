@@ -662,6 +662,49 @@ parameter change of the round arrives with its before/after row.
 | kill rate | - | - | - |
 | death rate | - | - | - |
 
+### The continuous circle (issue #70, rounds 17-19)
+
+The round-17/18 live verdicts replaced the window-sized shuffle with a
+continuous race the shot cycle rides (the full record lives in
+`docs/progress/2026-09-23-issue70-kite-timing-probe.md`):
+
+- The RACE leg (`kiteStepLength`): inside the re-shot floor (480) the
+  straight leg runs `kiteStep + (floor - dist) * kiteRaceFactor` - the
+  deficit bought back at the parity exchange rate of the chase - capped
+  at `kiteRaceStepMax` (1700). The leg arrives back AT the floor, so
+  the arrival shot (or the re-request at the window end) is the ONE
+  shot of the cycle, fired from the safe distance.
+- The CIRCLE (`kiteCurveDirection`): every later retreat aims the
+  CHORD of the fight's anchor circle - the endpoint sits exactly the
+  ring radius from the anchor, swung the fight's fixed turn side, so
+  the character stays equidistant from the point it kites around. The
+  ring is `kiteRoamRadius * kiteCircleLeashShare` = 972 units; the
+  chord NEVER leashes (it lands on the ring by construction) and the
+  lane battery walks the exact chord length.
+- The ANCHOR is the MOB'S STAND (`kiteResolveAndClick`), not the
+  character's first-retreat cell: the reopening live audit measured the
+  self anchor parking the fight at the 1500-unit drift leash, where
+  every chord pointed inward and the away half-plane refused it (the
+  fence-edge hold). The opening straight leg budgets against the ring
+  around the mob's stand (`kiteStraightLeg`), so the fight opens on the
+  circle it keeps.
+- The WINDOW scales with the walked leg at the per-unit pace of the
+  bow disable formula (`kiteIssueWalk`): a 722-unit opening leg at the
+  Short Bow pAtkSpd 337 holds the movement ~5.4s, the fallback 2s
+  window giving ~3.6s - the leg runs to its endpoint before anything
+  else owns the movement.
+- The ARRIVAL (`kiteReclickWalk`): a stand within `kiteArrivalEpsilon`
+  (100) of the endpoint completes the leg, the walk's own
+  `combatAvoidUntil` hold ends with it, and under the re-shot floor the
+  next pursuit chord issues on the SAME tick - the character never
+  stands between the legs of the race. At or beyond the floor the
+  stand-down hands the tick to the arrival shot's own cycle.
+- The CELL-FOLLOW (`cellHunter.applyFollowing`): a fight that crosses a
+  hexagon boundary keeps its target when the held ground follows it -
+  the follow is bookkeeping, not a travel reset. The round-19 live log
+  measured the old `apply` dropping the fight target twice inside 40s
+  on every cell boundary the kite crossed.
+
 ## Hexagon cell hunting (hunt/cell*.go, hunt/cells_elven.go)
 
 The cell mode replaces the square zone ladder of the elven lands (the

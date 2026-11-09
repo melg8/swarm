@@ -91,24 +91,25 @@ func TestKiteRefusalRotatesAtTheProbeAge(t *testing.T) {
         "the refusal evidence latched the dead verdict")
 
     // The walk ages past the probe: the rotation lands. At the
-    // anchored race length (1300, the fresh anchor's leash budget
-    // minus the rounding guard) the +-45 degree fan candidates fit
-    // inside the roam fence (the 919*sqrt(2) diagonal stays ~50
-    // under the 1350 fence the battery enforces), so the rotation
-    // steps onto the +45 degree candidate - the first fan lane off
-    // the dead straight ray.
+    // opening ring length (722, the leash share of the roam radius
+    // around the mob's stand minus the stand distance and the
+    // rounding guard) the +-45 degree fan candidates stay well
+    // inside the roam fence, so the rotation steps onto the +45
+    // degree candidate - the first fan lane off the dead straight
+    // ray.
     ageKiteReclick(loop)
     ageKiteWalkIssue(loop)
     loop.tick()
     require.Len(t, game.walks, 3)
     require.NotEqual(t, game.walks[1], game.walks[2],
         "the refused endpoint rotated onto the fan lane")
-    // The +45 degree fan candidate at the race length, recomputed
-    // from first principles (the leg: the deficit 280 capped at the
-    // fresh anchor's 1300 leash budget).
+    // The +45 degree fan candidate at the straight-leg length,
+    // recomputed from first principles (the deficit 280 capped at
+    // the opening ring budget 972-200-50 = 722).
     leg := math.Min(
         kiteStep+(kiteReshotFloor-200)*kiteRaceFactor, kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius-kiteArrivalEpsilon/2)
+    leg = math.Min(leg,
+        kiteRoamRadius*kiteCircleLeashShare-200-kiteArrivalEpsilon/2)
     fanX, fanY := rotatePlanar(-1, 0, kiteFanStep)
     require.Equal(t, [3]int32{
         45000 + int32(math.Round(fanX*leg)),
@@ -150,10 +151,10 @@ func TestKiteSilentProbeRotatesTheDeadEndpoint(t *testing.T) {
 
     // The click stayed silent through the broadcast gate window.
     // The rotation lands on the +45 degree fan candidate: at the
-    // anchored race length (1300, the fresh anchor's leash budget
-    // minus the rounding guard) the diagonal candidates fit inside
-    // the roam fence (the 919*sqrt(2) diagonal stays ~50 under the
-    // 1350 fence), the first fan lane off the dead straight ray.
+    // opening ring length (722, the leash share of the roam radius
+    // around the mob's stand minus the stand distance and the
+    // rounding guard) the diagonal candidates stay well inside the
+    // roam fence, the first fan lane off the dead straight ray.
     ageKiteReclick(loop)
     ageKiteWalkIssue(loop)
     loop.tick()
@@ -163,7 +164,8 @@ func TestKiteSilentProbeRotatesTheDeadEndpoint(t *testing.T) {
         "the silent endpoint rotated onto the fan lane")
     leg := math.Min(
         kiteStep+(kiteReshotFloor-200)*kiteRaceFactor, kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius-kiteArrivalEpsilon/2)
+    leg = math.Min(leg,
+        kiteRoamRadius*kiteCircleLeashShare-200-kiteArrivalEpsilon/2)
     fanX, fanY := rotatePlanar(-1, 0, kiteFanStep)
     require.Equal(t, [3]int32{
         45000 + int32(math.Round(fanX*leg)),
@@ -180,13 +182,13 @@ func TestKiteRefusalWithNoLaneLeftStandsDown(t *testing.T) {
     // of sight; every fan candidate is walled.
     nav := &fakeNavigator{}
     nav.sightFunc = func(_, to pathfind.Vec3) (bool, error) {
-        return int32(to.X) == 43700, nil
+        return int32(to.X) == 44278, nil
     }
     loop.SetNavigator(nav)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1,
         "the straight lane carried the step")
-    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[0])
+    require.Equal(t, [3]int32{44278, 50000, -3500}, game.walks[0])
 
     // The straight cell got refused and the walk aged past the
     // probe: the rotation has no alternative lane (the fans are
@@ -271,7 +273,7 @@ func TestKiteReclickLadderSurvivesTheWalkAdoption(t *testing.T) {
     // fights the running walk.
     bot.ApplyMovement(state.Movement{
         ObjectID: 100, X: 45000, Y: 50000, Z: -3500,
-        DestX: 43700, DestY: 50000, DestZ: -3500,
+        DestX: 44278, DestY: 50000, DestZ: -3500,
     })
     ageKiteReclick(loop)
     loop.tick()
@@ -283,7 +285,7 @@ func TestKiteReclickLadderSurvivesTheWalkAdoption(t *testing.T) {
         "the ladder stays armed through the running walk")
 
     // The walk drops mid-route (no more movement broadcasts, the
-    // character stands 400 into the 1300 leg): the ladder re-bases
+    // character stands 400 into the 722 leg): the ladder re-bases
     // onto the drop cell and re-clicks the SAME endpoint.
     moveSelfTo(bot, 44600, 50000, -3500)
     ageKiteReclick(loop)
@@ -311,8 +313,15 @@ func TestKiteReclickLadderCompletesAtTheEndpoint(t *testing.T) {
     require.Len(t, game.walks, 1)
 
     // The character arrives 50 units short of the clicked endpoint
-    // (43700): inside the 100 unit arrival radius.
-    moveSelfTo(bot, 43750, 50000, -3500)
+    // (44278): inside the 100 unit arrival radius. The mob chases to
+    // 500 units: inside the bow stall radius (the chase watchdog owns
+    // only the stretches beyond it) and beyond the re-shot floor (the
+    // arrival chain preserves the stand of a safe shot).
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 44828, Y: 50000, Name: "Keltir",
+    })
+    moveSelfTo(bot, 44328, 50000, -3500)
     ageKiteReclick(loop)
     loop.tick()
     require.Len(t, game.walks, 1,
@@ -389,9 +398,9 @@ func TestKiteReclickLadderDoesNotFirePastTheFreshPacing(t *testing.T) {
 // PER-UNIT pace of the race leg - the walk spends the whole
 // cooldown the server enforces between the shots ("its like 3
 // seconds to draw shot" - the owner's own measurement of the Short
-// Bow kit) for every kiteStep of the leg, so the 1300 race leg of
-// the closed mob (the deficit cap of the fresh anchor) holds the
-// movement for ~9.64s from the issue: nothing interrupts the leg
+// Bow kit) for every kiteStep of the leg, so the 722 opening leg of
+// the closed mob (the ring budget around its stand) holds the
+// movement for ~5.36s from the issue: nothing interrupts the leg
 // before it reaches its endpoint.
 func TestKiteBowWindowSpendsTheCooldown(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
@@ -429,7 +438,7 @@ func TestKiteBowWindowFallsBackWithoutTheSpeed(t *testing.T) {
     tickPastTheWindup(loop)
     require.Zero(t, bot.SelfPAtkSpd(),
         "the scene never broadcast the attack speed")
-    // The shipped fixed window at the leg pace: 1300/400 * 2s.
+    // The shipped fixed window at the leg pace: 722/400 * 2s.
     leg := math.Hypot(
         float64(game.walks[0][0]-45000), float64(game.walks[0][1]-50000))
     aged := loop.kiteWalkUntil.Sub(loop.kiteWalkIssuedAt)

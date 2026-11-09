@@ -139,10 +139,21 @@ func (l *Loop) kiteTrainDirection(
     }
     count := float64(len(bearings))
     sumLen := math.Hypot(sumX, sumY)
-    if sumLen < kiteEncircleShare*count || sumLen < 1 {
-        // The encircled sum (or the degenerate zero): the centroid
-        // names no direction - the widest-gap bisector serves the
-        // step when the bearings leave one.
+    if len(bearings) == 0 {
+        // The degenerate no-chaser scene: no ray to guard at all -
+        // the hold keeps the pacing until the next probe. The empty
+        // list is tested EXPLICITLY: a single bearing sums to a unit
+        // vector whose hypot may land one ulp UNDER 1 (the live
+        // round-19 run measured the phantom surround on two single
+        // chaser fights - cos/sin rounding read as the encirclement
+        // and the zero gap answer pinned the archer at melee), so a
+        // magnitude comparison can never separate "one chaser" from
+        // "no chaser".
+        return 0, 0, true
+    }
+    if sumLen < kiteEncircleShare*count {
+        // The encircled sum: the centroid names no direction - the
+        // widest-gap bisector serves the step.
         if gapX, gapY, gap := kiteGapDirection(bearings); gap {
             return gapX, gapY, true
         }

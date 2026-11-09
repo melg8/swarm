@@ -29,18 +29,19 @@ import (
 )
 
 // kiteChaseBehindOnTheCircle stages the second-retreat scene of the
-// circling fights: the character ran 600 of the opening leg west and
+// circling fights: the character ran 800 of the opening leg west and
 // stands there (a mid-leg stand - the fake server never moves it on
 // its own), and the mob chases BEHIND THE CIRCLING PATH, 200 north of
 // the character: the fight's fixed counterclockwise turn side runs the
 // circle southward from the west radius, so the chaser that follows
 // the path closes from the north and the away-ray (south) agrees with
 // the chord - the lane battery takes the chord preference as-is, the
-// equidistant endpoint walks untouched.
+// equidistant endpoint walks untouched. The anchor is the MOB'S stand
+// at the first resolution (45200, 50000), not the mid-leg self.
 func kiteChaseBehindOnTheCircle(
     bot *state.Bot, loop *Loop,
 ) (selfX, selfY int32) {
-    // The mid-leg stand: 600 west of the anchor (45000, 50000).
+    // The mid-leg stand: 800 west of the anchor (45200, 50000).
     moveSelfTo(bot, 44400, 50000, -3500)
     // The chaser behind on the circle: 200 north of the stand.
     bot.ApplyNpcInfo(state.NpcInfo{
@@ -85,13 +86,13 @@ func kiteWantChord(
 
 // TestKiteOpeningRetreatRunsStraight pins the opening semantics: the
 // FIRST retreat of a fight is the panic retreat - the straight
-// away-ray at the RACE length (the deficit leg capped at the fresh
-// anchor's leash budget), no curve.
+// away-ray at the race length capped by the opening ring budget, no
+// curve.
 func TestKiteOpeningRetreatRunsStraight(t *testing.T) {
     _, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
-    require.Equal(t, int32(43700), game.walks[0][0],
+    require.Equal(t, int32(44278), game.walks[0][0],
         "the opening retreat runs the straight away-ray at the race length")
     require.True(t, loop.kiteCurved,
         "the issued walk spends the opening straight step")
@@ -108,26 +109,25 @@ func TestKiteSecondRetreatCurvesTheCircle(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45200)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 1)
-    require.Equal(t, [3]int32{43700, 50000, -3500}, game.walks[0],
+    require.Equal(t, [3]int32{44278, 50000, -3500}, game.walks[0],
         "the opening retreat runs the straight race leg")
 
-    // The character stands 600 west of the anchor (the mid-leg
-    // stand), the mob chases behind on the circling path: the second
-    // retreat resolves on the anchor circle now.
+    // The character stands 800 west of the anchor (the mob's stand at
+    // 45200, 50000), the mob chases behind on the circling path: the
+    // second retreat resolves on the anchor circle now.
     selfX, selfY := kiteChaseBehindOnTheCircle(bot, loop)
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 2,
         "the second retreat of the fight must issue")
     curved := game.walks[1]
     // The leg at the stand: the deficit 280 (the mob at 200) bought
-    // back at the parity rate, capped by the leash budget the anchor
-    // 600 away leaves (1350-600-50 = 700).
+    // back at the parity rate, capped by the ring the chord lands on
+    // (the leash share of the roam radius).
     leg := math.Min(
         kiteStep+(kiteReshotFloor-200)*kiteRaceFactor,
         kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius-600-kiteArrivalEpsilon/2)
     wantX, wantY, radiusTarget := kiteWantChord(
-        45000, 50000, selfX, selfY, leg)
+        45200, 50000, selfX, selfY, leg)
     require.InDelta(t, wantX, float64(curved[0]), 1.0,
         "the second retreat lands on the anchor-circle chord")
     require.InDelta(t, wantY, float64(curved[1]), 1.0,
@@ -136,7 +136,7 @@ func TestKiteSecondRetreatCurvesTheCircle(t *testing.T) {
     // anchor - the character stays equidistant from the point it
     // kites around.
     require.InDelta(t, radiusTarget,
-        math.Hypot(float64(curved[0]-45000), float64(curved[1]-50000)),
+        math.Hypot(float64(curved[0]-45200), float64(curved[1]-50000)),
         1.0,
         "the chord endpoint keeps the circle radius to the anchor")
     // The chord never folds back into the train: the endpoint still
@@ -176,11 +176,12 @@ func TestKiteFreshTargetResetsTheCircle(t *testing.T) {
     tickPastTheWindup(loop)
     require.Len(t, game.walks, 2)
     fresh := game.walks[1]
-    // The fresh fight re-anchors AT the self position and opens with
-    // the straight away-ray at its own race length: the mob 400 out
-    // owes a deficit of 80, so the leg runs 400 + 80*8 = 1040 - well
-    // under the fresh anchor's 1300 leash budget.
-    require.Equal(t, int32(43960), fresh[0],
+    // The fresh fight re-anchors on the fresh mob's stand (45400,
+    // 50000) and opens with the straight away-ray at its own race
+    // length: the mob 400 out owes a deficit of 80, so the formula
+    // runs 400 + 80*8 = 1040, capped by the opening ring budget
+    // 972-400-50 = 522 - the fresh circle starts on its ring.
+    require.Equal(t, int32(44478), fresh[0],
         "the fresh fight opens with the straight away-ray")
 }
 
@@ -209,17 +210,17 @@ func TestKiteCurveTurnsTowardTheZoneCenter(t *testing.T) {
     require.Less(t, curved[1], int32(50000),
         "the circle bends the retreat toward the zone center")
     // The endpoint is the chord, exactly: the equidistant geometry
-    // on the south-leaning (counterclockwise) side of the radius.
+    // on the south-leaning (counterclockwise) side of the radius,
+    // around the mob's stand (45200, 50000).
     leg := math.Min(
         kiteStep+(kiteReshotFloor-200)*kiteRaceFactor,
         kiteRaceStepMax)
-    leg = math.Min(leg, kiteRoamRadius-600-kiteArrivalEpsilon/2)
     _, wantY, radiusTarget := kiteWantChord(
-        45000, 50000, selfX, selfY, leg)
+        45200, 50000, selfX, selfY, leg)
     require.InDelta(t, wantY, float64(curved[1]), 1.0,
         "the south-leaning side carries the circle")
     require.InDelta(t, radiusTarget,
-        math.Hypot(float64(curved[0]-45000), float64(curved[1]-50000)),
+        math.Hypot(float64(curved[0]-45200), float64(curved[1]-50000)),
         1.0,
         "the chord endpoint keeps the circle radius to the anchor")
 }
