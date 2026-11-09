@@ -279,12 +279,18 @@ func (l *Loop) killApproachWalk() bool {
 // the corpse of the last kill (a mob shot down from a distance drops
 // at its corpse), and the corpse approach walk of the ranged kills
 // holds the phase until the drops land instead of leaving them behind.
+// A living attacker outranks the drops: the tick hands to the engage
+// (see lootAnswerAttacker) and the loot resumes after the fight.
 func (l *Loop) loot() {
     // The potion serves the loot too: the kill that emptied the
     // health bar (the tanked pair, the hard single) leaves the
     // character picking up drops at a bar the survivor's next swing
     // can empty - drink before the walk to the corpse.
-    l.maybeDrinkFightPotion(time.Now())
+    now := time.Now()
+    l.maybeDrinkFightPotion(now)
+    if l.lootAnswerAttacker(now) {
+        return
+    }
     radius := lootRadius
     if l.killPosKnown {
         if selfX, selfY, _, ok := l.tracker.SelfPosition(); ok {
@@ -312,7 +318,6 @@ func (l *Loop) loot() {
 
         return
     }
-    now := time.Now()
     if item.ObjectID != l.lootID {
         l.lootID = item.ObjectID
         l.lootAt = now
@@ -346,6 +351,39 @@ func (l *Loop) loot() {
     if err := l.game.PickupItem(item); err != nil {
         l.logf("Hunt: pickup failed: %v", err)
     }
+}
+
+// lootAnswerAttacker hands the loot tick to the engage when a living
+// mob holds the character as its target: a mob that reached the
+// character while it picks up the kill must be answered before
+// another corpse step - standing in the blows for a drop is the
+// reported peaceful pick death. The handoff is the engage's own aggro
+// answer: the winnable attacker becomes the target (the loot phase
+// resumes after the fight, the drops stay on the ground), the rest
+// keep the defense flow. It reports whether the tick was consumed.
+func (l *Loop) lootAnswerAttacker(now time.Time) bool {
+    attacker, ok := l.tracker.NearestAttacker()
+    if !ok {
+        return false
+    }
+    l.phase = phaseEngage
+    l.lootID = 0
+    if !l.attackerEngageable(attacker.ObjectID) {
+        l.logf("Hunt: %s interrupts the loot and cannot be won, "+
+            "switching to the defense", attacker.Name)
+        l.target = 0
+        l.engageAt = time.Time{}
+        l.fleeFromThreat(now)
+
+        return true
+    }
+    l.logf("Hunt: %s interrupts the loot, answering it first",
+        attacker.Name)
+    l.target = attacker.ObjectID
+    l.engageAt = now
+    l.clearBlindRecovery()
+
+    return true
 }
 
 // cleanupInventory destroys junk items when the slots or the weight of
