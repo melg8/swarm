@@ -44,6 +44,32 @@ Constraints:
 
 ## Progress
 
+### 2026-11-09 - the pursuit hold of the walk tail
+
+- `kitePursuitHold` (kite.go) re-arms the straight retreat at every
+  walk-window end and every leg arrival while the nearest hostile
+  still holds inside the re-shot floor: the chaser spends the reload
+  tail closing the distance again instead of the archer standing
+  through it, and the re-shot fires only from the regained floor
+  (the forced attack re-request owns the tick once the hold stands
+  down).
+- The hold carries its OWN per-shot ledger (`kitePursuitSteps`,
+  `kitePursuitDist`, `kitePursuitStall`, `kitePursuitWalkOpen`) apart
+  from the proximity streak: the reset seams are the fresh shot
+  broadcast (`kitePursuitCycle`) and a walk issued outside the
+  previous context (a new fight, the respawned same-id target).
+- The stall exit (`kitePursuitStallLimit = 2`,
+  `kitePursuitDeadlockSteps = 4`, `kitePursuitStallSlack = 20`) stands
+  a spent budget down and lets the bow fire from the hold; the
+  `kitePursuitStreakLimit = 12` crossing is the diagnostic of a chain
+  that still opens distance; `kitePursuitContext = 12 s` expires the
+  stale fight behind the reused Mobius object id.
+- `kite_pursuit_test.go` pins the continuation, the straight ray, the
+  won race re-shot, the stall exit, the progress reset, the context
+  expiry and both reset seams (7 tests, no added real sleeps).
+- Next: the live `archer-kite` acceptance run against the deployed
+  stack.
+
 ### 2026-11-09 - the gauge timing and the retreat ownership
 
 - New parser `setup_gauge.go` (0x85, the RED bow cycle) and the

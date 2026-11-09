@@ -836,6 +836,44 @@ type Loop struct {
     // re-click would only fight the re-engage for the movement. The
     // zero value disarms the ladder.
     kiteWalkUntil time.Time
+    // kitePursuitFor names the fight the last kite retreat served
+    // and kitePursuitAt stamps the walk that served it: the pursuit
+    // hold of the walk tail (see kite.go) continues a walk only
+    // behind a FRESH retreat of the same fight - a close hostile of
+    // the approach phase (no shot, no retreat behind it) must never
+    // trigger the continuation, the engage requests the attack
+    // instead. The stamp expires the context: the Mobius respawn
+    // re-uses the object id, so the ownership alone would let a
+    // stale context of the PREVIOUS fight answer the approach of the
+    // respawned one - the continuation chain re-stamps every walk.
+    kitePursuitFor int32
+    kitePursuitAt  time.Time
+    // kitePursuitShot stamps the own shot broadcast the current
+    // pursuit ledger belongs to: every fresh shot starts a fresh
+    // race (the re-shot proves the distance opened, or the windup
+    // ended affordable), so the steps, stalls and the open walk of
+    // the previous cycle never inherit into the new one. The zero
+    // value precedes the first shot.
+    kitePursuitShot time.Time
+    // The pursuit ledger of the current shot cycle (see
+    // kitePursuitHold): the continuation chain owns its budget
+    // apart from the proximity streak - the race it runs is the
+    // re-shot's own. kitePursuitSteps counts the continuations
+    // issued since the last shot; kitePursuitDist is the threat
+    // distance at the last accounting; kitePursuitStall counts the
+    // CONSECUTIVE walks that opened no distance (the unwinnable
+    // race); kitePursuitWalkOpen marks the walk whose window-end
+    // accounting is still owed - a cornered hold re-probe between
+    // the walks never mints a stall (the hold pause is not a lost
+    // race step, the pocket cells survive their holds on exactly
+    // that). The ledger resets whole on every fresh shot cycle and
+    // on any walk issued outside the previous chain's context
+    // (kiteIssueWalk - a new fight or the respawned same-id target
+    // starts its own race).
+    kitePursuitSteps    int
+    kitePursuitDist     float64
+    kitePursuitStall    int
+    kitePursuitWalkOpen bool
     // kiteFightFor/X/Y anchor the current fight's own ground (the
     // round-14 location-general redesign): the position of the
     // fight target at the fight's FIRST retreat resolution (see
