@@ -237,11 +237,15 @@ type NpcInfo struct {
     WalkSpeed       int32
     MoveSpeedMult   float64
     CollisionRadius float64
-    Running         bool
-    InCombat        bool
-    Dead            bool
-    Name            string
-    Title           string
+    // RightHandItem is the template rhand item id of the npc (the
+    // NpcInfo equipment block): the hunt resolves the enemy weapon
+    // family from it (the anti-archer gate of the kite layer).
+    RightHandItem int32
+    Running       bool
+    InCombat      bool
+    Dead          bool
+    Name          string
+    Title         string
 }
 
 // PlayerInfo carries the fields of a parsed CharInfo packet.
@@ -1059,6 +1063,24 @@ func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
     }
 
     return obj.X, obj.Y, obj.Z, true
+}
+
+// ObjectUsesBow reports whether a known npc carries a bow in its
+// right hand: the NpcInfo equipment block names the template rhand
+// item and the item stats resolve the weapon family. The hunt kite
+// layer refuses to engage an archer enemy (the owner rule: a ranged
+// opponent cannot be outrun, the standing trade answers it), so the
+// gate reads this on every fight tick. Players never ride NpcInfo
+// and unknown objects answer false.
+func (b *Bot) ObjectUsesBow(objectID int32) bool {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    obj, _ := b.objectLocked(objectID)
+    if obj == nil || obj.Kind != kindNPC {
+        return false
+    }
+
+    return obj.BowWielding
 }
 
 // ObjectName returns the display name of a known object, an empty
@@ -2275,6 +2297,11 @@ func (b *Bot) ApplyNpcInfo(info NpcInfo) {
     cold.TemplateID = info.TemplateID
     obj.Attackable = info.Attackable
     obj.Aggressive = npcdata.NPCIsAggressive(info.TemplateID)
+    // The enemy weapon family: the NpcInfo equipment block names the
+    // template rhand item, and the anti-archer gate of the hunt kite
+    // layer refuses to engage a bow wielding enemy (a ranged
+    // opponent cannot be outrun, the standing trade answers it).
+    obj.BowWielding = npcBowWielding(info.RightHandItem)
     cold.AggroRange = npcdata.NPCAggroRange(info.TemplateID)
     obj.Level = npcdata.NPCLevel(info.TemplateID)
     obj.ClanHelpRange = npcdata.NPCClanHelpRange(info.TemplateID)
@@ -3311,6 +3338,23 @@ func (b *Bot) Info() BotInfo {
 
 // npcDisplayOffset mirrors the template id offset of NpcInfo packets.
 const npcDisplayOffset = 1000000
+
+// bowWeaponType is the weapon family of a bow in the item stats
+// dictionary.
+const bowWeaponType = "BOW"
+
+// npcBowWielding resolves whether the NpcInfo right hand item id is
+// a bow: the equipment int carries the template rhand item id and
+// the generated item stats name the weapon family. An unknown or
+// zero id (a natural weapon monster) is not a bow.
+func npcBowWielding(rightHandItem int32) bool {
+    if rightHandItem <= 0 {
+        return false
+    }
+    stats, ok := npcdata.ItemGearStats(rightHandItem)
+
+    return ok && stats.WeaponType == bowWeaponType
+}
 
 // resolveNpcName prefers the server side name and falls back to the
 // generated npc dictionary for client side names.

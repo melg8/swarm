@@ -83,6 +83,7 @@ func (gc *GameClient) applyNpcInfo(payload []byte) {
             WalkSpeed:       info.WalkSpeed,
             MoveSpeedMult:   info.MoveSpeedMult,
             CollisionRadius: info.CollisionRadius,
+            RightHandItem:   info.RightHandItem,
             Running:         info.Running,
             InCombat:        info.InCombat,
             Dead:            info.Dead,

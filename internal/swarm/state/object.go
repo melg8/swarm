@@ -111,9 +111,13 @@ type objectHot struct {
     // MoveSpeedMult is the multiplier of the spawn packet.
     MoveSpeedMult float64
     // Kind is the objectKindCode of the record.
-    Kind          int8
-    Attackable    bool
-    Aggressive    bool
+    Kind       int8
+    Attackable bool
+    Aggressive bool
+    // BowWielding marks an npc whose NpcInfo right hand carries a
+    // bow: the anti-archer gate of the hunt kite layer reads it every
+    // fight tick, so the flag lives in the hot half.
+    BowWielding   bool
     Dead          bool
     Moving        bool
     Running       bool

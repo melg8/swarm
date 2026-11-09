@@ -152,6 +152,36 @@ func TestObjectAccessorsServeKnownObjects(t *testing.T) {
     require.InDelta(t, 50.0, maxHp, 0.001)
 }
 
+func TestObjectUsesBowTracksTheNpcEquipment(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    // Kendell carries the Elven Bow (item 276) and the Kaboo Orc
+    // Archer the plain Bow (item 14); the Short Sword (item 1) and
+    // the natural weapon (0) are melee.
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 7, Attackable: true, X: 45200, Y: 50200,
+        RightHandItem: 276, Name: "Kendell",
+    })
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 8, Attackable: true, X: 45400, Y: 50200,
+        RightHandItem: 14, Name: "Kaboo Orc Archer",
+    })
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 9, Attackable: true, X: 45600, Y: 50200,
+        RightHandItem: 1, Name: "Keltir",
+    })
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 10, Attackable: true, X: 45800, Y: 50200,
+        Name: "Gremlin",
+    })
+
+    require.True(t, bot.ObjectUsesBow(7), "the elven bow sentinel")
+    require.True(t, bot.ObjectUsesBow(8), "the orc archer bow")
+    require.False(t, bot.ObjectUsesBow(9), "the short sword is melee")
+    require.False(t, bot.ObjectUsesBow(10), "the natural weapon")
+    require.False(t, bot.ObjectUsesBow(11), "an unknown object")
+}
+
 func TestApplyItemInfoTracksGroundItems(t *testing.T) {
     bot := NewBot("acc1")
     bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
