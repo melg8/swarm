@@ -5,6 +5,7 @@
 package hunt
 
 import (
+    "bytes"
     "errors"
     "io"
     "log"
@@ -1495,6 +1496,33 @@ func TestLoopLogsOutWhenThePileUpRunNeverMakesDistance(t *testing.T) {
         "a cornered pile up run still ends the session")
     require.True(t, loop.logoutDone)
     require.LessOrEqual(t, bot.LoginCooldownRemaining(), 2*time.Second)
+}
+
+// TestLoopPileUpNamesTheWalledLane pins the honest cornered answer:
+// a pile up where every escape lane is clamped (a tiny square) must
+// log the missing lane, not claim the pack dissolved - the 14:02:41
+// dump logged "shook the chase at 0 units" while two mobs still held
+// the character and the relogin landed in the same pack.
+func TestLoopPileUpNamesTheWalledLane(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45600)
+    spawnMobAt(bot, 8, 45600)
+    attackerHits(bot, 7, 45600)
+    attackerHits(bot, 8, 45600)
+    hurtTo(bot, 40)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetHuntingZone(45000, 50000, 100)
+    var logBuf bytes.Buffer
+    loop.SetLogger(log.New(&logBuf, "", 0))
+    loop.lastHit = time.Now().Add(-2 * time.Second)
+
+    loop.tick()
+    require.Equal(t, 1, game.logouts,
+        "the cornered pile up still ends the session")
+    require.Contains(t, logBuf.String(),
+        "no escape lane opens from the pile up")
+    require.NotContains(t, logBuf.String(), "shook the chase")
 }
 
 func TestLoopKeepsFightingAgainstOneAttacker(t *testing.T) {

@@ -372,6 +372,20 @@ func (l *Loop) panicPileUpRun(now time.Time) {
     }
     moveX, moveY, moveZ, ok := l.escapeWalkDestination()
     if !ok {
+        if _, _, hasThreat := l.threatPosition(); hasThreat {
+            // A chaser still holds the character while every
+            // ordered lane is clamped to nothing or walled: the
+            // cornered pile up (the 14:02:41 dump logged out at
+            // 0 units). The old line claimed the pack dissolved
+            // and hid the real reason from the dump - the logout
+            // is the cornered answer, the log must say so.
+            l.logger.Printf("Hunt: no escape lane opens from the "+
+                "pile up at %.0f units, logging out",
+                l.panicAnchorDistance())
+            l.emergencyLogout()
+
+            return
+        }
         // No mob holds the target anymore and nothing
         // attackable stands within the escape range: the
         // pack dissolved, the chase is over wherever the

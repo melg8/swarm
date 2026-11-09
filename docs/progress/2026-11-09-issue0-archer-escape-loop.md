@@ -119,7 +119,20 @@ archer-kite re-check.
   `TestCellResumeRefusesTheDeathRegression`,
   `TestCellResumeKeepsTheStandingGround`.
 
+### 2026-11-09 - hunt: name the walled pile up lane
+
+- `panicPileUpRun` mirrors `fleeFromThreat` when
+  `escapeWalkDestination` answers false: a live threat turns the
+  line into "no escape lane opens from the pile up", the no-threat
+  case keeps the pack-dissolved wording. The 14:02:41 dump claimed
+  "shook the chase at 0 units" while two mobs still held the
+  character.
+- Test: `TestLoopPileUpNamesTheWalledLane` (a tiny leash square
+  walls every lane; the cornered logout still fires, the log names
+  the wall).
+
 ## Status
 
-In progress: fix 1 landed; fix 2 (honest pile-up no-lane answer)
-next.
+In progress: fixes 1-2 landed; fix 3 (engage gate fed by incoming
+attacks) next.
+
