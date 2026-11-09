@@ -314,20 +314,7 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     }
     // The deepest band penetration wins: the mob closest to its
     // on-sight trigger steps first.
-    worst := -1
-    worstPen := 0.0
-    for i := range l.avoidScratch {
-        threat := &l.avoidScratch[i]
-        if math.Abs(float64(threat.Z-selfZ)) > threat.AggroRange {
-            // Another deck: the 3D trigger cannot reach across the gap.
-            continue
-        }
-        dist := math.Hypot(threat.X-float64(selfX), threat.Y-float64(selfY))
-        pen := threat.AggroRange + combatAvoidWarning - dist
-        if pen > worstPen {
-            worst, worstPen = i, pen
-        }
-    }
+    worst := l.avoidDeepestThreat(selfX, selfY, selfZ)
     if worst < 0 {
         return false
     }
@@ -354,4 +341,27 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     }
 
     return true
+}
+
+// avoidDeepestThreat picks the scanned add with the deepest band
+// penetration on the character's deck: the mob closest to its
+// on-sight trigger steps first (-1 when every scan sits on another
+// deck).
+func (l *Loop) avoidDeepestThreat(selfX, selfY, selfZ int32) int {
+    worst := -1
+    worstPen := 0.0
+    for i := range l.avoidScratch {
+        threat := &l.avoidScratch[i]
+        if math.Abs(float64(threat.Z-selfZ)) > threat.AggroRange {
+            // Another deck: the 3D trigger cannot reach across the gap.
+            continue
+        }
+        dist := math.Hypot(threat.X-float64(selfX), threat.Y-float64(selfY))
+        pen := threat.AggroRange + combatAvoidWarning - dist
+        if pen > worstPen {
+            worst, worstPen = i, pen
+        }
+    }
+
+    return worst
 }

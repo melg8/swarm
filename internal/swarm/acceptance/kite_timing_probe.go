@@ -355,7 +355,8 @@ func kiteProbeScenario(ctx context.Context, m *Manager, t *Test) error {
         return fmt.Errorf("ensure character: %w", err)
     }
     time.Sleep(ensurePause)
-    if err := m.injectReset(kiteProbeReset(kiteProbeAccount), test); err != nil {
+    if err := m.injectReset(kiteProbeReset(kiteProbeAccount),
+        test); err != nil {
         return fmt.Errorf("inject start state: %w", err)
     }
     time.Sleep(ensurePause)
@@ -466,13 +467,16 @@ func probeVerdict(rounds []probeRound, wasd probeWASDResult) error {
 // with the probe recorder tapped into the receive stream next to the
 // run log mirror.
 type kiteProbeSession struct {
-    ctx      context.Context
     manager  *Manager
     game     *connection.GameClient
     tracker  *state.Bot
     recorder *probeRecorder
     runDone  chan error
     cancel   context.CancelFunc
+    // done is the Done channel of the session's run context: the
+    // long-lived session polls it instead of carrying the context
+    // itself, so the waits across the ladder share one stop signal.
+    done <-chan struct{}
 }
 
 // newKiteProbeSession logs the temp character in, enters the world
@@ -490,7 +494,6 @@ func newKiteProbeSession(
         return nil, err
     }
     session := &kiteProbeSession{
-        ctx:     ctx,
         manager: m,
         game:    game,
         tracker: tracker,
@@ -517,6 +520,7 @@ func newKiteProbeSession(
     }
     runCtx, cancel := context.WithCancel(ctx)
     session.cancel = cancel
+    session.done = runCtx.Done()
     session.runDone = make(chan error, 1)
     go func() {
         session.runDone <- game.Run(runCtx, kiteProbeAccount)
@@ -552,8 +556,8 @@ func (s *kiteProbeSession) wireTaps() {
 func (s *kiteProbeSession) waitWorld() error {
     deadline := time.Now().Add(onlineWait)
     for time.Now().Before(deadline) {
-        if s.ctx.Err() != nil {
-            return fmt.Errorf("cancelled: %w", s.ctx.Err())
+        if s.stopped() {
+            return fmt.Errorf("cancelled: %w", context.Canceled)
         }
         if _, _, _, ok := s.tracker.SelfPosition(); ok {
             if len(s.tracker.Snapshot().Inventory) > 0 {
@@ -564,6 +568,17 @@ func (s *kiteProbeSession) waitWorld() error {
     }
 
     return errors.New("the world entry burst never settled")
+}
+
+// stopped reports whether the session's run context ended: the
+// scenario cancelled or the session closed.
+func (s *kiteProbeSession) stopped() bool {
+    select {
+    case <-s.done:
+        return true
+    default:
+        return false
+    }
 }
 
 // close tears the session down: the read loop unwinds with the
@@ -623,8 +638,8 @@ func (s *kiteProbeSession) inventoryObject(itemID int32,
 func (s *kiteProbeSession) findTarget() (int32, error) {
     deadline := time.Now().Add(30 * time.Second)
     for time.Now().Before(deadline) {
-        if s.ctx.Err() != nil {
-            return 0, fmt.Errorf("cancelled: %w", s.ctx.Err())
+        if s.stopped() {
+            return 0, fmt.Errorf("cancelled: %w", context.Canceled)
         }
         if id, ok := s.nearestMob(); ok {
             return id, nil
@@ -700,7 +715,7 @@ func (s *kiteProbeSession) walkLadder() []probeRound {
     var rounds []probeRound
     started := time.Now()
     for _, delay := range kiteProbeLadder {
-        if s.ctx.Err() != nil ||
+        if s.stopped() ||
             time.Since(started) > kiteProbeLadderBudget {
             break
         }
@@ -735,7 +750,7 @@ func (s *kiteProbeSession) waitForTarget() (int32, bool) {
         if id, ok := s.nearestMob(); ok {
             return id, true
         }
-        if time.Now().After(deadline) || s.ctx.Err() != nil {
+        if time.Now().After(deadline) || s.stopped() {
             return 0, false
         }
         time.Sleep(2 * time.Second)
@@ -773,7 +788,7 @@ func (s *kiteProbeSession) drinkIfNeeded() {
 func (s *kiteProbeSession) anchorShot(
     target int32,
 ) (time.Time, bool) {
-    for attempt := 0; attempt < 3; attempt++ {
+    for range 3 {
         mark := time.Now()
         if err := s.game.AttackTarget(target); err != nil {
             return time.Time{}, false
@@ -831,7 +846,7 @@ func (s *kiteProbeSession) observeMove(
 ) (time.Time, int) {
     deadline := walkSent.Add(kiteProbeObserveWindow)
     for time.Now().Before(deadline) {
-        if s.ctx.Err() != nil {
+        if s.stopped() {
             break
         }
         movedAt, refusals := s.recorder.firstMoveAfter(walkSent)
@@ -941,7 +956,7 @@ func (s *kiteProbeSession) streamClaims(
     defer ticker.Stop()
     deadline := anchor.Add(windup)
     for now := range ticker.C {
-        if now.After(deadline) || s.ctx.Err() != nil {
+        if now.After(deadline) || s.stopped() {
             break
         }
         step := float64(now.Sub(anchor)) / float64(time.Millisecond) *

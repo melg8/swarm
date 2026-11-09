@@ -410,13 +410,13 @@ const (
     // bows carry 1500, dist/game/data/stats/items - the value feeds
     // the bow disable window formula of kiteWalkWindow).
     kiteBowReuseDelay = 1500.0
-    // kiteWalkWindowMin/Max clamp the bow-aware walk window: the
+    // kiteWalkWindowFloor/Max clamp the bow-aware walk window: the
     // formula reads the live pAtkSpd, and a broken broadcast (a
     // zero, a partial) must never collapse or explode the window -
     // the clamp keeps the walk inside the sane attack-speed band
     // and falls back to the shipped kiteStepWindow outside it.
-    kiteWalkWindowMin = 1 * time.Second
-    kiteWalkWindowMax = 5 * time.Second
+    kiteWalkWindowFloor = 1 * time.Second
+    kiteWalkWindowMax   = 5 * time.Second
     // kiteWindupLead is the safety lead the deferred retreat click
     // adds past the windup end before it goes out (issue #70, the
     // kite timing findings): the live ladder measured the accepted
@@ -924,6 +924,28 @@ func (l *Loop) kiteStraightLeg(step float64, selfX, selfY int32) float64 {
     return step
 }
 
+// kiteLanePreference picks the preferred ray and the leg length of a
+// retreat step: the curving chord of the fight's anchor circle when
+// the circle owns the fight (kiteCurveDirection), the straight
+// ring-budgeted away-ray otherwise (kiteStraightLeg), and the raw gap
+// ray for an encircled train - the chord on top of the gap bisector
+// would fold the step back onto a flanker. Reports the ray and the
+// leg length the lane battery must walk.
+func (l *Loop) kiteLanePreference(
+    dirX, dirY float64, selfX, selfY int32, step float64, encircled bool,
+) (float64, float64, float64) {
+    if encircled {
+        return dirX, dirY, l.kiteStraightLeg(step, selfX, selfY)
+    }
+    curveX, curveY, curveLen, handled := l.kiteCurveDirection(
+        dirX, dirY, selfX, selfY, step)
+    if handled {
+        return curveX, curveY, curveLen
+    }
+
+    return dirX, dirY, l.kiteStraightLeg(step, selfX, selfY)
+}
+
 // kiteResolveAndClick resolves the retreat lane against the live
 // train and terrain and issues the retreat click through the ladder
 // seam: the encircled train (the away vectors cancel - chasers stand
@@ -994,19 +1016,8 @@ func (l *Loop) kiteResolveAndClick(
         // window-sized shuffle that ends short of it.
         stepLen = l.kiteStepLength(threatDist)
     }
-    prefX, prefY := dirX, dirY
-    laneLen := l.kiteStraightLeg(stepLen, selfX, selfY)
-    if !encircled {
-        curveX, curveY, curveLen, handled := l.kiteCurveDirection(
-            dirX, dirY, selfX, selfY, stepLen)
-        if handled {
-            prefX, prefY, laneLen = curveX, curveY, curveLen
-        } else {
-            // The straight leg (the opening retreat of the fight):
-            // the away-ray endpoint budgets against the opening ring.
-            laneLen = l.kiteStraightLeg(stepLen, selfX, selfY)
-        }
-    }
+    prefX, prefY, laneLen := l.kiteLanePreference(
+        dirX, dirY, selfX, selfY, stepLen, encircled)
     stepX, stepY, found := l.kiteRetreatLaneSkipping(
         selfX, selfY, selfZ, prefX, prefY, dirX, dirY,
         laneLen, l.kiteDeadCellsFor())
@@ -1488,7 +1499,7 @@ func (l *Loop) kiteWalkWindow() time.Duration {
     }
     ms := (500000.0 + kiteBowReuseDelay*333.0) * float64(time.Millisecond) /
         float64(spd)
-    if ms < float64(kiteWalkWindowMin) || ms > float64(kiteWalkWindowMax) {
+    if ms < float64(kiteWalkWindowFloor) || ms > float64(kiteWalkWindowMax) {
         return kiteStepWindow
     }
 
