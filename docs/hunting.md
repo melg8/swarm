@@ -160,16 +160,25 @@ would have paid for.
   ALL clan of the attacked mob matches everything, a 600 unit z
   distance blocks the assist, the projected positions measure moving
   packs, a 200 unit margin covers the mates wandering mid fight).
-- The aggro answer (2026-09-10): a mob that already holds the
-  character as its target (its swings or its chase - both carry the
-  character as the mob's target id, `NearestAttacker`) owns the
-  targetless pick: a healthy character with a winnable attacker
-  (inside the engage level ceiling, `attackerEngageable`) engages it
-  at once - the forced attack request fires on the same tick and the
-  fight answers the aggro where it stands - while anything else (a
-  hurt character, an attacker above the ceiling) keeps the defensive
-  flow, the standard escape walk with its logout budget. The town
-  trips answer the same way (`interruptTripForAttacker` runs first
+- The aggro answer (2026-09-10, extended 2026-11-09): a mob that
+  already holds the character as its target (its swings or its chase -
+  both carry the character as the mob's target id, `NearestAttacker`)
+  owns the targetless pick: a healthy character with a winnable
+  attacker (inside the engage level ceiling, `attackerEngageable`)
+  engages it at once - the forced attack request fires on the same
+  tick and the fight answers the aggro where it stands - while
+  anything else (a hurt character, an attacker above the ceiling)
+  keeps the defensive flow, the standard escape walk with its logout
+  budget. The answer also outranks the approach: on every engage tick
+  where the selected target is not fighting yet, a DIFFERENT nearer
+  attacker replaces the pick before the stuck timeout, the
+  losing-fight verdict and the blind recovery run - the pick holding
+  the character as its own target no longer suppresses the switch,
+  the mob that actually swings owns the next swing. The loot phase
+  yields the same way (`loot` hands the tick to the engage when a
+  living attacker exists): the winnable attacker is fought before the
+  next corpse step, the rest run the defense flow. The town trips
+  answer the same way (`interruptTripForAttacker` runs first
   in the trip tick): a mob on the walking seller drops the trip
   through the soft reset (no cooldown, the junk, the books and the
   sold proceeds survive) and fights or runs instead of dragging the
@@ -177,13 +186,25 @@ would have paid for.
   deaths of the walkers. `adoptOutZoneFight` checks the same
   winnability before it finishes an attacker outside the zone: an
   unbeatable chase switches to the escape instead of a losing fight.
-- A running fight that turns into a death risk is fled: under 25%
+- A RUNNING fight that turns into a death risk is fled: under 25%
   health, or under 60% while the target holds a 25+ percent health
   lead, the target is dropped with a two minute skip and paced escape
-  segments open distance (toward the zone center when the straight line
-  leaves the square); a target one swing from dead is finished
-  instead. A hurt character under attack keeps fleeing instead of
-  standing in the blows.
+  segments open distance; a target one swing from dead is finished
+  instead. The percent-gap rule needs the confirmed fight
+  (`SelfFighting`): before the first swing the target bar is simply
+  full, and the old pre-fight rule fled a winnable aggroed mob seconds
+  after the answer (the 2026-11-09 live round: the adopted spider sat
+  at 100% against a 56% character and the bot ran). A hurt character
+  under attack keeps fleeing instead of standing in the blows.
+- The escape runs an ordered lane fan (`escapeWalkDestination`): the
+  straight away ray first, then the 45 and 90 degree lanes each side
+  of it, each clamped along its own ray into the patrol square at the
+  `escapeZoneMargin` inner line. The old out-of-square fallback ran
+  toward the zone center - the camp focus in cell mode - which
+  flipped the character 180 degrees back through the chaser on every
+  tick the away point left the square (the reported chaotic flee).
+  The fan never folds back toward the threat and keeps the direction
+  stable between ticks while the geometry does.
 - **The overhit finishing blow (hunt/combat_skills.go)**: the bot
   farms the server overhit experience bonus deliberately. The
   verified mechanic (Mobius C1): a skill whose stats carry
@@ -239,7 +260,13 @@ would have paid for.
   episode older than `fleeLogoutAfter` (20 s) logs the character out
   (a recovered health or a fresh fight clears the episode) - the
   relogin after the pause resets the mob aggro instead of the bot
-  running from the pack forever. A zone switch drops the remembered
+  running from the pack forever. A cornered escape (every lane clamped
+  under `escapeMinLane`) and a dead one (less than
+  `escapeNoProgressDistance` = 120 units covered inside
+  `escapeNoProgressWindow` = 3 s - the H-006 silent click drop, a
+  terrain pin) log out at once instead of standing in the blows; the
+  observation window re-anchors on every covered window and clears
+  with the flee episode. A zone switch drops the remembered
   farm spot of the previous square (the returns aim at the new center
   until a fresh spot is remembered inside it).
 
