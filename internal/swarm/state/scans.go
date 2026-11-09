@@ -608,23 +608,8 @@ func (b *Bot) nearestAttackableSocial(
     scans = b.appendAttackableScans(scans, nowNano)
     for i := range scans {
         cand := &scans[i]
-        if skipContains(skip, cand.objectID) {
-            continue
-        }
-        if maxLevel > 0 && cand.level > maxLevel && cand.level > 0 {
-            continue
-        }
-        if minLevel > 0 && cand.level < minLevel && cand.level > 0 {
-            continue
-        }
-        if avoidBows && cand.bowWielding {
-            continue
-        }
-        if zone != nil && !zone.Contains(
-            int32(math.Round(cand.x)), int32(math.Round(cand.y))) {
-            continue
-        }
-        if socialHelpersNear(scans, cand) {
+        if !socialCandidateKeep(scans, cand, zone, skip,
+            minLevel, maxLevel, avoidBows) {
             continue
         }
         dist := math.Hypot(cand.x-selfX, cand.y-selfY)
@@ -647,6 +632,35 @@ func (b *Bot) nearestAttackableSocial(
     }
 
     return best, found
+}
+
+// socialCandidateKeep reports whether one flattened candidate passes
+// the filters of the constrained search: the skip list, the level
+// window, the bow fence, the zone box and the social pull. The split
+// keeps the search loop under the complexity cap without loosening a
+// single rule.
+func socialCandidateKeep(
+    scans []npcScan, cand *npcScan, zone ZoneArea, skip []int32,
+    minLevel int32, maxLevel int32, avoidBows bool,
+) bool {
+    if skipContains(skip, cand.objectID) {
+        return false
+    }
+    if maxLevel > 0 && cand.level > maxLevel && cand.level > 0 {
+        return false
+    }
+    if minLevel > 0 && cand.level < minLevel && cand.level > 0 {
+        return false
+    }
+    if avoidBows && cand.bowWielding {
+        return false
+    }
+    if zone != nil && !zone.Contains(
+        int32(math.Round(cand.x)), int32(math.Round(cand.y))) {
+        return false
+    }
+
+    return !socialHelpersNear(scans, cand)
 }
 
 // appendAttackableScans flattens every living attackable npc of the
