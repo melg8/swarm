@@ -136,6 +136,32 @@ func (b *Bot) SelfAttackers() []AttackTarget {
     return attackers
 }
 
+// HasBowAttackerBesides reports whether a living attackable npc other
+// than the given object currently holds the character as its target
+// while carrying a bow in its right hand. The hunt losing-fight
+// verdict reads it: a bow-wielding add shoots from its own range
+// while the kite retreats (the owner rule - a ranged enemy is never
+// out-kited), so the shot cycle cannot answer it the way it answers
+// a melee chaser. The scan is allocation free: the verdict runs on
+// every engage tick.
+func (b *Bot) HasBowAttackerBesides(objectID int32) bool {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    if b.selfID == 0 {
+        return false
+    }
+    for i := range b.world.hot {
+        obj := &b.world.hot[i]
+        if obj.Kind == kindNPC && obj.Attackable && !obj.Dead &&
+            obj.TargetID == b.selfID && obj.ObjectID != objectID &&
+            obj.BowWielding {
+            return true
+        }
+    }
+
+    return false
+}
+
 // NearestAttackable returns the closest living attackable npc within the
 // given distance of the character. The distance uses the projected
 // current position of every npc (see projectedPosition), not the raw

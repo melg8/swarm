@@ -638,6 +638,66 @@ func TestKiteOwnsThePileUpAnswer(t *testing.T) {
         "the shot cycle owns the tick")
 }
 
+// TestKiteFlightOwnsTheTargetlessPileUp pins the survival handoff of
+// the 2026-11-10 acceptance run: the losing-fight verdict drops the
+// melee pick when a bow add joins, and the targetless straight flight
+// - not the zoned pile up run with its emergency logout - owns the
+// escape while a melee chaser stays the nearest threat.
+func TestKiteFlightOwnsTheTargetlessPileUp(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45440)
+    // The nearly-dead melee pick of the run: its one-shot exemption
+    // keeps the shot cycle alive until the bow add invalidates it.
+    setMobHealth(bot, 7, 1)
+    // The level 8 Kaboo Orc Archer of the run joined BEHIND the melee
+    // pack, so the nearest attacker stays a melee chaser and the
+    // straight flight answers it.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000469, Attackable: true,
+        X: 45350, Y: 50000, RightHandItem: 14,
+        Name: "Kaboo Orc Archer",
+    })
+    attackerHits(bot, 8, 45350)
+    for i, objectID := range []int32{9, 11} {
+        x := int32(45200 - i*100)
+        bot.ApplyNpcInfo(state.NpcInfo{
+            ObjectID: objectID, TemplateID: 1000010,
+            Attackable: true, X: x, Y: 50000, Name: "High Orc",
+        })
+        mobChasesSelf(bot, objectID, x, -3500)
+    }
+    hurtTo(bot, 50)
+    require.True(t, loop.losingFight(),
+        "the bow add turns the nearly-dead pick into a loss")
+    require.GreaterOrEqual(t, bot.SelfAttackerCount(),
+        panicLogoutAttackers, "the pack arms the pile up gate")
+    require.False(t, loop.pileUpWinnable(),
+        "the hurt character cannot tank the pack")
+
+    // The first tick drops the melee pick and the targetless straight
+    // flight - not the zoned pile up run - opens the escape.
+    loop.tick()
+    require.Zero(t, loop.target,
+        "the bow add drops the melee pick")
+    require.True(t, loop.kiteFlightOwnsEscape(),
+        "the nearest melee chaser leaves the flight in charge")
+    require.True(t, loop.panicAt.IsZero(),
+        "the pile up run must not replace the flight")
+    require.Zero(t, game.logouts,
+        "the flight keeps the session online")
+    require.NotEmpty(t, game.walks,
+        "the straight lane opens the escape")
+    require.Less(t, game.walks[0][0], int32(45000),
+        "the walk runs away from the chasers")
+
+    // The next tick reads the SAME targetless pile up: the gate must
+    // stand down for the flight again instead of arming the logout.
+    loop.tick()
+    require.True(t, loop.panicAt.IsZero(),
+        "the pile up gate keeps standing down")
+    require.Zero(t, game.logouts,
+        "the flight owns the whole escape")
+}
+
 // TestKiteDisengagesTheLosingFight pins the death-risk gate of the
 // archer: a hurt bow archer below the escape threshold drops the
 // fight and flies the straight defensive flight. The old exemption

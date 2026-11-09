@@ -335,6 +335,40 @@ func TestNearestAttackerFindsTheClosestChaser(t *testing.T) {
     require.False(t, ok)
 }
 
+// TestHasBowAttackerBesidesFindsTheArcherAdd pins the bow add scan of
+// the losing-fight verdict: a living attackable npc that targets the
+// character while carrying a bow answers true, the excluded object
+// and the melee attackers answer false.
+func TestHasBowAttackerBesidesFindsTheArcherAdd(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    spawnNpcInfo(bot, 7, 1000001, 45300)
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 8, TemplateID: 1000469, Attackable: true,
+        X: 45200, Y: 50000, Z: -3500, Name: "Kaboo Orc Archer",
+        RightHandItem: 14,
+    })
+    require.True(t, bot.ObjectUsesBow(8), "the scene carries a bow")
+
+    // The melee attacker alone is no bow add.
+    bot.ApplyAttack(Attack{
+        AttackerID: 7, X: 45300, Y: 50000, Z: -3500,
+        TargetCount: 1, TargetIDs: [AttackTargets]int32{100},
+        TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+    })
+    require.False(t, bot.HasBowAttackerBesides(7))
+
+    // The archer that joined the fight is one.
+    bot.ApplyAttack(Attack{
+        AttackerID: 8, X: 45200, Y: 50000, Z: -3500,
+        TargetCount: 1, TargetIDs: [AttackTargets]int32{100},
+        TargetX: 45000, TargetY: 50000, TargetZ: -3500,
+    })
+    require.True(t, bot.HasBowAttackerBesides(7))
+    require.False(t, bot.HasBowAttackerBesides(8),
+        "the excluded object never counts as the add")
+}
+
 func TestZoneHasAttackableReadsTheSquare(t *testing.T) {
     bot := NewBot("acc1")
     bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)

@@ -107,6 +107,50 @@ func TestLosingFightKeepsTheGapRuleForTheRunningFight(t *testing.T) {
         "the running fight with a 50 point lead is lost")
 }
 
+// TestLosingFightFleesTheBowAddBeforeTheNearlyDeadTarget pins the bow
+// add verdict of the 2026-11-10 live acceptance run: a level 8 Kaboo
+// Orc Archer joined the melee fight and the shot cycle kept firing at
+// a 1 percent grunt while the archer took the health from 68 to 10
+// percent and the emergency logout broke the survival check. The
+// nearly-dead exemption covers the melee trade only - the bow add
+// outranges the retreat, so the fight is dropped at once.
+func TestLosingFightFleesTheBowAddBeforeTheNearlyDeadTarget(
+    t *testing.T,
+) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45600)
+    setMobHealth(bot, 7, 1)
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000469, Attackable: true,
+        X: 45700, Y: 50000, RightHandItem: 14,
+        Name: "Kaboo Orc Archer",
+    })
+    attackerHits(bot, 8, 45700)
+    hurtTo(bot, 68)
+    loop := NewLoop(&fakeGame{}, bot)
+    loop.target = 7
+
+    require.True(t, loop.losingFight(),
+        "the bow add turns the nearly-dead target into a loss")
+}
+
+// TestLosingFightKeepsTheNearlyDeadMeleeTarget pins the other half of
+// the bow add rule: a melee pack without a bow keeps the nearly-dead
+// exemption, so the one-shot kill is finished instead of fled.
+func TestLosingFightKeepsTheNearlyDeadMeleeTarget(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45600)
+    setMobHealth(bot, 7, 1)
+    spawnMobAt(bot, 8, 45700)
+    attackerHits(bot, 8, 45700)
+    hurtTo(bot, 68)
+    loop := NewLoop(&fakeGame{}, bot)
+    loop.target = 7
+
+    require.False(t, loop.losingFight(),
+        "a melee add does not take the one-shot kill away")
+}
+
 // TestLosingFightStillEscapesTheCriticalHealth pins the pre-fight
 // critical escape: below the escape threshold the untouched target
 // does not buy a fight either.

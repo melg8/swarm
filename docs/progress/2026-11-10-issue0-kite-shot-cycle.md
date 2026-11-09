@@ -119,6 +119,24 @@ whatever range the chaser reached meanwhile.
   function over the cyclop cap; the full lint gate is red without
   the split).
 
+### 2026-11-10 - the bow add survival answer (run 21)
+
+- Run 21 failed only the `survives` check: a level 8 Kaboo Orc Archer
+  joined a nearly-dead melee target at +257 s, the shot cycle kept
+  firing (the nearly-dead exemption returned before the health gate),
+  the health fell 68 -> 10 percent and the critical-HP emergency
+  logout ended the session at +275 s.
+- The losing-fight verdict now drops the fight the moment a
+  bow-wielding add holds the character as its target
+  (`state.HasBowAttackerBesides`), before the nearly-dead exemption:
+  a ranged add outranges the straight retreat, so its reload-tail
+  fire is free damage the shot cycle cannot answer.
+- The targetless flight after the drop is protected from the pile up
+  gate (`kiteFlightOwnsEscape`): while the bow is in hand and the
+  nearest chaser is melee, the straight flight owns the escape and
+  the zoned fan with its emergency logout stands down. The
+  critical-HP logout (< 12 percent) stays armed above both.
+
 ## Status
 
 Code and tests written; the full suites and the lint gate are green.

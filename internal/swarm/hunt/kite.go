@@ -598,6 +598,27 @@ func (l *Loop) kiteOwnsRetreat() bool {
         !l.tracker.ObjectUsesBow(l.target)
 }
 
+// kiteFlightOwnsEscape reports whether the TARGETLESS straight flight
+// of the bow character owns the aggro answer: the kite layer is on,
+// the bow is in hand, no fight target is held (the losing verdict
+// dropped it) and the nearest attacker is not itself a bow (a bow
+// attacker closes the flight, see kiteFleeThreat). The pile up gate
+// of the tick stands down while it holds: the flight is the survival
+// answer the melee fan cannot give without the logout - the
+// 2026-11-10 acceptance run dropped a melee fight when a level 8
+// Kaboo Orc Archer joined, the grunt stayed the nearest chaser, and
+// the pile up gate would have replaced the straight run with the
+// zoned fan and its emergency logout. The critical-HP logout stays
+// armed above both.
+func (l *Loop) kiteFlightOwnsEscape() bool {
+    if !l.kite.Enabled || !l.bowEquipped() || l.target != 0 {
+        return false
+    }
+    attacker, ok := l.tracker.NearestAttacker()
+
+    return ok && !l.tracker.ObjectUsesBow(attacker.ObjectID)
+}
+
 // avoidBowTargets reports whether the hunt target search must fence
 // bow wielding mobs out: the archer profile (the kite layer is on
 // and the bow is in hand) never INITIATES a fight with an archer.

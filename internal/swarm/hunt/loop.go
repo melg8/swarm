@@ -1728,7 +1728,7 @@ func (l *Loop) tick() { //nolint:cyclop,funlen
         if !l.panicAt.IsZero() ||
             (l.tracker.SelfAttackerCount() >= panicLogoutAttackers &&
                 !l.pileUpWinnable() && !l.settleHolding() &&
-                !l.kiteOwnsRetreat()) {
+                !l.kiteOwnsRetreat() && !l.kiteFlightOwnsEscape()) {
             l.panicPileUpRun(time.Now())
 
             return
@@ -2506,18 +2506,34 @@ func (l *Loop) engage() {
 }
 
 // losingFight reports whether the running fight turned into a death
-// risk: the character fell under the escape threshold, or a RUNNING
-// fight dropped below the re-engage health while the target keeps a
-// clear health lead (a level gap pull, an add that joined a social
-// pack). The percent-gap rule needs the confirmed fight: before the
-// first swing the target health is simply its full bar, and treating
-// the untouched bar as a lead fled winnable aggroed mobs five seconds
-// after the answer (the reported flee at 56 percent while the mob sat
-// at 100). A target that is nearly finished does not count as losing
-// - the kill is one swing away and fleeing drops its loot.
+// risk: the character fell under the escape threshold, a bow-wielding
+// add joined the melee fight, or a RUNNING fight dropped below the
+// re-engage health while the target keeps a clear health lead (a level
+// gap pull, an add that joined a social pack). The percent-gap rule
+// needs the confirmed fight: before the first swing the target health
+// is simply its full bar, and treating the untouched bar as a lead
+// fled winnable aggroed mobs five seconds after the answer (the
+// reported flee at 56 percent while the mob sat at 100). A target that
+// is nearly finished does not count as losing - the kill is one swing
+// away and fleeing drops its loot. The bow add is the exception: it
+// outranges the kite's straight retreat, so the reload tails the shot
+// cycle spends in its fire are free damage, and the nearly-dead
+// exemption covers the melee trade only - the 2026-11-10 live run kept
+// shooting a 1 percent grunt while a level 8 Kaboo Orc Archer brought
+// the health from 68 to 10 percent and forced the emergency logout.
 func (l *Loop) losingFight() bool {
     selfHP := l.tracker.SelfHealthPercent()
     targetHP := l.tracker.ObjectHealthPercent(l.target)
+    // The bow add verdict (the 2026-11-10 acceptance run): the ranged
+    // attacker joined a melee fight and every shot cycle kept the
+    // character inside its 1100 range. The straight flight opens that
+    // range in seconds while the archer cannot answer the standing
+    // trade, so the fight is dropped the moment the add is known -
+    // whatever the target and the character health are (the nearly
+    // dead target does not buy the archer's fire).
+    if l.tracker.HasBowAttackerBesides(l.target) {
+        return true
+    }
     if targetHP >= 0 && targetHP < escapeTargetBeatenPercent {
         return false
     }
