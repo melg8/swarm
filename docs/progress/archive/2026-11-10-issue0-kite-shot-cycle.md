@@ -1,4 +1,4 @@
-# The archer kite shot cycle: one shot per bow cooldown (status: in progress)
+# The archer kite shot cycle: one shot per bow cooldown (status: complete)
 
 Started 2026-11-10, branch feature/kite-range-contract, issue #0
 (the owner instruction, no board issue). Follow-up of
@@ -139,9 +139,13 @@ whatever range the chaser reached meanwhile.
 
 ## Status
 
-Code and tests written; the full suites and the lint gate are green.
-Next: the atomic commits, the 5-minute live confirmation with the new
-acceptance code, then the fragment archive.
+Complete 2026-11-10. The full `internal/swarm/hunt`,
+`internal/swarm/state` and `internal/swarm/acceptance` suites, the
+build and the lint gate are green, and the closing 5-minute live
+`archer-kite` run (run 25, the fix set of this fragment) passed all
+eight checks: 47 shots, 94 percent of the gaps inside the 4 s
+cooldown, 63 kite steps, 0 holds, 12 kills, min HP 66 percent, min
+554 arrows, online the whole window with no escape-stall logout.
 
 ### 2026-11-10 - run 22: the pack focus and the pile-up flight
 
@@ -234,3 +238,11 @@ acceptance code, then the fragment archive.
   the full-pocket hold that keeps the ticks, the bow add rule, the
   pile-up conversion and the kill window. The targetless hold log line
   no longer claims the fan owns the next period.
+
+### 2026-11-10 - closing
+
+- The task is complete: the shot-cycle contract, the bow add survival
+  answer, the pile-up flight and its kill window, the windup-wait
+  flight and the no-fan refusal answer are committed, documented and
+  live-confirmed (run 25). The fragment moves to
+  `docs/progress/archive/`.
