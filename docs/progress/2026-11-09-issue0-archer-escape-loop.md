@@ -203,8 +203,48 @@ archer-kite re-check.
   ./internal/swarm/state/...` 0 issues; the focused
   fight/flee/escape/kite suite passes (66 s).
 
+## Live round 2026-11-09 15:13 (the six-fix re-check)
+
+The archer-kite scenario re-ran on the fixed build (`commit
+84cf2adc`, temp18, 3 minute window, log
+`logs/acceptance/archer-kite-20261109-151337-30468-1.log`):
+
+- **Verdict FAILED 5 of 6 checks after 3m6s** - armed, retreats,
+  survives and quiver pass; the range check fails (83 samples, 22%
+  ranged, max 1281 units).
+- **The survival side is green**: zero `emergency logout`, zero
+  `regressing`, zero `piled on us` and zero `fleeing` lines in the
+  window (the 14:02 run had 8 emergency logouts and 8 death
+  regressions in 10 minutes), min HP 69 percent, 9 kite steps and 1
+  cornered hold.
+- **The engage gate held**: zero `does not engage` drops in the
+  window (the failed run had 8, on a target that was chasing and
+  hitting the character), and zero bow-retry refusal attributions.
+- **The sidestep fan ran live**: three `stepping clear` lines
+  (15:15:02, 15:15:08, 15:15:13) with no wall freeze; the click of
+  15:15:13 went silent (the H-006 accepted-but-moved-nothing form)
+  and the next walk re-entered the loop 3 s later.
+- **The range failure is not one of the six defects.** The 1281
+  unit maximum is an engage-approach artifact: at 15:15:00 the loop
+  picked a new target 1340 units away after the kill, the auto
+  attack stance of the previous fight was still on, and the monitor
+  folded the cross-cell approach (`MoveToPawn` chase at 500
+  distance) as a fight sample. The low ranged share is the walled
+  pocket at the cell edge (15:14:36: `no walkable retreat lane on
+  target 268439335 (cornered) ... 6 walled or dead`), where the
+  chaser at parity keeps the fight at 12-150 units for a minute.
+  The 14:02 run of the old build already failed the same check
+  (43% ranged, max 900), so the contract weakness pre-dates this
+  round: the ground's chaser speed and the leash wall make the
+  ranged majority unattainable once the pack aggros; the 13:55
+  pass was a two minute window whose first fight landed
+  unaggroed. The next round owns it (the sample definition and
+  the parity/walled-pocket kite), not this fix set.
+
 ## Status
 
-In progress: all six fixes landed and are lint clean; the live
-`temp18` re-check and the push remain.
+Done: the six fixes landed, lint clean and unit pinned; the live
+re-check confirms the survival side (no emergency logout, no death
+regression) and leaves the pre-existing range contract failure to
+the next round.
 
