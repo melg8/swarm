@@ -1094,6 +1094,58 @@ func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
     return obj.X, obj.Y, obj.Z, true
 }
 
+// ObjectTrack is the chase view of a known object: the raw
+// last-known placement plus the movement segment it belongs to. The
+// server broadcasts a chasing mob's MoveToPawn at a one to two second
+// cadence, so the raw placement can lag a whole close-in behind the
+// live mob; the distance floors of the kite layer must not trust that
+// stale gap (the 2026-11-09 live acceptance run measured a 512 unit
+// raw gap against an actual 256).
+type ObjectTrack struct {
+    // X/Y/Z are the raw last-broadcast placement.
+    X int32
+    Y int32
+    Z int32
+    // MovedAt is the start of the movement segment the placement
+    // belongs to; the zero time while the object stands.
+    MovedAt time.Time
+    // Speed is the fastest movement speed of the object in world
+    // units per second (see chaseSpeed).
+    Speed float64
+    // Moving reports whether the last movement packet left the
+    // object walking.
+    Moving bool
+}
+
+// ObjectTrackOf returns the chase view of a known object (see
+// ObjectTrack): the raw placement, the start of its movement segment,
+// the fastest speed and the moving flag. The kite layer computes the
+// conservative closed distance from it: a chaser whose broadcast
+// lags may have closed speed*age units already, and the floor
+// decisions only ever see a distance at or below the true gap.
+func (b *Bot) ObjectTrackOf(objectID int32) (ObjectTrack, bool) {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    obj, _ := b.objectLocked(objectID)
+    var track ObjectTrack
+    if obj == nil {
+        return track, false
+    }
+    track = ObjectTrack{
+        X:       obj.X,
+        Y:       obj.Y,
+        Z:       obj.Z,
+        MovedAt: time.Time{},
+        Speed:   obj.chaseSpeed(),
+        Moving:  obj.Moving,
+    }
+    if obj.Moving && obj.MoveAt != 0 {
+        track.MovedAt = time.Unix(0, obj.MoveAt)
+    }
+
+    return track, true
+}
+
 // ObjectUsesBow reports whether a known npc carries a bow in its
 // right hand: the NpcInfo equipment block names the template rhand
 // item and the item stats resolve the weapon family. The hunt kite

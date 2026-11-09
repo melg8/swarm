@@ -87,3 +87,57 @@ Constraints:
   still fails on the pre-existing two: the post-kill pile-up logout
   and the ranged share (the shots fire at the reload lapse and the
   windup collapses the band).
+
+### 2026-11-09 - the continuous retreat, the flight and the ceiling
+
+- The pursuit hold lost its stall exit: the owner rule removed the
+  "stand the walk down and shoot" answer even for a parity race, so
+  a slow chain keeps walking and the ONLY standing-shoot case is a
+  genuinely walled lane. `kitePursuitStreakLimit` (12) is now a
+  runaway diagnostic, not a stop.
+- `kiteDeferShot` (the engage rung ahead of `AttackTarget`) holds
+  the forced attack request while a retreat of this fight ran inside
+  `kitePursuitContext` and the nearest hostile holds inside
+  `kiteReshotFloor`: the reload is walked instead of spent standing.
+  A fresh fight keeps its first shot, the cornered hold keeps its
+  shot.
+- The distance floors use the conservative closed distance
+  (`closedDistance`, `Bot.ObjectTrackOf`, `chaseSpeed`): the raw
+  `MoveToPawn` gap is aged by the movement segment and shortened by
+  the fastest chaser speed (the live run measured 512 raw against
+  256 actual).
+- The click validation rejects a partial run shorter than
+  `kiteMinStep` (the live 38 unit walk).
+- The corner-only angular escape (`kiteLaneEscapeAngles`, +-22.5/45/
+  67.5/90 degrees inside the away half-plane) fires only when every
+  rung of the preferred away-ray is walled; the direct ray stays the
+  primary retreat (the live spot 34792,49416 had the west ray walled
+  at every length while south/east/north stood open).
+- The defensive flight (`kiteFleeThreat`) hooks first in
+  `fleeFromThreat`: a bow character with the kite enabled flies the
+  straight away-ray at the full escape segment and bypasses the
+  fan's closure watchdog/logout; the fan stays the fallback of a
+  walled lane, a bow attacker, a melee weapon, another deck or a
+  disabled profile, and the critical-HP logout stays armed.
+- The kite engage ceiling (`kiteEngageLevelSlack` = 5): the run-4
+  dump showed the general +2 ceiling refusing the level 10 Kaboo
+  Orc Fighter of the level 7 cell - the pick and the loot answer
+  fled it, the parity chaser dragged the flight and the window
+  passed without a shot. The widened ceiling answers the Fighter
+  with the bow; a bow attacker and a melee attacker six levels up
+  still keep the flight.
+- Tests: `kite_pursuit_test.go` (11: continuation, won race, slow
+  race, context, both reset seams, closed distance, deferred shot x3,
+  partial-run rejection, walled-ray escape), `kite_flee_test.go`
+  (7: straight flight, live leg, watchdog bypass, fan fallback, bow
+  attacker, disabled profile, stand-up guard),
+  `TestKiteAnswersTheMeleeAttacker` plus the updated add-answer test.
+- Verification: `task fmt`, `task fmt:check`, `task --force
+  lint:new`, full `task lint` (0 issues), `go build ./...`, full
+  `internal/swarm/hunt` suite (107 s) green.
+- Live acceptance run 5 PASS: 51 fight samples, 78% ranged, max 656
+  units, 6 kite steps, 0 holds, min HP 78%, min arrows 593 (log
+  `logs/acceptance/archer-kite-20261109-220729-26760-1.log`). Run 6
+  PASS reproduced the shot -> windup-end retreat -> pursuit chain ->
+  re-shot cadence (22:12:36).
+- Next: `task verify`, the atomic commits, and the fragment archive.

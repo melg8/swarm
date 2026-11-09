@@ -179,6 +179,29 @@ func (h *objectHot) effectiveSpeed() float64 {
     return speed
 }
 
+// chaseSpeed returns the FASTEST movement speed the object can use in
+// world units per second: the run speed or the walk speed, whichever
+// the spawn packet carries higher, with the move multiplier applied.
+// The kite layer bounds how far a chaser may have closed since its
+// last movement broadcast with it (see ObjectTrack): the conservative
+// distance must never assume a slower chase than the object can run,
+// so the faster of the two speeds wins whatever the current moving
+// flag says.
+func (h *objectHot) chaseSpeed() float64 {
+    speed := float64(h.RunSpeed)
+    if speed < float64(h.WalkSpeed) {
+        speed = float64(h.WalkSpeed)
+    }
+    if h.MoveSpeedMult > 0 {
+        speed *= h.MoveSpeedMult
+    }
+    if speed <= 1 {
+        return defaultRunSpeed
+    }
+
+    return speed
+}
+
 // defaultRunSpeed is the fallback movement speed for objects without
 // transmitted speeds.
 const defaultRunSpeed = 120

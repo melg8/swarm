@@ -183,6 +183,71 @@ func TestObjectUsesBowTracksTheNpcEquipment(t *testing.T) {
     require.False(t, bot.ObjectUsesBow(11), "an unknown object")
 }
 
+// TestObjectTrackOfServesTheChaseView pins the conservative closure
+// data of the kite layer: the raw placement, the start of the
+// movement segment and the FASTEST movement speed the object can use.
+// The server broadcasts a chasing mob's movement at a one to two
+// second cadence, so the raw gap can lag a whole close-in; the floor
+// decisions of the kite must bound the closure from it instead of
+// trusting the raw placement.
+func TestObjectTrackOfServesTheChaseView(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 7, Attackable: true, X: 45200, Y: 50200, Z: -3400,
+        RunSpeed: 110, WalkSpeed: 80, MoveSpeedMult: 1.5,
+        Name: "Gremlin",
+    })
+
+    track, ok := bot.ObjectTrackOf(7)
+    require.True(t, ok)
+    require.Equal(t, int32(45200), track.X)
+    require.Equal(t, int32(50200), track.Y)
+    require.Equal(t, int32(-3400), track.Z)
+    require.False(t, track.Moving, "the spawn leaves the npc standing")
+    require.True(t, track.MovedAt.IsZero(),
+        "a standing object carries no movement segment")
+    require.InDelta(t, 165.0, track.Speed, 0.001,
+        "the run speed with the multiplier is the chase speed")
+
+    // The chasing movement packet starts the segment: the stamp moves
+    // with it and the moving flag arms the closure bound.
+    bot.ApplyPawnMovement(PawnMovement{
+        ObjectID: 7, TargetID: 100, Distance: 40,
+        X: 45200, Y: 50200, TargetX: 45000, TargetY: 50000,
+        TargetZ: -3500,
+    })
+    track, ok = bot.ObjectTrackOf(7)
+    require.True(t, ok)
+    require.True(t, track.Moving)
+    require.False(t, track.MovedAt.IsZero())
+    require.WithinDuration(t, time.Now(), track.MovedAt, time.Second,
+        "the movement stamp lands with the chase packet")
+
+    // The walk speed wins when the packet carries it as the faster
+    // one, and a speedless spawn falls back to the default run speed.
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 8, Attackable: true, X: 45400, Y: 50200,
+        RunSpeed: 40, WalkSpeed: 90, Name: "Keltir",
+    })
+    track, ok = bot.ObjectTrackOf(8)
+    require.True(t, ok)
+    require.InDelta(t, 90.0, track.Speed, 0.001,
+        "the faster of the two carried speeds is the chase speed")
+
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 9, Attackable: true, X: 45600, Y: 50200,
+        Name: "Kaboo Orc",
+    })
+    track, ok = bot.ObjectTrackOf(9)
+    require.True(t, ok)
+    require.InDelta(t, float64(defaultRunSpeed), track.Speed, 0.001,
+        "a speedless spawn falls back to the default run speed")
+
+    _, ok = bot.ObjectTrackOf(404)
+    require.False(t, ok, "an unknown object carries no track")
+}
+
 func TestApplyItemInfoTracksGroundItems(t *testing.T) {
     bot := NewBot("acc1")
     bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
