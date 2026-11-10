@@ -688,3 +688,8 @@ class.
   session and set them repo-locally (never `--global`) if they differ.
   Never commit as another identity and never amend the identity of
   pushed commits.
+- The GitHub side of a round (closing a landed or rejected PR,
+  commenting the verdict, reading the PR state) runs through
+  `bash tools/gh_token.sh ...`, which reuses the git credential
+  instead of a second `gh auth login` token; `docs/deployment.md` holds
+  the install and the rationale.

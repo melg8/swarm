@@ -137,6 +137,46 @@ What each script does:
   the deployed stack; a fake C1 client walks the real protocol through
   the proxy, moves the character through the relay and prints
   `PROXY_E2E_OK`).
+- `tools/gh_token.sh` - runs the GitHub CLI with the credential git
+  already stores (see the GitHub access section below).
+
+## GitHub access from the machine (gh + the stored git credential)
+
+The agent closes pull requests, comments on issues and reads the PR
+state through `gh`, authenticated with the OAuth token git already
+uses for pushes - no second credential, no `gh auth login`.
+
+`gh` is not a Go module, so `tools/install_dev_tools.sh` does not
+install it (its `check` mode is a preflight gate and `gh` stays
+optional). Drop the release binary into `~/go/bin`, which is already
+on PATH:
+
+```bash
+cd /tmp && curl -sLO \
+    https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_amd64.zip
+unzip -q gh_2.103.3_windows_amd64.zip
+cp gh_2.103.3_windows_amd64/bin/gh.exe ~/go/bin/
+```
+
+Do not run `gh auth login`: it copies the token into a plain text
+`~/.config/gh/hosts.yml`. The credential helper already holds a
+`repo`-scoped OAuth token (the Windows Credential Manager, DPAPI
+encrypted, `gist`/`repo`/`workflow` scopes; `read:org` is missing and
+only org-wide queries need it), and the wrapper hands exactly that
+token to gh per invocation:
+
+```bash
+bash tools/gh_token.sh auth status
+bash tools/gh_token.sh pr list --state open
+bash tools/gh_token.sh pr close 61 --comment "evaluated and rejected"
+```
+
+The wrapper reads the credential through `git credential fill` with
+`GCM_INTERACTIVE=never`, never prints it and never writes it to disk;
+revoking it in the credential store revokes the API access with it.
+It exits non-zero with a hint when the helper holds nothing - run any
+fetch or push first. `GH_CREDENTIAL_HOST` and `GH_BIN` override the
+host and the binary path.
 
 ## Build identity of the produced binaries
 
