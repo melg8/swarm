@@ -64,6 +64,7 @@ the area you are about to touch, not all of them.
 
 | Document | Area |
 | --- | --- |
+| [hypotheses.md](hypotheses.md) | The registry of the server assumptions that are not yet verified: the rules, the H-NNN entries with their verification plans and the open/verified status |
 | [progress/](progress/) | The active task handover fragments, one file per task (crash-safe progress tracking, the shared-file clash policy); finished fragments move to progress/archive/ |
 | [agent_progress.md](agent_progress.md) | FROZEN ARCHIVE: the pre-split handover log - read for history, never append |
 | [agent_progress_archive.md](agent_progress_archive.md) | FROZEN ARCHIVE: the archive of the finished pre-split agent rounds |

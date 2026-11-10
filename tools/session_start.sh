@@ -65,9 +65,9 @@ fi
 # 3. The open hypotheses.
 open_hypotheses="$(awk '/^### H-[0-9]+/ { id = $2; sub(/:$/, "", id) }
     /^- Status: open/ && id != "" { printf "%s ", id; id = "" }' \
-    "${REPO_DIR}/AGENTS.md" 2>/dev/null)"
+    "${REPO_DIR}/docs/hypotheses.md" 2>/dev/null)"
 if [ -n "${open_hypotheses}" ]; then
-    mark "open hypotheses: ${open_hypotheses}- advance or close one this session when the touched area matches its plan (AGENTS.md, the hypotheses registry)" "warn"
+    mark "open hypotheses: ${open_hypotheses}- advance or close one this session when the touched area matches its plan (docs/hypotheses.md)" "warn"
 else
     mark "open hypotheses: none (the registry is clean)" "ok"
 fi

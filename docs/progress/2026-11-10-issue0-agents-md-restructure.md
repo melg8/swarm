@@ -87,7 +87,18 @@ fleete2e `SWARM_FLEET_E2E=1` gate and its 10 minute online timeout,
 the `Build:` identity line, `SWARM_FLEET_PROFILE`, and every
 `docs/*.md` file present in the documentation map.
 
+### 2026-11-10 - the registry moved to docs/hypotheses.md
+
+The H-001..H-007 entries and the registry rules left `AGENTS.md` for
+`docs/hypotheses.md` (193 lines); `AGENTS.md` keeps a two paragraph
+rule and the link, the documentation map gained the row,
+`docs/README.md` lists the document under the working process, and
+`tools/session_start.sh` reads the open ids from the new file. The
+entries themselves are unchanged, so no verification evidence was
+lost.
+
 ## Status
 
-Step 2 of 3 (the factual pass) is done. Step 3 is the registry
-extraction into `docs/hypotheses.md` plus the duplication squeeze.
+Step 3 of 3 is under way: the registry extraction is done, the
+duplication squeeze (protocol notes, layout, commands, proxy, stack
+notes) is next.
