@@ -85,6 +85,45 @@ func (l *Loop) kiteChaserBearings(
     return out
 }
 
+// kiteContactAway resolves the flight ray of a melee attacker
+// standing ON the character. At zero distance the train geometry has
+// no away bearing at all (kiteChaserBearings skips the contact
+// member: the vector between the two bodies is empty) and the flight
+// used to spend the tick on nothing - the 2026-11-10 run-29
+// acceptance dump stood a healthy level 7 archer at (35516,51008)
+// for 21 seconds while the level 10 Kaboo Orc Fighter broadcast from
+// the very same coordinates landed 15 damage every 1.9 s, the health
+// fell 78 -> 11 percent and the session ended at 6 percent after the
+// emergency logout. Contact is the one scene the ground hold never
+// owns: every swing lands from there, and the server attack timeout
+// (AttackableAI MAX_ATTACK_TIMEOUT) only starts once the blows stop
+// landing. The flight therefore takes the first OPEN ring ray instead
+// of standing - the character's own facing first (the direction its
+// client last moved or shot), then the two perpendiculars and the
+// back ray - and each candidate is a straight full escape segment,
+// never a turn: the owner rule of the round keeps the retreat
+// straight, and a contact escape has no previous leg to bend away
+// from. Reports the unit ray and whether any straight lane opens.
+func (l *Loop) kiteContactAway(
+    selfX, selfY, selfZ int32,
+) (float64, float64, bool) {
+    heading := float64(l.tracker.SelfHeading()) * 2 * math.Pi / 65536
+    dirX, dirY := math.Cos(heading), math.Sin(heading)
+    for _, angle := range [...]float64{
+        0, math.Pi / 2, -math.Pi / 2, math.Pi,
+    } {
+        rayX, rayY := rotatePlanar(dirX, dirY, angle)
+        if _, _, found := l.kiteRetreatLane(
+            selfX, selfY, selfZ, rayX, rayY, rayX, rayY,
+            escapeWalkDistance,
+        ); found {
+            return rayX, rayY, true
+        }
+    }
+
+    return 0, 0, false
+}
+
 // kiteGapDirection resolves the escape ray of an encircled train:
 // the bisector of the WIDEST angular gap between the chaser
 // bearings - the direction that stays farthest from every flanker

@@ -813,6 +813,15 @@ func (l *Loop) kiteFleeThreat(now time.Time) bool {
     if !ok || l.tracker.ObjectUsesBow(attacker.ObjectID) {
         return false
     }
+    if !l.kiteClickAt.IsZero() && l.kiteClickFor != l.target {
+        // The deferred retreat click of a finished fight no longer
+        // owns the movement: the loot interrupt drops the target a
+        // second after the shot, and its disable hold kept the whole
+        // flight standing through the bow window (the 2026-11-10
+        // run-29 dump took 15 damage per 1.9 s inside it). The same
+        // stand-down kiteClickWalk runs on the fight side.
+        l.kiteClickDrop()
+    }
     if l.kiteFleeBusy(now) {
         return true
     }
@@ -848,10 +857,19 @@ func (l *Loop) kiteFleeThreat(now time.Time) bool {
     }
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
     if dirX == 0 && dirY == 0 {
-        // No chaser bearing to run from (the attacker targets the
-        // character but its position has not broadcast yet): the
-        // next tick re-probes.
-        return false
+        // No away bearing at all: the chaser stands ON the character
+        // (kiteContactAway) or its position has not broadcast yet.
+        // Standing in contact is death - the ring rays answer instead
+        // of the silent tick the run-29 dump spent 21 seconds on.
+        var contact bool
+        dirX, dirY, contact = l.kiteContactAway(selfX, selfY, selfZ)
+        if !contact {
+            // Even the ring is walled: hold the ground and re-probe at
+            // the kite period (the critical-HP logout stays armed).
+            l.kiteHoldGround(now, encircled)
+
+            return true
+        }
     }
     until := now.Add(l.kiteWalkWindow(now) + l.kite.ReengageDelay)
     stepX, stepY, found := l.kiteRetreatLane(
@@ -998,7 +1016,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
         return false
     }
     threatID, dist, ok := l.kiteThreat(now, selfX, selfY, selfZ)
-    if !ok || dist >= l.kite.RetreatRadius || dist < 1 {
+    if !ok || dist >= l.kite.RetreatRadius {
         return false
     }
     clickAt, until, live := l.kiteShotPhase(now)
@@ -1112,7 +1130,7 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
         return false
     }
     threatID, dist, ok := l.kiteThreat(now, selfX, selfY, selfZ)
-    if !ok || l.kiteThreatBeyondThePursue(threatID, dist) || dist < 1 {
+    if !ok || l.kiteThreatBeyondThePursue(threatID, dist) {
         return false
     }
     clickAt, until, live := l.kiteShotPhase(now)
@@ -1236,11 +1254,18 @@ func (l *Loop) kiteResolveAndClick(
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
     if encircled && dirX == 0 && dirY == 0 {
         // The degenerate no-chaser scene (a tracker gap inside the
-        // broadcast window): no ray to guard, the hold keeps the
-        // pacing until the next probe.
-        l.kiteHoldGround(now, true)
+        // broadcast window) or a threat standing ON the character:
+        // the train has no ray to guard. Contact is the one scene the
+        // hold never owns - the retreat takes the first open ring ray
+        // (kiteContactAway), a tracker gap still holds the pacing
+        // until the next probe.
+        var contact bool
+        dirX, dirY, contact = l.kiteContactAway(selfX, selfY, selfZ)
+        if !contact {
+            l.kiteHoldGround(now, true)
 
-        return false
+            return false
+        }
     }
     // The straight retreat (the owner rule of the 2026-11-09 round):
     // the step runs exactly the away-ray of the train - the centroid
@@ -1311,7 +1336,10 @@ func (l *Loop) kiteArmClick(clickAt, until time.Time) bool {
 // and the straight lane itself (the chasers moved while the character
 // stood - the train direction resolves fresh at the click moment).
 // The encircled and the cornered answers hold the ground as always.
-// Reports whether the tick spent the click.
+// A threat standing ON the character is no reason to stand either:
+// the train geometry has no bearing there, so the retreat takes the
+// first open ring ray (kiteContactAway) instead of spending the shot
+// cycle in melee. Reports whether the tick spent the click.
 
 func (l *Loop) kiteClickWalk(now time.Time) bool {
     if l.kiteClickAt.IsZero() {
@@ -1326,10 +1354,7 @@ func (l *Loop) kiteClickWalk(now time.Time) bool {
         // re-check below keeps the shot's real disable hold (a
         // re-request the server would only refuse through the
         // disable).
-        if l.combatAvoidUntil.Equal(l.kiteClickUntil) {
-            l.combatAvoidUntil = time.Time{}
-        }
-        l.kiteClickClear()
+        l.kiteClickDrop()
 
         return false
     }
@@ -1358,7 +1383,7 @@ func (l *Loop) kiteClickWalk(now time.Time) bool {
         return false
     }
     threatID, dist, ok := l.kiteThreat(now, selfX, selfY, selfZ)
-    if !ok || l.kiteThreatBeyondThePursue(threatID, dist) || dist < 1 {
+    if !ok || l.kiteThreatBeyondThePursue(threatID, dist) {
         // The hostile left the pursue band (or the chase dissolved):
         // the retreat has nothing to retreat from - the stall
         // watchdog owns the re-approach, the next shot cycle re-arms
@@ -1386,6 +1411,20 @@ func (l *Loop) kiteClickClear() {
     l.kiteClickAt = time.Time{}
     l.kiteClickFor = 0
     l.kiteClickUntil = time.Time{}
+}
+
+// kiteClickDrop stands a deferred click schedule down together with
+// the movement hold its arming set: the Equal guard keeps a walk
+// already in flight on its own window (only the hold the arming
+// itself armed dies with the schedule). The fight side runs it from
+// kiteClickWalk (a target switch), the defensive flight from
+// kiteFleeThreat (the loot interrupt drops the target a second after
+// the shot, and the orphaned hold kept the whole flight standing).
+func (l *Loop) kiteClickDrop() {
+    if l.combatAvoidUntil.Equal(l.kiteClickUntil) {
+        l.combatAvoidUntil = time.Time{}
+    }
+    l.kiteClickClear()
 }
 
 // kiteShotPhase resolves the server bow cycle a retreat must

@@ -304,3 +304,76 @@ func TestKiteFleeThreatStandsTheSittingCharacterUp(t *testing.T) {
     require.Empty(t, game.walks,
         "the first walk waits for the standing character")
 }
+
+// TestKiteFleeThreatFlightsTheContactAttacker pins the 2026-11-10
+// run-29 death: the level 10 Kaboo Orc Fighter broadcast from the
+// very cell the level 7 archer stood on (both at 35516,51008,-3639),
+// the train geometry skipped the zero-distance member, and the flight
+// spent 21 seconds declining the tick while the Fighter landed 15
+// damage every 1.9 s (78 -> 11 percent of the health, the emergency
+// logout, the survival check reopened at 6 percent). A chaser in
+// contact is never answered with a standing tick: the flight takes
+// the first open ring ray and runs.
+func TestKiteFleeThreatFlightsTheContactAttacker(t *testing.T) {
+    _, game, loop := kiteFleeBot(t)
+    bot := loop.tracker
+    // The attacker walks onto the character: its broadcast position
+    // IS the self position, so no away bearing exists.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 7, TemplateID: 1000471, Attackable: true,
+        X: 45000, Y: 50000, Name: "Kaboo Orc Fighter",
+    })
+    mobChasesSelf(bot, 7, 45000, -3500)
+    dirX, dirY, encircled := loop.kiteTrainDirection(45000, 50000, -3500)
+    require.Zero(t, dirX, "the contact train has no centroid ray")
+    require.Zero(t, dirY, "the contact train has no centroid ray")
+    require.True(t, encircled, "the empty train reads degenerate")
+
+    require.True(t, loop.kiteFleeThreat(time.Now()),
+        "contact keeps the flight tick")
+    require.Len(t, game.walks, 1, "the contact flight issues its leg")
+    require.NotEqual(t, int32(45000), game.walks[0][0],
+        "the leg opens distance instead of standing")
+}
+
+// TestKiteFleeThreatDropsTheStaleShotClick pins the second half of
+// the run-29 finding: the loot interrupt dropped the fight 1.2 s
+// after a shot, and the deferred retreat schedule of that shot kept
+// its disable hold armed - the flight waited the whole bow window out
+// inside the contact threat. The flight stands the orphaned schedule
+// down (only the hold the arming itself set) and moves at once.
+func TestKiteFleeThreatDropsTheStaleShotClick(t *testing.T) {
+    _, game, loop := kiteFleeBot(t)
+    now := time.Now()
+    until := now.Add(2 * time.Second)
+    loop.kiteClickAt = now.Add(time.Second)
+    loop.kiteClickFor = 7
+    loop.kiteClickUntil = until
+    loop.combatAvoidUntil = until
+    require.True(t, loop.kiteFleeBusy(now),
+        "the armed schedule holds the movement")
+
+    require.True(t, loop.kiteFleeThreat(now))
+    require.True(t, loop.kiteClickAt.IsZero(),
+        "the orphaned schedule clears")
+    require.Len(t, game.walks, 1, "the flight issues its leg at once")
+    require.True(t, loop.combatAvoidUntil.Equal(loop.kiteWalkUntil),
+        "the movement hold belongs to the fresh leg, not the old shot")
+}
+
+// TestKiteClickRetreatsFromTheContactTarget pins the fight side of
+// the same geometry: the shot-cycle retreat resolves the train
+// direction at the click moment, and a target standing ON the
+// character used to hold the ground there (the encounter the run-29
+// loot interrupt converted into the standing death).
+func TestKiteClickRetreatsFromTheContactTarget(t *testing.T) {
+    _, game, loop := kiteBowBot(t, 45000)
+    now := time.Now()
+    require.True(t, loop.kiteResolveAndClick(
+        now, now.Add(time.Second), 45000, 50000, -3500),
+        "the contact target takes the ring ray")
+    require.Len(t, game.walks, 1,
+        "the shot cycle retreats from the contact target")
+    require.NotEqual(t, int32(45000), game.walks[0][0],
+        "the leg opens distance instead of holding")
+}

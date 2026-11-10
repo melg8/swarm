@@ -88,3 +88,46 @@ losing melee race on every skip expiry.
   fresh add and the skip outliving the server attack timeout.
 - `go build ./...`, the hunt and state suites and
   `golangci-lint run --new` pass.
+
+### 2026-11-10 - the contact standstill (run 29)
+
+Run 29 (the 5-minute window of the flight-authority build) got 3
+kills (the floor is 2) and 25 of 27 shot gaps inside the cooldown,
+but failed `survives`: at +117 s the loot interrupt dropped a fight
+whose target died, and the character stood motionless for 21 s at
+(35516,51008,-3639) while a level 10 Kaboo Orc Fighter broadcast
+from the very same coordinates landed 15 damage every 1.9 s. The
+health fell to 11 percent, the death reconnected the session at 6
+percent and the survival check reopened.
+
+Root cause (two halves, both in the flight):
+
+- `kiteChaserBearings` skips a chaser at distance under one unit (no
+  away direction exists), so the train direction resolved the zero
+  vector. `kiteFleeThreat` read that as "no bearing yet", returned
+  without a walk, and `fleeFromThreat` fell through to the silent
+  `kiteLayerArmed()` return. Every tick spent 21 s on nothing.
+- The shot that preceded the interrupt armed its deferred retreat
+  click 1.2 s earlier; the loot interrupt zeroed the target, and the
+  orphaned schedule kept the disable hold (`combatAvoidUntil`) armed:
+  the flight would have waited the whole bow window out even with a
+  bearing.
+
+Fixes:
+
+- `kiteContactAway` (kite_lane.go): a melee attacker in contact
+  takes the first open ring ray (the character's facing, the two
+  perpendiculars, the back ray) at the full escape segment, each a
+  straight run. Contact is the one scene the ground hold never owns.
+- `kiteFleeThreat` and `kiteResolveAndClick` use it instead of the
+  degenerate skip/hold; a fully walled ring still holds and logs.
+- `kiteClickDrop` extracts the schedule stand-down of
+  `kiteClickWalk`; `kiteFleeThreat` runs it for an orphaned schedule
+  before the busy check, so the flight starts on the first accepted
+  tick (the real bow windup still gates through `kiteFlightMovable`).
+- The `dist < 1` guards of the shot-cycle triggers (`kiteFromShot`,
+  `kiteClickWalk`, `kiteFromTarget`) are removed: they refused the
+  retreat exactly when the mob stood on the character.
+- Tests: the contact flight, the orphaned-schedule release and the
+  contact shot-cycle retreat (`kite_flee_test.go`).
+- `go build ./...` and the full `internal/swarm/hunt` suite pass.
