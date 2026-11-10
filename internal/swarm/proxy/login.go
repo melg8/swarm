@@ -184,15 +184,17 @@ func (lc *loginConn) handlePacket(content []byte) error {
 // handleAuthLogin accepts any credentials, mirrors the Mobius field
 // layout ([opcode][account: 14][password: 14]) and answers LoginOk.
 func (lc *loginConn) handleAuthLogin(content []byte) error {
-    account, password, err := parseRequestAuthLogin(content)
+    account, _, err := parseRequestAuthLogin(content)
     if err != nil {
         return fmt.Errorf("failed to parse auth login: %w", err)
     }
     lc.account = strings.ToLower(account)
+    // The password never reaches the log: the proxy accepts any pair,
+    // so the value carries no diagnostic worth leaking to proxy.log.
     lc.server.logger.Printf(
         "login#%d: auth login accepted for account %q "+
-            "(password %q, any pair is accepted)",
-        lc.id, lc.account, password)
+            "(any password is accepted)",
+        lc.id, lc.account)
 
     // The login ok session ids only have to be unique within the
     // process: they are not secrets.
