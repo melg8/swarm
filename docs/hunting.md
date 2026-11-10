@@ -319,6 +319,20 @@ drop re-arms the panic run mid fight. The unwinnable pile up keeps
 the old run, relogin and regenerate cycle - which now lands into
 the settle instead of an immediate walk back into the pack.
 
+The CEILING belongs to the layer that fights the pack: the melee
+trade reads the general pick ceiling (targetMaxLevelSlack, level
+plus two), the armed archer kite reads its own engage ceiling
+(kiteEngageLevelSlack, level plus five). The run-26 acceptance dump
+measured the mismatch: a level 7 archer fighting a level 9 Spore
+Fungus with a level 10 Kaboo Orc Fighter chasing - both inside the
+kite ceiling of 12 - was judged "unwinnable" by the melee ceiling
+of 9, both mobs were dropped at 79 percent health, the parity
+Fighter stayed the nearest chaser and the character flew the rest
+of the window with no kill. The kite branch of the tick also
+converts an unwinnable pile up into the straight flight (see the
+archer kite section) instead of the zoned panic run, and it keeps a
+fight whose target is inside the kill window (30 percent).
+
 ## Blind engage recovery (walk around the obstacle, then switch)
 
 A small obstacle (a column) between the character and its target locks

@@ -82,3 +82,11 @@ flight.
   farthest at 495 units, min HP 55 percent, min 531 arrows, online
   the whole window. The shot-cycle share is the highest measured so
   far - the kept two-mob fight spent its reload tails walking.
+
+### 2026-11-10 - closing
+
+- `docs/hunting.md`'s pile up policy documents the per-layer ceiling
+  (the melee +2, the archer kite +5), the run-26 evidence and the
+  kite-specific conversion into the straight flight.
+- The follow-up is complete and live-confirmed; the fragment moves
+  to `docs/progress/archive/`.
