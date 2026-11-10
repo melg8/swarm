@@ -178,6 +178,21 @@ It exits non-zero with a hint when the helper holds nothing - run any
 fetch or push first. `GH_CREDENTIAL_HOST` and `GH_BIN` override the
 host and the binary path.
 
+The scope set covers `pr list`, `pr close`, `pr comment`, `issue`,
+`release` and `api`. The GraphQL queries that resolve author
+affiliation need `read:org` and fail (`gh pr view --comments`, the
+`author` field); read a thread through REST instead:
+
+```bash
+bash tools/gh_token.sh api repos/melg8/swarm/issues/62/comments \
+    --jq '.[].body'
+```
+
+If those become a daily need, a fine-grained PAT (Pull requests RW,
+Issues RW, Contents read, Metadata read) installed once with
+`gh auth login --with-token` adds the scope - at the cost of a second
+credential, which is why the wrapper is the default.
+
 ## Build identity of the produced binaries
 
 The `swarm_bot` binaries the scripts build carry the build identity
