@@ -605,7 +605,7 @@ func TestKiteOwnsTheAddAnswer(t *testing.T) {
 }
 
 // TestKitePileUpTakesTheFlight pins the pile up answer of the archer
-// fight: two attackers past the engage ceiling make the pile up
+// fight: two attackers past the KITE engage ceiling make the pile up
 // unwinnable, and the old unconditional arming ran the melee escape
 // and logged the session out on the drifted kite ground. The
 // standing kite is no survival answer either - the shot cycle spends
@@ -620,8 +620,9 @@ func TestKitePileUpTakesTheFlight(t *testing.T) {
     for i, objectID := range []int32{8, 9} {
         x := int32(45100 + i*100)
         bot.ApplyNpcInfo(state.NpcInfo{
-            ObjectID: objectID, TemplateID: 1000010,
-            Attackable: true, X: x, Y: 50000, Name: "High Orc",
+            ObjectID: objectID, TemplateID: 1000012,
+            Attackable: true, X: x, Y: 50000,
+            Name: "Gora Werewolf",
         })
         mobChasesSelf(bot, objectID, x, -3500)
     }
@@ -649,8 +650,8 @@ func TestKitePileUpTakesTheFlight(t *testing.T) {
 }
 
 // kitePileUpScene arms the unwinnable pile up of the 2026-11-10 run-24
-// dump: a bow archer on a melee pick with two adds the engage ceiling
-// refuses. The pick health selects the kill-window verdict.
+// dump: a bow archer on a melee pick with two adds the KITE engage
+// ceiling refuses. The pick health selects the kill-window verdict.
 func kitePileUpScene(
     t *testing.T, targetHP int32,
 ) (*state.Bot, *fakeGame, *Loop) {
@@ -663,8 +664,9 @@ func kitePileUpScene(
     for i, objectID := range []int32{8, 9} {
         x := int32(45100 + i*100)
         bot.ApplyNpcInfo(state.NpcInfo{
-            ObjectID: objectID, TemplateID: 1000010,
-            Attackable: true, X: x, Y: 50000, Name: "High Orc",
+            ObjectID: objectID, TemplateID: 1000012,
+            Attackable: true, X: x, Y: 50000,
+            Name: "Gora Werewolf",
         })
         mobChasesSelf(bot, objectID, x, -3500)
     }
@@ -705,6 +707,42 @@ func TestKitePileUpFinishesTheKillWindow(t *testing.T) {
         "the healthy pick still converts to the flight")
     require.NotEmpty(t, healthyGame.walks,
         "the straight flight answers the healthy pile up")
+}
+
+// TestKitePileUpKeepsTheWithinCeilingPack pins the run-26 ceiling
+// mismatch: the level 9 Spore Fungus pick and the level 10 Kaboo Orc
+// Fighter add are both inside the archer kite's own +5 engage
+// ceiling, but the pile up verdict read the MELEE +2 ceiling, called
+// the pack unwinnable at 79 percent health, dropped both mobs and
+// flew from the parity Fighter for the rest of the window with zero
+// kills.
+func TestKitePileUpKeepsTheWithinCeilingPack(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45440)
+    bot.ApplyStatusUpdate(100, []state.Attribute{
+        {ID: state.AttrLevel, Value: 7},
+    })
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 8, TemplateID: 1000509, Attackable: true,
+        X: 45300, Y: 50000, Name: "Spore Fungus",
+    })
+    mobChasesSelf(bot, 8, 45300, -3500)
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 9, TemplateID: 1000471, Attackable: true,
+        X: 45200, Y: 50000, Name: "Kaboo Orc Fighter",
+    })
+    mobChasesSelf(bot, 9, 45200, -3500)
+    require.GreaterOrEqual(t, bot.SelfAttackerCount(),
+        panicLogoutAttackers, "the pair arms the pile up gate")
+    require.True(t, loop.pileUpWinnable(),
+        "both adds sit inside the kite engage ceiling")
+
+    loop.tick()
+    require.NotZero(t, loop.target,
+        "the within-ceiling pack keeps a fight")
+    require.True(t, loop.panicAt.IsZero(),
+        "the pile up run never arms")
+    require.Zero(t, game.logouts,
+        "the pack fight stays online")
 }
 
 // TestKiteFlightOwnsTheTargetlessPileUp pins the survival handoff of

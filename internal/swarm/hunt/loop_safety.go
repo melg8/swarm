@@ -630,7 +630,19 @@ func (l *Loop) pileUpWinnable() bool {
     if len(attackers) > pileUpFightMaxAttackers {
         return false
     }
+    // The ceiling belongs to the layer that fights the pack: the
+    // melee trade uses the general pick ceiling, while the archer
+    // kite answers melee attackers up to kiteEngageLevelSlack above
+    // the character (see kiteEngageLevelCeiling). Reading the melee
+    // ceiling for the bow turned a normal two-mob fight (the level 9
+    // Spore Fungus and the level 10 Kaboo Orc Fighter of the
+    // 2026-11-10 run-26 dump, a level 7 archer at 79 percent health)
+    // into an "unwinnable" pack, dropped both mobs and flew from the
+    // parity Fighter for the rest of the window with no kill.
     maxLevel := l.maxTargetLevel()
+    if l.kiteLayerArmed() {
+        maxLevel = l.kiteEngageLevelCeiling()
+    }
     for i := range attackers {
         level, ok := l.tracker.ObjectLevel(attackers[i].ObjectID)
         if !ok || level <= 0 {
