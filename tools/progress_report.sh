@@ -221,6 +221,6 @@ if not steps:
         echo '```'
         render_commits
         echo '```'
-} > "${OUT}"
+} | tr -d '\r' > "${OUT}"
 
 echo "wrote ${OUT}"
