@@ -66,3 +66,16 @@ runs/coverage.html
 # files the 40 bot instrument writes; the report lands in the commit
 # message and the docs instead).
 runs/fleetprofile/
+
+# The per round acceptance and hunt logs of the local runs (the
+# verdicts land in docs/acceptance_botlog.md and the commit message;
+# a raw log is a machine local byproduct, never a repository input).
+runs/acceptance-*.log
+runs/hunt-*.log
+runs/live-*.log
+runs/fleet-*/
+
+# The raw coverage profiles of the local coverage runs (the committed
+# baseline is runs/coverage-latest.txt).
+runs/cover
+runs/cover-func.txt
