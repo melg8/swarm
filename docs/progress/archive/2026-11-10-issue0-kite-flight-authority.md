@@ -1,4 +1,4 @@
-# The archer kite flight authority (status: in progress)
+# The archer kite flight authority (status: complete)
 
 Started 2026-11-10, branch feature/kite-range-contract, issue #0
 (the owner instruction, no board issue). Follow-up of
@@ -209,3 +209,18 @@ holds, 5 kills of the wanted 2, 96 standing fight samples with the
 farthest at 483 units, min HP 69 percent, min quiver 538. Consecutive
 with run 34 this is the second green window in a row and the first on
 the exact pushed tree.
+
+Run 36 (5 minutes, the same binary) repeated the pass: 69 shots with
+all 60 shot gaps inside the cooldown, 56 kite steps (every one of
+them shot-cycle), 0 holds, 6 kills, 112 standing fight samples with
+the farthest at 584 units, min HP 50 percent, min quiver 531. Three
+consecutive green windows (34, 35, 36) close the task: the shot arms
+the retreat at the windup end, the walk owns the bow disable window
+and the next shot leaves the moment the cooldown clears.
+
+## Status
+
+Complete on branch feature/kite-range-contract: the shot-per-cycle
+flight, the contact answer, the selection clears and the dead-target
+clear all ship with the three green acceptance windows. Next step:
+the owner reviews the branch; nothing on the bot side is open.
