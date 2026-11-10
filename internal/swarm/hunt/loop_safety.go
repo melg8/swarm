@@ -34,7 +34,7 @@ func (l *Loop) dropAttackTarget(reason string) {
     l.clearBlindRecovery()
     l.noTargetSince = time.Time{}
     l.noPickLogAt = time.Time{}
-    l.clearTalkedTarget()
+    l.clearServerSelection()
 }
 
 // fleeFromTarget drops a fight the character is losing and opens
@@ -53,6 +53,13 @@ func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
         l.targetSkip = make(map[int32]time.Time)
     }
     l.targetSkip[targetID] = now.Add(fleeSkipDelay)
+    // The dropped fight leaves no selection behind: the self click
+    // replaces the server side target with the own object, and the
+    // answered MyTargetSelected zeroes the fight target of the
+    // tracker (see ApplySelfTarget). A flight is not a fight - the
+    // stale selection made the run-31 acceptance sample the
+    // abandoned mob at 868 units and fail the bow band.
+    l.clearServerSelection()
     l.fleeFromThreat(now)
 }
 

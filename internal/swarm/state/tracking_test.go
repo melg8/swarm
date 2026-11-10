@@ -162,6 +162,38 @@ func TestSelfTargetTracking(t *testing.T) {
     require.Equal(t, int32(0), snap.Objects[0].TargetID)
 }
 
+// TestSelfClickClearsTheFightingTarget pins the flight handover: the
+// loop drops a fight it flees with the clear self click, the server
+// answers MyTargetSelected of the own object and the fight state
+// stops tracking the abandoned mob - a flight is not a fight. The
+// 2026-11-10 run-31 acceptance sampled the dropped target at 868
+// units through the lingering attack stance and failed the bow band.
+func TestSelfClickClearsTheFightingTarget(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 45100, Y: 50100, Name: "Gremlin",
+    })
+    bot.ApplyAttack(Attack{
+        AttackerID:  100,
+        TargetIDs:   [AttackTargets]int32{7},
+        TargetCount: 1,
+        X:           45000, Y: 50000, Z: -3500,
+        TargetX: 45100, TargetY: 50100,
+    })
+    require.Equal(t, int32(7),
+        bot.Snapshot().Diagnostics.FightingTargetID,
+        "the shot tracks the fight target")
+
+    bot.ApplySelfTarget(100)
+    snap := bot.Snapshot()
+    require.Equal(t, int32(100), snap.Character.TargetID,
+        "the self click selects the own object")
+    require.Zero(t, snap.Diagnostics.FightingTargetID,
+        "the self selection drops the fight target")
+}
+
 func TestTeleportSnapsPosition(t *testing.T) {
     bot := NewBot("acc1")
     bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)

@@ -4076,13 +4076,19 @@ func (l *Loop) startReturnSegment() {
     l.logf("Hunt: walking back to the farm spot")
 }
 
-// clearTalkedTarget drops the npc selection a stop or a whole trip
-// left behind (the merchant select, the teacher talk click): the self
-// click of the clear replaces the server side selection, so the
-// hunting engage that follows the trip never adopts the friendly
-// villager as its target (the forced attacks on it only burn the
-// stuck timeout). The call is a no-op without a selection.
-func (l *Loop) clearTalkedTarget() {
+// clearServerSelection drops a selection the loop no longer owns: the
+// npc a stop or a whole trip left behind (the merchant select, the
+// teacher talk click) and the fight target of a flight the loop just
+// dropped. The self click of the clear replaces the server side
+// selection, so the hunting engage that follows never adopts the
+// leftover object as its target (the forced attacks on a villager
+// only burn the stuck timeout, and the abandoned fight target kept
+// the fight state reporting it - the run-31 acceptance sampled the
+// dropped target at 868 units while the character ran a healthy
+// flight and failed the bow band). The call is a no-op without a
+// selection; the client skips a selection the clear itself left
+// (the own object id).
+func (l *Loop) clearServerSelection() {
     if l.tracker.SelfTargetID() == 0 {
         return
     }
@@ -4095,7 +4101,7 @@ func (l *Loop) clearTalkedTarget() {
 // frozen trip plan dies with it: the next trip freezes a fresh one
 // against the gear the purchases reached.
 func (l *Loop) endTownTrip(reason string) {
-    l.clearTalkedTarget()
+    l.clearServerSelection()
     // The trip answer for the gear debt: whatever kept the trip
     // from landing the replacements (a refused buy, an abort, a
     // session death the relogin resumed), the exits compare the

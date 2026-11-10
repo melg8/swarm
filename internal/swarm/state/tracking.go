@@ -121,10 +121,18 @@ func (b *Bot) applyRotation(r Rotation, stop bool) {
 }
 
 // ApplySelfTarget records the target the server assigned to the played
-// character (MyTargetSelected).
+// character (MyTargetSelected). A selection of the own object is the
+// official unselect (the self click of ClearTarget): the fight state
+// stops tracking the abandoned target with it, so a flight or a town
+// trip never reads as a fight (the run-31 acceptance sampled the
+// dropped target at 868 units and failed the bow band).
 func (b *Bot) ApplySelfTarget(objectID int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
+    if objectID == b.selfID && b.char.FightingTargetID != 0 {
+        b.char.FightingTargetID = 0
+        b.touch()
+    }
     if b.char.TargetID == objectID {
         return
     }

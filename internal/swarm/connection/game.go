@@ -698,20 +698,21 @@ func (gc *GameClient) InteractPull(objectID int32) error {
     return nil
 }
 
-// ClearTarget drops the selection a conversation with an npc left
-// behind (the teacher or the merchant the trip talked to): the client
-// cannot unselect directly - the C1 protocol has no deselect request
-// and the server never clears a selection on its own (only the next
-// selection replaces it) - so the self click is the official client
-// way out: Action 0x04 on the own object id runs through the
-// PlayerClick handler, selects the character itself (MyTargetSelected
-// of the own id, the friendly npc selection is gone) and the follow
-// intention on self moves nothing. The hunt loop calls it when a trip
-// stop finishes talking, so the leftover villager selection never
-// reaches the hunting engage.
+// ClearTarget drops a selection the loop no longer owns (see the
+// hunt's clearServerSelection): the client cannot unselect directly -
+// the C1 protocol has no deselect request and the server never clears
+// a selection on its own (only the next selection replaces it) - so
+// the self click is the official client way out: Action 0x04 on the
+// own object id runs through the PlayerClick handler, selects the
+// character itself (MyTargetSelected of the own id, the friendly npc
+// or the abandoned fight target is gone) and the follow intention on
+// self moves nothing. A selection that already IS the own object is
+// left alone: a second self click only re-sends ActionFailed and
+// re-arms the follow-self intention.
 func (gc *GameClient) ClearTarget() error {
     objectID := gc.tracker.SelfObjectID()
-    if objectID == 0 || gc.tracker.SelfTargetID() == 0 {
+    selected := gc.tracker.SelfTargetID()
+    if objectID == 0 || selected == 0 || selected == objectID {
         return nil
     }
     x, y, z, ok := gc.tracker.SelfPosition()
@@ -726,7 +727,7 @@ func (gc *GameClient) ClearTarget() error {
     if err := gc.sendPacket(request); err != nil {
         return fmt.Errorf("failed to clear the target: %w", err)
     }
-    gc.tracker.RecordEvent("clearing the target after the talk")
+    gc.tracker.RecordEvent("clearing the target")
 
     return nil
 }

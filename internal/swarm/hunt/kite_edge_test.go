@@ -930,3 +930,20 @@ func TestKiteDisengagesTheLosingFight(t *testing.T) {
     require.Less(t, game.walks[0][0], int32(45000),
         "the flight runs away from the chaser, not through the fan")
 }
+
+// TestKiteDisengageClearsTheServerSelection pins the second half of
+// the run-31 bow band failure: the fight dropped for the flight kept
+// its server side selection, and the fight state kept reporting the
+// abandoned mob while the character ran. The drop sends the clear
+// self click with it, so the flight reads as a flight.
+func TestKiteDisengageClearsTheServerSelection(t *testing.T) {
+    bot, game, loop := kiteBowBot(t, 45200)
+    bot.ApplySelfTarget(7)
+    mobChasesSelf(bot, 7, 45200, -3500)
+    hurtTo(bot, 20)
+
+    loop.tick()
+    require.Zero(t, loop.target, "the death risk drops the fight")
+    require.Equal(t, 1, game.clears,
+        "the abandoned selection clears with the dropped fight")
+}

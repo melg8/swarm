@@ -797,6 +797,15 @@ func TestGameClientSendsInteractionActions(t *testing.T) {
     require.Equal(t, floodNpcID, tracker.SelfTargetID())
     require.NoError(t, client.ClearTarget())
 
+    // A selection of the own object is the unselect the last clear
+    // left behind: a second self click only re-sends ActionFailed and
+    // re-arms the follow-self intention, so the clear stays a no-op.
+    tracker.ApplySelfTarget(floodSelfID)
+    before := len(sends.opcodes())
+    require.NoError(t, client.ClearTarget())
+    require.Len(t, sends.opcodes(), before,
+        "the self selection is not cleared twice")
+
     // The skill rounds: a lesson at the teacher and a cast.
     require.NoError(t, client.AcquireSkill(1177, 1))
     require.NoError(t, client.UseMagicSkill(1177))
