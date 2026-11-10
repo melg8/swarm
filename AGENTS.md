@@ -27,9 +27,9 @@ the documentation map below) and is read on demand, not upfront.
 4. Find the active task context: the GitHub project board (the "In
    progress" column) names the issue, the issue comments carry the
    claim and the findings, and the task fragment under
-   `docs/progress/` on the task's feature branch carries the working
-   state. The legacy `docs/agent_progress.md` is a frozen archive -
-   never append to it (the shared-file clash policy below).
+   `docs/progress/` (on the branch the task lives on) carries the
+   working state. The legacy `docs/agent_progress.md` is a frozen
+   archive - never append to it (the shared-file clash policy below).
 5. Bring the stack up first (the Linux sandbox runs
    `tools/swarm_fast_deploy.sh`, the Windows host follows the manual
    deployment of `docs/deployment.md`) - no task runs against an
@@ -404,11 +404,12 @@ checks with commands and the failure handling live in
 Windows host deployment and the stack tunables). If any check fails,
 stop and fix the deployment first.
 
-The full deploy + dev-tools + lint + test + e2e cycle on a fresh sandbox
-is ~5.5 minutes total (measured): deploy ~99 s, dev tools ~10 s,
-`go build` ~1 s, `golangci-lint run --new` ~2 s, `go test ./...` ~123 s
-(pathfind dominates at ~99 s), `mobius_e2e.sh 45` ~47 s. Use these
-numbers to budget a verification loop.
+Verification budget: the deploy is ~100 s, the dev tools ~10 s, `go
+build ./...` seconds, a warm `golangci-lint run` seconds and a cold
+one under a minute; the full test suite is minutes (the hunt, pathfind
+and navmesh packages dominate), and `tools/mobius_e2e.sh 45` ~50 s.
+`task prepush` is the cheap pre-push answer; reach for `task verify`
+and the E2E only when the change actually needs them.
 
 ## Work protocol: atomic commits and per-task fragments
 
@@ -619,7 +620,9 @@ internal/swarm/
   acceptance/                  The live acceptance scenarios of the
                                -acceptance flag: the monitor, the
                                verdict lines and the per-run packet
-                               log (docs/acceptance_botlog.md).
+                               log (docs/acceptance_botlog.md);
+                               acceptance/botlog is the packet log
+                               writer itself.
   pathfind/                    Geodata path finder (docs/pathfinding.md).
   pathfind/navmesh/            The navmesh runtime: tiles, mesh, A*,
                                funnel, the approach goal and the
@@ -669,6 +672,10 @@ internal/swarm/
     to_auth_server/            Client -> login server packets.
     from_game_server/          Game server -> client packets.
     to_game_server/            Client -> game server packets.
+internal/logfmt/               The repository log convention scan (the
+                               TestRepoLogConventions gate).
+internal/version/              The build identity line of the bot log
+                               and the state dump.
 data/geodata/                  Geodata region files (X_Y.l2j), see
                                data/geodata/Readme.txt and
                                docs/pathfinding.md.
@@ -693,12 +700,15 @@ sandbox stack up; the Windows host uses the manual deployment of
 
 ## Commands
 
-Run the application (expects the Mobius stack at `127.0.0.1:2106` and
-`127.0.0.1:7777`, account `test1`/`test`, elven fighter `test1`). The
-web interface is served on `127.0.0.1:8080` by default; pass `-web ""`
-to disable it, `-web 0.0.0.0:9000` to change the address and `-bots N`
-to launch N concurrent bot sessions in one process (accounts
-`test2`..`testN` are auto-created on the fly):
+Run the application (expects the Mobius stack on port 2106 for login
+and 7777 for the game, account `test1`/`test`, elven fighter `test1`).
+The login address default is `127.0.0.1:2106`; the Windows deployment
+binds the login server to `127.0.0.3:2106`, so that host passes
+`-login 127.0.0.3:2106` (see `docs/deployment.md`). The web interface
+is served on `127.0.0.1:8080` by default; pass `-web ""` to disable
+it, `-web 0.0.0.0:9000` to change the address and `-bots N` to launch
+N concurrent bot sessions in one process (accounts `test2`..`testN`
+are auto-created on the fly):
 
 ```bash
 task run:app              # or: go run ./cmd/swarm -web 127.0.0.1:8080
@@ -711,17 +721,17 @@ docs/pathfinding.md; the 3D navmesh viewer of `-show-navmesh`
 tiles) is described in docs/navmesh.md.
 
 Tests and linters (run both before considering work done). The single
-fastest verification of changed code is `task lint:new` (2 s on a
-warm cache); it runs only the linters against the lines you touched.
-The full `task lint` (39 s) is the CI gate and runs against the whole
-tree - use it before a push, not on every save:
+fastest verification of changed code is `task lint:new`: it runs only
+the linters against the lines you touched and answers in seconds on a
+warm cache. The full `task lint` is the CI gate and runs against the
+whole tree - use it before a push, not on every save:
 
 ```bash
-task check:all            # alias of verify: build + vet + lint + test + fmt:check (the CI gate, ~170 s)
+task check:all            # alias of verify: build + vet + lint + test + fmt:check (the CI gate)
 task verify               # the same, the canonical name (v)
-task prepush              # the fast pre-push gate: build, vet, lint --new, whitespace, touched-package tests (~30 s)
-task lint                 # golangci-lint run (full, ~39 s, all code)
-task lint:new             # golangci-lint run --new (~2 s, changed code only)
+task prepush              # the fast pre-push gate: build, vet, lint --new, whitespace, touched-package tests
+task lint                 # golangci-lint run (full, all code)
+task lint:new             # golangci-lint run --new (changed code only)
 task lint:fix             # golangci-lint run --fix
 task test:cover           # coverage + the per package delta vs runs/coverage-latest.txt (fails on a drop > 2 pp)
 task bench:save PKG=./internal/swarm/pathfind   # commit the benchmark baseline into runs/bench-<name>.txt
@@ -857,8 +867,9 @@ goal reachable.
 - **Hotpaths to look for.** The packet apply path (every received
   packet mutates the tracker), the snapshot encode (the SSE stream
   fires it on every version change), the hunt tick (target search,
-  loot scan, movement), and the pathfinder (99 s of the test suite is
-  here). A change to any of these ships with a benchmark delta.
+  loot scan, movement), and the pathfinder (the hunt, pathfind and
+  navmesh packages hold most of the test suite's wall time). A change
+  to any of these ships with a benchmark delta.
 - **What is NOT a hotpath.** The web UI handlers (one per SSE client,
   human-paced), the bot startup (one per session), the gear planner
   (one per shopping trip). Optimize the first three before touching
@@ -897,11 +908,10 @@ debugging session):
   the whole world and can hold port 7777 open for tens of seconds,
   which looks like "already running". Wait for the process to
   disappear before restarting the stack.
-- **Restricted sandbox shells may kill background processes when the
-  invoking shell exits** (see the subprocess section above for the
-  verified current behavior). `tools/mobius_e2e.sh` runs the stack
-  and the bot in a single invocation - the reliable way to test end
-  to end.
+- **The stack and the bot belong in one invocation.**
+  `tools/mobius_e2e.sh` starts the stack, runs the bot and stops
+  everything inside a single call - the reliable way to test end to
+  end (see the subprocess section above).
 - Account auto registration is enabled by the shipped login config
   (`AutoCreateAccounts = True`), so the bot simply logs in with
   `test1`/`test` and the account is created on first use.
@@ -1209,7 +1219,9 @@ with a link to the reference Mobius Java class.
 
 ## Git conventions
 
-- `main` is the default branch. Work in feature branches.
+- `main` is the default branch. A larger task gets a feature branch;
+  a small round may land on `main` directly (the owner's current
+  working mode).
 - Commit messages are short, imperative and lowercase-ish, e.g. `fix
   line size`, `add cyclop check`, `make init packet parsing more memory
   friendly`.

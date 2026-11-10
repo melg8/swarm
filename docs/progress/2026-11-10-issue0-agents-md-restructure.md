@@ -60,13 +60,34 @@ into the cost discipline (it said the same thing twice), and
 1..4 and the script prints the open hypothesis ids without the
 trailing colon).
 
-### 2026-11-10 - the factual pass is next
+### 2026-11-10 - the factual pass
 
-Every remaining claim gets checked against the code, the CI or the
-live stack; the stale ones are fixed in place before anything is
-deleted.
+Checked against the tree and the live stack, fixed in place:
+
+- the login endpoint of the Windows deployment (`127.0.0.3:2106`,
+  the `-login` note in the Commands section);
+- the verification budget: the old numbers (39 s lint, 123 s suite,
+  99 s of pathfind) no longer match the machine - the paragraph now
+  names the shape of the cost instead of stale seconds;
+- the repository layout gained the three packages it omitted
+  (`acceptance/botlog`, `internal/logfmt`, `internal/version`) and
+  lost the false sibling indentation;
+- the performance section no longer claims pathfind holds 99 s of
+  the suite (the hunt package is the slow one now);
+- the shell-survival bullet of the stack notes merged into the
+  subprocess rule (it said the same thing twice);
+- git conventions admit the current mode: small rounds land on
+  `main`, larger tasks get a feature branch.
+
+Verified while passing: 9 `tools/repro_*.js` harnesses, 165 geodata
+regions, 3134 item icons, 46 vendored `golang-*` skills plus the 7
+project playbooks, protocol revision 419, the game server login
+registration on 9014, the 250 unit shop interaction gate, the
+fleete2e `SWARM_FLEET_E2E=1` gate and its 10 minute online timeout,
+the `Build:` identity line, `SWARM_FLEET_PROFILE`, and every
+`docs/*.md` file present in the documentation map.
 
 ## Status
 
-Step 1 of 3 (the sandbox cleanup) is committed. Step 2 is the factual
-pass, step 3 the registry extraction plus the duplication squeeze.
+Step 2 of 3 (the factual pass) is done. Step 3 is the registry
+extraction into `docs/hypotheses.md` plus the duplication squeeze.
