@@ -971,6 +971,14 @@ The fight side of the same round:
   lingering on the incoming blows kept reporting the abandoned mob
   as a live fight - the run-31 acceptance sampled it at 868 units
   during a healthy flight and failed the bow band.
+- A dead or removed target stops being a fight: the tracker drops
+  the tracked fight target with the selection
+  (`clearSelfTargetLocked`), so the loot walk of the kill and the
+  stance lingering after the last blow never sample as a far fight.
+  The run-33 acceptance sampled the corpse of the mob it had just
+  killed at 781 units on the loot stop and failed the bow band by
+  one unit, while no shot of the window was released beyond 426
+  units.
 - A pile up holding an attacker ABOVE the engage ceiling converts
   the STANDING kite into the flight (`dropFightForFlight`): the shot
   cycle spends half of every reload inside the melee range of a mob
