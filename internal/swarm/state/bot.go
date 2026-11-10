@@ -2764,10 +2764,18 @@ func (b *Bot) clearCharMovement() {
 // selected on its side (MyTargetSelected only answers new selections and
 // the own TargetUnselected broadcast is the sole removal notice), so the
 // tracker mirrors the official client: the target is gone once it died
-// or was removed from the world. The caller must hold the write lock.
+// or was removed from the world. The fight state follows the target - a
+// corpse or a removed object cannot be the object of an ongoing fight.
+// The 2026-11-10 run-33 acceptance sampled the corpse of the killed mob
+// at 781 units on the loot walk of that same kill (the fight target
+// survived the death) and failed the bow band by one unit. The caller
+// must hold the write lock.
 func (b *Bot) clearSelfTargetLocked(reason string) {
     if b.char.TargetID == 0 {
         return
+    }
+    if b.char.FightingTargetID == b.char.TargetID {
+        b.char.FightingTargetID = 0
     }
     b.char.TargetID = 0
     b.touch()

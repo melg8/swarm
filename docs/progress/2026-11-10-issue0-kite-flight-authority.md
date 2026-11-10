@@ -157,3 +157,33 @@ target drop on the self selection (`tracking_test.go`) and the
 repeated-clear guard (`game_handlers_test.go`).
 - `go build ./...`, the hunt, state and connection suites and
   `golangci-lint run --new` pass.
+- Run 32 (5 minutes, the cleared build) passed all eight checks: 48
+  shots with every gap inside the cooldown, 61 kite steps (36
+  shot-cycle), 0 holds, 5 kills of the wanted 2, 89 standing fight
+  samples with the farthest at 613 units, min HP 63 percent, min
+  quiver 552. The bow-add flight of +225.8 s started with the clear
+  self click (`Action` on the own object, the `MyTargetSelected`
+  answer on the next line) and contributed no fight samples.
+
+### 2026-11-10 - the dead target of the loot stop (run 33)
+
+Run 33 (5 minutes, the cleared build) passed seven of eight checks
+(61 shots, 5 kills, min HP 22 percent, 0 holds) and failed the bow
+band by one unit: 114 standing samples, max 781 against the 780
+ceiling. The reconstruction of the packet log
+(`logs/acceptance/archer-kite-20261110-131107-36916-1.log`) found a
+single scene behind it: at +163 s the character killed 268439322,
+walked 781 units to a drop of that same kill and stopped to loot.
+The attack stance lingered on the incoming blows and the tracker
+still reported the dead mob as the fight target, so the loot stop
+sampled as a standing fight at 781 units five seconds after the kill
+ended. No shot was released beyond 426 units: the band never saw a
+real long-range trade.
+
+Fix: `clearSelfTargetLocked` (the target died or left the world) now
+also zeroes the tracked fight target, and the explicit zero or
+own-object answer of `ApplySelfTarget` does the same - a corpse is
+not the object of an ongoing fight. Test:
+`TestFightTargetClearedWhenTargetDies` (the run-33 scene).
+- `go build ./...`, the state, connection and hunt suites and
+  `golangci-lint run --new` pass.

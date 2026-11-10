@@ -322,11 +322,39 @@ func TestSelfTargetClearedWhenTargetRemoved(t *testing.T) {
         ObjectID: 7, X: 100, Y: 100, Name: "Gremlin", Attackable: true,
     })
     bot.ApplySelfTarget(7)
-
     // The corpse despawn removes the object; the selection must not
     // survive as a dangling "object 7" reference.
     bot.RemoveObject(7)
     require.Zero(t, bot.SelfTargetID())
+}
+
+// TestFightTargetClearedWhenTargetDies pins the run-33 acceptance band
+// failure: the character killed a mob, walked to a drop 781 units away
+// and stood there while the attack stance still lingered, and the
+// tracker kept reporting the corpse as the fight target. A standing
+// sample of that loot stop read "a fight at 781 units" although the
+// kill was over and failed the bow band by one unit.
+func TestFightTargetClearedWhenTargetDies(t *testing.T) {
+    bot := NewBot("acc1")
+    bot.SetCharacter("unittest1", 100, 18, 45000, 50000, -3500, 50, 30)
+    bot.ApplyNpcInfo(NpcInfo{
+        ObjectID: 7, TemplateID: 1000001, Attackable: true,
+        X: 45100, Y: 50100, Name: "Gremlin",
+    })
+    bot.ApplyAttack(Attack{
+        AttackerID:  100,
+        TargetIDs:   [AttackTargets]int32{7},
+        TargetCount: 1,
+        X:           45000, Y: 50000, Z: -3500,
+        TargetX: 45100, TargetY: 50100,
+    })
+    require.Equal(t, int32(7),
+        bot.Snapshot().Diagnostics.FightingTargetID,
+        "the shot tracks the fight target")
+
+    bot.ApplyStatusUpdate(7, []Attribute{{ID: AttrCurHP, Value: 0}})
+    require.Zero(t, bot.Snapshot().Diagnostics.FightingTargetID,
+        "a corpse is not the target of an ongoing fight")
 }
 
 func TestSelfTargetClearedOnOwnTargetUnselected(t *testing.T) {
