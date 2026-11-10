@@ -566,34 +566,20 @@ func kiteFleeOtherDeck(attackerZ, selfZ int32) bool {
         math.Abs(float64(attackerZ-selfZ)) > deckReachableZ
 }
 
-// kiteFleeThreat answers a defensive flee with the STRAIGHT bow
-// flight (the run-3 finding of the 2026-11-09 round): the melee flee
-// machinery (fleeFromThreat) fans its escape lanes inside the CURRENT
-// hunting zone, and a kite fight drifts across the cell boundaries -
-// the run-3 acceptance dump measured the fan walking a competent
-// 700 units while the parity chaser kept pace at 38, then the
-// closure watchdog named the held gap and the session logged out
-// MID-KITE with the bow healthy and the quiver full. The archer's own
-// answer is the straight away-ray of the train (kiteTrainDirection,
-// the same geometry every kite layer runs) walked at the full escape
-// segment (escapeWalkDistance): the flight is armed by the DEFENSIVE
-// flee instead of the fight cycle, owns the movement through its
-// walk window (the forced attack waits it out) and keeps re-running
-// the re-click ladder for the dead transports. A walled lane (the
-// cornered scene, the OverWater ray, the server click refusal at
-// every rung and every escape angle) stamps the flight hold for one
-// kite period and hands the ticks to the fan - the melee escape's own
-// cornered answer, never a standing archer. A bow-wielding attacker
-// closes the flight (a ranged enemy cannot be outrun - the owner rule
-// of the round), exactly like every kite layer.
+// kiteFleeThreat answers a defensive flee with the straight bow
+// flight instead of the melee fan: the fan is clamped to the current
+// hunting zone, and a kite fight drifting across the cell boundaries
+// collapsed it until the closure watchdog logged the session out. The
+// flight runs the away-ray every kite layer computes, at the full
+// escape segment, and keeps re-clicking through the ladder. A walled
+// lane stamps the hold for one kite period and hands the ticks to the
+// fan; a bow-wielding attacker closes the flight (it cannot be
+// outrun).
 //
-// The flight deliberately bypasses the fan's budgets (fleeLogoutAfter
-// and the escapeNotOpening closure probe): the straight run IS the
-// designed archer answer, and a mob that keeps pace with it is
-// outlasted by the server's own attack timeout (AttackableAI
-// MAX_ATTACK_TIMEOUT, two minutes without a landed hit, then the
-// aggro clears and the mob teleports home) instead of the session
-// logout. The critical-HP logout of the tick top stays armed above
+// The flight bypasses the fan's budgets on purpose: a chaser that
+// keeps pace is cleared by the server's own attack timeout
+// (AttackableAI MAX_ATTACK_TIMEOUT, two minutes without a landed
+// hit), and the critical-HP logout at the tick top stays armed above
 // both. Reports whether the flight spent the tick.
 func (l *Loop) kiteFleeThreat(now time.Time) bool {
     if !l.kiteLayerArmed() {
@@ -739,31 +725,17 @@ func (l *Loop) kiteStepAdmitted(now time.Time) bool {
     return true
 }
 
-// kiteFromTarget steps a bow fighting character away from the
-// hostile that armed the step (the target or a train member, see
-// kiteThreat): the archer buys back the weapon range instead of
-// tanking the melee. The step DIRECTION is the straight away-ray of
-// the whole chaser train (the centroid of the target plus every
-// attacker in range, the widest-gap bisector of an encircled one -
-// see kiteTrainDirection), and it is the ONLY lane: the owner rule
-// of the 2026-11-09 round removed the fan, the camp deflection and
-// the circling chord, because a turn spends the distance the
-// retreat just bought. A train that surrounds the character or a
-// blocked straight lane resolves to the cornered hold: the archer
-// stops retreating and keeps shooting the bow at melee range - never
-// a weapon switch (the archetype rule of issue #21). The step
-// respects the movement window contract of the fight steps (the
-// forced attack re-requests wait out the walk), and the streak limit
-// (an unwinnable distance race keeps running straight - a
-// diagnostic only). A fresh target resets the streak. The step
-// timing honors the live shot cycle (kiteShotPhase): inside the bow
-// windup the click defers to the windup end (the server would save
-// an immediate one and replay it at the disable end where the
-// re-shot cancels it), inside the accepted move window the click
-// goes out at once with the cycle end as its window, and with no
-// live cycle the ordinary full window applies. Reports whether the
-// tick issued or armed the step (the caller skips the rest of the
-// fighting branch then - the walk owns the movement).
+// kiteFromTarget steps a bow fighting character away from the hostile
+// that armed the step (kiteThreat), buying the weapon range back
+// instead of tanking the melee. The direction is the straight away-ray
+// of the whole chaser train (kiteTrainDirection) and it is the only
+// lane: a turn would spend the distance the step just bought. When the
+// train surrounds the character or the lane is blocked, the cornered
+// hold keeps the bow shooting at melee range - never a weapon switch.
+// The timing follows the live shot cycle (kiteShotPhase): the click
+// defers past the windup, goes out at once inside the accepted move
+// window, and uses the full window when no cycle is live. Reports
+// whether the tick armed the step - the walk owns the movement then.
 
 func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !l.kiteStepAdmitted(now) {
@@ -1383,51 +1355,15 @@ func (l *Loop) kiteClickRefused() bool {
         failedAt.Add(-kiteBowRetryLead), l.kiteReclickAt)
 }
 
-// kiteReclickWalk is the re-click ladder of the kite retreat (issue
-// #60, the rounds two and three; the straight-lane rework of the
-// 2026-11-09 round): the single retreat click of the first round
-// proved fragile three ways, and the owner's dumps show the
-// character standing through the whole bow reload while the mob
-// closed. The third-round acceptance dump named the dominant
-// mechanism exactly: the server answers SOME destination cells with
-// an instant bare ActionFailed (the MoveToLocation handler refusal
-// family - the isCompletelyBlocked destination check among others)
-// while a lane a few cells aside walks fine, and the bot's own
-// geodata reads the refused cells open, so only the ONLINE evidence
-// settles it. The ladder answers with the manual behavior the owner
-// demonstrated ("clicking behind the character runs 2 seconds no
-// problem"), faster now per the third-round ask:
-//
-//   - while the movement window runs and the character stands
-//     (wherever the leg finds it - the issue cell, or mid-route
-//     after a silent drop or a short server path), the click goes
-//     out again every kiteReclickPeriod (250ms - the tick cadence,
-//     the owner ask: "it should spam clicks much faster"); a
-//     re-click inside the broadcast gate just re-aims the same
-//     endpoint server-side.
-//   - the retreat window is the bow disable window, so the ladder
-//     lives for the whole reuse tail: the walk adopting refreshes
-//     the episode budget (a mid-window drop later gets its own
-//     re-clicks), a stand within kiteArrivalEpsilon of the endpoint
-//     completes the leg - the ladder stops re-clicking and keeps the
-//     movement hold until the disable end, so an early arrival never
-//     opens the forced attack gate before the bow is ready - and a
-//     stand anywhere short of it re-bases the ladder onto the
-//     current cell and re-clicks the endpoint.
-//   - the retreat has ONE lane now (the owner rule of the 2026-11-09
-//     round): a refused or silent-probed endpoint has no fan to
-//     rotate onto. The ladder keeps the spam while the walk is
-//     younger than the broadcast gate, then latches the dead
-//     verdict, stands itself down and holds the ground for the bow
-//     (kiteHoldGround) - turning the retreat would spend the
-//     distance it just bought.
-//   - the window ending stands the ladder down and the forced attack
-//     re-request owns the tick: the next shot fires at the disable
-//     end whatever range the chase reached, and its own broadcast
-//     arms the next deferred retreat.
-//
-// Reports whether this tick spent a re-click so the caller yields
-// the tick to the walk.
+// kiteReclickWalk runs the re-click ladder of the retreat walk: while
+// the movement window runs and the character still stands, the click
+// goes out again at kiteReclickPeriod toward the same endpoint - a
+// re-click inside the server's once-per-second broadcast gate re-aims
+// it and never wastes it. A stand inside kiteArrivalEpsilon completes
+// the step; a stand short of it re-bases the ladder onto the current
+// cell. The retreat has one lane, so a refused or silent endpoint
+// latches the dead verdict and the layer holds the ground for the bow
+// instead of turning. Reports whether this tick spent a re-click.
 
 func (l *Loop) kiteReclickWalk(now time.Time) bool {
     if l.kiteWalkUntil.IsZero() {
