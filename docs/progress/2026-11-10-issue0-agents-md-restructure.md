@@ -113,7 +113,34 @@ subsystem documents:
   session `writeMu`) went to `docs/proxy.md` (the live-patch details it
   sat next to were already documented there).
 
+### 2026-11-10 - the duplication squeeze
+
+`AGENTS.md` went from 937 to 690 lines. The duplicated blocks were
+compressed against their homes:
+
+- the documentation map dropped the 30-row table and points at
+  `docs/README.md` as the canonical index (the near-duplicate copy was
+  the main source of merge clashes);
+- `Commands` keeps the launch line, the task list and the CI note; the
+  benchmark/pprof snippet defers to the `golang-benchmark` skill;
+- `Client proxy`, `Mobius stack operational notes`, `Server integrity`,
+  `Repository layout`, `Architecture`, `Performance`, `Code
+  conventions`, `Tree cleanliness`, `Testing`, `Protocol notes` and
+  `Git conventions` lost the restated prose while keeping every rule,
+  threshold and fact;
+- `Time and cost discipline` and `Long running subprocesses` merged
+  into one section; `Work protocol` absorbed the shared-file clash
+  policy; `Testing` and `Logging` merged.
+
+Verified while squeezing: `crypt.MobiusAuthKey()` is a function, the
+packet packages live one per direction under
+`internal/swarm/packets/`, the nine `tools/repro_*.js` harnesses, 46
+vendored `golang-*` skills, the 3134 item icon PNGs and every path
+named in the remaining text exists.
+
 ## Status
 
-Step 3 of 3 is under way: the registry extraction and the fact moves
-are done, the duplication squeeze of `AGENTS.md` is next.
+Step 3 of 3 is done: the registry extraction, the fact moves and the
+duplication squeeze are in, and `AGENTS.md` now reads as rules plus
+the map. The next round may archive this fragment after the owner
+reviews the result.
