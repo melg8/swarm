@@ -546,7 +546,10 @@ func (c *countingWriter) Write(p []byte) (int, error) {
 // removes the original on success. Any failure (open, create,
 // compress) keeps the original on disk - the data survives, only the
 // compression is lost - and drops the partial archive so a truncated
-// .gz never shadows the intact original.
+// .gz never shadows the intact original. Both handles close before a
+// remove: Windows refuses to unlink a file another handle still holds,
+// so the deferred source close of the old order left every rotated
+// segment in place after a successful compression.
 func gzipFile(path string, wg *sync.WaitGroup, logger *log.Logger) {
     defer wg.Done()
     source, err := os.Open(path)
@@ -555,21 +558,23 @@ func gzipFile(path string, wg *sync.WaitGroup, logger *log.Logger) {
 
         return
     }
-    defer source.Close()
     target, err := os.Create(path + ".gz")
     if err != nil {
         gzipLog(logger, "create", err)
+        closeGzipHandle(logger, "close source", source)
 
         return
     }
     if err := compressSegment(target, source); err != nil {
         gzipLog(logger, "compress", err)
+        closeGzipHandle(logger, "close source", source)
         if rmErr := os.Remove(path + ".gz"); rmErr != nil {
             gzipLog(logger, "cleanup", rmErr)
         }
 
         return
     }
+    closeGzipHandle(logger, "close source", source)
     if err := os.Remove(path); err != nil {
         gzipLog(logger, "cleanup", err)
     }
@@ -577,17 +582,31 @@ func gzipFile(path string, wg *sync.WaitGroup, logger *log.Logger) {
 
 // compressSegment copies the source through the gzip sink into the
 // target. The copy, the sink close and the target close are one unit
-// of work - a failure anywhere means the archive did not land.
+// of work - a failure anywhere means the archive did not land - and
+// every path closes both handles, so a failed archive never pins the
+// partial file open. A failed compression drops the partial archive.
 func compressSegment(target *os.File, source *os.File) error {
     sink := gzip.NewWriter(target)
-    if _, err := gzipCopy(sink, source); err != nil {
-        return err
+    _, err := gzipCopy(sink, source)
+    closeErr := sink.Close()
+    if err == nil {
+        err = closeErr
     }
-    if err := sink.Close(); err != nil {
+    if targetErr := target.Close(); err == nil {
+        err = targetErr
+    }
+    if err != nil {
         return err
     }
 
-    return target.Close()
+    return nil
+}
+
+// closeGzipHandle closes one journal handle and reports the failure
+// when the journal carries a logger. The close of a handle that only
+// served a failed stage must never mask the stage error.
+func closeGzipHandle(logger *log.Logger, stage string, handle *os.File) {
+    gzipLog(logger, stage, handle.Close())
 }
 
 // gzipLog reports one gzip stage failure when the journal carries a
