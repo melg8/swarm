@@ -285,7 +285,7 @@ var kiteLaneEscapeAngles = [9]float64{
 // kiteRetreatLane resolves the retreat lane of a kite step: the
 // STRAIGHT ray the caller preferred (the centroid away-vector of the
 // train, the widest-gap bisector of an encircled one), at the
-// caller's step length (the ring-budgeted leg of kiteStraightLeg).
+// caller's step length (the ring-budgeted leg of kiteStraightStep).
 // The owner rule of the
 // 2026-11-09 round keeps the primary retreat straight: when a rung
 // of the preferred ray walks, that rung is the lane, and the ray is

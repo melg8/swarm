@@ -4,149 +4,22 @@
 
 package hunt
 
-// The kiting layer of the archer fight (issue #13, the edge case
-// slice of issue #19): a bow user that fights a mob from the weapon
-// range never wants the mob in its face. The Mobius server AI stands
-// the archer still while the auto attack shoots, and a melee mob that
-// closes the distance simply swings away - the standing archer trades
-// blow for blow with a mob it could outrange. The kite step answers
-// exactly that: while the fight runs, a hostile that closed inside
-// the retreat radius (the mob is a second or two from melee) makes
-// the character step away, the movement window pauses the forced
-// attack re-requests (a forced attack request interrupts a running
-// walk server-side, the same rule the impending-add step of
-// loop_avoid.go follows), and once the step finished the engage
-// re-requests the attack - the bow shoots again from the opened
-// distance. The cycle - stand, shoot, step clear, shoot - is the
-// kiting behavior of the issue: the damage slows by the step
-// overhead, the melee uptime drops to zero on a ground the mob cannot
-// cross faster than the character.
+// The kiting layer of the archer fight: while the fight runs, a hostile
+// inside the retreat radius makes the character step away, the movement
+// window pauses the forced attack re-requests, and the engage re-requests
+// the attack once the step finished - the bow shoots again from the
+// opened distance it just bought.
 //
-// The edge case layer of this slice (issue #19) rides the same step
-// the core round armed:
+// Three rules shape every layer below. The retreat runs one straight
+// away-ray and never turns (a turn spends the distance the step bought);
+// a blocked lane holds the ground and keeps shooting the bow; and the
+// layer never arms against a bow-wielding enemy, which cannot be outrun.
+// The shot-paced layer reads the character's own Attack broadcast as the
+// server commit of the shot, so the retreat starts inside the bow
+// cooldown instead of after the mob closed the range.
 //
-//   - the train direction: the retreat direction weighs EVERY chaser
-//     on the character (the centroid away-vector of the fight target
-//     plus the SelfAttackers train), not the armed threat alone - a
-//     train member dragging west bends the retreat west before it
-//     becomes the pile up. A train that surrounds the character (the
-//     summed away vectors cancel - chasers stand on every side) is
-//     too wide to outrun: the widest-gap bisector keeps the step
-//     moving until the geometry leaves no walkable straight ray, and
-//     the archer holds ground and shoots through it then.
-//   - the corner: when the straight retreat lane is blocked - the
-//     fight leash, a wall behind (the geodata line of sight), water
-//     behind (the OverWater oracle) - the archer stops retreating and
-//     KEEPS SHOOTING THE BOW at melee range: no weapon switch, no
-//     standing idle (the archetype rule of issue #21 - the bow is the
-//     always-weapon, a cornered kite never degrades to a melee
-//     trade). The cornered hold re-probes at the kite pacing, not
-//     every tick - no idle stutter of failed probes - and the hunt
-//     loop's watchdogs stay quiet through it: the stuck timeout only
-//     owns a fight that never started (the cornered fight runs - the
-//     swings keep it fresh), the chase stall watchdog only owns the
-//     stretches beyond the bow stall radius (the cornered fight sits
-//     at melee range, well inside it).
-//   - the straight retreat (the owner rule of the 2026-11-09 round):
-//     the step runs the straight away-ray and NOTHING else. The old
-//     fan (the 45/90 degree candidates), the camp deflection, the
-//     circling chord and the pocket breakouts all TURNED the
-//     character, and a turn spends the distance the retreat just
-//     bought - exactly the waste the owner measured on the fights
-//     whose speeds sit too close. A blocked straight lane holds the
-//     ground and shoots; it never bends the retreat.
-//   - the defensive flight (the run-3 finding of the same round):
-//     the melee flee machinery owns the aggro answer of a fight the
-//     bot cannot win, and its fan is clamped to the CURRENT hunting
-//     zone - a kite fight drifts across the cell boundaries, the fan
-//     collapses to nothing, and the closure watchdog logged the
-//     session out MID-KITE with the bow healthy and the quiver full.
-//     The bow answer is the same straight away-ray the fight cycle
-//     runs (kiteFleeThreat), walked at the full escape segment and
-//     paced by the kite geometry; the fan stays the fallback of a
-//     genuinely walled lane.
-//
-// The honest limits of the layer, by the edge cases the issue names:
-//   - the chaser positions of the DIRECTION scan are the raw
-//     last-known packet positions (SelfAttackers), not the projected
-//     ones - the centroid needs every chaser, the projected scan only
-//     serves the nearest one (the armed threat of kiteThreat); a
-//     chaser mid-chase lags its broadcast by up to a second, which
-//     the 250 unit trigger margin absorbs.
-//   - a retreat the gates clear but the server refuses (the click
-//     validation collapses it, a mob body blocks the click point)
-//     surfaces through the re-click ladder and then the hold: the
-//     straight endpoint is the only retreat this layer takes, so a
-//     dead click holds the ground and the bow keeps shooting.
-//   - the streak limit of the core is a DIAGNOSTIC since the
-//     round-14 always-run redesign: a chaser at least as fast as
-//     the character never falls behind, the counter names the
-//     unwinnable race in the log, and the retreat keeps running
-//     straight - the standing "fight it out" answer is gone (it was
-//     the melee damage the kite exists to avoid).
-//   - attack animation/travel time: the bow arrow flies ~500ms; the
-//     step window pauses the re-requests but the server keeps the
-//     already flying shots - a shot fired a moment before the step
-//     still lands. Not modeled beyond that.
-//
-// The shot-paced layer of issue #60 rides the same machinery and
-// flips the trigger: the character's own Attack broadcast is the
-// server commit of the shot (the Mobius doAttack rolls the hit,
-// consumes the arrow and schedules the HitTask BEFORE the packet
-// goes out, and the damage task carries no attacker movement check),
-// so the retreat starts the moment the shot released - inside the
-// bow cooldown (timeAtk + reuse, roughly three seconds for the short
-// bow) instead of after the mob crossed the retreat radius. The
-// cycle is the owner contract of the 2026-11-09 round: shoot, run
-// the accepted move window (the windup end to the disable end),
-// shoot again the moment the bow is ready - one shot per cooldown,
-// whatever range the chase reached. There is no re-shot floor and no
-// pursuit ledger any more: waiting for a "safe" distance against an
-// equal-speed chaser walked 20-30 seconds between the shots, the
-// mob's regeneration outpaced the arrows, and the 5-minute
-// acceptance run measured a treadmill that drifted into a level-15
-// zone and died. The shot at the disable end is the commitment; the
-// retreat resumes on its own broadcast, even when the chaser stands
-// in melee between the shots - the mob then spends the next reload
-// closing the distance again after the first hit.
-//
-// The re-click ladder of the issue #60 second round owns the WALK
-// of the retreat: the owner's follow-up dump showed the rhythm
-// trigger working (a "shot released" line every cycle) with the
-// character still standing through every reload ("moving: no",
-// the mob closing ~380 units per cycle) - the single retreat click
-// barely executed. The manual clicking the owner demonstrated
-// ("clicking behind the character runs 2 seconds no problem") is
-// the recovery the ladder replicates: while the movement window
-// runs and the character stands still on the issue cell, the click
-// goes out again at the 250ms pace - toward exactly the same
-// straight endpoint, because inside the once-per-second broadcast
-// gate a healthy accepted click may legitimately not have answered
-// yet. The three candidate mechanisms the ladder answers: the
-// stance transition swallow (the click lands while the server side
-// ATTACK intention of the just-broadcast shot is still tearing
-// down), the destination-cell refusal (the server refuses the cell
-// the bot side LineOfSight blessed) and the H-006 silent drop (the
-// deployment that swallows accepted move requests). The probe line
-// names which mechanism ate the clicks of a given fight; the
-// straight design has no second lane to rotate onto, so a probe that
-// stays dead past the age gate holds the ground and lets the bow
-// shoot. The window ending (the bow disable end) stands the ladder
-// down and hands the tick to the forced attack re-request: that
-// request IS the next shot, never a wait for a regained distance.
-//
-// The behavior arms itself on the weapon in hand (bowEquipped): no
-// config, no class check - whatever bot ends up holding a bow (the
-// planned archer type of the config launch, a lured guard round)
-// kites its fights. The enemy weapon gate (the owner rule of the
-// 2026-11-09 round) narrows it: the layer never arms against an
-// archer fight target. The NpcInfo equipment block names the enemy
-// template rhand item, the state resolves the weapon family
-// (state.Bot.ObjectUsesBow) and a bow-wielding enemy closes every
-// kite layer - a ranged opponent cannot be outrun, the retreat only
-// spends the bow cooldown on walking while the enemy keeps shooting,
-// so the standing archer trade answers it (the same hold rule the
-// cornered fight follows).
+// The design, the round history and the live measurements live in
+// docs/hunting.md (the archer kite section and its subsections).
 
 import (
     "math"
@@ -155,223 +28,107 @@ import (
 
 // The kiting constants of the archer fight.
 const (
-    // kiteRetreatRadius is the trigger distance of the kite step and
-    // the INNER edge of the optimal band: any bow fight hostile (the
-    // target or a train member) closer than this to the fighting
-    // character is about to reach melee (the swing range sits around
-    // 150 units and the chasers run 120+ units per second), so the
-    // step fires before the blows land. Above it the archer stands
-    // and shoots - the standing fight inside the optimal band is the
-    // good case.
+    // kiteRetreatRadius arms the step: a hostile closer than this is
+    // about to reach melee (the swing range sits near 150, a chaser
+    // runs 120+ units per second).
     kiteRetreatRadius = 250.0
-    // kiteStep is the retreat length away from the closed threat:
-    // the direction target of one walk. The walk itself is cut at the
-    // bow disable end (the forced attack fires the next shot there),
-    // so the endpoint mostly names the line the character runs
-    // between the shots; the step stays long enough that a walk which
-    // does reach it (a short arrival, the catch-up tick) lands back
-    // inside the optimal band.
+    // kiteStep is the retreat length of one walk, sized so a completed
+    // walk lands back inside the optimal band.
     kiteStep = 400.0
-    // kiteStepWindow is the movement window the step owns: the walk
-    // runs ~400 units (about two seconds at the run speed), and a
-    // forced attack request would interrupt it server-side, so the
-    // engage holds its re-requests until the window closes - the
-    // same contract the impending-add step uses
-    // (combatAvoidStepPeriod).
+    // kiteStepWindow is the movement window one step owns: a forced
+    // attack request interrupts a running walk server-side, so the
+    // engage holds its re-requests until the window closes.
     kiteStepWindow = 2 * time.Second
-    // kiteReengageDelay is the hold between the step walk ending and
-    // the first forced attack re-request of the re-engage: zero
-    // today - the window end IS the re-engage (the opened distance
-    // sits inside the optimal band, the re-request shoots from
-    // range), the knob is pinned here so the live tuning round (#20)
-    // can hold the aim without touching the walk contract.
+    // kiteReengageDelay holds the first forced attack re-request after
+    // the walk. Zero today - the window end IS the re-engage.
     kiteReengageDelay time.Duration = 0
-    // kiteStepPeriod paces the steps: the kite cycle spends the
-    // window walking and the rest standing and shooting; the period
-    // bounds the walking share from above (2s walk, 1s shoot at the
-    // fastest). The cornered hold re-probes on the same pacing.
+    // kiteStepPeriod paces the steps and the cornered hold re-probes.
     kiteStepPeriod = 3 * time.Second
-    // kiteStreakLimit is the DIAGNOSTIC threshold of the proximity
-    // shuffle: a chaser at least as fast as the character never
-    // falls behind, and the shuffle repeats without opening
-    // distance. The round-14 redesign REMOVED the old "stop the
-    // shuffle, fight it out" answer - the standing trade is the
-    // melee damage the kite exists to avoid (the owner feedback: a
-    // same-speed chase answered by standing eats the whole health
-    // bar while a moving one outwaits the mob's home leash) - so
-    // the counter now only names the unwinnable race in the log
-    // while the retreat keeps running straight.
+    // kiteStreakLimit is the diagnostic threshold of an unwinnable
+    // race: a chaser at least as fast never falls behind, the counter
+    // names it, and the retreat keeps running.
     kiteStreakLimit = 8
     // kiteTrainScanRange bounds the chaser scan of the retreat
-    // DIRECTION: a train member farther than this from the character
-    // cannot reach it inside a step window, so it cannot drag the
-    // centroid - the flee machinery owns chasers that distant. The
-    // value matches the combat avoid scan band (the impending-add
-    // step reads the same neighborhood).
+    // direction: a farther member cannot reach the character inside a
+    // step window.
     kiteTrainScanRange = 800.0
-    // kiteEncircleShare is the encirclement threshold of the train:
-    // when the summed away vectors of the chasers shrink under this
-    // share of their count (the unit vectors cancel - chasers stand
-    // on every side), the centroid names no retreat direction and
-    // the widest-gap bisector takes the step over (kiteGapDirection
-    // - the live fleet round of issue #70 measured the standing
-    // encircled fight as a death trap on the mass cells). A single
-    // chaser always sums to a full unit (share 1.0); two chasers on
-    // opposite sides sum to ~0.
+    // kiteEncircleShare is the encirclement threshold: when the summed
+    // away vectors shrink under this share of the chaser count (they
+    // stand on every side), the widest-gap bisector takes the step.
     kiteEncircleShare = 0.3
-    // kiteMaxTrainMembers caps the bearing scratch of the retreat
-    // direction (kiteBearings): the gap geometry of a wider train
-    // reads its nearest members alone - a train that wide outranks
-    // the kite (the flee machinery's logout case), and the scratch
-    // must stay a fixed array to keep the resolution allocation
-    // free.
+    // kiteMaxTrainMembers caps the bearing scratch; the array stays
+    // fixed to keep the resolution allocation free.
     kiteMaxTrainMembers = 16
-    // kiteHalfPlaneSlack is the tolerance of the away half-plane
-    // gate: a lane may run perpendicular to the away-ray, but never
-    // fold back toward the train - the guard rejects the endpoints
-    // whose retreat component turned negative beyond the float
-    // noise.
+    // kiteHalfPlaneSlack lets a lane run perpendicular to the away-ray
+    // but never fold back toward the train.
     kiteHalfPlaneSlack = -0.05
-    // kiteRoamRadius bounds how far the fight's retreats may drift
-    // from the FIGHT ANCHOR - the position of the fight target at
-    // the fight's first retreat resolution (see kiteResolveAndClick).
-    // The anchor is the live-observed farm point of the fight: the
-    // straight legs keep the fight on its own ground wherever it
-    // started, and the radius fences the walk traffic. This
-    // replaces the old hunting-square leash (the zone.Contains read
-    // of the generated elven/dion tables): the kite must stay
-    // LOCATION-GENERAL - it works on any map, any ground, with or
-    // without a zone registry, and the target economy alone owns the
-    // tables. Three bow engage radii leave the healthy band well
-    // inside while a dragged chase still has room to maneuver.
+    // kiteRoamRadius fences the retreat around the fight anchor (the
+    // target position at the first retreat resolution): three bow
+    // engage radii, location-general, no zone table.
     kiteRoamRadius = 3 * userBowEngageRadius
-    // kiteMinStep is the shortest retreat step the ring budget may
-    // leave: a stand already at the ring still takes a short straight
-    // hop, and the lane gate refuses it when even that is walled.
+    // kiteMinStep is the shortest step the ring budget may leave; the
+    // lane gate refuses even that when it is walled.
     kiteMinStep = 250.0
-    // kiteHoldLogPeriod paces the cornered hold diagnostic: the hold
-    // itself re-probes at the kite pacing, the log line lands once
-    // per period - a cornered fight is a standing fight, the line is
-    // its visibility, not a complaint.
+    // kiteHoldLogPeriod paces the cornered hold diagnostic line.
     kiteHoldLogPeriod = 15 * time.Second
     // kiteShotWindow is the freshness window of the character's own
-    // Attack broadcast that arms the shot-paced retreat (issue #60):
-    // the packet is the server commit of the shot (the hit roll, the
-    // arrow consumption and the HitTask schedule all happened before
-    // the broadcast, and the damage task carries no attacker movement
-    // check). The broadcast arms the DEFERRED retreat schedule (see
-    // kiteArmClick - the issue #70 findings: the server forbids the
-    // movement through the windup, so the click waits the windup end
-    // instead of going out at the broadcast). The loop ticks four
-    // times a second - the window keeps the broadcast catchable for
-    // at least two ticks while still bounding the schedule to the
-    // shot it belongs to.
+    // Attack broadcast, the server commit of the shot. It keeps the
+    // broadcast catchable for at least two ticks at the quarter-second
+    // loop cadence while bounding the schedule to its own shot.
     kiteShotWindow = 700 * time.Millisecond
-    // kiteReclickPeriod paces the re-click ladder of the kite walk
-    // (issue #60, the second round - the owner feedback: the bot
-    // click "doesnt cover enough distance, dont start running",
-    // while the manual clicking behind the character "runs 2
-    // seconds no problem, covering large distance"): while the kite
-    // movement window runs and the character still stands on the
-    // issue cell, the retreat click goes out again at this pace -
-    // the manual behavior the owner demonstrated, replicated by
-    // the bot one click at a time. The period sits under the
-    // server's once per second movement broadcast gate on purpose:
-    // an accepted click may take up to a second to answer with the
-    // broadcast, and a re-click that lands inside that gate just
-    // re-aims the same endpoint server-side (the walk continues,
-    // the click is not wasted) - exactly what the repeated manual
-    // clicks do.
+    // kiteReclickPeriod paces the re-click ladder of the retreat walk
+    // while the character still stands on the issue cell. It sits
+    // under the server's once-per-second movement broadcast gate, so a
+    // re-click re-aims the same endpoint and is never wasted.
     kiteReclickPeriod = 250 * time.Millisecond
-    // kiteReclickLimit bounds the re-clicks of one kite walk: the
-    // initial click plus this many re-issues - the owner ask of the
-    // third round is the FASTER spam ("it should spam clicks much
-    // faster"), so the bound pins the packet budget of a dead
-    // transport while the 250ms pace fills the whole window with
-    // retries.
+    // kiteReclickLimit bounds the re-clicks of one walk (the initial
+    // click plus this many re-issues): the packet budget of a dead
+    // transport.
     kiteReclickLimit = 8
-    // kiteProbeElapsed is the silent-verdict age of the walk: the
-    // initial click plus the re-clicks stayed unanswered for this
-    // long while the character still stands on the issue cell (no
-    // ActionFailed, no movement broadcast - the H-006 silent drop
-    // signature) names the endpoint click dead the way the probe
-    // does. The value sits past the server's once-per-second
-    // movement broadcast gate plus the pacing headroom - a healthy
-    // accepted click answers with the broadcast inside it.
+    // kiteProbeElapsed is the silent-verdict age: the initial click
+    // and every re-click stayed unanswered while the character stands
+    // on the issue cell (no ActionFailed, no movement broadcast), so
+    // the endpoint is dead. It sits past the once-per-second
+    // broadcast gate plus the pacing headroom.
     kiteProbeElapsed = 1200 * time.Millisecond
-    // kiteRefusalAnswerWindow bounds the ActionFailed attribution of
-    // the kite clicks: the genuine refusal answer of a refused
-    // endpoint arrives within the round trip (the acceptance dump
-    // shows it landing the same millisecond), so a failure older
-    // than one tick past the click belongs to some other request,
-    // not the click. The window is deliberately TIGHT: the server
-    // AI's own attack retries answer ActionFailed at a one-second
-    // cadence through the whole bow disable (Creature.doAttack
-    // schedules notifyActionReadyToAct a second ahead, each retry
-    // on a still-disabled bow bounces) - a wide window would
-    // misattribute that cadence to the kite clicks and latch
-    // healthy endpoints dead (the local acceptance round caught
-    // exactly that cascade before the tightening).
+    // kiteRefusalAnswerWindow bounds the ActionFailed attribution of a
+    // kite click: a genuine refusal answers within the round trip, and
+    // the server AI's own attack retries bounce at a one-second
+    // cadence through the whole bow disable - a wide window would
+    // latch healthy endpoints dead.
     kiteRefusalAnswerWindow = 250 * time.Millisecond
     // kiteBowRetryLead is the look-back band of the bow retry: an
-    // attack request the server refused during the bow disable
-    // schedules notifyActionReadyToAct one second ahead
-    // (Creature.canUseRangeWeapon), and the retry's ActionFailed
-    // lands with no client request inside the tight answer window -
-    // the 14:06:50 dump of the round-19 run shows the chain: the
-    // attack request at 49.013, the refusal at 50.263 (1.25 s, the
-    // schedule plus the tick granularity). An action request inside
-    // the band owns that failure, never the retreat click.
+    // attack refused during the disable schedules its re-try a second
+    // ahead (Creature.canUseRangeWeapon) and its ActionFailed lands
+    // with no client request inside the tight answer window.
     kiteBowRetryLead = 1350 * time.Millisecond
-    // kiteBowReuseDelay is the reuse delay of the bow family the
-    // fleet shoots (the C1 item data: the Short Bow and the D-grade
-    // bows carry 1500, dist/game/data/stats/items - the value feeds
-    // the bow disable window formula of kiteWalkWindow).
+    // kiteBowReuseDelay is the reuse delay of the bow family the fleet
+    // shoots (the C1 item data: the Short Bow and the D-grade bows
+    // carry 1500); it feeds the bow disable formula of kiteWalkWindow.
     kiteBowReuseDelay = 1500.0
-    // kiteWalkWindowFloor/Max clamp the bow-aware walk window: the
-    // formula reads the live pAtkSpd, and a broken broadcast (a
-    // zero, a partial) must never collapse or explode the window -
-    // the clamp keeps the walk inside the sane attack-speed band
-    // and falls back to the shipped kiteStepWindow outside it.
+    // kiteWalkWindowFloor and kiteWalkWindowMax clamp the bow-aware
+    // walk window: the formula reads the live pAtkSpd, and a broken
+    // broadcast must never collapse or explode the window. Outside the
+    // band the shipped kiteStepWindow applies.
     kiteWalkWindowFloor = 1 * time.Second
     kiteWalkWindowMax   = 5 * time.Second
-    // kiteGaugeMaxAge bounds how long a RED SetupGauge still counts
-    // as the bow cycle of the shot in flight: the server sends the
-    // gauge on every shot commit, so a live cycle always has a fresh
-    // one; a gauge older than this belongs to a fight that ended and
-    // the formula fallback owns the window.
+    // kiteGaugeMaxAge bounds how long a RED SetupGauge still counts as
+    // the bow cycle of the shot in flight: the server sends one on
+    // every commit, so an older gauge belongs to a fight that ended.
     kiteGaugeMaxAge = 10 * time.Second
     // kiteWindupLead is the safety lead the deferred retreat click
-    // adds past the windup end before it goes out (issue #70, the
-    // kite timing findings): the live ladder measured the accepted
-    // move window OPENING at the windup end - a click 1500 ms after
-    // the shot moved at once (1.52 s) while a 1200 ms one stood to
-    // the cycle end (2.96 s), the boundary sitting at the
-    // theoretical (timeAtk+reuse)/2 = 1483 ms of pAtkSpd 337 - so
-    // the click must land safely PAST that boundary despite the
-    // quarter-second loop cadence and the broadcast lag. The lead
-    // trades 150 ms of the walk tail for the certainty the click
-    // rides the accepted window instead of the deferred one (the
-    // deferred click is replayed only at the disable end where the
-    // re-shot cancels it - the whole-reload stall the findings
-    // measured as the fleet retreat lag).
+    // adds past the windup end: the accepted move window opens at the
+    // (timeAtk+reuse)/2 boundary, and the lead must clear it despite
+    // the quarter-second loop cadence and the broadcast lag.
     kiteWindupLead = 150 * time.Millisecond
-    // kiteRingLeashShare caps the straight leg as a share of the
-    // roam radius (kiteStraightLeg lands it on the ring): the ring
-    // is the band the fight keeps, the fence is the emergency margin
-    // between the ring and the roam radius, and an endpoint in
-    // between would leave the next leg no room to run without
-    // crossing the leash. The round-17 live verdict sized the share
-    // at 0.72 (972 units): the audit drift leash is 1500 from the
-    // anchor, and the ring at 972 keeps the whole band inside it.
+    // kiteRingLeashShare caps the straight step as a share of the roam
+    // radius: the ring keeps the whole fight band inside the 1500 unit
+    // audit drift leash from the anchor.
     kiteRingLeashShare = 0.72
-    // kiteArrivalEpsilon is the arrival radius of the re-click
-    // ladder: a stand within this distance of the walk endpoint
-    // completes the leg (the server's cell granularity and a partial
-    // route's last walkable cell never leave the character exactly ON
-    // the clicked cell), while a stand beyond it - mid-route, or
-    // short of the endpoint after a partial path - re-arms the
-    // episode and keeps pushing the endpoint.
+    // kiteArrivalEpsilon is the arrival radius of the re-click ladder:
+    // a stand inside it completes the step, a stand beyond it re-arms
+    // the episode (the server cell granularity and a partial route
+    // never leave the character exactly on the clicked cell).
     kiteArrivalEpsilon = 100.0
 )
 
@@ -1171,7 +928,7 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
     return true
 }
 
-// kiteStraightLeg budgets a STRAIGHT leg against the opening ring:
+// kiteStraightStep budgets a STRAIGHT leg against the opening ring:
 // the endpoint of the away-ray must stay inside the fight's ring -
 // the leash share of the roam radius around the fight anchor (the
 // target's stand, see kiteResolveAndClick) - so the retreat stays on
@@ -1184,7 +941,7 @@ func (l *Loop) kiteFromShot(now time.Time) bool {
 // leash and the walk is refused. Reports the step unchanged before
 // the fight anchored.
 
-func (l *Loop) kiteStraightLeg(step float64, selfX, selfY int32) float64 {
+func (l *Loop) kiteStraightStep(step float64, selfX, selfY int32) float64 {
     if l.kiteFightFor != l.target {
         return step
     }
@@ -1210,7 +967,7 @@ func (l *Loop) kiteStraightLeg(step float64, selfX, selfY int32) float64 {
 // deferred click of the shot cycle (kiteClickWalk), the accepted
 // window catch of the broadcast tick and the ordinary proximity step
 // - one resolution, one click path, one ladder. The leg length is
-// the plain kiteStep, fenced by the fight ring (kiteStraightLeg): the
+// the plain kiteStep, fenced by the fight ring (kiteStraightStep): the
 // walk is interrupted by the forced attack at the disable end, so the
 // endpoint names the line of the retreat, not a distance to wait for.
 // Reports whether the click went out.
@@ -1277,7 +1034,7 @@ func (l *Loop) kiteResolveAndClick(
     // preferred lane and the half-plane reference of the battery.
     // The leg is the plain step, ring-budgeted so the fight stays on
     // its own ground.
-    laneLen := l.kiteStraightLeg(l.kite.Step, selfX, selfY)
+    laneLen := l.kiteStraightStep(l.kite.Step, selfX, selfY)
     stepX, stepY, found := l.kiteRetreatLane(
         selfX, selfY, selfZ, dirX, dirY, dirX, dirY, laneLen)
     if !found {

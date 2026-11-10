@@ -523,7 +523,7 @@ func TestFleetFoldCornerNeedsTheSameFight(t *testing.T) {
     require.Len(t, watch.kiteFightDrifts(), 2)
 }
 
-// fleetRaceLegStream emits the synthetic samples of the redesigned
+// fleetRaceStepStream emits the synthetic samples of the redesigned
 // race-leg kite (the round-17 contract): each cycle books one shot,
 // one long retreat walk - the race leg that regains the safe
 // shooting distance - and the single re-shot at reShotDist once the
@@ -535,7 +535,7 @@ func TestFleetFoldCornerNeedsTheSameFight(t *testing.T) {
 // straight away from the trailing target so every walk clears the
 // away-direction gate, and the fight distance rides the reShotDist
 // parameter the way the live sampler carries the measured range.
-func fleetRaceLegStream(
+func fleetRaceStepStream(
     retreatLag, walkDur time.Duration, reShotDist float64,
     interrupt bool, cycles int,
 ) []fleetSample {
@@ -597,7 +597,7 @@ func fleetRaceLegStream(
 // and the description names the median re-shot distance.
 func TestFleetVerdictReshotReadsTheReShotDistance(t *testing.T) {
     watch := newFleetWatch()
-    for _, sample := range fleetRaceLegStream(
+    for _, sample := range fleetRaceStepStream(
         1600*time.Millisecond, 12*time.Second, 500.0, false, 3,
     ) {
         watch = watch.fold(sample)
@@ -627,7 +627,7 @@ func TestFleetVerdictReshotReadsTheReShotDistance(t *testing.T) {
 // the description must name the collapsed distance.
 func TestFleetVerdictReshotFailsTheCollapsedRangeReShot(t *testing.T) {
     watch := newFleetWatch()
-    for _, sample := range fleetRaceLegStream(
+    for _, sample := range fleetRaceStepStream(
         1600*time.Millisecond, 1500*time.Millisecond, 141.0, true, 3,
     ) {
         watch = watch.fold(sample)

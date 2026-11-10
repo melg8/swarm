@@ -406,7 +406,7 @@ func TestKiteOpeningAnchorsOnTheMobStand(t *testing.T) {
 }
 
 // TestKiteStraightLegBudgetsTheRing pins the ring budget of the
-// straight leg (kiteStraightLeg): the endpoint must stay inside the
+// straight leg (kiteStraightStep): the endpoint must stay inside the
 // fight's ring - the leash share of the roam radius around the
 // anchor - minus the rounding guard (kiteArrivalEpsilon's half keeps
 // the int32 cell rounding of the endpoint from crossing the ring the
@@ -417,19 +417,19 @@ func TestKiteStraightLegBudgetsTheRing(t *testing.T) {
     loop.target = 7
 
     require.InDelta(t, kiteStep,
-        loop.kiteStraightLeg(kiteStep, 45000, 50000), 0.001,
+        loop.kiteStraightStep(kiteStep, 45000, 50000), 0.001,
         "the unanchored fight keeps the plain step")
     loop.kiteFightFor = 7
     loop.kiteFightX, loop.kiteFightY = 45200, 50000
     ring := kiteRoamRadius * kiteRingLeashShare
     require.InDelta(t, kiteStep,
-        loop.kiteStraightLeg(kiteStep, 45000, 50000), 0.001,
+        loop.kiteStraightStep(kiteStep, 45000, 50000), 0.001,
         "a step that fits the ring budget rides unchanged")
     require.InDelta(t, ring-600-kiteArrivalEpsilon/2,
-        loop.kiteStraightLeg(kiteStep, 44600, 50000), 0.001,
+        loop.kiteStraightStep(kiteStep, 44600, 50000), 0.001,
         "a stand deep on the ring keeps the remaining budget")
     require.InDelta(t, kiteMinStep,
-        loop.kiteStraightLeg(kiteStep, 44200, 50000), 0.001,
+        loop.kiteStraightStep(kiteStep, 44200, 50000), 0.001,
         "a stand at the ring keeps the short hop of room")
 }
 
