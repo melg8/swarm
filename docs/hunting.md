@@ -1810,6 +1810,14 @@ safety net for servers where the deaths remove nothing: three
 consecutive penalty-free deaths abort the deleveling and arm a 30 min
 cooldown.
 
+The level gap rules of the drop calculation
+(`NpcTemplate.calculateGroupDrops`) set the farming window: item drops
+slide from 100 percent at mob level + 5 to 10 percent at + 10 and
+beyond, adena from 100 percent at + 8 to 10 percent at + 15, and
+experience and SP stop at + 11 (`MonsterExpMaxLevelDifference`). The
+elven fields mobs are levels 1-5, so a level 11 character gets 10
+percent item drops - the deleveling exists to fix that.
+
 The deleveling stops at the target level = median zone mob level + 5
 (the last level with the full item drop chance, floored at 9) and
 re-triggers after hunting raised the level back above the trigger. The
@@ -1955,6 +1963,10 @@ server integrity rules in AGENTS.md).
   the self TeleportToLocation (connection/game.go applyTeleport), the
   death -> village revive -> walk cycle worked: consecutive provoke ->
   die -> revive -> walk-to-guard cycles.
+- **The aggressive default is TRUE**: the Mobius `NpcTemplate`
+  `isAggressive` falls back to TRUE when the npc xml omits the
+  attribute, so a mob like the Kaboo Orc Fighter attacks players on
+  sight; the generated npc data mirrors this since the clan round.
 - **Archer guards always retaliate, melee guards may not**: an archer
   guard in the attack intention shoots at everything within its 850+
   unit bow range (the thinkAttack doAttack branch applies no karma

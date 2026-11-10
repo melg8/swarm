@@ -374,6 +374,65 @@ to the merchant and selects it like the official client.
 
 The `TransactionFloodProtector` paces the requests (10 s by default).
 
+### UseItem (0x14)
+
+The equip/unequip request. A plain use equips the item; the unequip
+branch rides the same opcode. The server applies it through
+`Player.useEquippableItem` / `Inventory.equipItem`:
+
+- a right hand weapon, chest, neck, head, gloves, feet or back item
+  replaces the occupant of its slot directly (the paperdoll listener
+  unequips the old item);
+- the earring and ring pair families fill the first EMPTY slot (left
+  first, right second) and replace the LEFT slot blindly when both are
+  occupied - swapping a better jewel needs the explicit unequip of the
+  weaker piece first (`gear.NextUpgrade`);
+- a two hand weapon (`lrhand`: bows, poles) unequips the left hand
+  shield on equip, a shield unequips a two hand weapon, and a one-piece
+  armor (`onepiece`) occupies the chest slot, blocks the legs slot and
+  unequips on a legs equip.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x14 |
+| 1 | 4 | Object id of the item |
+
+Reference: [UseItem.java](https://gitlab.com/MobiusDevelopment/L2J_Mobius/-/blob/master/L2J_Mobius_C1_HarbingersOfWar/java/org/l2jmobius/gameserver/network/clientpackets/UseItem.java)
+
+### RequestBuyItem (0x1F)
+
+Buys from the selected merchant buylist. The request requires the
+selected merchant of the list within the 250 unit interaction
+distance; the server prices every entry itself (the buylist product
+price or the item reference price) with the town tax - Elven Village
+charges 15 percent over reference while no castle owns it
+(`MerchantPriceConfig.xml`), selling is always `referencePrice/2`.
+Buying and selling share the `TransactionFloodProtector` (10 s), so
+the buy and sell batches pace alike. The buylist ids are the file
+names of `data/buylists/*.xml`; the merchant of a list is the npc of
+its `<npcs>` block (joined to the packet template id through
+`stats/npcs/CT0_to_C4_ids.txt`, 30147 Unoren -> 7147 etc).
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x1F |
+| 1 | 4 | Buy list id |
+| 5 | 4 | Item count |
+| 9 | 8×n | Entries: item id (4), count (4) |
+
+Reference: [RequestBuyItem.java](https://gitlab.com/MobiusDevelopment/L2J_Mobius/-/blob/master/L2J_Mobius_C1_HarbingersOfWar/java/org/l2jmobius/gameserver/network/clientpackets/RequestBuyItem.java)
+
+### Logout (0x09)
+
+The leave-world request, no body. The server refuses it while the
+character holds an attack stance (`Player.canLogout` checks the
+`AttackStanceTaskManager`, `YOU_CANNOT_LOGOUT_WHILE_IN_COMBAT`); the
+stance lapses 15 seconds after the last combat event
+(`AttackStanceTaskManager.COMBAT_TIME`). A socket close of a character
+in combat stores it on the same 15 second delay
+(`Disconnection.onDisconnection`), so the emergency logout is one
+escape walk plus the logout packet plus the socket close either way.
+
 ### RequestBypassToServer (0x21)
 
 Routes a html dialog bypass command to the server (the gatekeeper
@@ -492,6 +551,16 @@ animates the item flying into the inventory). The picker position is
 already known from the StopMove broadcasts of the arrival, so the tracker
 must not snap the picker to these coordinates - it teleported the marker
 across the map on every pickup.
+
+### UserInfo (0x04) paperdoll slots
+
+The inventory packets carry the template bodypart mask (an earring is
+always 0x6) and cannot tell which ear or finger slot an equipped jewel
+occupies; the UserInfo paperdoll object id block is the only source
+for that. The slot order is: underwear, right ear, left ear, neck,
+right finger, left finger, head, right hand, left hand, gloves, chest,
+legs, feet, back and a C1 duplicate right hand. The server broadcasts
+UserInfo after every equip and unequip.
 
 # The proxy emulation (swarm -> C1 client)
 

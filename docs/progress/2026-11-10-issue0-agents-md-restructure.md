@@ -97,8 +97,23 @@ rule and the link, the documentation map gained the row,
 entries themselves are unchanged, so no verification evidence was
 lost.
 
+### 2026-11-10 - the facts moved out of the agent guide
+
+Before any line left `AGENTS.md`, the facts it carried landed in their
+subsystem documents:
+
+- the drop-slide rules of `NpcTemplate.calculateGroupDrops` (item,
+  adena, exp/SP level gaps) and the `isAggressive` TRUE default went
+  to `docs/hunting.md`;
+- `UseItem` (the equip/unequip slot semantics), `RequestBuyItem` (the
+  merchant distance, the tax, the buylist layout), `Logout` (the
+  attack stance refusal and the 15 second delay) and the `UserInfo`
+  paperdoll slot order went to `docs/protocol_description.md`;
+- the shared outbound cipher chain fact (`GameClient.SendRaw` under the
+  session `writeMu`) went to `docs/proxy.md` (the live-patch details it
+  sat next to were already documented there).
+
 ## Status
 
-Step 3 of 3 is under way: the registry extraction is done, the
-duplication squeeze (protocol notes, layout, commands, proxy, stack
-notes) is next.
+Step 3 of 3 is under way: the registry extraction and the fact moves
+are done, the duplication squeeze of `AGENTS.md` is next.

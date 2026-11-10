@@ -127,9 +127,12 @@ needs `-proxy-login 0.0.0.0:2107 -proxy-game 0.0.0.0:7778` and the
 5. **In world**: every server packet is relayed to the client, every
    client packet (movement, attacks, actions, chat, logout) is
    forwarded to the real game server through the bot session - the
-   server cannot tell the difference. The hunt loop of the bot keeps
-   running: autonomous actions and user actions interleave on the same
-   character. A bot initiated logout does NOT end this phase: the
+   server cannot tell the difference. The client packets ride the SAME
+   outbound cipher chain as the hunt actions (`GameClient.SendRaw`
+   encrypts under the session `writeMu`), so proxied clicks and
+   autonomous actions interleave without corrupting the stream. The
+   hunt loop of the bot keeps running: autonomous actions and user
+   actions interleave on the same character. A bot initiated logout does NOT end this phase: the
    client is held through the bot relogin and restarted onto the
    replacement (see "The bot relogin handoff" below). The one exception
    is the keepalive: the `RequestNetPing` of the client is answered by
