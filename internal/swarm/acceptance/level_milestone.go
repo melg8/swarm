@@ -292,7 +292,7 @@ func milestoneFail(
 ) error {
     if cancel != nil {
         cancel()
-        <-done
+        joinSessionDone(done)
     }
     writeMilestoneFailMetrics(test, level, err.Error())
 

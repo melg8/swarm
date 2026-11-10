@@ -104,7 +104,7 @@ func runStuckPointScenario(
     }()
     defer func() {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
     }()
 
     tracker := m.tracker(test)

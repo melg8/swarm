@@ -63,7 +63,7 @@ mkdir -p "$BIN_DIR"
 # (cmd/gofmt-spaces) and travels with the committed source.
 declare -A PIN=(
     [task]="github.com/go-task/task/v3/cmd/task@v3.53.1"
-    [golangci-lint]="github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2"
+    [golangci-lint]="github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.15.0"
     [gci]="github.com/daixiang0/gci@v0.13.5"
     [govulncheck]="golang.org/x/vuln/cmd/govulncheck@v1.8.0"
 )

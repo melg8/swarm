@@ -44,7 +44,7 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
 
         return err
     }
@@ -55,7 +55,7 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
     for {
         if ctx.Err() != nil {
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         }
@@ -74,7 +74,7 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
         select {
         case <-ctx.Done():
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         case <-time.After(monitorPeriod):
@@ -119,7 +119,7 @@ func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
 
         return err
     }
@@ -129,7 +129,7 @@ func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     for {
         if ctx.Err() != nil {
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         }
@@ -148,7 +148,7 @@ func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
         select {
         case <-ctx.Done():
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         case <-time.After(monitorPeriod):
@@ -208,7 +208,7 @@ func runSupervisedScenario(
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
 
         return err
     }
@@ -217,7 +217,7 @@ func runSupervisedScenario(
     for {
         if ctx.Err() != nil {
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         }
@@ -235,7 +235,7 @@ func runSupervisedScenario(
         select {
         case <-ctx.Done():
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         case <-time.After(monitorPeriod):
@@ -376,7 +376,7 @@ func botLifetimeScenario(ctx context.Context, m *Manager, t *Test) error {
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
 
         return err
     }
@@ -386,13 +386,13 @@ func botLifetimeScenario(ctx context.Context, m *Manager, t *Test) error {
     for {
         if ctx.Err() != nil {
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         }
         if tracker.Status() != state.StatusOnline {
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("the session dropped after %s",
                 time.Since(onlineSince).Round(time.Second))
@@ -403,7 +403,7 @@ func botLifetimeScenario(ctx context.Context, m *Manager, t *Test) error {
         select {
         case <-ctx.Done():
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         case <-time.After(monitorPeriod):
@@ -452,7 +452,7 @@ func proxyRelayScenario(ctx context.Context, m *Manager, t *Test) error {
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
 
         return err
     }
@@ -460,7 +460,7 @@ func proxyRelayScenario(ctx context.Context, m *Manager, t *Test) error {
     client, err := driveRelayClient(ctx, serverAddr, tracker, test)
     if err != nil {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
 
         return err
     }

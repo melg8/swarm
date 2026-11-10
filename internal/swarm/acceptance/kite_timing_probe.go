@@ -589,7 +589,7 @@ func (s *kiteProbeSession) close() {
     }
     if s.runDone != nil {
         select {
-        case <-s.runDone:
+        case <-s.runDone: //nolint:errcheck // teardown join, error is moot
         case <-time.After(10 * time.Second):
         }
     }

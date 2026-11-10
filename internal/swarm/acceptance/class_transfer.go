@@ -233,7 +233,7 @@ func classTransferScenario(ctx context.Context, m *Manager, t *Test) error {
     if err := waitOnline(ctx, tracker, test); err != nil {
         writeClassTransferFailMetrics(test, err.Error())
         session.cancel()
-        <-session.done
+        joinSessionDone(session.done)
 
         return fmt.Errorf("world entry: %w", err)
     }
@@ -441,7 +441,7 @@ func classTransferAbort(
     writeClassTransferOutcomeMetrics(test, tracker, true,
         time.Since(start), reason)
     session.cancel()
-    <-session.done
+    joinSessionDone(session.done)
 
     return errors.New(reason)
 }

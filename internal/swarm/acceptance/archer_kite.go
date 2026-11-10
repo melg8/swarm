@@ -736,13 +736,13 @@ func archerKiteScenario(ctx context.Context, m *Manager, t *Test) error {
 
     sessionCtx, cancelSession := context.WithCancel(ctx)
     defer cancelSession()
-    sessionDone := make(chan error, 1)
+    sessionDone := make(chan struct{}, 1)
     kiteLog := newArcherKiteLog(test.appendLog)
     go func() {
         m.runSessionSupervised(sessionCtx, archerKiteAccount,
             archerKitePassword, archerKiteAccount, m.proxy,
             kiteLog.line, archerKiteTypeHook)
-        sessionDone <- nil
+        sessionDone <- struct{}{}
     }()
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
@@ -771,7 +771,7 @@ func archerKiteScenario(ctx context.Context, m *Manager, t *Test) error {
 // broken halves otherwise.
 func archerKiteAwaitOutcome(
     ctx context.Context, test *Test, cancelSession context.CancelFunc,
-    sessionDone chan error, cancelMonitor context.CancelFunc,
+    sessionDone chan struct{}, cancelMonitor context.CancelFunc,
     monitorDone chan archerKiteWatch,
 ) error {
     var watch archerKiteWatch

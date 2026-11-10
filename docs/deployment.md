@@ -190,20 +190,20 @@ and provenance (verified 2026-09-05) are the reference for future work:
 - Shipped config differences vs the bootstrap tweaks: `PathFinding = 2`
   and `AutoPlay.ini` has `EnableAutoPlay = False` on this deployment
   (ground items must be picked by the bot itself, nothing auto loots).
-- Windows dev tooling caveats: the installed Go (1.27) is newer than
-  `go.mod` (1.23) - fine for building and tests. The toolchain works:
-  `task` 3.53.1 (installed 2026-09-08 via `go install
+- Windows dev tooling caveats: the module pins `go 1.27.2` and the
+  local Go (1.27.1 or newer) switches to that toolchain on the first
+  command inside the module - no separate install step. The toolchain
+  works: `task` 3.53.1 (installed 2026-09-08 via `go install
   github.com/go-task/task/v3/cmd/task@latest`) and golangci-lint
-  v2.13.2 (the `.golangci.yml` v2 migration of the same day; the
-  strict linter set is preserved with documented exclusions - G115 for
-  the wire parser integer conversions, test-file relief for fixtures -
-  see the comments in `.golangci.yml`). Run `golangci-lint run` before
-  considering work done. The race detector needs cgo with a gcc
-  toolchain, which the Windows host lacks: `task test:race` is the
-  `-race` suite for environments with cgo (the Linux sandbox, CI); the
-  plain `task test` stays race free. The `exhaustruct` ->
-  `exhaustruct_v5` rename (deprecated since v2.13) is a known
-  follow-up - the v5 major flags new sites and needs its own round.
+  v2.15.0 (the pin that reads the 1.27.2 export data; the older 2.13
+  line fails the typecheck phase on it - the `.golangci.yml` v2
+  migration keeps the strict linter set with documented exclusions -
+  G115 for the wire parser integer conversions, test-file relief for
+  fixtures - see the comments in `.golangci.yml`). Run
+  `golangci-lint run` before considering work done. The race detector
+  needs cgo with a gcc toolchain, which the Windows host lacks: `task
+  test:race` is the `-race` suite for environments with cgo (the Linux
+  sandbox, CI); the plain `task test` stays race free.
 
 ## Mobius stack operational notes
 

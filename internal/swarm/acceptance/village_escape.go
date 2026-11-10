@@ -128,7 +128,7 @@ func villageEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
     for {
         if ctx.Err() != nil {
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         }
@@ -147,7 +147,7 @@ func villageEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
         }
         if time.Since(onlineSince) > villageEscapeWindow {
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return errors.New("the character stood inside the city for " +
                 time.Since(onlineSince).Round(time.Second).String() +
@@ -156,7 +156,7 @@ func villageEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
         select {
         case <-ctx.Done():
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         case <-time.After(monitorPeriod):
@@ -194,7 +194,7 @@ func launchEscapeSession(
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
 
         return nil, nil, nil, err
     }

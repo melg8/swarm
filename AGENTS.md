@@ -124,11 +124,11 @@ server is load-bearing for the task.
 ## Tech stack at a glance (read this first)
 
 - **Language**: Go (deployed by `tools/swarm_fast_deploy.sh`).
-  `go.mod` pins `go 1.26.0` (raised by the 2026-09-21 dependency
-  bump) and the `toolchain go1.26.8` line - every
-  `go` invocation inside the module switches to the go1.26.8
-  toolchain, so the formatting and the gates agree on every host (the
-  deb go1.24 GOROOT included). There is **no Rust, no Node, no C** in
+  `go.mod` pins `go 1.27.2` and the `toolchain go1.27.2` line (the
+  floor that carries the stdlib fixes of the 2026-11 govulncheck
+  round) - every `go` invocation inside the module switches to the
+  go1.27.2 toolchain, so the formatting and the gates agree on every
+  host. There is **no Rust, no Node, no C** in
   the bot itself. Node is only used by the nine `tools/repro_*.js`
   web UI harnesses (plain JS, no npm).
 - **Module path**: `github.com/melg8/swarm`.
@@ -137,14 +137,14 @@ server is load-bearing for the task.
   helpers), `klauspost/compress` (the zstd navmesh tile pack).
 - **Task runner**: `Taskfile.yml` (go-task) wraps every routine
   command - prefer the `task` aliases over bare `go`/lint calls.
-- **Linter gate**: golangci-lint v2.13.2, strict (see
+- **Linter gate**: golangci-lint v2.15.0, strict (see
   `.golangci.yml`). `task` and the repository formatter
   `gofmt-spaces` are installed by `tools/install_dev_tools.sh`.
 
 Do **not** install Rust, Cargo, Node bundlers, webpack or any C/C++
 toolchain. Use the Go installation the host provides (the deployment
 layout of the Linux sandbox and the Windows host lives in
-`docs/deployment.md`); the module's `toolchain go1.26.8` line selects
+`docs/deployment.md`); the module's `toolchain go1.27.2` line selects
 the actual toolchain on either host.
 
 ## What this project is

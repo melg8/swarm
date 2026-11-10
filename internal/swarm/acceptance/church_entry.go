@@ -169,7 +169,7 @@ func churchEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     tracker := m.tracker(test)
     if err := waitOnline(ctx, tracker, test); err != nil {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
 
         return err
     }
@@ -181,7 +181,7 @@ func churchEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     for {
         if ctx.Err() != nil {
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         }
@@ -200,7 +200,7 @@ func churchEntryScenario(ctx context.Context, m *Manager, t *Test) error {
         select {
         case <-ctx.Done():
             cancelSession()
-            <-sessionDone
+            joinSessionDone(sessionDone)
 
             return fmt.Errorf("cancelled: %w", ctx.Err())
         case <-time.After(monitorPeriod):

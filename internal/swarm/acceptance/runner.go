@@ -347,6 +347,13 @@ func wireSessionLoop(
     }
 }
 
+// joinSessionDone waits for a supervised session goroutine after a
+// cancel and discards its error: the teardown paths call it only to
+// join the goroutine, the scenario verdict already names the outcome.
+func joinSessionDone(done <-chan error) {
+    <-done //nolint:errcheck // teardown join, the error is moot
+}
+
 // runSessionSupervised keeps the temp session alive the way the
 // runBotForever supervisor does: a lost session (the emergency logout
 // of the hunt loop, a server kick, a transport error) reconnects

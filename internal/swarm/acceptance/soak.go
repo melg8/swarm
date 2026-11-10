@@ -243,7 +243,7 @@ func soakTeardownSession(
     }
     cancel()
     if done != nil {
-        <-done
+        joinSessionDone(done)
     }
 }
 

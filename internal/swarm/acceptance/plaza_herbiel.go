@@ -157,7 +157,7 @@ func plazaHerbielScenario(ctx context.Context, m *Manager, t *Test) error {
     }()
     defer func() {
         cancelSession()
-        <-sessionDone
+        joinSessionDone(sessionDone)
     }()
 
     tracker := m.tracker(test)

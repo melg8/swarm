@@ -230,11 +230,11 @@ func delevelScenario(ctx context.Context, m *Manager, t *Test) error {
     time.Sleep(ensurePause)
 
     sessionCtx, cancelSession := context.WithCancel(ctx)
-    sessionDone := make(chan error, 1)
+    sessionDone := make(chan struct{}, 1)
     go func() {
         m.runSessionSupervised(sessionCtx, delevelAccount,
             delevelPassword, delevelAccount, m.proxy, test.appendLog)
-        sessionDone <- nil
+        sessionDone <- struct{}{}
     }()
     defer func() {
         cancelSession()
