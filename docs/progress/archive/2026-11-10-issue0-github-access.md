@@ -1,4 +1,4 @@
-# GitHub access from the machine: gh over the stored git credential (status: in progress)
+# GitHub access from the machine: gh over the stored git credential (status: complete)
 
 Started 2026-11-10, branch main, issue0.
 
@@ -53,5 +53,9 @@ Collected 2026-11-10:
 
 ## Status
 
-Access works end to end. Next: the final verification pass, the commit
-and the archive of this fragment.
+Complete. `tools/gh_token.sh` answers `gh auth status` and `gh pr
+list` on this host without any stored gh config; the housekeeping of
+2026-11-10 (five PR closes, the #62 comment, the #11 and #59 closes)
+went through it. The setup is documented in `docs/deployment.md` and
+pinned by `AGENTS.md`, so a fresh host repeats it from the repository
+alone.
