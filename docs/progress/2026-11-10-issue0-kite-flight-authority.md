@@ -199,3 +199,13 @@ not the object of an ongoing fight. Test:
   `setMobHealth` test helper drops its constant object id parameter
   and the tick carries the documented `gocognit` directive of the
   hunt decision-tree convention. The behavior is unchanged.
+
+### 2026-11-10 - the final build confirmations (runs 35, 36)
+
+Run 35 (5 minutes, the final `ffd3bfef` build carrying the lint
+refactor) passed all eight checks: 62 shots with every one of the 55
+shot gaps inside the bow cooldown, 72 kite steps (52 shot-cycle), 0
+holds, 5 kills of the wanted 2, 96 standing fight samples with the
+farthest at 483 units, min HP 69 percent, min quiver 538. Consecutive
+with run 34 this is the second green window in a row and the first on
+the exact pushed tree.
