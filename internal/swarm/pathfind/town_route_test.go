@@ -30,9 +30,6 @@ func townGeodataCandidates() []string {
             dir = parent
         }
     }
-    candidates = append(candidates, filepath.Join("E:\\", "work",
-        "lineage_workspace_fresh", "L2J_Mobius_C1_HarbingersOfWar",
-        "game", "data", "geodata"))
 
     return candidates
 }

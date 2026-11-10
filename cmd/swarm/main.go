@@ -59,8 +59,6 @@ var defaultGeodataCandidates = []string{
     filepath.Join("..", "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar",
         "dist", "game", "data", "geodata"),
     filepath.Join("L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
-    filepath.Join("E:\\", "work", "lineage_workspace_fresh",
-        "L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
 }
 
 // Candidate navmesh tile directories, checked in order when -navmesh
