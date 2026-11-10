@@ -776,6 +776,39 @@ func (l *Loop) kiteFlightMovable(now time.Time) bool {
     return !now.Before(at.Add(cycle/2 + kiteWindupLead))
 }
 
+// kiteFleeWait reports whether a movement owner keeps the flight on
+// the ground this tick. The deferred retreat click of a finished
+// fight is stood down first: the loot interrupt drops the target a
+// second after the shot, and its disable hold kept the whole flight
+// standing through the bow window (the 2026-11-10 run-29 dump took 15
+// damage per 1.9 s inside it). The same stand-down kiteClickWalk runs
+// on the fight side. The busy window and the walled-lane hold own
+// their ticks too - the hold re-probes at the kite period and the
+// zone-clamped melee fan never runs behind it (its no-lane and
+// no-progress guards log a drifted archer out mid-flight - the run-24
+// dump). The bow windup owns its moment: a move request inside it is
+// saved by the server and replayed at the disable end (see
+// kiteFlightMovable), so the flight waits instead of arming a
+// deferred click the stall watchdog misreads. The stand request (or
+// the server side stand settle) owns the tick as well - the first
+// walk must land on a movable character.
+func (l *Loop) kiteFleeWait(now time.Time) bool {
+    if !l.kiteClickAt.IsZero() && l.kiteClickFor != l.target {
+        l.kiteClickDrop()
+    }
+
+    return l.kiteFleeBusy(now) || l.kiteFleeHeld(now) ||
+        !l.kiteFlightMovable(now) || !l.standUpGuarded(now)
+}
+
+// kiteFleeOtherDeck reports whether the attacker sits on another
+// deck: its swings cannot land and the straight lane crosses the
+// geodata wall - the hunt owns that chase.
+func kiteFleeOtherDeck(attackerZ, selfZ int32) bool {
+    return attackerZ != 0 &&
+        math.Abs(float64(attackerZ-selfZ)) > deckReachableZ
+}
+
 // kiteFleeThreat answers a defensive flee with the STRAIGHT bow
 // flight (the run-3 finding of the 2026-11-09 round): the melee flee
 // machinery (fleeFromThreat) fans its escape lanes inside the CURRENT
@@ -813,46 +846,14 @@ func (l *Loop) kiteFleeThreat(now time.Time) bool {
     if !ok || l.tracker.ObjectUsesBow(attacker.ObjectID) {
         return false
     }
-    if !l.kiteClickAt.IsZero() && l.kiteClickFor != l.target {
-        // The deferred retreat click of a finished fight no longer
-        // owns the movement: the loot interrupt drops the target a
-        // second after the shot, and its disable hold kept the whole
-        // flight standing through the bow window (the 2026-11-10
-        // run-29 dump took 15 damage per 1.9 s inside it). The same
-        // stand-down kiteClickWalk runs on the fight side.
-        l.kiteClickDrop()
-    }
-    if l.kiteFleeBusy(now) {
-        return true
-    }
-    if l.kiteFleeHeld(now) {
-        // The walled-lane hold of the flight owns every tick: the
-        // re-probe fires at the kite period, the zone-clamped melee
-        // fan never runs behind it (its no-lane and no-progress
-        // guards log a drifted archer out mid-flight - the
-        // 2026-11-10 run-24 dump).
-        return true
-    }
-    if !l.kiteFlightMovable(now) {
-        // The bow windup owns the moment: a move request inside it
-        // is saved by the server and replayed at the disable end
-        // (see kiteFlightMovable), so the flight waits instead of
-        // arming a deferred click the stall watchdog misreads.
-        return true
-    }
-    if !l.standUpGuarded(now) {
-        // The stand request (or the server side stand settle) owns
-        // the tick: the first walk must land on a movable character.
+    if l.kiteFleeWait(now) {
         return true
     }
     selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
     if !selfOK {
         return false
     }
-    if attacker.Z != 0 &&
-        math.Abs(float64(attacker.Z-selfZ)) > deckReachableZ {
-        // Another deck: its swings cannot land and the straight lane
-        // crosses the geodata wall - the hunt owns this chase.
+    if kiteFleeOtherDeck(attacker.Z, selfZ) {
         return false
     }
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)

@@ -17,10 +17,11 @@ import (
     "github.com/stretchr/testify/require"
 )
 
-// setMobHealth sets the current and maximum health of a spawned mob:
-// the health percent view of the losing-fight verdict needs both.
-func setMobHealth(bot *state.Bot, objectID int32, hp int32) {
-    bot.ApplyStatusUpdate(objectID, []state.Attribute{
+// setMobHealth sets the current and maximum health of the spawned
+// mob 7 (the attacker of the aggro-answer scenes): the health percent
+// view of the losing-fight verdict needs both.
+func setMobHealth(bot *state.Bot, hp int32) {
+    bot.ApplyStatusUpdate(7, []state.Attribute{
         {ID: state.AttrMaxHP, Value: 100},
         {ID: state.AttrCurHP, Value: hp},
     })
@@ -81,7 +82,7 @@ func TestLoopAnswersTheAggroAheadOfTheStuckTimeout(t *testing.T) {
 func TestLosingFightIgnoresTheUntouchedTargetBar(t *testing.T) {
     bot := newTestBot()
     spawnMobAt(bot, 7, 45600)
-    setMobHealth(bot, 7, 100)
+    setMobHealth(bot, 100)
     hurtTo(bot, 56)
     loop := NewLoop(&fakeGame{}, bot)
     loop.target = 7
@@ -97,7 +98,7 @@ func TestLosingFightIgnoresTheUntouchedTargetBar(t *testing.T) {
 func TestLosingFightKeepsTheGapRuleForTheRunningFight(t *testing.T) {
     bot := newTestBot()
     spawnMobAt(bot, 7, 45600)
-    setMobHealth(bot, 7, 100)
+    setMobHealth(bot, 100)
     selfSwingsAt(bot, 45600)
     hurtTo(bot, 50)
     loop := NewLoop(&fakeGame{}, bot)
@@ -119,7 +120,7 @@ func TestLosingFightFleesTheBowAddBeforeTheNearlyDeadTarget(
 ) {
     bot := newTestBot()
     spawnMobAt(bot, 7, 45600)
-    setMobHealth(bot, 7, 1)
+    setMobHealth(bot, 1)
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 8, TemplateID: 1000469, Attackable: true,
         X: 45700, Y: 50000, RightHandItem: 14,
@@ -140,7 +141,7 @@ func TestLosingFightFleesTheBowAddBeforeTheNearlyDeadTarget(
 func TestLosingFightKeepsTheNearlyDeadMeleeTarget(t *testing.T) {
     bot := newTestBot()
     spawnMobAt(bot, 7, 45600)
-    setMobHealth(bot, 7, 1)
+    setMobHealth(bot, 1)
     spawnMobAt(bot, 8, 45700)
     attackerHits(bot, 8, 45700)
     hurtTo(bot, 68)
@@ -157,7 +158,7 @@ func TestLosingFightKeepsTheNearlyDeadMeleeTarget(t *testing.T) {
 func TestLosingFightStillEscapesTheCriticalHealth(t *testing.T) {
     bot := newTestBot()
     spawnMobAt(bot, 7, 45600)
-    setMobHealth(bot, 7, 100)
+    setMobHealth(bot, 100)
     hurtTo(bot, 20)
     loop := NewLoop(&fakeGame{}, bot)
     loop.target = 7

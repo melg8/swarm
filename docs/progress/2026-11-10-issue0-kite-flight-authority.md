@@ -187,3 +187,15 @@ not the object of an ongoing fight. Test:
 `TestFightTargetClearedWhenTargetDies` (the run-33 scene).
 - `go build ./...`, the state, connection and hunt suites and
   `golangci-lint run --new` pass.
+- Run 34 (5 minutes, the dead-target clear) passed all eight
+  checks: 62 shots with 98 percent of the gaps inside the bow
+  cooldown, 50 kite steps (48 shot-cycle), 0 holds, 7 kills of the
+  wanted 2, 99 standing fight samples with the farthest at 516
+  units, min HP 68 percent, min quiver 538.
+- The full lint pass of the branch (the `--new` gate hid the
+  function-level findings) is clean again: the flight gate ladder
+  splits out as `kiteFleeWait` and `kiteFleeOtherDeck`
+  (`kiteFleeThreat` back under the cyclomatic limit), the
+  `setMobHealth` test helper drops its constant object id parameter
+  and the tick carries the documented `gocognit` directive of the
+  hunt decision-tree convention. The behavior is unchanged.

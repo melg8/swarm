@@ -1688,7 +1688,7 @@ func (l *Loop) releaseCellClaim() {
 // first pickup happens on the same tick.
 // Pre-consolidation phase debt; the hunt loop cleanup is planned
 // (docs/quality_review_and_agent_prompts.md P07).
-func (l *Loop) tick() { //nolint:cyclop,funlen
+func (l *Loop) tick() { //nolint:cyclop,funlen,gocognit
     // Publish the hunt loop phase to the bot tracker so the web UI
     // can show the human readable activity banner. SetPhase is a
     // no-op when the phase has not changed, so the per tick call

@@ -661,7 +661,7 @@ func kitePileUpScene(
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrLevel, Value: 10},
     })
-    setMobHealth(bot, 7, targetHP)
+    setMobHealth(bot, targetHP)
     for i, objectID := range []int32{8, 9} {
         x := int32(45100 + i*100)
         bot.ApplyNpcInfo(state.NpcInfo{
@@ -793,7 +793,7 @@ func TestKiteFlightOwnsTheTargetlessPileUp(t *testing.T) {
     bot, game, loop := kiteBowBot(t, 45440)
     // The nearly-dead melee pick of the run: its one-shot exemption
     // keeps the shot cycle alive until the bow add invalidates it.
-    setMobHealth(bot, 7, 1)
+    setMobHealth(bot, 1)
     // The level 8 Kaboo Orc Archer of the run joined BEHIND the melee
     // pack, so the nearest attacker stays a melee chaser and the
     // straight flight answers it.
