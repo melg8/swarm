@@ -1,4 +1,4 @@
-# The old navmesh PRs: land the size round, the corpus gate and the dual view (status: in progress)
+# The old navmesh PRs: land the size round, the corpus gate and the dual view (status: complete)
 
 Started 2026-11-10, branch main, issues #11, #27 and #59.
 
@@ -106,5 +106,10 @@ retired sandbox and noreply identities).
 
 ## Status
 
-#26, #55 and #67 are landed on the landing branch and verified; the
-remaining step is the final pre-push gate and the push of main.
+Complete: #26, #55 and #67 are landed on `main` (fast-forward, four
+linear commits, `60869338` is the head; `task prepush` green). The
+GitHub side still needs the owner: mark #26, #55 and #67 merged (or
+close them with the landed commit references), close #16 as landed and
+#61 as rejected by the zero-drift gate; #62 stays open for the corpus
+answer contract decision. There is no `gh` binary or API token on this
+machine, so those clicks cannot be automated from here.
