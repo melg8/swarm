@@ -27,8 +27,10 @@ the documentation map below) and is read on demand, not upfront.
    `docs/progress/` on the task's feature branch carries the working
    state. The legacy `docs/agent_progress.md` is a frozen archive -
    never append to it (the shared-file clash policy below).
-5. Deploy first (`tools/swarm_fast_deploy.sh`, the mandatory first
-   step below) - no task runs against an undeployed stack.
+5. Bring the stack up first (the Linux sandbox runs
+   `tools/swarm_fast_deploy.sh`, the Windows host follows the manual
+   deployment of `docs/deployment.md`) - no task runs against an
+   undeployed stack.
 
 ## Session limits (owner instruction, mandatory)
 
@@ -44,15 +46,13 @@ the documentation map below) and is read on demand, not upfront.
   sandbox reaper): budget the verification loops accordingly and
   split anything longer (per-package test runs instead of the whole
   tree in one call).
-- Stamp the session start into `/home/z/my-project/.session_start_ts`
-  (a unix timestamp, one line) at the session start; read it back
-  (`cat /home/z/my-project/.session_start_ts`) and compare with
-  `date +%s` before starting any long operation. Budget with the
-  measured cycle times in the deploy section below (the full verify
-  loop is ~5.5 minutes). `tools/session_start.sh` prints the whole
-  bootstrap checklist in one command (the stamp age, the rebase
-  verdict, the login port probe, the open hypotheses, the active
-  task headline).
+- In the Linux sandbox, stamp the session start into
+  `/home/z/my-project/.session_start_ts` (a unix timestamp, one
+  line) and read it back (`cat`) before starting any long operation.
+  `tools/session_start.sh` prints the whole bootstrap checklist in
+  one command (the stamp age, the rebase verdict, the login port
+  probe, the open hypotheses, the active task headline). The Windows
+  host has no stamp file: budget the session from the prompt time.
 - The exact kill mechanism is not observable from inside the
   sandbox; treat the limits as a hard owner directive, not a
   hypothesis (the registry below collects server facts, this is an
@@ -107,19 +107,19 @@ server is load-bearing for the task.
   a smaller bot count, a shorter window) and record the cycle time
   in the docs so the next agent does not re-measure blindly.
 
-## Language (owner instruction, 2026-09-20, mandatory)
+## Language (owner instruction, updated 2026-11-10)
 
-- Reason and answer in English **always**, whatever language the
-  owner prompt arrives in (the prompts mix Russian and English; the
-  internal reasoning and the owner facing replies stay English
-  regardless - no Russian or any other language in the answers, not
-  even when quoting the owner message verbatim: translate the quote).
+- Answer in the language the owner prompt is written in: a Russian
+  prompt gets a Russian answer, an English prompt gets an English
+  answer, and the answer stays in that language until the owner
+  switches. Do not translate the owner's words into another language
+  in the reply.
 - The code and the comments are English **always**: every identifier,
   comment, log string, test name, commit message, doc file and work
   log entry written in this repository is English. The code
   conventions section below enforces the comment part through the
   lint gate; this rule covers every produced text the gate does not
-  see (the commit bodies, the docs prose, the replies).
+  see (the commit bodies and the docs prose).
 
 ## Tech stack at a glance (read this first)
 
@@ -134,7 +134,7 @@ server is load-bearing for the task.
 - **Module path**: `github.com/melg8/swarm`.
 - **Libraries**: `golang.org/x/crypto` (Blowfish), `golang.org/x/text`
   (UTF-16 handling), `testify` (assertions), `sergi/go-diff` (test
-  helpers).
+  helpers), `klauspost/compress` (the zstd navmesh tile pack).
 - **Task runner**: `Taskfile.yml` (go-task) wraps every routine
   command - prefer the `task` aliases over bare `go`/lint calls.
 - **Linter gate**: golangci-lint v2.13.2, strict (see
@@ -142,9 +142,10 @@ server is load-bearing for the task.
   `gofmt-spaces` are installed by `tools/install_dev_tools.sh`.
 
 Do **not** install Rust, Cargo, Node bundlers, webpack or any C/C++
-toolchain. The only Go toolchain is the one the fast deploy puts at
-`/home/z/opt/go-root/usr/lib/go-1.24/bin/go`; add it to PATH or invoke
-through `task` (the fast deploy wrapper).
+toolchain. Use the Go installation the host provides (the deployment
+layout of the Linux sandbox and the Windows host lives in
+`docs/deployment.md`); the module's `toolchain go1.26.8` line selects
+the actual toolchain on either host.
 
 ## What this project is
 
@@ -176,13 +177,15 @@ one of them is the reference for its subsystem:
 | `docs/launch_config.md` | The launch configuration file (the -config flag): the JSON format, the flag precedence rules, the fleet composition (bot types with counts), the default config |
 | `docs/hunting.md` | The autonomous hunt: hunt loop, combat safety, blind engage recovery, multi-zone hunting, the hexagon cell system, auto equipment, shop strategy execution, town trips, deleveling, live-validated facts |
 | `docs/hunting_cells.md` | The hexagon cell hunting: the uniform ground partition, the visibility budget, the enemy-first roam, the ripeness-paced neighbor rotation, the mesh endpoint, the registry invariants |
+| `docs/kite_timing_findings.md` | The measured Mobius C1 bow cycle (the shot, the windup end, the disable end) and the retreat-click ladder behind the shot-cycle kite; the current design lives in docs/hunting.md |
 | `docs/shopping_strategy.md` | The shop strategy reasoning, prices, purchase phases and the was/is level journey comparison |
 | `docs/webui.md` | The web interface: launch modes, map rendering, movement interpolation, HUD, equipment and shop queue widgets, interactivity, the bot statistics tab, snapshot encoding, the state tracker internals, repro harnesses |
 | `docs/session_journal.md` | The persistent session journal: the JSONL record of the whole run (events, samples, kills, trips, purchases), the session dump report of the web UI, the offline -session-report CLI |
+| `docs/acceptance_botlog.md` | The acceptance run logs: the per-run packet trail and the monitor verdicts of the live scenarios (-acceptance, logs/acceptance) |
 | `docs/pathfinding.md` | The geodata pathfinder: format, engine, deviations from the original, test UI, benchmarks, geodata visualization |
-| `docs/navmesh.md` | The navmesh pathfinding of feature/new-pathfind: the Detour-style runtime, the Go mesh builder from the geodata, the tile format, the pack cmd, the measured comparison, the live hybrid integration behind the Navigator seam |
+| `docs/navmesh.md` | The navmesh pathfinding: the Detour-style runtime, the Go mesh builder from the geodata, the tile format, the pack cmd, the measured comparison, the live hybrid integration behind the Navigator seam |
 | `docs/navigation_analysis.md` | The measured gaps on the road to universal A to B world navigation (continue navigation work from there) |
-| `docs/recast_pathfinding.md` | The recastnavigation research of feature/new-pathfind: what the Detour navmesh gives the geodata pathfinder, the sheet decomposition converter, the Go runtime prototype and the migration verdict |
+| `docs/recast_pathfinding.md` | The recastnavigation research: what the Detour navmesh gives the geodata pathfinder, the sheet decomposition converter, the Go runtime prototype and the migration verdict |
 | `docs/proxy.md` | The MITM client proxy: running it, the l2.ini recipes, the protocol the client sees, the relogin handoff, debugging proxy.log |
 | `docs/protocol_description.md` | The wire protocol: packet framing, the login and game flows, per-packet layouts (originally written against l2j-lisvus; Mobius C1 is the current reference) |
 | `docs/devlog/` | The permanent record of the development rounds, one fragment file per round with the root cause analyses (`docs/development_log.md` is the frozen pre-split archive) - read the matching rounds before reworking movement rendering or the hunt behavior |
@@ -390,17 +393,16 @@ conversation or in a commit message: it lives in the registry below.
 ## Mandatory first step of every task: deploy and verify the environment
 
 Any task in this repository - a bug fix, a feature, a refactor, a test
-run or an investigation - starts by deploying the repository
-dependencies with `tools/swarm_fast_deploy.sh` and installing the
-Go developer tools with `tools/install_dev_tools.sh`. The fast deploy
-brings up the Go toolchain, the Mobius C1 stack (login 2106, game
-7777, MariaDB 3306) and builds the bot; the dev-tools script fills the
-gap the fast deploy leaves open (`task`, `golangci-lint`, `gci`,
-`gofmt-spaces`). Do not begin the actual work on an undeployed or broken
-stack: nearly every task needs the live login server (2106), game
-server (7777) and MariaDB (3306) to reproduce, test and validate
-behavior. (A pure documentation change that touches no code needs
-only `go build ./...` and the lint gate.)
+run or an investigation - starts by bringing the stack up: the Linux
+sandbox runs `tools/swarm_fast_deploy.sh`, the Windows host follows
+the manual deployment of `docs/deployment.md`. Both install the Go
+developer tools with `tools/install_dev_tools.sh` (`task`,
+`golangci-lint`, `gci`, `gofmt-spaces`, `govulncheck`). Do not begin
+the actual work on an undeployed or broken stack: nearly every task
+needs the live login server (2106), game server (7777) and MariaDB
+(3306) to reproduce, test and validate behavior. (A pure
+documentation change that touches no code needs only
+`go build ./...` and the lint gate.)
 
 ```bash
 bash tools/swarm_fast_deploy.sh        # ~90 s on a blank sandbox
@@ -422,14 +424,15 @@ the foreground start with the long timeout is the only correct first
 attempt. The full rule lives in `docs/deployment.md` ("Foreground
 execution is mandatory").
 
-The deploy is successful only when the last lines printed contain
-`STACK_READY: login :2106, game :7777, db :3306` (printed by
+The sandbox deploy is successful only when the last lines printed
+contain `STACK_READY: login :2106, game :7777, db :3306` (printed by
 `tools/mobius_start.sh` invoked at the end of `swarm_fast_deploy.sh`,
 not by the deploy script itself), the three ports listen
-(`ss -ltn | grep -E ':(2106|7777|3306) '`) and the schema count is 75.
-The deeper end-to-end check is `tools/mobius_e2e.sh 45` (must print
-`E2E_OK`). The script is idempotent and needs no root; the full
-procedure, all checks with commands and the failure handling live in
+(`ss -ltn | grep -E ':(2106|7777|3306) '`, `netstat -ano` on the
+Windows host) and the schema count is 75. The deeper end-to-end check
+of the Linux stack is `tools/mobius_e2e.sh 45` (must print `E2E_OK`).
+The script is idempotent and needs no root; the full procedure, all
+checks with commands and the failure handling live in
 `docs/deployment.md` (which also covers the script inventory, the
 Windows host deployment and the stack tunables). If any check fails,
 stop and fix the deployment first.
@@ -590,8 +593,9 @@ never the other way round.
   checkout). They must not alter any decision the server makes.
 - Vanilla quirks discovered along the way (guards that follow without
   attacking, the Lucky newbie protection below level 10) go into the
-  protocol notes below and into `docs/development_log.md`, and shape
-  the bot logic instead of a server fix. The historical
+  protocol notes below and into a `docs/devlog/` fragment (the frozen
+  `docs/development_log.md` never takes appends), and shape the bot
+  logic instead of a server fix. The historical
   `mobius_server_delevel.patch` (guard revenge + NPC kill penalty)
   violated this rule and was removed.
 - The geodata region files the bot navigates with live in
@@ -607,20 +611,28 @@ never the other way round.
 ## Repository layout
 
 ```
-cmd/swarm/                     Application entry point (flags: login,
-                               account, password, char, web, hunt, bots,
-                               proxy, pathfind-test, test-fight-ui,
-                               test-fight-ui-v1, geodata, navmesh,
-                               show-navmesh, max-passable).
+cmd/swarm/                     Application entry point: the bot
+                               launcher (login, account, password,
+                               char, web, hunt, bots, proxy), the
+                               botless test modes (pathfind-test,
+                               test-fight-ui, show-navmesh) and the
+                               acceptance/session-report CLI; the
+                               full flag list is `-h` and
+                               cmd/swarm/main.go.
 cmd/navmesh-build/             The offline geodata -> navmesh tile
-                               converter of feature/new-pathfind
-                               (docs/navmesh.md).
+                               converter (docs/navmesh.md).
 cmd/navmesh-export/            Dumps the built tile pack (polygons,
                                links, portals) for the external
                                pathfinding harnesses (docs/navmesh.md).
 cmd/navanalyze/                Scratch analysis of the navmesh tile
                                geometry and the raw geodata (the viewer
                                defect hunts).
+cmd/cornerprobe/               The delevel guard walk route probe:
+                               every turn click validated the way the
+                               server movement validation does.
+cmd/counterprobe/              Scratch probe of the merchant counter
+                               geometry: the geodata classification
+                               and the mesh route answer per shop.
 cmd/stuckprobe/                Prints the exact RouteApproach answers
                                for reported frozen bot positions (the
                                stuck verdict probe).
@@ -637,6 +649,10 @@ cmd/gofmt-spaces/              The spaces-only gofmt the repository
                                tools/install_dev_tools.sh, run through
                                `task fmt`).
 internal/swarm/
+  acceptance/                  The live acceptance scenarios of the
+                               -acceptance flag: the monitor, the
+                               verdict lines and the per-run packet
+                               log (docs/acceptance_botlog.md).
   pathfind/                    Geodata path finder (docs/pathfinding.md).
   pathfind/navmesh/            The navmesh runtime: tiles, mesh, A*,
                                funnel, the approach goal and the
@@ -655,6 +671,10 @@ internal/swarm/
                                (docs/hunting.md); navmesh_navigator.go
                                is the mesh/grid hybrid behind the
                                Navigator seam (docs/navmesh.md).
+  huntaudit/                   The spot audit: injects a spot anchor and
+                               records where the server places the
+                               character plus the npc population around
+                               it (the resumable JSON evidence).
   gear/                        Equipment scoring and the shop strategy
                                planner (docs/hunting.md,
                                docs/shopping_strategy.md).
@@ -664,8 +684,16 @@ internal/swarm/
                                snapshot endpoints, the SSE event stream,
                                the pathfind test mode (docs/webui.md).
   proxy/                       The MITM client proxy (docs/proxy.md).
+  session/                     The session journal aggregation behind the
+                               dump report and the offline session
+                               report (docs/session_journal.md).
   fleete2e/                    The 100 bot fleet E2E benchmark
                                (docs/webui.md).
+  fleetprofile/                The opt-in fleet profile window (the 40
+                               bot CPU and allocation capture of the
+                               real Run cadence; SWARM_FLEET_PROFILE).
+  memwatch/                    The once-a-minute process memory log of
+                               the unattended runs.
   helpers/                     Hex+ASCII dump helpers for debugging.
   packets/
     packet/                    Binary Reader/Writer primitives (little
@@ -692,8 +720,9 @@ docs/                          Subsystem documentation (the map above).
 
 Keep new code inside `internal/`. There is no public API yet:
 everything is an internal implementation detail of the bot. The
-`tools/` shell scripts are the only supported way to bring the test
-server stack up.
+`tools/` shell scripts are the supported way to bring the Linux
+sandbox stack up; the Windows host uses the manual deployment of
+`docs/deployment.md`.
 
 ## Commands
 
@@ -736,15 +765,16 @@ task fmt:check            # fails on any tab left in a tracked text file
 task tidy                 # go mod tidy (re-tabs go.mod: run task fmt after)
 ```
 
-`docs/ci_workflow.yml` (the copy the owner places into
-`.github/workflows/ci.yml` - the workflow-scoped token) runs the same
-gate on every push (build,
-vet, test, fmt:check, lint --new, the race slice of connection and
-pathfind, the logfmt scan) - a red commit is caught by the runner,
-not by the next session. The logging conventions are enforced by the
-`internal/logfmt` scan (the `TestRepoLogConventions` test): capital
-first letter (a lowercase component tag like `login#%d:` counts), no
-trailing period - fix the message, not the checker.
+The committed CI workflow (`.github/workflows/ci.yml`) runs the gate
+on every push to main, on every pull request and on a manual
+dispatch: build, vet, the full test suite, fmt:check, the full
+uncapped lint, the logfmt scan, the race slice and govulncheck - a
+red commit is caught by the runner, not by the next session.
+`docs/ci_workflow.yml` is the in-repository reference copy. The
+logging conventions are enforced by the `internal/logfmt` scan (the
+`TestRepoLogConventions` test): capital first letter (a lowercase
+component tag like `login#%d:` counts), no trailing period - fix the
+message, not the checker.
 
 The full uncapped lint is zero findings and every commit keeps it
 there (the discipline lives in the tree cleanliness section below).
@@ -1016,10 +1046,10 @@ if every commit keeps it at zero:
   previously masked the tail of the debt behind 3-identical-issue
   rounds). Expect the FULL list from every lint run.
 - `task verify` (build, vet, full `lint`, test, `fmt:check`) and
-  `task prepush` run before every push; the CI workflow
-  (`docs/ci_workflow.yml`, the copy the owner places into
-  `.github/workflows/ci.yml` when the token carries the workflow
-  scope) runs the same order plus the race slice.
+  `task prepush` run before every push; the committed CI workflow
+  (`.github/workflows/ci.yml`) runs the same gates plus the race
+  slice, govulncheck and the coverage gate on every push to main and
+  every pull request.
 - Before committing files another agent may have touched in
   parallel: run `task fmt` first (the parallel commits landed tab
   formatted ten times), then `golangci-lint run ./...` - a red
