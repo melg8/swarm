@@ -319,19 +319,19 @@ drop re-arms the panic run mid fight. The unwinnable pile up keeps
 the old run, relogin and regenerate cycle - which now lands into
 the settle instead of an immediate walk back into the pack.
 
-The CEILING belongs to the layer that fights the pack: the melee
-trade reads the general pick ceiling (targetMaxLevelSlack, level
-plus two), the armed archer kite reads its own engage ceiling
-(kiteEngageLevelSlack, level plus five). The run-26 acceptance dump
-measured the mismatch: a level 7 archer fighting a level 9 Spore
-Fungus with a level 10 Kaboo Orc Fighter chasing - both inside the
-kite ceiling of 12 - was judged "unwinnable" by the melee ceiling
-of 9, both mobs were dropped at 79 percent health, the parity
-Fighter stayed the nearest chaser and the character flew the rest
-of the window with no kill. The kite branch of the tick also
-converts an unwinnable pile up into the straight flight (see the
-archer kite section) instead of the zoned panic run, and it keeps a
-fight whose target is inside the kill window (30 percent).
+The CEILING is one for every layer: the general pick ceiling
+(targetMaxLevelSlack, level plus two) bounds the melee trade, the
+armed archer kite and the pile up verdict alike (attackerEngageable
+and pileUpWinnable in loop_safety.go). The 2026-11-10 archer round
+once widened the kite answer to level plus five and run 28 measured the
+cost: the archer adopted a level 10 Fighter against a Spore Fungus,
+lost half of its arrows and every fight at ~59 percent health. The
+widened ceiling is reverted. A pack whose attackers all sit inside
+the ceiling is TANKED (run 27 farmed its kills this way); only a
+pack holding an above-ceiling attacker converts into the straight
+flight (dropFightForFlight, see the archer kite section) instead of
+the zoned panic run, and the kill window (30 percent) still
+finishes first.
 
 ## Blind engage recovery (walk around the obstacle, then switch)
 
@@ -595,7 +595,6 @@ are references, not copies):
 | `kiteRefusalAnswerWindow` | 1s | the round-trip window of the ActionFailed attribution |
 | `kiteBowReuseDelay` | 1500 | the reuse delay of the bow family (the C1 item data) feeding the walk window formula |
 | `kiteWindupLead` | 150ms | the safety lead past the windup end before the deferred retreat clicks |
-| `kiteEngageLevelSlack` | 5 | the level gap the kite answers a melee attacker above the character |
 
 ### The shot-paced retreat (issue #60)
 
@@ -936,6 +935,13 @@ The flight geometry around the refusal:
   watchdog read the saved seconds as a dead click (the run-24 +131 s
   reset at 99 percent health). The flight issues its first leg on the
   accepted side of the cycle and arms nothing on a deferred click.
+- A chaser standing ON the character has no away bearing (the train
+  geometry skips a member at zero distance): the flight takes the
+  first open ray of the contact ring - the facing, the two
+  perpendiculars, the back ray - at the full escape segment. Contact
+  is the one scene the ground hold never owns (the run-29 dump
+  stood 21 s inside a level 10 Fighter, health 78 -> 11 percent,
+  then the emergency logout).
 - A walled away half-plane gets a breakout attempt before the hold:
   the back half-plane - the ground behind the character, THROUGH the
   chaser's bearing - is walked when the away ray and its corner
@@ -957,46 +963,59 @@ The fight side of the same round:
   add outranges the retreat, so its reload-tail fire is free damage).
   The targetless answer does not re-adopt a just-fled attacker and
   keeps flying while a bow add is present.
-- An unwinnable pile up converts the STANDING kite into the flight
-  (`dropFightForFlight`): the shot cycle spends half of every reload
-  inside the melee range, so a pack the arrows cannot out-damage is
-  dropped and flown. The kill window (`pileUpKillWindowPercent`, 30)
-  is the exception: a target one or two arrows from death keeps the
-  fight, because the flight throws the kill away - the run-24 dump
-  dropped a 24 percent grunt for a 30 s flight into the pocket.
+- The dropped fight leaves no selection behind: `fleeFromTarget`
+  sends the clear self click (the same official unselect the town
+  trips use, `clearServerSelection`), and the answered
+  `MyTargetSelected` of the own object zeroes the tracked fight
+  target (`Bot.ApplySelfTarget`). Without it the attack stance
+  lingering on the incoming blows kept reporting the abandoned mob
+  as a live fight - the run-31 acceptance sampled it at 868 units
+  during a healthy flight and failed the bow band.
+- A pile up holding an attacker ABOVE the engage ceiling converts
+  the STANDING kite into the flight (`dropFightForFlight`): the shot
+  cycle spends half of every reload inside the melee range of a mob
+  the arrows cannot trade with; a pack inside the ceiling is tanked
+  instead (see the pile up policy and the ceiling section). The kill
+  window (`pileUpKillWindowPercent`, 30) is the exception: a target
+  one or two arrows from death keeps the fight, because the flight
+  throws the kill away - the run-24 dump dropped a 24 percent grunt
+  for a 30 s flight into the pocket.
 
-### The kite engage ceiling (the run-4 acceptance finding)
+### The kite engage ceiling (the run-4 finding, reverted by run 28)
 
 The general pick ceiling (`targetMaxLevelSlack`, character level
 plus two) protects the MELEE trade: the higher level lands more and
-takes less. The kite fights from the bow range and buys the distance
-back between the shots, so the melee ceiling is not its race. The
-elven mass cells put a level 10 Kaboo Orc Fighter (template 20471)
-on the level 7 ground (`elven-hex-104`, band 7-10), and the run-4
-acceptance dump measured the general ceiling refusing exactly that
-attacker: the loot answer and the targetless pick fled it, the
-defensive flight dragged the session across the map (a 130 chaser
-never falls behind the 125 runner) and the archer spent the whole
-window shooting nothing (2 fight samples, no ranged sample).
+takes less. The run-4 acceptance dump measured the ceiling refusing
+a level 10 Kaboo Orc Fighter (template 20471) on the level 7 ground
+(`elven-hex-104`, band 7-10): the targetless pick fled it, the
+defensive flight dragged the session across the map and the archer
+spent the window shooting nothing. The round answered with a
+kite-only ceiling of level plus five
+(`kiteEngageLevelSlack` / `kiteAnswersMelee` /
+`kiteEngageLevelCeiling`) and measured the opposite cost in run 28:
+the confirmation window adopted exactly that level 10 Fighter into
+the fight against a Spore Fungus, the pair took the archer from 100
+to 53-59 percent in 16 s (about half of the arrows missed, 13-16
+damage per Fighter swing at 163 HP each) and the health gate dropped
+every fight at ~59 percent - 1 kill of the wanted 2 in the window.
 
-`kiteEngageLevelSlack` (5) widens the ceiling of the ANSWER
-(`attackerEngageable` through `kiteAnswersMelee` /
-`kiteEngageLevelCeiling`) for a melee attacker the archer kite
-fights: the level 7 archer engages the level 10 Fighter and the
-level 12 mob, and the widened ceiling stays a real bound (a melee
-attacker six levels above keeps the flight). A bow-wielding
-attacker is never a kite answer - the anti-archer gate refuses it at
-every level, so the general +2 ceiling keeps it out and the flight
-answers.
+The widened ceiling is REVERTED. `attackerEngageable` and
+`pileUpWinnable` (`loop_safety.go`) read the general ceiling for
+every profile, the armed archer included: a within-ceiling pack is
+TANKED (run 27 farmed its kills this way - the melee rule plus the
+bow rhythm), and only a pack holding an above-ceiling attacker
+converts into the straight flight (`dropFightForFlight`). A
+bow-wielding attacker is never a kite answer - the anti-archer gate
+refuses it at every level, and the bow-add verdict drops the fight
+for the flight (see the pile up section).
 
-The live evidence of the round (`SWARM_ARCHER_KITE_MINUTES=2`,
-temp18, the Kaboo Orc Grunt SW-5 cell, the logs under
-`logs/acceptance/`): run 5 measured 51 fight samples, 78 percent of
-them beyond the melee radius, the farthest stand at 656 units, 6
-kite steps, 0 cornered holds, the minimum HP at 78 percent and the
-minimum quiver at 593 arrows; run 6 reproduced the shot ->
-windup-end retreat -> reload-tail walk -> re-shot cadence in the log.
-Both runs passed every check of the scenario.
+The flight that answers the above-ceiling attacker is bounded by
+the server, not by the bot: `fleeSkipDelay` is 3 minutes and
+`kiteFlightHolds` keeps the flight in charge while any attacker
+still carries a live skip, because Mobius C1 `AttackableAI`
+`MAX_ATTACK_TIMEOUT` (1200 ticks of 100 ms) drops the aggro of a mob
+that cannot land a hit two minutes after its last swing. A 2-minute
+skip lapsed into a re-adoption in run 28 exactly there.
 
 ### The disengage of the losing fight (the run-7 finding)
 

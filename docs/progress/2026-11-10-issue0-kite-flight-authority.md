@@ -131,3 +131,29 @@ Fixes:
 - Tests: the contact flight, the orphaned-schedule release and the
   contact shot-cycle retreat (`kite_flee_test.go`).
 - `go build ./...` and the full `internal/swarm/hunt` suite pass.
+
+### 2026-11-10 - the stale selection of the flight (run 31)
+
+Run 30 (the contact-fix build) passed all eight checks: 3 kills,
+minimum health 69 percent, 28 shots with 23 of 24 gaps inside the
+cooldown, 76 kite steps. Run 31 failed only the bow band: at +118 s a
+Kaboo Orc Archer add fired the bow-add verdict, the loop dropped the
+grunt it was fighting and ran a healthy 132-second flight (health
+recovered from 35 to 70 percent), but the dropped fight left the
+server side selection and the tracked fight target on the abandoned
+grunt. The attack stance lingers on the incoming blows, so the
+standing samples at the leg ends read a fight with the mob 868 units
+behind (751, 881, 903 later) and reopened the range check.
+
+Fix: `fleeFromTarget` sends the clear self click with the dropped
+fight (the official unselect the town trips already use, now
+`clearServerSelection`), and the answered `MyTargetSelected` of the
+own object zeroes the tracked fight target
+(`Bot.ApplySelfTarget`) - a flight never reads as a fight.
+`ClearTarget` also treats a selection of the own object as a no-op,
+so a repeated clear cannot re-arm the follow-self intention. Tests:
+the fight clear of the disengage (`kite_edge_test.go`), the fight
+target drop on the self selection (`tracking_test.go`) and the
+repeated-clear guard (`game_handlers_test.go`).
+- `go build ./...`, the hunt, state and connection suites and
+  `golangci-lint run --new` pass.
