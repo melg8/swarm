@@ -16,7 +16,7 @@ engage toward the exp rich ones).
 
 Inputs (env-overridable):
   MOBIUS_C1  the L2J_Mobius_C1_HarbingersOfWar dist tree
-             (default: /home/z/my-project/l2j_mobius/...)
+             (default: the in-repo l2j_mobius checkout)
   OUT        the generated Go file path
              (default: internal/swarm/hunt/zones_elven.go of this repo)
   DION_OUT   the generated Go file path of the Dion registry
