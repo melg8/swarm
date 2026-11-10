@@ -152,11 +152,17 @@ optional). Drop the release binary into `~/go/bin`, which is already
 on PATH:
 
 ```bash
-cd /tmp && curl -sLO \
-    https://github.com/cli/cli/releases/download/v2.103.3/gh_2.103.3_windows_amd64.zip
-unzip -q gh_2.103.3_windows_amd64.zip
-cp gh_2.103.3_windows_amd64/bin/gh.exe ~/go/bin/
+gh_ver=2.103.3
+gh_zip="gh_${gh_ver}_windows_amd64.zip"
+gh_url="https://github.com/cli/cli/releases/download/v${gh_ver}"
+cd /tmp && curl -sLO "${gh_url}/${gh_zip}"
+unzip -q "${gh_zip}"
+cp "gh_${gh_ver}_windows_amd64/bin/gh.exe" ~/go/bin/
 ```
+
+The asset name follows the host (`_linux_amd64.tar.gz` breaks out of
+the archive, not a zip); the version is the one `winget` carries, and
+nothing depends on it beyond the release shape.
 
 Do not run `gh auth login`: it copies the token into a plain text
 `~/.config/gh/hosts.yml`. The credential helper already holds a
