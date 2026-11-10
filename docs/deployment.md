@@ -28,9 +28,10 @@ preinstalled) in about 90 seconds: it clones this repo (the branch of
 the build clone is configurable through `SWARM_BRANCH`, default
 `main` - the historical `mobius-c1-client-1` development branch was
 merged and deleted from the remote), sparse-clones the Mobius C1
-module, unpacks OpenJDK 25, MariaDB and Go 1.24 from `deb.debian.org`
-into `~/opt`, compiles the server, loads the 75-table database and
-starts the stack. All paths can be overridden through the same-named
+module, unpacks OpenJDK 25, MariaDB and the distro Go 1.24 from
+`deb.debian.org` into `~/opt` (the module's `toolchain go1.27.2`
+line upgrades the build itself on the first `go` command), compiles
+the server, loads the 75-table database and starts the stack. All paths can be overridden through the same-named
 environment variables (`BASE`, `SWARM`, `SWARM_BRANCH`, `MOBIUS_ROOT`,
 `OPT`, ...), see the script header. The script is byte-identical to
 `tools/mobius_fast_deploy.sh`; `swarm_fast_deploy.sh` is the canonical

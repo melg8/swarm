@@ -27,7 +27,7 @@ the area you are about to touch, not all of them.
 | [hunting_cells.md](hunting_cells.md) | The hexagon cell hunting: the uniform ground partition, the enemy-first roam, the visibility budget, the ripeness-paced neighbor rotation, the mesh endpoint, the registry invariants |
 | [shopping_strategy.md](shopping_strategy.md) | The shop strategy reasoning, the prices, the purchase phases and the was/is level journey comparison |
 | [pathfinding.md](pathfinding.md) | The geodata pathfinder: format, engine, deviations from the original, test UI, benchmarks, geodata visualization |
-| [navmesh.md](navmesh.md) | The navmesh pathfinding of feature/new-pathfind: the Detour-style runtime, the Go mesh builder, the tile format, the live hybrid integration |
+| [navmesh.md](navmesh.md) | The navmesh pathfinding: the Detour-style runtime, the Go mesh builder, the tile format, the live hybrid integration |
 | [navigation_analysis.md](navigation_analysis.md) | The measured gaps on the road to universal A to B world navigation |
 | [quest_protocol.md](quest_protocol.md) | The quest subsystem protocol (Mobius C1, the M2 research): the quest machine, the packet flows, the live traces |
 | [band_20_25_survey.md](band_20_25_survey.md) | The 20-25 band survey (M3 preparation): the hunting grounds, the travel, the shopping, the learning |
@@ -67,7 +67,7 @@ the area you are about to touch, not all of them.
 | [progress/](progress/) | The active task handover fragments, one file per task (crash-safe progress tracking, the shared-file clash policy); finished fragments move to progress/archive/ |
 | [agent_progress.md](agent_progress.md) | FROZEN ARCHIVE: the pre-split handover log - read for history, never append |
 | [agent_progress_archive.md](agent_progress_archive.md) | FROZEN ARCHIVE: the archive of the finished pre-split agent rounds |
-| [ci_workflow.yml](ci_workflow.yml) | The CI verification gate designed for GitHub Actions (build, vet, test, whitespace, the full lint, the race slice, govulncheck): inactive until a workflow-scoped token copies it to .github/workflows/ci.yml |
+| [ci_workflow.yml](ci_workflow.yml) | The reference copy of the active CI verification gate in `.github/workflows/ci.yml` (build, vet, test, whitespace, the full lint, the race slice, govulncheck) |
 | [agent_feedback_loops.md](agent_feedback_loops.md) | The audit of the feedback an autonomous agent receives: the verification loop, the live acceptance, the observability, the process memory |
 | [flake_ledger.md](flake_ledger.md) | The searchable memory of observed test flakes: every flake gets one row (the cause, the fix, the pin that closed it) |
 
