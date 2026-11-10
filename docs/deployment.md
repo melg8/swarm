@@ -184,10 +184,13 @@ and provenance (verified 2026-09-05) are the reference for future work:
 - The dist runs from the `.vbs` launchers (`GameServer.vbs`,
   `LoginServer.vbs` etc), which read `set/java.cfg` and restart
   themselves on exit code 2).
-- Network: login listens on `0.0.0.0:2106`, game on `0.0.0.0:7777`, DB
-  and inter-server traffic stay on `127.0.0.1`. No active
-  `ipconfig.xml`: the game server auto registers its LAN IP, so bots
-  can connect via `127.0.0.1` or the LAN address.
+- Network: the deployed `login/config/Server.ini` sets
+  `LoginserverHostname = 127.0.0.3`, so login listens on
+  `127.0.0.3:2106` only (verified 2026-11-10: a bot on the default
+  `127.0.0.1:2106` cannot connect) - launch the bot with
+  `-login 127.0.0.3:2106`. Game listens on `0.0.0.0:7777`, DB and
+  inter-server traffic stay on `127.0.0.1`. No active `ipconfig.xml`:
+  the game server auto registers its LAN IP.
 - Shipped config differences vs the bootstrap tweaks: `PathFinding = 2`
   and `AutoPlay.ini` has `EnableAutoPlay = False` on this deployment
   (ground items must be picked by the bot itself, nothing auto loots).
