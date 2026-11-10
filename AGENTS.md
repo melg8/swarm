@@ -557,6 +557,53 @@ Enforced by `.golangci.yml` (strict, most linters enabled):
 - Extract repeated string literals into constants (`goconst`); do not
   shadow predeclared identifiers (`predeclared`).
 
+## Comments: the fact, not the story
+
+The tree carries ~26k comment lines and the debt is real: a comment
+that retells the code, the round or the old behavior costs a reader
+more than it pays. `task comment:audit` counts it (the share, the
+blocks above 8 lines, the history markers); the target is a share
+under 10 percent and no block above 8 lines outside a package doc.
+
+The rule every comment obeys:
+
+- **A comment states a fact the code cannot say**: a server rule, a
+  physical constraint, a rejected alternative, a subtle invariant. If
+  the code already says it, the comment goes.
+- **One sentence for a doc comment, two for an inline one.** A fact
+  that needs a paragraph belongs in the matching `docs/` file, and
+  the comment points there by name (`the flood protector window:
+  docs/protocol_description.md`).
+- **No history.** No dates, round numbers ("round 14"), "the legacy
+  path", "the old implementation" - unless that behavior still exists
+  in the code and a reader must avoid it. The rounds live in
+  `docs/devlog/`, the measurements in the subsystem doc; the comment
+  carries the current fact only.
+- **No issue ids as explanation** (`issue #60`, "the run-3 finding"):
+  they date a fact and the tracker outlives it. An id stays only for
+  an open decision the code waits on.
+- **No shouting.** One ALL-CAPS word per file at most; the current
+  style spends `STRAIGHT`, `EVERY`, `NOT` on emphasis the sentence
+  carries itself.
+- **One word per concept** (the glossary below). A synonym invented
+  per file is a bug: a reader who greps for `segment` must find every
+  segment.
+- **Before deleting a fact, move it to `docs/`** - in the same commit
+  (the no-fact-lost rule of this file). A compressed comment that
+  keeps the load-bearing number and drops the narrative is the goal.
+- The mechanical part: English, capital first letter, period at the
+  end (`godot`), 80 columns (`lll`).
+
+### The glossary (one concept, one word)
+
+| Concept | The word | Never |
+| --- | --- | --- |
+| A piece of a planned route (town trip, quest walk) | `segment` | leg, hop, stretch |
+| One paced walk the kite issues | `step` | leg, leg of the flight |
+| The armor slot and its item family | `legs` | - (matches the server `PAPERDOLL_LEGS`) |
+| The defensive flee answer of a losing fight | `flight` | flee, escape run |
+| A hunting ground of the zone registry | `zone` | spot, area, region |
+
 ## Tree cleanliness discipline (keep the gate green)
 
 The full uncapped lint is **zero findings** since 2026-09-19 (the

@@ -1,0 +1,71 @@
+# The comment sweep: one concept one word, the fact not the story (status: in progress)
+
+Started 2026-11-10, branch main, issue0 (owner instruction: the code
+carries too many long and stale comments, `leg` names things it does
+not mean, and the model needs a standing rule).
+
+## Goal
+
+The comment debt is measured and falling, the vocabulary is one word
+per concept, and every future session reads the rule before writing a
+comment. Done means:
+
+- `AGENTS.md` carries the comment rule and the glossary, so the model
+  applies it without being told again;
+- `task comment:audit` reports the debt (the share, the blocks above
+  8 lines, the history markers) and the baseline is recorded;
+- the `leg` vocabulary is fixed where the word names something else
+  (`step` for one kite walk, `segment` for a route piece, `len` for a
+  length), while the armor `legs` stays (it matches the server);
+- the worst files are compressed in their own commits, each keeping
+  the load-bearing numbers and dropping the round history the docs
+  already carry.
+
+## Context
+
+Measured 2026-11-10 (`python tools/comment_audit.py`):
+
+- 25 958 comment lines of 177 062 (14.7 percent), 723 blocks above 8
+  lines, 1 429 history markers (dates, round numbers, issue ids,
+  "legacy", shouting);
+- the worst files: `hunt/town.go` (1 948 lines, 45.5 percent),
+  `hunt/loop.go` (1 425, 54.1), `hunt/kite.go` (1 090, 57.9),
+  `state/bot.go` (1 050, 30.0), `gear/shopping.go` (471, 30.7);
+- the longest single block: 143 lines at `hunt/kite.go:7` - the file
+  header retelling every round from issue #13 to #70.
+
+The facts those comments carry are not lost: `docs/hunting.md` holds
+the kite sections (issues #60, #70 and the owner rounds), the protocol
+notes hold the server rules, and the round fragments sit in
+`docs/progress/archive/`. The compression therefore keeps the
+measurable number and points at the document.
+
+The `leg` usage, surveyed over 218 hits: the armor family
+(`PaperdollLegs`, `SlotLegs`, `partLegs`, `planLegs`, the gear
+planner) matches the server naming and stays; the route and kite hits
+are the ones that rename - a route piece is a `segment` (the tree
+already has `startWalkSegment`, `townSegments`), one paced kite walk
+is a `step` (the tree already has `kiteStep`), and `outLeg` in the
+corner probe is a length, not a leg at all.
+
+## Progress
+
+### 2026-11-10 - the tool, the rule, the renames
+
+- `tools/comment_audit.py` and `task comment:audit` measure the debt;
+  the baseline above is its first report.
+- `AGENTS.md` gains "Comments: the fact, not the story" with the
+  eight rules and the glossary table.
+- Renamed: `kiteStraightLeg` to `kiteStraightStep` (the kite, the lane
+  code and the tests), `auditLegs` to `auditSegments`, `legZ` to
+  `segmentZ` and `TestLegZ` to `TestSegmentZ` (the corner probe),
+  `outLeg` to `outLen` (it is a distance), `worldLegsVerified` to
+  `worldSegmentsVerified` (the counter probe), `fleetRaceLegStream` to
+  `fleetRaceStepStream` (the fleet race sampler). The armor `legs`
+  identifiers are untouched.
+
+## Status
+
+The tool and the rule are in; the renames are in the tree pending the
+build and the package tests. Next: the `hunt/kite.go` header
+compression, then the worst files one commit each.
