@@ -179,7 +179,7 @@ func verifyWorldStand(
             if math.Hypot(last.X-x, last.Y-y) > 16 {
                 continue
             }
-            if !worldLegsVerified(engine, result) {
+            if !worldSegmentsVerified(engine, result) {
                 continue
             }
             ways++
@@ -194,10 +194,10 @@ func verifyWorldStand(
     return ways
 }
 
-// worldLegsVerified checks the grid line of sight of every route leg
+// worldSegmentsVerified checks the grid line of sight of every route leg
 // (the mesh link truth the grid walls off is the frozen corridor
 // class - the stand entry serves only a walk the grid walks too).
-func worldLegsVerified(
+func worldSegmentsVerified(
     engine *pathfind.Engine, result *pathfind.Result,
 ) bool {
     for i := 0; i+1 < len(result.Waypoints); i++ {

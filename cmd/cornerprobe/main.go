@@ -100,16 +100,16 @@ func main() {
         }
         fmt.Printf("\n=== %s: found=%v partial=%v wps=%d\n",
             w.name, route.Found, route.Partial, len(route.Waypoints))
-        auditLegs(engine, route)
+        auditSegments(engine, route)
         auditTurns(engine, route)
     }
 }
 
-// auditLegs validates every planned leg of the route the way the
+// auditSegments validates every planned leg of the route the way the
 // server validates the follower clicks: a refused leg means the plan
 // itself holds a chord the server movement never delivers - the
 // follower sticks on it whatever the recovery does.
-func auditLegs(engine *pathfind.Engine, route *navmesh.Route) {
+func auditSegments(engine *pathfind.Engine, route *navmesh.Route) {
     wps := route.Waypoints
     for i := 0; i+1 < len(wps); i++ {
         from := wps[i]
@@ -153,7 +153,7 @@ func auditTurns(engine *pathfind.Engine, route *navmesh.Route) {
                 // The lateral vector of the incoming leg.
                 px := wp.X - ux*back - uy*side
                 py := wp.Y - uy*back + ux*side
-                pz := legZ(wp, prev, back)
+                pz := segmentZ(wp, prev, back)
                 from := pathfind.Vec3{X: px, Y: py, Z: pz}
                 to := pathfind.Vec3{X: next.X, Y: next.Y, Z: next.Z}
                 total++
@@ -190,17 +190,17 @@ func auditTurns(engine *pathfind.Engine, route *navmesh.Route) {
         ux, uy := dx/leg, dy/leg
         line := ""
         outDx, outDy := next.X-wp.X, next.Y-wp.Y
-        outLeg := math.Hypot(outDx, outDy)
-        if outLeg < 1 {
+        outLen := math.Hypot(outDx, outDy)
+        if outLen < 1 {
             continue
         }
-        oux, ouy := outDx/outLeg, outDy/outLeg
+        oux, ouy := outDx/outLen, outDy/outLen
         bad := false
         for _, back := range []float64{0, 2, 4, 8, 12, 15, 16, 24, 32, 40, 48} {
             px := wp.X - ux*back
             py := wp.Y - uy*back
             from := pathfind.Vec3{
-                X: px, Y: py, Z: legZ(wp, prev, back),
+                X: px, Y: py, Z: segmentZ(wp, prev, back),
             }
             to := pathfind.Vec3{X: next.X, Y: next.Y, Z: next.Z}
             _, ok := engine.ValidateClick(from, to)
@@ -276,7 +276,7 @@ func auditTurns(engine *pathfind.Engine, route *navmesh.Route) {
         for _, back := range []float64{8, 15, 16} {
             from := pathfind.Vec3{
                 X: wp.X - ux*back, Y: wp.Y - uy*back,
-                Z: legZ(wp, prev, back),
+                Z: segmentZ(wp, prev, back),
             }
             if _, ok := engine.ValidateClick(from, pathfind.Vec3{
                 X: next.X, Y: next.Y, Z: next.Z,
@@ -331,9 +331,9 @@ func auditTurns(engine *pathfind.Engine, route *navmesh.Route) {
     }
 }
 
-// legZ interpolates the surface height along the incoming leg at the
+// segmentZ interpolates the surface height along the incoming leg at the
 // given distance short of the turn waypoint.
-func legZ(wp, prev navmesh.Pos, back float64) float64 {
+func segmentZ(wp, prev navmesh.Pos, back float64) float64 {
     dx, dy := wp.X-prev.X, wp.Y-prev.Y
     leg := math.Hypot(dx, dy)
     if leg < 1 {

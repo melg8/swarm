@@ -17,11 +17,11 @@ import (
 // probe - the back extrapolation of a leg height, the coordinate
 // adapters and the hunt navigator filter it mirrors.
 
-func TestLegZ(t *testing.T) {
+func TestSegmentZ(t *testing.T) {
     t.Run("a sub unit leg answers the waypoint height", func(t *testing.T) {
         wp := navmesh.Pos{X: 100, Y: 100, Z: -3000}
         prev := navmesh.Pos{X: 100.5, Y: 100.5, Z: -2900}
-        require.InDelta(t, -3000.0, legZ(wp, prev, 40), 1e-9)
+        require.InDelta(t, -3000.0, segmentZ(wp, prev, 40), 1e-9)
     })
 
     t.Run("a long leg interpolates the back distance", func(t *testing.T) {
@@ -29,7 +29,7 @@ func TestLegZ(t *testing.T) {
         // the waypoint sits 25% down toward the previous height.
         wp := navmesh.Pos{X: 100, Y: 100, Z: -3000}
         prev := navmesh.Pos{X: 200, Y: 100, Z: -2900}
-        require.InDelta(t, -2975.0, legZ(wp, prev, 25), 1e-9)
+        require.InDelta(t, -2975.0, segmentZ(wp, prev, 25), 1e-9)
     })
 
     t.Run("the diagonal leg measures the hypotenuse", func(t *testing.T) {
@@ -37,7 +37,7 @@ func TestLegZ(t *testing.T) {
         // 10% of the height difference.
         wp := navmesh.Pos{X: 0, Y: 0, Z: -3000}
         prev := navmesh.Pos{X: 30, Y: 40, Z: -2900}
-        require.InDelta(t, -2990.0, legZ(wp, prev, 5), 1e-9)
+        require.InDelta(t, -2990.0, segmentZ(wp, prev, 5), 1e-9)
     })
 }
 
