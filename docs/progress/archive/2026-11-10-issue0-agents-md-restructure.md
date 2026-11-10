@@ -1,4 +1,4 @@
-# The AGENTS.md restructure: rules and map, not an encyclopedia (status: in progress)
+# The AGENTS.md restructure: rules and map, not an encyclopedia (status: complete)
 
 Started 2026-11-10, branch main, no issue (owner conversation).
 
