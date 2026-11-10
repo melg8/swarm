@@ -584,13 +584,17 @@ func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
 // attacker by fighting it: the mob level sits inside the engage
 // ceiling and the character is healthy enough to press a fight - the
 // winnable half of the aggro answer. The ceiling is the general pick
-// ceiling (the character level plus the slack), widened for a melee
-// attacker the archer kite answers (see kiteEngageLevelSlack): the
-// kite fights from the bow range and buys the distance back between
-// the shots, so the melee level ceiling is not its race. An
-// unresolved template (level 0 or unknown) passes like every level
-// filter of the target search; an attacker above the ceiling never
-// becomes winnable and the defense flow answers instead (the escape
+// ceiling (the character level plus the slack) for every profile:
+// the 2026-11-10 run-28 acceptance dump measured the bow archer
+// against a level 10 Kaboo Orc Fighter (three levels up, 163 HP) -
+// roughly half of the arrows missed and the Fighter pair dealt 13-16
+// per swing, taking the level 7 archer from 100 to 59 percent of its
+// health in sixteen seconds while the target lost a third of its
+// bar. The widened kite ceiling never bought that race; it only
+// delayed the flight that answers it. An unresolved template (level
+// 0 or unknown) passes like every level filter of the target search;
+// an attacker above the ceiling never becomes winnable and the
+// defense flow answers instead (the straight kite flight, the escape
 // walk and, when the chase holds, the logout).
 func (l *Loop) attackerEngageable(objectID int32) bool {
     if l.tracker.SelfHealthPercent() < reengageHealthPercent {
@@ -601,11 +605,6 @@ func (l *Loop) attackerEngageable(objectID int32) bool {
         return true
     }
     maxLevel := l.maxTargetLevel()
-    if l.kiteAnswersMelee(objectID) {
-        if kiteMax := l.kiteEngageLevelCeiling(); kiteMax > maxLevel {
-            maxLevel = kiteMax
-        }
-    }
 
     return maxLevel <= 0 || level <= maxLevel
 }
@@ -622,6 +621,17 @@ func (l *Loop) attackerEngageable(objectID int32) bool {
 // makes the verdict dynamic: the fight that goes bad re-arms the
 // panic run on the next tick, the kill that thins the pack to one
 // attacker hands the answer to the ordinary aggro flow.
+//
+// The ceiling is the general pick ceiling (the character level plus
+// the slack) for every profile: the archer kite fights the pack from
+// the same bow rhythm it fights a single mob with, and the 2026-11-10
+// run-28 acceptance dump measured the race it cannot buy - two level
+// 10 Kaboo Orc Fighters kept the level 7 archer in melee and took
+// 100 -> 59 percent of its health in sixteen seconds while the
+// target lost a third of its bar. A pack with an attacker above the
+// ceiling is unwinnable whatever the weapon is, so the gate converts
+// it into the straight flight (see dropFightForFlight); a target
+// inside the kill window is still finished first.
 func (l *Loop) pileUpWinnable() bool {
     if l.tracker.SelfHealthPercent() < reengageHealthPercent {
         return false
@@ -630,19 +640,7 @@ func (l *Loop) pileUpWinnable() bool {
     if len(attackers) > pileUpFightMaxAttackers {
         return false
     }
-    // The ceiling belongs to the layer that fights the pack: the
-    // melee trade uses the general pick ceiling, while the archer
-    // kite answers melee attackers up to kiteEngageLevelSlack above
-    // the character (see kiteEngageLevelCeiling). Reading the melee
-    // ceiling for the bow turned a normal two-mob fight (the level 9
-    // Spore Fungus and the level 10 Kaboo Orc Fighter of the
-    // 2026-11-10 run-26 dump, a level 7 archer at 79 percent health)
-    // into an "unwinnable" pack, dropped both mobs and flew from the
-    // parity Fighter for the rest of the window with no kill.
     maxLevel := l.maxTargetLevel()
-    if l.kiteLayerArmed() {
-        maxLevel = l.kiteEngageLevelCeiling()
-    }
     for i := range attackers {
         level, ok := l.tracker.ObjectLevel(attackers[i].ObjectID)
         if !ok || level <= 0 {

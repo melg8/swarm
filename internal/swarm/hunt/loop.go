@@ -262,8 +262,15 @@ const (
     escapeTargetBeatenPercent = 15.0
     // fleeSkipDelay keeps a fled target out of the search: walking
     // straight back into the mob the character just ran from
-    // re-creates the same death risk at lower health.
-    fleeSkipDelay = 2 * time.Minute
+    // re-creates the same death risk at lower health. The delay
+    // outlasts the server's own attack timeout (AttackableAI
+    // MAX_ATTACK_TIMEOUT, 1200 ticks of 100 ms): a mob that keeps
+    // chasing without landing a hit drops its aggro two minutes
+    // after the last swing, and the skip must not lapse first. The
+    // 2026-11-10 run-28 acceptance dump re-adopted a fled Kaboo Orc
+    // Fighter exactly at the two-minute mark and restarted the
+    // losing race that cost the window.
+    fleeSkipDelay = 3 * time.Minute
     // escapeWalkDistance is one escape segment of the flee flow.
     escapeWalkDistance = 700.0
     // escapeFanStep is the angular spacing of the ordered escape
@@ -2314,17 +2321,24 @@ func (l *Loop) engage() {
         // defensive flow: the standard escape walk that logs
         // out when it never shakes the chase.
         if attacker, ok := l.tracker.NearestAttacker(); ok {
-            if !l.attackerEngageable(attacker.ObjectID) ||
+            if l.kiteFlightHolds(now) ||
+                !l.attackerEngageable(attacker.ObjectID) ||
                 l.targetSkipped(attacker.ObjectID, now) ||
                 l.tracker.HasBowAttackerBesides(attacker.ObjectID) {
-                // The defensive flow owns this attacker: it
-                // outranks the character, the loop just ran from
-                // it (the skip keeps the flight authority), or a
-                // bow add is still firing - re-adopting the melee
-                // chaser there walked the character back into the
-                // archer's range on every flight tick (the
-                // 2026-11-10 run-23 window ping-ponged through
-                // the drop/adopt cycle every half second).
+                // The defensive flow owns this attacker: the
+                // straight flight holds a chase the loop already
+                // ran from, this one outranks the character, the
+                // loop just ran from it (the skip keeps the
+                // flight authority), or a bow add is still
+                // firing - re-adopting the melee chaser there
+                // walked the character back into the archer's
+                // range on every flight tick (the 2026-11-10
+                // run-23 window ping-ponged through the
+                // drop/adopt cycle every half second). The
+                // run-28 dump did the same with a fled Fighter
+                // at the two-minute skip expiry: the flight
+                // owns the answer until the server clears the
+                // aggro (see kiteFlightHolds).
                 l.fleeFromThreat(now)
 
                 return

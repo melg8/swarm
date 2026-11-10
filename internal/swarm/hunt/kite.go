@@ -691,43 +691,31 @@ func (l *Loop) avoidBowTargets() bool {
     return l.kite.Enabled && l.bowEquipped()
 }
 
-// kiteEngageLevelSlack is the level gap a kiteable melee attacker
-// may sit above the character: the general pick ceiling
-// (targetMaxLevelSlack) protects the MELEE trade, where the higher
-// level lands more and takes less, while the kite fights from the
-// bow range and buys the distance back between the shots. The elven
-// mass cells put a level 10 Kaboo Orc Fighter on the level 7 ground
-// (elven-hex-104 band 7-10); the run-3/run-4 acceptance dumps of the
-// 2026-11-09 round measured the general ceiling refusing exactly
-// that attacker - the loot answer and the targetless pick fled it,
-// the defensive flight dragged the session (a 130 chaser against the
-// 125 runner never falls behind) and the archer spent the window
-// shooting nothing. The cap stays a real bound: a wider gap stops
-// the hit and damage flow the bow needs to win.
-const kiteEngageLevelSlack = 5
-
-// kiteAnswersMelee reports whether the archer kite answers the
-// object as a fight: the layer is enabled, the bow is in hand and
-// the object is not a bow wielder (the owner rule of the round - no
-// kiting against bow users, a ranged enemy cannot be outrun and the
-// standing trade answers it). The kitable answer widens the level
-// ceiling of attackerEngageable (see kiteEngageLevelSlack).
-func (l *Loop) kiteAnswersMelee(objectID int32) bool {
-    return l.kite.Enabled && l.bowEquipped() &&
-        !l.tracker.ObjectUsesBow(objectID)
-}
-
-// kiteEngageLevelCeiling is the level ceiling of the kite answer:
-// the character level plus kiteEngageLevelSlack. An unknown
-// character level keeps the general pick ceiling (its zero means
-// unfenced).
-func (l *Loop) kiteEngageLevelCeiling() int32 {
-    level := l.tracker.SelfLevel()
-    if level <= 0 {
-        return 0
+// kiteFlightHolds reports whether a mob the loop just fled still
+// holds the character as its target: the straight flight owns the
+// aggro answer until the server clears that chase. AttackableAI
+// MAX_ATTACK_TIMEOUT (1200 game ticks of 100 ms) drops the aggro of
+// a mob that cannot reach its target two minutes after the last
+// swing, so the flight is bounded; the archer must not re-open the
+// fight before that. The 2026-11-10 run-28 acceptance dump
+// re-adopted the fled Kaboo Orc Fighter at the two-minute skip
+// expiry, lost the health race again and spent the remaining window
+// in the drop/adopt cycle (one kill of the two wanted). A fresh
+// attacker that joins the chase rides the same flight - adopting it
+// walks the character straight back into the pack the flight is
+// shedding, and the shot cycle spends half of every reload standing
+// inside the melee range.
+func (l *Loop) kiteFlightHolds(now time.Time) bool {
+    if !l.kiteLayerArmed() {
+        return false
+    }
+    for _, attacker := range l.tracker.SelfAttackers() {
+        if l.targetSkipped(attacker.ObjectID, now) {
+            return true
+        }
     }
 
-    return level + kiteEngageLevelSlack
+    return false
 }
 
 // kiteFleeBusy reports whether the defensive flight's own movement

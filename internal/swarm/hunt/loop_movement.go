@@ -213,6 +213,17 @@ func (l *Loop) adoptOutZoneFight(now time.Time) bool {
         return true
     }
     if l.tracker.SelfUnderAttack() {
+        if l.kiteFlightHolds(now) {
+            // The chase that dragged the character over the zone
+            // line is one the flight already ran from: the away
+            // ray keeps the answer until the server clears the
+            // aggro (see kiteFlightHolds) - adopting the next
+            // roadside chaser there restarted the losing race on
+            // every skip expiry (the 2026-11-10 run-28 dump).
+            l.fleeFromThreat(now)
+
+            return true
+        }
         if pick, ok := l.tracker.NearestAttacker(); ok &&
             !l.targetSkipped(pick.ObjectID, now) {
             if !l.attackerEngageable(pick.ObjectID) {
