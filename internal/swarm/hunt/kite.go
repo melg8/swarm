@@ -132,18 +132,10 @@ const (
     kiteArrivalEpsilon = 100.0
 )
 
-// KiteParams is the tunable block of the kite fight (owner issue
-// #29): the four named knobs the live tuning round adjusts from the
-// measured numbers, plus the enable gate. The launch config carries
-// one per bot spec (the "kite" section of launch_config.go), so the
-// standing-archer baseline (a bow bot with the kite disabled) and the
-// tuned profile switch by editing the file instead of a code edit and
-// a rebuild between the measurement runs. Every remaining kite
-// constant (the streak limit, the train scan, the encirclement
-// share) stays a package constant on purpose: the tuning round names
-// these four, the rest ride the shipped values until the numbers ask
-// otherwise.
-
+// KiteParams is the tunable block of the kite fight: the four knobs
+// the launch config carries per bot spec (launch_config.go), plus the
+// enable gate. Every other kite constant stays a package constant -
+// only these four are tuned between measurement runs.
 type KiteParams struct {
     // Enabled gates the kite layer whole: false turns every bow fight
     // into the standing archer the baseline measures (the mob closes,
@@ -167,10 +159,7 @@ type KiteParams struct {
 }
 
 // DefaultKiteParams returns the shipped tuning: the constants block
-// above read into the params shape. A loop starts with these - the
-// config file overrides per bot spec, everything else keeps the
-// behavior the acceptance scenario (#28) pins.
-
+// above read into the params shape.
 func DefaultKiteParams() KiteParams {
     return KiteParams{
         Enabled:       true,
@@ -182,13 +171,10 @@ func DefaultKiteParams() KiteParams {
 }
 
 // SetKiteParams overrides the tunable block of the loop. A
-// non-positive number or period falls back to the shipped value (a
-// broken config line degrades to the shipped tuning, never to a
-// degenerate fight), the re-engage delay keeps zero - it is a
-// legitimate value (the window end IS the re-engage) - so only the
-// negative side normalizes. The kite state carries over: the override
-// between fights never resets the pacing or the streak.
-
+// non-positive value falls back to the shipped one (a broken config
+// line degrades to the shipped tuning); the re-engage delay keeps a
+// zero, which is legitimate. The pacing and the streak survive the
+// override.
 func (l *Loop) SetKiteParams(p KiteParams) {
     if p.RetreatRadius <= 0 {
         p.RetreatRadius = kiteRetreatRadius
@@ -205,27 +191,13 @@ func (l *Loop) SetKiteParams(p KiteParams) {
     l.kite = p
 }
 
-// The optimal band of the kite fight is the distance range where the
-// standing archer is the good case: the inner edge is
-// kiteRetreatRadius (a hostile below it arms the next step), the
-// outer edge is the bow engage radius of the weapon-aware radii
-// (userBowEngageRadius, user.go - 450), where the forced attack
-// re-request shoots from range. The band is pinned as these two
-// edge references on purpose - a copy of the engage radius here
-// would drift from the radii the fight actually fights with - and
-// the kiteStep length is sized against both edges.
-
 // closedDistance bounds how close a chaser may stand NOW from the
 // distance of its last movement broadcast: the server sends a
 // chasing mob's MoveToPawn at a one to two second cadence, so the
-// raw gap can lag a whole close-in behind the live mob (the
-// 2026-11-09 live acceptance run measured a 512 unit raw gap against
-// an actual 256). The bound assumes the chaser kept running for the
-// whole age of its movement segment at its fastest speed, so the
-// result is never above the true gap - the floor decisions of the
-// kite may only ever UNDER-estimate the distance, never fire a shot
-// the collapsed range did not afford.
-
+// raw gap can lag a whole close-in behind the live mob. The bound
+// assumes the chaser ran for the whole age at its fastest speed, so
+// the result is never above the true gap - the floor decisions of the
+// kite may only ever UNDER-estimate the distance.
 func closedDistance(
     dist float64, age time.Duration, speed float64,
 ) float64 {
@@ -240,13 +212,10 @@ func closedDistance(
     return closed
 }
 
-// kiteClosedDistance applies the conservative closure bound to one
-// object: the raw distance of the object's last movement broadcast,
-// aged by the movement segment start and shortened by the fastest
-// speed it can run. A standing object, an object without a movement
-// stamp and a scene without the track all answer the raw distance
-// unchanged.
-
+// kiteClosedDistance applies the closure bound to one object: the raw
+// distance of its last movement broadcast, aged by the movement start
+// and shortened by the speed it can run. A standing object, a missing
+// stamp and a scene without the track answer the raw distance.
 func (l *Loop) kiteClosedDistance(
     now time.Time, objectID int32, dist float64,
 ) float64 {
@@ -259,19 +228,11 @@ func (l *Loop) kiteClosedDistance(
 }
 
 // kiteThreat locates the hostile that arms the kite step: the fight
-// target or the nearest train member - a living mob that already
-// chases the character (its server target is the character, the
-// NearestAttacker scan reads it, see scans.go) - whichever sits
-// closer. A mob on a deck the walk cannot reach (the z gap past
-// deckReachableZ, the same test the pick uses) is no melee threat.
-// The distance is the CONSERVATIVE closed distance of the moment
-// (kiteClosedDistance): a chaser whose movement broadcast lags may
-// have closed a whole second's run already, and every floor decision
-// reads this number. Returns the threat identity for the logs and
-// its closed ground distance to the character (the retreat
-// DIRECTION weighs the whole train through kiteTrainDirection, so
-// the position itself has no reader).
-
+// target or the nearest chasing attacker, whichever sits closer. A mob
+// on a deck the walk cannot reach (deckReachableZ) is no melee threat.
+// The distance is the conservative closed distance (kiteClosedDistance)
+// because every floor decision reads it; the direction weighs the
+// whole train separately (kiteTrainDirection).
 func (l *Loop) kiteThreat(
     now time.Time, selfX, selfY, selfZ int32,
 ) (id int32, dist float64, ok bool) {
@@ -315,12 +276,9 @@ func (l *Loop) kiteLayerGates(now time.Time) bool {
     if !l.kite.Enabled || !l.bowEquipped() || l.target == 0 {
         return false
     }
-    // The enemy weapon gate (the owner rule): against an archer the
-    // kite never engages. A ranged enemy cannot be outrun - the
-    // retreat spends the bot's bow cooldown on walking while the
-    // enemy keeps shooting - so the standing archer trade is the
-    // answer, exactly like the cornered hold. The fight still runs
-    // through the ordinary attack machinery; only the retreat is off.
+    // The enemy weapon gate (docs/hunting.md): against an archer the
+    // kite never engages - a ranged enemy cannot be outrun, so the
+    // standing trade is the answer. Only the retreat is off.
     if l.tracker.ObjectUsesBow(l.target) {
         return false
     }
@@ -336,20 +294,11 @@ func (l *Loop) kiteLayerGates(now time.Time) bool {
 }
 
 // kiteOwnsRetreat reports whether the archer kite owns the aggro
-// answer of the current fight: the kite layer is enabled, the
-// character holds a bow, a fight is selected and the enemy is not
-// itself an archer (a ranged enemy cannot be outrun - the same
-// weapon gate kiteLayerGates enforces). While it holds, the melee
-// escape machinery must stand down: its flee fan is clamped to the
-// CURRENT hunting zone, and the 2026-11-09 acceptance run measured
-// what that clamp does on a kite fight that drifted across a
-// cell boundary - every lane zeroed, the pile-up and losing-fight
-// answers dropped the fight and logged the session out mid-kite
-// (the Green Dryad cell center 37500,51095 against the character on
-// the Kaboo ground at 36056,50360 in the 18:33 dump). The kite's own
-// straight lane battery validates the real world instead of a zone
-// box, and the critical-HP logout (< 12%) stays armed above both.
-
+// answer of the current fight: enabled, bow in hand, a fight target
+// that is not itself an archer. While it holds, the melee escape
+// stands down - its fan is clamped to the hunting zone, which a
+// drifted kite fight leaves, and the kite lane battery validates the
+// real world instead (docs/hunting.md).
 func (l *Loop) kiteOwnsRetreat() bool {
     return l.kite.Enabled && l.target != 0 && l.bowEquipped() &&
         !l.tracker.ObjectUsesBow(l.target)
@@ -364,12 +313,10 @@ func (l *Loop) kiteLayerArmed() bool {
 }
 
 // kiteFlightWanted reports whether the straight flight could own the
-// aggro answer right now: the kite layer is armed and the nearest
-// attacker is a melee chaser (a bow attacker cannot be outrun, see
-// kiteFleeThreat). Unlike kiteFlightOwnsEscape the fight target may
-// still be held: the pile up gate reads it to CONVERT the unwinnable
-// standing kite into the flight (the target is dropped on the same
-// tick).
+// aggro answer right now: the layer is armed and the nearest attacker
+// is a melee chaser. Unlike kiteFlightOwnsEscape the fight target may
+// still be held - the pile up gate reads it to convert the unwinnable
+// kite into the flight.
 func (l *Loop) kiteFlightWanted() bool {
     if !l.kiteLayerArmed() {
         return false
@@ -379,12 +326,9 @@ func (l *Loop) kiteFlightWanted() bool {
     return ok && !l.tracker.ObjectUsesBow(attacker.ObjectID)
 }
 
-// kiteKillWindow reports whether the held fight target is one or two
-// arrows from death (see pileUpKillWindowPercent): the pile up gate
-// never throws such a fight away. The 2026-11-10 run-24 dump dropped
-// a 24 percent grunt when a level 10 Kaboo Orc Fighter joined - the
-// kill was two arrows away and the flight that replaced it ran into
-// a corner pocket 30 seconds later.
+// kiteKillWindow reports whether the held target is one or two arrows
+// from death (pileUpKillWindowPercent): a pile up never throws such a
+// kill away.
 func (l *Loop) kiteKillWindow() bool {
     if l.target == 0 {
         return false
@@ -394,31 +338,20 @@ func (l *Loop) kiteKillWindow() bool {
     return hp > 0 && hp <= pileUpKillWindowPercent
 }
 
-// kiteFlightOwnsEscape reports whether the TARGETLESS straight flight
-// of the bow character owns the aggro answer: the flight is wanted
-// and no fight target is held (the losing verdict dropped it). The
-// pile up gate of the tick stands down while it holds: the flight is
-// the survival answer the melee fan cannot give without the logout -
-// the 2026-11-10 acceptance run dropped a melee fight when a level 8
-// Kaboo Orc Archer joined, the grunt stayed the nearest chaser, and
-// the pile up gate would have replaced the straight run with the
-// zoned fan and its emergency logout. The critical-HP logout stays
-// armed above both.
+// kiteFlightOwnsEscape reports whether the targetless straight flight
+// owns the aggro answer: the flight is wanted and the losing verdict
+// already dropped the target. The pile up gate stands down then - the
+// flight is the survival answer the zoned melee fan cannot give.
 func (l *Loop) kiteFlightOwnsEscape() bool {
     return l.target == 0 && l.kiteFlightWanted()
 }
 
 // dropFightForFlight hands the aggro answer to the straight bow
-// flight on this tick: the held fight target is dropped and skipped
-// (the fleeFromTarget contract) and the targetless flight walks the
-// away-ray. The pile up gate calls it when the standing kite turned
-// unwinnable - the shot cycle stands half of every reload inside the
-// melee range, so a pack that outnumbers the arrows grinds the
-// health down while the character waits for the bow cycle. The
-// 2026-11-10 acceptance run measured the death: four melee mobs kept
-// the character at 12-43 units through the kite, the health fell 64
-// -> 16 percent in 45 seconds and the session logged out at the
-// death.
+// flight: the held target is dropped and skipped (the fleeFromTarget
+// contract) and the targetless flight walks the away-ray. The pile up
+// gate calls it when the standing kite turned unwinnable - the shot
+// cycle stands half of every reload inside the melee range, so a pack
+// that outnumbers the arrows grinds the health down.
 func (l *Loop) dropFightForFlight(now time.Time) {
     if l.target != 0 {
         l.fleeFromTarget(l.target, now)
@@ -428,40 +361,23 @@ func (l *Loop) dropFightForFlight(now time.Time) {
     l.fleeFromThreat(now)
 }
 
-// avoidBowTargets reports whether the hunt target search must fence
-// bow wielding mobs out: the archer profile (the kite layer is on
-// and the bow is in hand) never INITIATES a fight with an archer.
-// The owner rule says the kite never engages against a bow enemy (a
-// ranged enemy cannot be outrun, the standing trade is the only
-// answer), and that standing trade is a break-even race this low
-// level archer loses the moment a melee add joins - the 2026-11-09
-// 22:42 acceptance run picked a level 8 Kaboo Orc Archer, traded
-// shots at 385 units for a minute (26-31 damage per arrow against a
-// 203 HP template), then a Grunt added and the two-mob pile-up fired
-// the emergency logout at 52 percent health, failing the survives
-// check without a single death. Fencing the archers out of the PICK
-// keeps the ground on the melee orcs the kite is built for; an
-// archer that attacks the character is still answered through the
-// attacker scan (attackerEngageable, the defensive flow), never
-// through this pick.
+// avoidBowTargets reports whether the hunt target search fences bow
+// wielding mobs out: the archer profile never initiates a fight with
+// an archer, because the standing trade is a break-even race it loses
+// the moment a melee add joins (docs/hunting.md). An archer that
+// attacks the character is still answered through attackerEngageable,
+// never through this pick.
 func (l *Loop) avoidBowTargets() bool {
     return l.kite.Enabled && l.bowEquipped()
 }
 
 // kiteFlightHolds reports whether a mob the loop just fled still
-// holds the character as its target: the straight flight owns the
-// aggro answer until the server clears that chase. AttackableAI
-// MAX_ATTACK_TIMEOUT (1200 game ticks of 100 ms) drops the aggro of
-// a mob that cannot reach its target two minutes after the last
-// swing, so the flight is bounded; the archer must not re-open the
-// fight before that. The 2026-11-10 run-28 acceptance dump
-// re-adopted the fled Kaboo Orc Fighter at the two-minute skip
-// expiry, lost the health race again and spent the remaining window
-// in the drop/adopt cycle (one kill of the two wanted). A fresh
-// attacker that joins the chase rides the same flight - adopting it
-// walks the character straight back into the pack the flight is
-// shedding, and the shot cycle spends half of every reload standing
-// inside the melee range.
+// holds the character as its target: the flight owns the aggro answer
+// until the server clears that chase. AttackableAI MAX_ATTACK_TIMEOUT
+// (1200 game ticks of 100 ms) drops the aggro of a mob that cannot
+// reach its target two minutes after the last swing, so the flight is
+// bounded. A fresh attacker that joins rides the same flight - the
+// shot cycle spends half of every reload inside the melee range.
 func (l *Loop) kiteFlightHolds(now time.Time) bool {
     if !l.kiteLayerArmed() {
         return false
@@ -475,13 +391,10 @@ func (l *Loop) kiteFlightHolds(now time.Time) bool {
     return false
 }
 
-// kiteFleeBusy reports whether the defensive flight's own movement
-// state already owns the tick: a live walk window (the re-click
-// ladder keeps it, and the tick stays with the walk whatever the
-// ladder answered) or a movement hold another step armed. A lapsed
-// window stands itself down and reports free so the next straight
-// leg issues on this very tick - the flight IS its own continuation,
-// the targeted kite re-arms from the next shot cycle instead.
+// kiteFleeBusy reports whether the flight's own movement state owns
+// the tick: a live walk window (the re-click ladder keeps it) or a
+// movement hold another step armed. A lapsed window stands down and
+// reports free, so the next step issues on this very tick.
 func (l *Loop) kiteFleeBusy(now time.Time) bool {
     if !l.kiteWalkUntil.IsZero() {
         if now.After(l.kiteWalkUntil) {
@@ -496,30 +409,21 @@ func (l *Loop) kiteFleeBusy(now time.Time) bool {
     return now.Before(l.combatAvoidUntil)
 }
 
-// kiteFleeHeld reports whether the last flight leg found no lane: the
-// hold paces the re-probe at the kite period and the flight KEEPS the
-// ticks in between (a targetless hold owns the flight; see
-// kiteFleeThreat). Only the targetless hold (kiteHeldFor == 0)
-// belongs to the flight - a fight hold of a live target names its own
-// fight.
+// kiteFleeHeld reports whether the last flight step found no lane:
+// the hold paces the re-probe at the kite period and keeps the ticks
+// in between. Only the targetless hold (kiteHeldFor == 0) belongs to
+// the flight; a hold of a live target names its own fight.
 func (l *Loop) kiteFleeHeld(now time.Time) bool {
     return l.kiteHeldFor == 0 && !l.kiteHeldAt.IsZero() &&
         now.Sub(l.kiteHeldAt) < l.kite.StepPeriod
 }
 
-// kiteFlightMovable reports whether the bow may start a movement
-// right now: the server SAVES a MoveToLocation that lands inside the
-// bow windup (the first half of the disable window, see
-// kiteWindupWindow) and replays it only at the disable end, so a
-// flight click inside the windup travels seconds later - and the
-// escape stall watchdog reads those saved seconds as a dead click
-// and logs the session out (the 2026-11-10 run-24 dump: the fight
-// was dropped 250 ms after the shot, the first flight click went out
-// at once, the server held it 2.7 s and the 3 s no-progress window
-// ended a healthy 99 percent flight). The flight waits the windup out
-// and issues its first leg on the accepted side. A gauge that is
-// absent, malformed or stale owns no live cycle - the flight is free
-// to move.
+// kiteFlightMovable reports whether the bow may start a movement right
+// now: the server SAVES a MoveToLocation that lands inside the bow
+// windup and replays it only at the disable end, so a click inside the
+// windup travels seconds later, and the escape stall watchdog reads
+// those saved seconds as a dead click and logs the session out. A
+// gauge that is absent, malformed or stale owns no live cycle.
 func (l *Loop) kiteFlightMovable(now time.Time) bool {
     at, cycle := l.tracker.SelfBowCycle()
     if at.IsZero() || cycle <= 0 || now.Before(at) ||
@@ -534,21 +438,11 @@ func (l *Loop) kiteFlightMovable(now time.Time) bool {
 }
 
 // kiteFleeWait reports whether a movement owner keeps the flight on
-// the ground this tick. The deferred retreat click of a finished
-// fight is stood down first: the loot interrupt drops the target a
-// second after the shot, and its disable hold kept the whole flight
-// standing through the bow window (the 2026-11-10 run-29 dump took 15
-// damage per 1.9 s inside it). The same stand-down kiteClickWalk runs
-// on the fight side. The busy window and the walled-lane hold own
-// their ticks too - the hold re-probes at the kite period and the
-// zone-clamped melee fan never runs behind it (its no-lane and
-// no-progress guards log a drifted archer out mid-flight - the run-24
-// dump). The bow windup owns its moment: a move request inside it is
-// saved by the server and replayed at the disable end (see
-// kiteFlightMovable), so the flight waits instead of arming a
-// deferred click the stall watchdog misreads. The stand request (or
-// the server side stand settle) owns the tick as well - the first
-// walk must land on a movable character.
+// the ground this tick: a deferred click of a finished fight (the loot
+// interrupt drops the target a second after the shot, and its disable
+// hold would keep the whole flight standing), the busy window, the
+// walled-lane hold, the bow windup (kiteFlightMovable) or the stand
+// request - the first walk must land on a movable character.
 func (l *Loop) kiteFleeWait(now time.Time) bool {
     if !l.kiteClickAt.IsZero() && l.kiteClickFor != l.target {
         l.kiteClickDrop()
