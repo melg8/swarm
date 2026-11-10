@@ -33,9 +33,9 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
-MOBIUS_C1 = os.environ.get(
-    "MOBIUS_C1",
-    "/home/z/my-project/l2j_mobius/L2J_Mobius_C1_HarbingersOfWar")
+MOBIUS_C1 = os.environ.get("MOBIUS_C1") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar")
 SPAWN_XML = os.path.join(
     MOBIUS_C1, "dist/game/data/spawns/ElvenTerritory/ElvenStarting.xml")
 REGISTRY = os.environ.get(
@@ -512,7 +512,7 @@ def emit_go(spots, source):
     lines.append("\treturn spots")
     lines.append("}")
 
-    with open(OUT, "w", encoding="utf-8") as fh:
+    with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("\n".join(lines) + "\n")
 
 
@@ -569,7 +569,7 @@ def main():
         "respawnDefault": {"min": DEFAULT_RESPAWN[0], "max": DEFAULT_RESPAWN[1]},
         "spots": result,
     }
-    with open(JSON_OUT, "w", encoding="utf-8") as fh:
+    with open(JSON_OUT, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(payload, fh, indent=1, sort_keys=False)
 
     by_band = {}

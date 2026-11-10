@@ -40,7 +40,8 @@ import sys
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SPOTS_JSON = os.path.join(REPO, "docs/hunt_analysis/spots_elven.json")
 TILES_DIR = os.path.join(REPO, "internal/swarm/webserver/web/maps/0")
-DEFAULT_OUT = "/home/z/my-project/download/hunt_spots_map.html"
+DEFAULT_OUT = os.path.join(
+    REPO, "docs/hunt_analysis/hunt_spots_map.html")
 
 # The world window of the visualization: the elven spot registry spans
 # x [1708, 54254], y [34387, 82406], the four tiles 20_19..21_20 cover
@@ -752,7 +753,7 @@ def main():
     out_dir = os.path.dirname(os.path.abspath(args.out))
     if out_dir:
         os.makedirs(out_dir, exist_ok=True)
-    with open(args.out, "w", encoding="utf-8") as fh:
+    with open(args.out, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(html)
     print("spots: %d, mode: %s" % (len(spots), mode))
     print("written: %s (%.1f MB)" % (args.out, os.path.getsize(args.out) / 1e6))

@@ -42,6 +42,9 @@ data/navmesh/
 # The repair backups of the concatenated geodata files (scripts/geo_repair).
 *.l2j.orig
 
+# The Python bytecode cache of the generator scripts under tools/.
+__pycache__/
+
 # The cargo build artifacts of the l2bridge harness
 tools/l2bridge/target/
 

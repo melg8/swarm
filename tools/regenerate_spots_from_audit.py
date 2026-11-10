@@ -55,9 +55,9 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
-MOBIUS_C1 = os.environ.get(
-    "MOBIUS_C1",
-    "/home/z/my-project/l2j_mobius/L2J_Mobius_C1_HarbingersOfWar")
+MOBIUS_C1 = os.environ.get("MOBIUS_C1") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar")
 SPAWN_XML = os.path.join(
     MOBIUS_C1, "dist/game/data/spawns/ElvenTerritory/ElvenStarting.xml")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -694,19 +694,19 @@ def main():
     assign_ids(spots)
     evidence = cross_check_audit(spots, AUDIT)
     covered, total = coverage_report(spots, territories)
-    with open(OUT, "w", encoding="utf-8") as fh:
+    with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(render_go(spots))
     slim = []
     for spot in spots:
         slim.append({k: spot[k] for k in (
             "id", "name", "anchor_x", "anchor_y", "radius", "mobs")})
-    with open(JSON_OUT, "w", encoding="utf-8") as fh:
+    with open(JSON_OUT, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(slim, fh, indent=2)
-    with open(ANCHORS_OUT, "w", encoding="utf-8") as fh:
+    with open(ANCHORS_OUT, "w", encoding="utf-8", newline="\n") as fh:
         json.dump({"spots": {s["id"]: {
             "x": s["anchor_x"], "y": s["anchor_y"], "z": -3600,
             "radius": s["radius"]} for s in spots}}, fh, indent=2)
-    with open(REPORT, "w", encoding="utf-8") as fh:
+    with open(REPORT, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("the elven spot regeneration report\n")
         fh.write("=================================\n\n")
         fh.write("old registry: %d spots (audited live: %d)\n"

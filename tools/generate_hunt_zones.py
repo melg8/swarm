@@ -52,10 +52,9 @@ import re
 import sys
 import xml.etree.ElementTree as ET
 
-MOBIUS_C1 = os.environ.get(
-    "MOBIUS_C1",
-    "/home/z/my-project/l2j_mobius/L2J_Mobius_C1_HarbingersOfWar",
-)
+MOBIUS_C1 = os.environ.get("MOBIUS_C1") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar")
 SPAWN_XML = os.path.join(
     MOBIUS_C1, "dist/game/data/spawns/ElvenTerritory/ElvenStarting.xml")
 SPAWNS_DIR = os.path.join(MOBIUS_C1, "dist/game/data/spawns")
@@ -609,7 +608,7 @@ def generate_registry(spec):
     lines.append("\treturn zones")
     lines.append("}")
 
-    with open(spec["out"], "w", encoding="utf-8") as f:
+    with open(spec["out"], "w", encoding="utf-8", newline="\n") as f:
         f.write("\n".join(lines) + "\n")
 
     # Report.

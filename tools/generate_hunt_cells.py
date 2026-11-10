@@ -55,9 +55,9 @@ import math
 import os
 import xml.etree.ElementTree as ET
 
-MOBIUS_C1 = os.environ.get(
-    "MOBIUS_C1",
-    "/home/z/my-project/l2j_mobius/L2J_Mobius_C1_HarbingersOfWar")
+MOBIUS_C1 = os.environ.get("MOBIUS_C1") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar")
 SPAWN_XML = os.path.join(
     MOBIUS_C1, "dist/game/data/spawns/ElvenTerritory/ElvenStarting.xml")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -890,13 +890,13 @@ def main():
     species = load_species_from_stats(npc_ids)
     cells = build_cells(territories, species)
     evidence = cross_check_audit(cells)
-    with open(OUT, "w", encoding="utf-8") as fh:
+    with open(OUT, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(render_go(cells))
-    with open(JSON_OUT, "w", encoding="utf-8") as fh:
+    with open(JSON_OUT, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(render_json(cells), fh, indent=1, sort_keys=False)
         fh.write("\n")
     report = render_report(cells, territories, evidence)
-    with open(REPORT, "w", encoding="utf-8") as fh:
+    with open(REPORT, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(report)
     print(report)
     print("wrote %s" % OUT)
