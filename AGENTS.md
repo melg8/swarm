@@ -14,7 +14,10 @@ the documentation map below) and is read on demand, not upfront.
 ## Start here (the first minute of a session)
 
 1. Skim this file once, top to bottom - it is the rules, the
-   load-bearing facts and the commands, nothing else.
+   load-bearing facts and the commands, nothing else. The
+   machine-checkable bootstrap is one command:
+   `bash tools/session_start.sh` (the git sync verdict, the login
+   port probe, the open hypotheses, the active fragments).
 2. Find your area in the documentation map below and read that one
    doc, on demand - never all of them.
 3. Load the matching playbook from `.agents/skills/` before opening
@@ -32,80 +35,44 @@ the documentation map below) and is read on demand, not upfront.
    deployment of `docs/deployment.md`) - no task runs against an
    undeployed stack.
 
-## Session limits (owner instruction, mandatory)
+## Time and cost discipline (owner instruction, updated 2026-11-10)
 
-- One agent process lives at most **2 hours** from the owner prompt.
-  **Stop all work and hand control back to the user no later than
-  1 hour 45 minutes in** - the stop is mandatory even mid task, and
-  everything must be pushed to the remote branch before it. Plan the
-  work so every atomic commit lands well before the mark.
-- A new owner prompt **resets the timer**: the 2 hour life and the
-  1h45m stop mark count again from the fresh prompt.
-- No single process, script or test run may exceed **6 minutes**
-  (owner instruction 2026-09-21, hard cap on top of the 10 minute
-  sandbox reaper): budget the verification loops accordingly and
-  split anything longer (per-package test runs instead of the whole
-  tree in one call).
-- In the Linux sandbox, stamp the session start into
-  `/home/z/my-project/.session_start_ts` (a unix timestamp, one
-  line) and read it back (`cat`) before starting any long operation.
-  `tools/session_start.sh` prints the whole bootstrap checklist in
-  one command (the stamp age, the rebase verdict, the login port
-  probe, the open hypotheses, the active task headline). The Windows
-  host has no stamp file: budget the session from the prompt time.
-- The exact kill mechanism is not observable from inside the
-  sandbox; treat the limits as a hard owner directive, not a
-  hypothesis (the registry below collects server facts, this is an
-  operational rule).
-- The sandbox root filesystem is ~10 GB and fills silently: the Go
-  build cache alone grows past 4 GB across a session's verify loops
-  (plus playwright/puppeteer caches at ~2 GB). A full disk fails
-  every `go build` with "no space left on device" under `/tmp`.
-  When it happens: `rm -rf ~/.cache/go-build ~/.cache/ms-playwright
-  ~/.cache/puppeteer /tmp/go-build*` frees ~6 GB instantly; nothing
-  in the repo or the deployed stack depends on those caches
-  (measured 2026-09-23, the round-14 session).
-
-## Long running subprocesses in the agent sandbox
-
-**Owner instruction (2026-09-20, mandatory): background processes
-live at most 10 minutes.** Treat a detached process as dead 10
-minutes after its launch. The reaper behavior is a property of the
-sandbox version and it changed between studies (2026-09-18: death
-at the end of the launching tool call; 2026-09-19: survival across
-calls) - never rely on a stale verdict, re-test when a long-lived
-server is load-bearing for the task.
-
-- Never assume a server or daemon started earlier is still serving:
-  re-check it (`ps -eo pid,ppid,sid,cmd | grep NAME`) immediately
-  before every reuse, kill the leftover and start a fresh twin (a
-  port conflict means the previous instance is still alive), and
-  never hand a long task to a background process and walk away.
-- **The always-correct pattern**: run an operation up to 10 minutes
-  inside ONE tool call - start the server, wait for the port, run
-  every probe, kill the server, print the results (a bash script
-  under `scripts/` keeps it reproducible; the Bash tool allows a
-  10 minute timeout).
-- A detached server is the option for services that must outlive
-  the call; a detached `setsid nohup ... &` twin is the known
-  workable form. The restricted shells also forbid `unshare --fork
-  --mount-proc` ("Operation not permitted").
-
-## Measurements (owner instruction, 2026-09-20)
-
+- There is no wall-clock session limit: the agent runs in the
+  owner's local opencode harness (DeepSeek V4.1 Flash), not the
+  retired z.ai sandbox. Do not stop mid task because of an
+  elapsed-time mark - finish the atomic unit, push it, then report.
+- Keep every verification bounded anyway. The cheap loop (`go build
+  ./...`, the affected package tests, `task lint:new`, `task
+  fmt:check`) answers "does it still work"; the full gate (`task
+  verify`) is for a push; a long measurement is a separate,
+  owner-approved question.
 - Do not run long measurements (benchmarks, soak probes, timing
-  loops, repeated live acceptance rounds) unless the owner asked for
-  them. A verification that answers "does it work" stays bounded:
-  one representative run of the affected suite plus the lint and
-  format gates. Minutes-scale or hours-scale measurements burn the
-  2 hour session clock and the 10 minute background process budget
-  for little extra confidence.
-- If a question genuinely needs a long measurement (a soak, a
-  concurrency ladder, a performance baseline), ask the owner first
-  and budget it explicitly against the session clock; prefer the
-  shortest measurement that answers the question (fewer iterations,
-  a smaller bot count, a shorter window) and record the cycle time
-  in the docs so the next agent does not re-measure blindly.
+  loops, repeated live acceptance rounds) unless the owner asked
+  for them. Prefer the shortest measurement that answers the
+  question (fewer iterations, a smaller bot count, a shorter
+  window) and record the cycle time in the docs so the next agent
+  does not re-measure blindly.
+- A foreground tool call still needs an explicit timeout long
+  enough for the command (the deploy and the full suite are
+  minutes, not seconds). Run long scripts in the foreground per
+  docs/deployment.md rather than splitting them artificially.
+
+## Long running subprocesses
+
+- Never assume a server or daemon started earlier is still
+  serving: re-check it (`ss -ltn` / `netstat -ano`, `ps` / the
+  task list) immediately before every reuse, kill the leftover and
+  start a fresh twin (a port conflict means the previous instance
+  is still alive), and never hand a long task to a background
+  process and walk away.
+- The reliable pattern is one foreground call that starts the
+  service, waits for the port, runs every probe, stops the service
+  and prints the result (a script under `scripts/` keeps it
+  reproducible). A detached process is only for a service that
+  must outlive the call; the Linux sandbox reaper may still kill
+  it, so re-check before use. The local Windows host has no
+  reaper, which makes the stale-instance check above more
+  important.
 
 ## Language (owner instruction, updated 2026-11-10)
 

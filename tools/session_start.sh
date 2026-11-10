@@ -7,19 +7,16 @@
 # checklist: the ritual every agent re-implements by hand from the
 # AGENTS.md prose, turned into one command with visible verdicts.
 #
-# It answers the five questions the session start ritual asks:
-#   1. the timer stamp - is /home/z/my-project/.session_start_ts
-#      written and how much of the 2h budget (hard stop 1h45m) is
-#      already gone;
-#   2. the git state - is the branch behind origin (rebase before
+# It answers the four questions the session start ritual asks:
+#   1. the git state - is the branch behind origin (rebase before
 #      any push, other agents commit in parallel);
-#   3. the deploy probe - is the Mobius login port listening
+#   2. the deploy probe - is the Mobius login port listening
 #      (checked through ss, never /dev/tcp - the flood protector
 #      answers SYN differently);
-#   4. the open hypotheses - the H-NNN entries with Status: open
+#   3. the open hypotheses - the H-NNN entries with Status: open
 #      (the work rule: advance or close one per session when the
 #      touched area matches its verification plan);
-#   5. the active tasks - the task fragments in docs/progress/
+#   4. the active tasks - the task fragments in docs/progress/
 #      (one file per task, newest by name; resume it or close it
 #      first - the board's "In progress" column names the owner).
 #
@@ -29,10 +26,7 @@
 set -euo pipefail
 
 REPO_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-STAMP="/home/z/my-project/.session_start_ts"
 BRANCH="$(git -C "${REPO_DIR}" rev-parse --abbrev-ref HEAD)"
-BUDGET_SECONDS=7200        # the 2h process life the owner enforces
-HARD_STOP_SECONDS=6300     # everything pushed by 1h45m
 
 mark() {
     if [ "$2" = "ok" ]; then
@@ -42,23 +36,7 @@ mark() {
     fi
 }
 
-# 1. The session timer stamp.
-if [ -f "${STAMP}" ]; then
-    stamp_value="$(cat "${STAMP}" 2>/dev/null || echo 0)"
-    now="$(date +%s)"
-    age=$(( now - stamp_value ))
-    if [ "${age}" -lt 0 ]; then
-        mark "session stamp ${stamp_value} is in the future - restamp it (date +%s > ${STAMP})" "warn"
-    else
-        left=$(( BUDGET_SECONDS - age ))
-        stop_left=$(( HARD_STOP_SECONDS - age ))
-        mark "session stamp ok, ${age}s spent, ${left}s of budget left, hard stop in ${stop_left}s - push before it" "ok"
-    fi
-else
-    mark "no session stamp - run: date +%s > ${STAMP} (the 2h budget measures from it)" "warn"
-fi
-
-# 2. The git state (fetch, then count).
+# 1. The git state (fetch, then count).
 if [ "${SKIP_FETCH:-0}" != "1" ]; then
     if git -C "${REPO_DIR}" fetch origin --quiet 2>/dev/null; then
         behind="$(git -C "${REPO_DIR}" rev-list --count HEAD..origin/${BRANCH} 2>/dev/null || echo '?')"
@@ -73,7 +51,7 @@ if [ "${SKIP_FETCH:-0}" != "1" ]; then
     fi
 fi
 
-# 3. The login port probe (ss, never /dev/tcp).
+# 2. The login port probe (ss, never /dev/tcp).
 if command -v ss > /dev/null 2>&1; then
     if ss -ltn 2>/dev/null | grep -q ':2106 '; then
         mark "login port 2106 listening - the Mobius stack is up" "ok"
@@ -84,17 +62,17 @@ else
     mark "ss unavailable - probe port 2106 by hand (never /dev/tcp)" "warn"
 fi
 
-# 4. The open hypotheses.
-open_hypotheses="$(awk '/^### H-[0-9]+/ { id = $2 }
-    /^- Status: open/ && id != "" { print id; id = "" }' \
-    "${REPO_DIR}/AGENTS.md" 2>/dev/null | tr '\n' ' ')"
+# 3. The open hypotheses.
+open_hypotheses="$(awk '/^### H-[0-9]+/ { id = $2; sub(/:$/, "", id) }
+    /^- Status: open/ && id != "" { printf "%s ", id; id = "" }' \
+    "${REPO_DIR}/AGENTS.md" 2>/dev/null)"
 if [ -n "${open_hypotheses}" ]; then
     mark "open hypotheses: ${open_hypotheses}- advance or close one this session when the touched area matches its plan (AGENTS.md, the hypotheses registry)" "warn"
 else
     mark "open hypotheses: none (the registry is clean)" "ok"
 fi
 
-# 5. The active task fragments (docs/progress/, one file per task).
+# 4. The active task fragments (docs/progress/, one file per task).
 progress_dir="${REPO_DIR}/docs/progress"
 if [ -d "${progress_dir}" ]; then
     fragments=$(find "${progress_dir}" -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | sort)
