@@ -77,7 +77,7 @@ func auditRegionInteriorWalls(t *testing.T, col, row int16) {
     rl, err := extractRegion(data, col, row, opts.DedupDelta)
     require.NoError(t, err)
     sh := assignSheets(rl, opts.Climb, opts.MinSheetLayers)
-    _, polyAt := buildRects(rl, sh, opts.Climb)
+    _, polyAt := buildRects(rl, sh, opts.Climb, opts.MergeTolerance)
 
     // Every kept layer instance must own a polygon: the decomposition
     // covers the sheet completely.

@@ -33,6 +33,21 @@ type Options struct {
     // blend (fakerepair.go): the bay filler turns into the sea floor
     // water, the land gaps into the connecting ground.
     RepairFake bool
+    // MergeTolerance bounds the rectangle merge across height deltas
+    // (the structural round, issue #57): the maximal rectangle growth
+    // admits an adjacent cell pair whose heights differ by at most
+    // the tolerance (0 keeps the exact same-height rule). The walls
+    // and the climb rule of the step check stay in force - a pair is
+    // still only mergeable when the step between the cells is open,
+    // so the interior of every polygon stays walkable by
+    // construction and the climb limit caps the tolerance from above
+    // (a pair beyond the climb can never share a step, let alone a
+    // rectangle). The emitted polygon keeps the geodata heights of
+    // its four corner cells - the runtime bilinear surface then
+    // blends the merged staircase instead of reproducing it, which is
+    // exactly the route answer drift the corpus replay of
+    // navpack-verify measures per candidate before anything lands.
+    MergeTolerance int32
 }
 
 // DefaultOptions returns the production tunables.
@@ -89,7 +104,7 @@ func BuildRegion(
         fakeFilled = repairFakeCells(rl, opts.Climb)
     }
     sh := assignSheets(rl, opts.Climb, opts.MinSheetLayers)
-    rects, polyAt := buildRects(rl, sh, opts.Climb)
+    rects, polyAt := buildRects(rl, sh, opts.Climb, opts.MergeTolerance)
     acc, strips := buildInternalLinks(rl, sh, polyAt, opts.Climb)
     specs := acc.emit()
 
