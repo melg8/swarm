@@ -1,0 +1,943 @@
+<!doctype html>
+<!--
+SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
+
+SPDX-License-Identifier: MIT
+
+The death mark variant gallery of the swarm map: every candidate draws
+on the real map imagery at the real marker scale, alone and in a camp.
+Open the file in a browser, pick a code, port that draw function into
+map.js.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Death marks — variant gallery</title>
+<style>
+    :root {
+        --bg: #0e1115;
+        --panel: #161a20;
+        --panel2: #1b2027;
+        --line: #272d36;
+        --line2: #333a45;
+        --text: #c9ced7;
+        --dim: #7d8590;
+        --accent: #e9b949;
+        --accent-dim: #8a6d20;
+        --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.45 var(--sans);
+        padding-bottom: 76px;
+    }
+    header {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 26px 18px 6px;
+    }
+    h1 {
+        margin: 0 0 4px;
+        font-size: 21px;
+        font-weight: 650;
+        letter-spacing: 0.2px;
+    }
+    .lede {
+        margin: 0 0 16px;
+        color: var(--dim);
+        max-width: 900px;
+    }
+    .lede b { color: var(--text); font-weight: 600; }
+    .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 18px;
+        align-items: center;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 14px;
+    }
+    .ctl { display: flex; align-items: center; gap: 8px; }
+    .ctl label { color: var(--dim); font-size: 12px; }
+    .ctl output {
+        min-width: 40px;
+        font: 12px var(--mono);
+        color: var(--text);
+    }
+    input[type="range"] { width: 118px; accent-color: var(--accent); }
+    select, button {
+        background: var(--panel2);
+        color: var(--text);
+        border: 1px solid var(--line2);
+        border-radius: 7px;
+        padding: 5px 9px;
+        font: 12px var(--sans);
+    }
+    button { cursor: pointer; }
+    button:hover { border-color: var(--accent-dim); color: #fff; }
+    .tog { cursor: pointer; user-select: none; }
+    .tog input { accent-color: var(--accent); }
+    .nav {
+        max-width: 1200px;
+        margin: 12px auto 0;
+        padding: 0 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .nav a {
+        color: var(--dim);
+        text-decoration: none;
+        font-size: 12px;
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 3px 11px;
+    }
+    .nav a:hover { color: var(--accent); border-color: var(--accent-dim); }
+    .hero {
+        max-width: 1200px;
+        margin: 16px auto 0;
+        padding: 0 18px;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 336px;
+        gap: 16px;
+    }
+    .herobox {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px;
+        min-width: 0;
+    }
+    .herobox .cap {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 6px 2px 2px;
+        font-size: 11.5px;
+        color: var(--dim);
+    }
+    .herobox .cap b { color: var(--accent); font-weight: 600; }
+    canvas { display: block; border-radius: 7px; }
+    main {
+        max-width: 1200px;
+        margin: 22px auto 0;
+        padding: 0 18px;
+    }
+    .famhead {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        margin: 26px 0 10px;
+        padding-top: 12px;
+        border-top: 1px solid var(--line);
+    }
+    .famhead h2 {
+        margin: 0;
+        font-size: 15px;
+        font-weight: 650;
+        letter-spacing: 0.3px;
+    }
+    .famhead span { color: var(--dim); font-size: 12px; }
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, 372px);
+        gap: 16px;
+    }
+    .card {
+        width: 372px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px;
+        cursor: pointer;
+        transition: border-color 120ms, box-shadow 120ms;
+    }
+    .card:hover { border-color: var(--line2); }
+    .card.sel {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px var(--accent-dim), 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+    .cardhead {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        padding: 2px 2px 8px;
+    }
+    .vid {
+        font: 600 12px var(--mono);
+        color: var(--accent);
+        background: rgba(233, 185, 73, 0.09);
+        border: 1px solid rgba(233, 185, 73, 0.26);
+        border-radius: 5px;
+        padding: 1px 6px;
+    }
+    .vname { font-weight: 600; font-size: 14px; }
+    .vtags {
+        margin-left: auto;
+        color: var(--dim);
+        font: 10.5px var(--mono);
+        white-space: nowrap;
+    }
+    .cardfoot {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        padding: 7px 2px 1px;
+        font-size: 11.5px;
+        color: var(--dim);
+    }
+    .cost {
+        margin-left: auto;
+        font: 10.5px var(--mono);
+        white-space: nowrap;
+        color: #6f7783;
+    }
+    .pickbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(16, 19, 24, 0.94);
+        border-top: 1px solid var(--line2);
+        backdrop-filter: blur(6px);
+        z-index: 10;
+    }
+    .pickbar .in {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 11px 18px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+    }
+    .pickbar .big {
+        font: 600 15px var(--mono);
+        color: var(--accent);
+    }
+    .pickbar .nm { font-weight: 600; }
+    .pickbar .hint { color: var(--dim); font-size: 12px; }
+    .pickbar .sp { margin-left: auto; }
+    .note { color: #8d95a0; }
+</style>
+</head>
+<body>
+<header>
+    <h1>Death marks — the variant gallery</h1>
+    <p class="lede">
+        The map keeps every kill of the fleet as a permanent mark on the
+        ground (<code>drawKillMarks</code> in <code>map.js</code>). This page
+        paints each candidate <b>on the real map imagery</b> at the real
+        marker size: one lone kill on the left, a hunting camp on the
+        right. Hover to preview, click to choose, then <b>tell me the
+        code</b> (for example “V07”) and I will implement it.
+    </p>
+    <div class="controls">
+        <div class="ctl">
+            <label for="terrain">Terrain</label>
+            <select id="terrain">
+                <option value="meadow">Meadow</option>
+                <option value="forest">Forest</option>
+                <option value="hills">Hills</option>
+            </select>
+        </div>
+        <div class="ctl">
+            <label for="zoom">Zoom</label>
+            <input id="zoom" type="range" min="0.12" max="1" step="0.01"
+                   value="0.45">
+            <output id="zoomOut">0.45</output>
+        </div>
+        <div class="ctl">
+            <label for="size">Mark size</label>
+            <input id="size" type="range" min="7" max="16" step="0.5"
+                   value="10">
+            <output id="sizeOut">r10</output>
+        </div>
+        <div class="ctl">
+            <label for="kills">Kills in view</label>
+            <input id="kills" type="range" min="4" max="90" step="1"
+                   value="26">
+            <output id="killsOut">26</output>
+        </div>
+        <div class="ctl">
+            <label class="tog"><input id="jitter" type="checkbox" checked>
+                rotation jitter</label>
+        </div>
+        <div class="ctl">
+            <label class="tog"><input id="anim" type="checkbox" checked>
+                animation</label>
+        </div>
+    </div>
+    <nav class="nav" id="nav"></nav>
+</header>
+
+<section class="hero">
+    <div class="herobox">
+        <canvas id="heroScene"></canvas>
+        <div class="cap">
+            <span id="heroCapLeft">Camp of the selected mark</span>
+            <span id="heroCapRight"></span>
+        </div>
+    </div>
+    <div class="herobox">
+        <canvas id="heroArt"></canvas>
+        <div class="cap">
+            <span>Detail</span>
+            <span>on the dark fill and on paper</span>
+        </div>
+    </div>
+</section>
+
+<main id="sections"></main>
+
+<div class="pickbar">
+    <div class="in">
+        <span class="big" id="pickId">V01</span>
+        <span class="nm" id="pickName">Skull</span>
+        <span class="hint" id="pickNote"></span>
+        <span class="sp"></span>
+        <button id="copyBtn">Copy code</button>
+    </div>
+</div>
+
+<script src="killmarks_art.js"></script>
+<script>
+"use strict";
+
+const state = {
+    zoom: 0.45,
+    size: 10,
+    kills: 26,
+    terrain: "meadow",
+    jitter: true,
+    anim: true,
+    selected: "V01",
+    hover: null
+};
+
+// The review shots use ?family=skull or ?ids=V01,V02 to keep a
+// screenshot small enough to judge the art detail.
+const query = new URLSearchParams(window.location.search);
+const onlyFamily = query.get("family");
+const onlyIds = query.get("ids") ? query.get("ids").split(",") : null;
+const hideHero = query.get("hero") === "0";
+
+// The cameras sit in the gallery world units: one map tile covers
+// TILE_WORLD of them and tile 24_20 starts at the origin.
+const TERRAINS = {
+    meadow: { name: "Meadow", cam: { x: -3584, y: -512 } },
+    forest: { name: "Forest", cam: { x: -1536, y: -512 } },
+    hills: { name: "Hills", cam: { x: -2560, y: -1536 } }
+};
+const TERRAIN_KEYS = Object.keys(TERRAINS);
+if (query.get("zoom")) { state.zoom = Number(query.get("zoom")); }
+if (query.get("kills")) { state.kills = Number(query.get("kills")); }
+if (query.get("size")) { state.size = Number(query.get("size")); }
+if (query.get("terrain") && TERRAIN_KEYS.indexOf(query.get("terrain")) >= 0) {
+    state.terrain = query.get("terrain");
+}
+
+// The web UI pyramid: level 0 tiles are 1024 px and every level
+// halves the resolution. The level rule is the map.js one (a tile is
+// never upscaled past 2x), which keeps the backdrop sharp at any zoom.
+const TILE_PX = [1024, 512, 256, 128];
+const TILE_WORLD = 1024;
+const TILE_ZERO = { x: 24, y: 20 };
+const TILE_DIR = "../../internal/swarm/webserver/web/maps/";
+
+const tileCache = new Map();
+const byId = new Map(KILL_MARKS.map((m) => [m.id, m]));
+
+function boot() {
+    if (query.get("sheet") === "1") {
+        renderSheet();
+        return;
+    }
+    const pick = query.get("sel");
+    if (pick && byId.has(pick)) { state.selected = pick; }
+    buildSections();
+    wireControls();
+    syncControls();
+    renderAll();
+    requestAnimationFrame(tick);
+}
+
+// syncControls mirrors state back into the header inputs, so the URL
+// parameters start the page on the view they describe.
+function syncControls() {
+    document.getElementById("zoom").value = state.zoom;
+    document.getElementById("zoomOut").textContent = state.zoom.toFixed(2);
+    document.getElementById("size").value = state.size;
+    document.getElementById("sizeOut").textContent = "r" + state.size;
+    document.getElementById("kills").value = state.kills;
+    document.getElementById("killsOut").textContent = state.kills;
+    document.getElementById("terrain").value = state.terrain;
+}
+
+// renderSheet paints every variant in one contact sheet: the quickest
+// way to compare the whole set at a readable size.
+function renderSheet() {
+    const cols = 6;
+    const cellW = 196;
+    const cellH = 214;
+    const rows = Math.ceil(KILL_MARKS.length / cols);
+    const W = cols * cellW;
+    const H = rows * cellH;
+    document.body.innerHTML = "";
+    document.body.style.padding = "0";
+    const cv = document.createElement("canvas");
+    document.body.appendChild(cv);
+    const ctx = fit(cv, W, H);
+    ctx.fillStyle = "#0e1115";
+    ctx.fillRect(0, 0, W, H);
+    KILL_MARKS.forEach((mark, i) => {
+        const x = (i % cols) * cellW + 10;
+        const y = Math.floor(i / cols) * cellH + 10;
+        const rect = { x: x, y: y, w: cellW - 20, h: cellH - 42 };
+        paintPlate(ctx, rect, i % 2 ? "paper" : "dark");
+        drawMark(ctx, mark, rect.x + rect.w / 2, rect.y + rect.h / 2,
+            46, 0);
+        kText(ctx, mark.id + "  " + mark.name,
+            rect.x + 1, rect.y + rect.h + 20, "left",
+            "rgba(226, 232, 240, 0.9)", 12);
+    });
+}
+
+// ---------------------------------------------------------------
+// Terrain: the tile pyramid shipped with the web UI.
+
+// pickLevel follows the map.js rule: the finest level whose native
+// resolution stays within a factor of two of the drawn tile size.
+function pickLevel(scale) {
+    const drawn = TILE_WORLD * scale;
+    for (let i = TILE_PX.length - 1; i >= 0; i -= 1) {
+        if (TILE_PX[i] <= drawn * 2) { return i; }
+    }
+
+    return TILE_PX.length - 1;
+}
+
+function tileFor(level, bx, by) {
+    const path = TILE_DIR + level + "/" + bx + "_" + by + ".jpg";
+    let entry = tileCache.get(path);
+    if (entry) { return entry; }
+    entry = { img: null, ready: false, missing: false };
+    tileCache.set(path, entry);
+    const img = new Image();
+    img.onload = () => {
+        entry.img = img;
+        entry.ready = true;
+        tileArrived();
+    };
+    img.onerror = () => {
+        entry.missing = true;
+        tileArrived();
+    };
+    img.src = path;
+
+    return entry;
+}
+
+// tileArrived coalesces the burst of loads of one view into a single
+// repaint instead of one full render per landed tile.
+let tileTimer = 0;
+function tileArrived() {
+    if (tileTimer) { return; }
+    tileTimer = setTimeout(() => {
+        tileTimer = 0;
+        renderAll();
+    }, 80);
+}
+
+// paintTerrain fills the rect with the loaded tiles of the camera.
+function paintTerrain(ctx, rect, cam, scale, fallback) {
+    ctx.fillStyle = fallback || "#4a6238";
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    const level = pickLevel(scale);
+    const left = cam.x - rect.w / 2 / scale;
+    const right = cam.x + rect.w / 2 / scale;
+    const top = cam.y - rect.h / 2 / scale;
+    const bottom = cam.y + rect.h / 2 / scale;
+    const bxMin = Math.floor(left / TILE_WORLD);
+    const bxMax = Math.floor(right / TILE_WORLD);
+    const byMin = Math.floor(top / TILE_WORLD);
+    const byMax = Math.floor(bottom / TILE_WORLD);
+    const size = TILE_WORLD * scale + 1;
+    const cx = rect.x + rect.w / 2 - cam.x * scale;
+    const cy = rect.y + rect.h / 2 - cam.y * scale;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "low";
+    for (let bx = bxMin; bx <= bxMax; bx += 1) {
+        for (let by = byMin; by <= byMax; by += 1) {
+            const entry = tileFor(level, bx + TILE_ZERO.x, by + TILE_ZERO.y);
+            if (!entry.ready) { continue; }
+            ctx.drawImage(entry.img, cx + bx * TILE_WORLD * scale,
+                cy + by * TILE_WORLD * scale, size, size);
+        }
+    }
+}
+
+// ---------------------------------------------------------------
+// Layout of the kills: packs around a few spawn centres plus strays.
+
+function mulberry32(a) {
+    return function () {
+        a |= 0;
+        a = (a + 0x6D2B79F5) | 0;
+        let t = Math.imul(a ^ (a >>> 15), 1 | a);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+const PACK_CENTERS = [
+    { x: -212, y: -54 }, { x: 128, y: 44 }, { x: 318, y: -142 },
+    { x: -24, y: 158 }, { x: 412, y: 118 }, { x: -356, y: 104 },
+    { x: 44, y: -196 }
+];
+
+function layoutKills(n, seed, spread) {
+    const rnd = mulberry32(seed);
+    const out = [];
+    for (let i = 0; i < n; i += 1) {
+        if (rnd() < 0.13) {
+            out.push({
+                x: (rnd() * 2 - 1) * 430 * spread,
+                y: (rnd() * 2 - 1) * 236 * spread,
+                rot: (rnd() * 2 - 1) * 0.55,
+                s: 0.84 + rnd() * 0.3
+            });
+            continue;
+        }
+        const c = PACK_CENTERS[Math.floor(rnd() * PACK_CENTERS.length)];
+        const a = rnd() * Math.PI * 2;
+        const d = Math.sqrt(rnd()) * 52;
+        out.push({
+            x: (c.x + Math.cos(a) * d) * spread,
+            y: (c.y + Math.sin(a) * d * 0.82) * spread,
+            rot: (rnd() * 2 - 1) * 0.55,
+            s: 0.84 + rnd() * 0.3
+        });
+    }
+
+    return out;
+}
+
+// ---------------------------------------------------------------
+// Painting.
+
+function fit(cv, w, h) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.style.width = w + "px";
+    cv.style.height = h + "px";
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    return ctx;
+}
+
+function drawMark(ctx, mark, x, y, r, rot) {
+    ctx.save();
+    ctx.translate(x, y);
+    if (rot) { ctx.rotate(rot); }
+    ctx.scale(r, r);
+    mark.draw(ctx, clock);
+    ctx.restore();
+}
+
+function kText(ctx, text, x, y, align, color, size) {
+    ctx.font = "600 " + (size || 10)
+        + "px ui-monospace, Consolas, monospace";
+    ctx.textAlign = align || "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "rgba(12, 16, 18, 0.7)";
+    ctx.fillText(text, x + 0.7, y + 0.8);
+    ctx.fillStyle = color || "rgba(255, 252, 240, 0.92)";
+    ctx.fillText(text, x, y);
+}
+
+function paneCaption(ctx, rect, text) {
+    kText(ctx, text, rect.x + 7, rect.y + 13, "left");
+}
+
+// paintMapPane draws one clipped map pane: terrain plus the marks.
+function paintMapPane(ctx, rect, kills, cam, scale, label, mark) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rect.x, rect.y, rect.w, rect.h);
+    ctx.clip();
+    paintTerrain(ctx, rect, cam, scale);
+    const r = state.size;
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    for (const k of kills) {
+        const jr = state.jitter ? k.rot : 0;
+        const js = state.jitter ? k.s : 1;
+        drawMark(ctx, mark, cx + k.x * scale, cy + k.y * scale,
+            r * js, jr);
+    }
+    ctx.restore();
+    if (label) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(rect.x, rect.y, rect.w, rect.h);
+        ctx.clip();
+        paneCaption(ctx, rect, label);
+        ctx.restore();
+    }
+}
+
+function activeMark() {
+    const id = state.hover || state.selected;
+    return byId.get(id) || KILL_MARKS[1];
+}
+
+// plate draws the neutral background of a detail cell.
+function paintPlate(ctx, rect, style) {
+    if (style === "dark") {
+        ctx.fillStyle = "#0c0f14";
+    } else if (style === "paper") {
+        ctx.fillStyle = "#ece7da";
+    } else {
+        ctx.fillStyle = "#4e6a3a";
+    }
+    ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    if (style === "paper") {
+        const g = ctx.createRadialGradient(
+            rect.x + rect.w / 2, rect.y + rect.h * 0.42, 4,
+            rect.x + rect.w / 2, rect.y + rect.h * 0.5,
+            Math.max(rect.w, rect.h) * 0.75);
+        g.addColorStop(0, "rgba(255, 255, 255, 0.55)");
+        g.addColorStop(1, "rgba(150, 140, 120, 0.22)");
+        ctx.fillStyle = g;
+        ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+    }
+    if (style === "terrain") {
+        const cam = TERRAINS[state.terrain].cam;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(rect.x, rect.y, rect.w, rect.h);
+        ctx.clip();
+        paintTerrain(ctx, rect, { x: cam.x - 520, y: cam.y + 340 }, 0.52);
+        ctx.restore();
+    }
+}
+
+function paintPlateMark(ctx, rect, style, mark) {
+    paintPlate(ctx, rect, style);
+    drawMark(ctx, mark, rect.x + rect.w / 2, rect.y + rect.h / 2 - 6,
+        32, 0);
+}
+
+// ---------------------------------------------------------------
+// Cards.
+
+const cardRefs = [];
+const liveRefs = [];
+
+function buildSections() {
+    const host = document.getElementById("sections");
+    const nav = document.getElementById("nav");
+    if (hideHero) {
+        document.querySelector(".hero").style.display = "none";
+    }
+    for (const fam of KILL_FAMILIES) {
+        if (onlyFamily && fam.id !== onlyFamily) { continue; }
+        const list = KILL_MARKS.filter((m) => m.family === fam.id
+            && (!onlyIds || onlyIds.indexOf(m.id) >= 0));
+        if (list.length === 0) { continue; }
+        const head = document.createElement("div");
+        head.className = "famhead";
+        head.id = "fam-" + fam.id;
+        head.innerHTML = "<h2>" + fam.name + "</h2><span>"
+            + list.length + (list.length === 1 ? " variant" : " variants")
+            + "</span>";
+        host.appendChild(head);
+        const grid = document.createElement("div");
+        grid.className = "grid";
+        host.appendChild(grid);
+        for (const mark of list) {
+            grid.appendChild(buildCard(mark));
+        }
+        const a = document.createElement("a");
+        a.href = "#fam-" + fam.id;
+        a.textContent = fam.name;
+        nav.appendChild(a);
+    }
+}
+
+function buildCard(mark) {
+    const card = document.createElement("article");
+    card.className = "card";
+    card.dataset.id = mark.id;
+    card.innerHTML =
+        '<div class="cardhead">'
+        + '<span class="vid">' + mark.id + "</span>"
+        + '<span class="vname">' + mark.name + "</span>"
+        + '<span class="vtags">' + mark.tags.join(" · ") + "</span>"
+        + "</div>"
+        + '<canvas class="scene"></canvas>'
+        + '<canvas class="plates"></canvas>'
+        + '<div class="cardfoot"><span class="note">' + mark.note
+        + '</span><span class="cost">' + costLabel(mark) + "</span></div>";
+    card.addEventListener("click", () => select(mark.id));
+    card.addEventListener("mouseenter", () => {
+        state.hover = mark.id;
+        renderHero();
+    });
+    card.addEventListener("mouseleave", () => {
+        state.hover = null;
+        renderHero();
+    });
+    const ref = {
+        mark: mark,
+        card: card,
+        scene: card.querySelector(".scene"),
+        plates: card.querySelector(".plates"),
+        sceneCtx: null,
+        platesCtx: null
+    };
+    cardRefs.push(ref);
+
+    return card;
+}
+
+function costLabel(mark) {
+    return "~" + (mark.ops || 0) + " paint ops";
+}
+
+function countOps(mark) {
+    const cv = document.createElement("canvas");
+    cv.width = 64;
+    cv.height = 64;
+    const ctx = cv.getContext("2d");
+    let ops = 0;
+    const fill = ctx.fill.bind(ctx);
+    const stroke = ctx.stroke.bind(ctx);
+    ctx.fill = function () { ops += 1; return fill.apply(null, arguments); };
+    ctx.stroke = function () { ops += 1; return stroke.apply(null, arguments); };
+    ctx.save();
+    ctx.scale(10, 10);
+    mark.draw(ctx, 0);
+    ctx.restore();
+
+    return ops;
+}
+
+function renderAll() {
+    renderHero();
+    for (const ref of cardRefs) { renderCard(ref); }
+    syncSelection();
+}
+
+function renderCard(ref) {
+    const W = 348;
+    const SCENE_H = 150;
+    const PLATE_H = 128;
+    if (!ref.sceneCtx) { ref.sceneCtx = fit(ref.scene, W, SCENE_H); }
+    if (!ref.platesCtx) { ref.platesCtx = fit(ref.plates, W, PLATE_H); }
+    const sctx = ref.sceneCtx;
+    sctx.clearRect(0, 0, W, SCENE_H);
+    const leftW = 118;
+    const gap = 8;
+    const solo = {
+        x: 0, y: 0, w: leftW, h: SCENE_H
+    };
+    const pack = {
+        x: leftW + gap, y: 0, w: W - leftW - gap, h: SCENE_H
+    };
+    const cam = TERRAINS[state.terrain].cam;
+    const soloKills = [{ x: 0, y: 0, rot: 0.1, s: 1 }];
+    const packKills = layoutKills(13, 7, 0.46);
+    sctx.save();
+    sctx.fillStyle = "#0c0f14";
+    sctx.fillRect(0, 0, W, SCENE_H);
+    sctx.beginPath();
+    sctx.rect(solo.x, solo.y, solo.w, solo.h);
+    sctx.clip();
+    paintTerrain(sctx, solo, { x: cam.x - 690, y: cam.y + 210 },
+        state.zoom);
+    sctx.restore();
+    sctx.save();
+    sctx.beginPath();
+    sctx.rect(solo.x, solo.y, solo.w, solo.h);
+    sctx.clip();
+    drawMark(sctx, ref.mark, solo.x + solo.w / 2, solo.y + solo.h / 2,
+        state.size, 0.08);
+    sctx.restore();
+    paneCaption(sctx, solo, "solo");
+    paintMapPane(sctx, pack, packKills,
+        { x: cam.x - 520, y: cam.y + 340 }, state.zoom, "pack", ref.mark);
+
+    // The three readability plates.
+    const pctx = ref.platesCtx;
+    pctx.clearRect(0, 0, W, PLATE_H);
+    const cw = Math.floor((W - 8) / 3);
+    const styles = ["dark", "paper", "terrain"];
+    for (let i = 0; i < styles.length; i += 1) {
+        const rect = { x: i * (cw + 4), y: 0, w: cw, h: PLATE_H };
+        paintPlateMark(pctx, rect, styles[i], ref.mark);
+        kText(pctx, styles[i], rect.x + 6, rect.y + PLATE_H - 6, "left",
+            styles[i] === "paper" ? "rgba(40, 36, 28, 0.75)"
+                : "rgba(230, 235, 240, 0.72)");
+    }
+    if (state.anim && ref.mark.animated) {
+        addLive(() => renderCard(ref));
+    }
+}
+
+const liveKeys = new Set();
+function addLive(fn) {
+    if (liveKeys.has(fn)) { return; }
+    liveKeys.add(fn);
+    liveRefs.push(fn);
+}
+
+function renderHero() {
+    const scene = document.getElementById("heroScene");
+    const art = document.getElementById("heroArt");
+    const W = 792;
+    const H = 420;
+    if (!renderHero.sceneCtx) { renderHero.sceneCtx = fit(scene, W, H); }
+    if (!renderHero.artCtx) { renderHero.artCtx = fit(art, 316, H); }
+    const ctx = renderHero.sceneCtx;
+    const mark = activeMark();
+    const cam = TERRAINS[state.terrain].cam;
+    const scale = state.zoom;
+    ctx.clearRect(0, 0, W, H);
+    const rect = { x: 0, y: 0, w: W, h: H };
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, W, H);
+    ctx.clip();
+    paintTerrain(ctx, rect, cam, scale);
+    const cx = W / 2;
+    const cy = H / 2;
+    const kills = layoutKills(state.kills, 23, 1.9);
+    for (const k of kills) {
+        drawMark(ctx, mark, cx + k.x * scale, cy + k.y * scale,
+            state.size, state.jitter ? k.rot : 0);
+    }
+    ctx.restore();
+    document.getElementById("heroCapLeft").innerHTML =
+        "<b>" + mark.id + "</b> " + mark.name + " — " + state.kills
+        + " kills, zoom " + state.zoom.toFixed(2);
+    document.getElementById("heroCapRight").textContent =
+        "the map default zoom is 0.12";
+
+    const actx = renderHero.artCtx;
+    actx.clearRect(0, 0, 316, H);
+    const top = { x: 0, y: 0, w: 316, h: 202 };
+    const bot = { x: 0, y: 218, w: 316, h: 202 };
+    paintPlate(actx, top, "dark");
+    paintPlate(actx, bot, "paper");
+    drawMark(actx, mark, top.x + top.w / 2, top.y + top.h / 2 + 4, 74, 0);
+    drawMark(actx, mark, bot.x + bot.w / 2, bot.y + bot.h / 2 + 4, 74, 0);
+    kText(actx, "dark fill  ×7", top.x + 8, top.y + 18, "left",
+        "rgba(225, 232, 238, 0.7)");
+    kText(actx, "paper  ×7", bot.x + 8, bot.y + 18, "left",
+        "rgba(40, 36, 28, 0.7)");
+    if (state.anim && mark.animated) { addLive(renderHero); }
+}
+
+// ---------------------------------------------------------------
+// Interaction.
+
+let clock = 0;
+let lastTick = 0;
+
+function tick(now) {
+    const t = now / 1000;
+    if (state.anim && liveRefs.length > 0 && t - lastTick > 1 / 24) {
+        lastTick = t;
+        clock = t;
+        const list = liveRefs.slice();
+        liveRefs.length = 0;
+        liveKeys.clear();
+        for (const fn of list) { fn(); }
+    } else if (!state.anim) {
+        clock = t;
+    }
+    requestAnimationFrame(tick);
+}
+
+function select(id) {
+    state.selected = id;
+    syncSelection();
+    renderHero();
+}
+
+function syncSelection() {
+    for (const ref of cardRefs) {
+        ref.card.classList.toggle("sel", ref.mark.id === state.selected);
+    }
+    const mark = byId.get(state.selected);
+    document.getElementById("pickId").textContent = mark.id;
+    document.getElementById("pickName").textContent = mark.name;
+    document.getElementById("pickNote").textContent = mark.note;
+}
+
+function wireControls() {
+    const zoom = document.getElementById("zoom");
+    zoom.addEventListener("input", () => {
+        state.zoom = Number(zoom.value);
+        document.getElementById("zoomOut").textContent =
+            state.zoom.toFixed(2);
+        renderAll();
+    });
+    const size = document.getElementById("size");
+    size.addEventListener("input", () => {
+        state.size = Number(size.value);
+        document.getElementById("sizeOut").textContent =
+            "r" + state.size;
+        renderAll();
+    });
+    const kills = document.getElementById("kills");
+    kills.addEventListener("input", () => {
+        state.kills = Number(kills.value);
+        document.getElementById("killsOut").textContent = state.kills;
+        renderHero();
+    });
+    const terrain = document.getElementById("terrain");
+    terrain.addEventListener("change", () => {
+        state.terrain = terrain.value;
+        renderAll();
+    });
+    const jitter = document.getElementById("jitter");
+    jitter.addEventListener("change", () => {
+        state.jitter = jitter.checked;
+        renderAll();
+    });
+    const anim = document.getElementById("anim");
+    anim.addEventListener("change", () => {
+        state.anim = anim.checked;
+        renderAll();
+    });
+    document.getElementById("copyBtn").addEventListener("click", () => {
+        const text = state.selected;
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).catch(() => {});
+        }
+        const btn = document.getElementById("copyBtn");
+        btn.textContent = "Copied " + text;
+        setTimeout(() => { btn.textContent = "Copy code"; }, 1200);
+    });
+    window.addEventListener("resize", () => { renderAll(); });
+}
+
+for (const mark of KILL_MARKS) {
+    mark.ops = countOps(mark);
+}
+
+boot();
+</script>
+</body>
+</html>
