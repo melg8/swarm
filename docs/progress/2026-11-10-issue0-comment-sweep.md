@@ -64,6 +64,15 @@ corner probe is a length, not a leg at all.
   `fleetRaceStepStream` (the fleet race sampler). The armor `legs`
   identifiers are untouched.
 
+### 2026-11-11 - the kite comments keep the constraint only
+
+- The `hunt/kite.go` comments drop the round history (the dates, the
+  run numbers, the issue ids and the stories behind each rule) and
+  keep the constraint and the measured number; `docs/hunting.md` and
+  `docs/kite_timing_findings.md` carry the rounds.
+- Verified: `go build ./...`, the hunt package tests, `task lint:new`
+  (0 issues), `task fmt:check`.
+
 ## Status
 
 The tool and the rule are in; the renames are in the tree pending the
