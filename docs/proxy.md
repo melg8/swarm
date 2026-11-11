@@ -280,6 +280,18 @@ is unconditional. Covered by internal/swarm/proxy/cannotmove_test.go
 carries the bot place, a veto matching the bot place is dropped too,
 the following position report transits again).
 
+The bot keeps a defense in depth for any deployment that swallows
+accepted move requests (H-006): the quest walk follower watches the
+movement start of each waypoint click, names the waypoint blocked after
+`questMoveStartWait` (3 s, the server's movement broadcast gate) when
+nothing moved and the tracker reports no walk, and skips it within the
+plan - a re-plan from the same position answers the identical
+deterministic waypoint, which is the loop the stuck run produced. The
+direct click of a segment carries the same verdict: a click that
+started nothing fails the walk at once instead of standing out the
+route budget. Covered by
+internal/swarm/hunt/quest_waypoint_blocked_test.go.
+
 ## The live self state (reconnection correctness)
 
 The replay answers one hard question: *where is the character right

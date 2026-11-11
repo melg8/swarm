@@ -127,3 +127,25 @@ correction sender extracted into `sendViewCorrection`). Tests:
 `cannotmove_test.go` with the captured payload of the stuck run. The
 veto policy and the reason a distance test cannot classify it are in
 `docs/proxy.md`, the packet layout in `docs/protocol_description.md`.
+
+### 2026-11-11 - the quest walker move start watchdog
+
+Defense in depth for any deployment that swallows accepted move
+requests (H-006): `followWaypoint` now returns a `waypointOutcome`,
+names a waypoint `waypointBlocked` when the click started no movement
+within `questMoveStartWait` (3 s) and the tracker reports no walk, and
+`followPlannedSegment` skips blocked waypoints within the plan (all
+blocked -> the direct click, a bounded failure, never the same
+waypoint loop). A blocked waypoint is never re-clicked while the
+verdict is pending, and `awaitSegmentProgress` gives the direct click
+the same verdict so a dead click fails the route at once instead of
+standing out the 10 minute walk budget. Tests:
+`quest_waypoint_blocked_test.go` (the skip of every waypoint, the
+walked plan untouched, the fast dead click, the running walk).
+
+## Status
+
+In progress: both fixes are in the tree with offline tests and the
+earlier proxy position fix is verified against the live stack; the
+remaining confirmation is the live proxy E2E rerun and the owner rerun
+with the real C1 client attached.

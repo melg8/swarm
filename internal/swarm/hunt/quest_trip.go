@@ -64,6 +64,15 @@ const questSegmentLen = 8000.0
 // The var (not a const) is a test seam: the route tests shorten it.
 var questStuckWait = 5 * time.Second
 
+// questMoveStartWait bounds the move start watchdog of the quest walk:
+// a click whose movement never started names its waypoint dead after
+// this window instead of waiting the full stuck timeout, the owner
+// rule of the town walker (see moveStartWindow). The value covers the
+// server's once per second movement broadcast gate plus the network
+// lag, and stays under the stuck window so the dead click verdict
+// always lands first. The var (not a const) is a test seam.
+var questMoveStartWait = 3 * time.Second
+
 // questTransferArriveRadius is the arrival gate of a gatekeeper
 // teleport: the arrival square of the teleporter xml plus the
 // scatter the server drops the character at.
@@ -371,9 +380,33 @@ func questSegmentTarget(selfX, selfY, x, y int32) (int32, int32) {
         int32(float64(selfY) + float64(y-selfY)*frac)
 }
 
+// waypointOutcome reports how the follower ended one waypoint of a
+// planned segment.
+type waypointOutcome int
+
+const (
+    // waypointReached means the follower arrived; a lapsed segment
+    // budget ends the plan the same way and the caller re-plans.
+    waypointReached waypointOutcome = iota
+    // waypointStalled means the character walked and then stopped
+    // short of the waypoint: the segment is dead and the route
+    // re-plans.
+    waypointStalled
+    // waypointBlocked means the click never started the movement, so
+    // the deterministic plan would name the identical waypoint again:
+    // the follower skips it within this plan.
+    waypointBlocked
+    // waypointFailed means a request error ended the waypoint and the
+    // caller falls back to the direct click.
+    waypointFailed
+)
+
 // followPlannedSegment plans the geodata path of one segment and
 // walks its waypoints. It reports whether the plan existed and was
 // followed (the caller falls back to the direct click otherwise).
+// Blocked waypoints are skipped within the plan: a re-plan from the
+// same position answers the identical waypoint, and repeating it would
+// loop forever.
 func (l *Loop) followPlannedSegment(
     selfX, selfY, selfZ, segX, segY int32, deadline time.Time,
 ) bool {
@@ -411,10 +444,23 @@ func (l *Loop) followPlannedSegment(
             "%d waypoints from (%d, %d)", segX, segY, len(waypoints),
             selfX, selfY)
     }
+    blocked := 0
     for i := range waypoints {
-        if !l.followWaypoint(waypoints, i, frameOffset, deadline) {
+        switch l.followWaypoint(waypoints, i, frameOffset, deadline) {
+        case waypointReached:
+        case waypointStalled:
             return true
+        case waypointBlocked:
+            blocked++
+        case waypointFailed:
+            return false
         }
+    }
+    if blocked == len(waypoints) {
+        // No waypoint of the plan could start a walk: the direct click
+        // keeps the failure bounded (the server answers it the same
+        // way, and the route gives up instead of looping the plan).
+        return false
     }
     // The degenerate plan guard: the approach search may answer with
     // a waypoint inside its own approach radius of the character (a
@@ -435,22 +481,24 @@ func (l *Loop) followPlannedSegment(
 
 // followWaypoint walks toward the waypoint at the index until the
 // tracker counts it reached (the tight pass radius of the town
-// trips) or the walk stalls. False when the waypoint needs a re-plan
-// (the follower returns, the caller plans a fresh segment); true
-// when the waypoint was reached or the segment ran out of budget.
+// trips) or the walk stalls. The verdict separates a dead segment
+// (stalled, the route re-plans) from a dead click (blocked, the plan
+// skips the waypoint) and a request error (failed).
 //
 //nolint:cyclop,gocognit // the refusal and stuck branches read side by side
 func (l *Loop) followWaypoint(
     waypoints []pathfind.Vec3, index int, frameOffset float64,
     deadline time.Time,
-) bool {
+) waypointOutcome {
     wp := waypoints[index]
     sent := false
+    clickAt := time.Time{}
+    clickX, clickY := int32(0), int32(0)
     lastX, lastY := int32(0), int32(0)
     stuckSince := time.Time{}
     for {
         if time.Now().After(deadline) {
-            return true
+            return waypointReached
         }
         selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
         if !ok {
@@ -469,7 +517,7 @@ func (l *Loop) followWaypoint(
         // waypointDistanceAnchored).
         if waypointDistanceAnchored(wp, selfX, selfY, selfZ,
             frameOffset) <= radius {
-            return true
+            return waypointReached
         }
         moving := selfX != lastX || selfY != lastY
         if moving {
@@ -485,17 +533,34 @@ func (l *Loop) followWaypoint(
         if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
             l.logf("quest: the potion drink failed: %v", err)
 
-            return false
+            return waypointFailed
         }
         if !stuckSince.IsZero() && time.Since(stuckSince) >= questStuckWait {
-            return false
+            return waypointStalled
+        }
+        // The move start watchdog: a click that started no movement
+        // at all is dead - the server answers the identical click the
+        // same way, so the wait runs to the verdict instead of
+        // re-clicking. The movement broadcast of the started walk
+        // keeps the tracker walking until the stop arrives.
+        now := time.Now()
+        if sent && selfX == clickX && selfY == clickY {
+            if now.Sub(clickAt) >= questMoveStartWait &&
+                !l.tracker.SelfWalking() {
+                l.logf("quest: the click to (%d, %d) never started the "+
+                    "walk, leaving the waypoint", int32(wp.X), int32(wp.Y))
+
+                return waypointBlocked
+            }
+            pace(questWalkPoll)
+
+            continue
         }
         // The pacing: no request while the character walks; a repeat
         // click only for the standing one, gated by the town walk
         // period (the Mobius PlayerActionFloodProtector mutes the
         // click stream above one action per second - the 2026-09-12
         // run stalled ten minutes on the mute).
-        now := time.Now()
         if sent && (moving || now.Sub(l.questWalkAt) < walkRequestPeriod) {
             pace(questWalkPoll)
 
@@ -519,9 +584,11 @@ func (l *Loop) followWaypoint(
             int32(wp.X), int32(wp.Y), clickZ); err != nil {
             l.logf("quest: the waypoint walk failed: %v", err)
 
-            return false
+            return waypointFailed
         }
         sent = true
+        clickAt = now
+        clickX, clickY = selfX, selfY
         l.questWalkAt = now
         pace(questWalkPoll)
     }
@@ -530,12 +597,14 @@ func (l *Loop) followWaypoint(
 // awaitSegmentProgress waits until the character moves a meaningful
 // distance from the position the direct click started at (the click
 // took, the walk runs) or the deadline lapses. False marks a stalled
-// click: the character stands where it stood.
+// click: the character stands where it stood, or the click never
+// started the walk at all.
 func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
     startX, startY, _, ok := l.tracker.SelfPosition()
     if !ok {
         return false
     }
+    clickAt := time.Now()
     for {
         if time.Now().After(deadline) {
             return false
@@ -553,6 +622,14 @@ func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
         if math.Hypot(float64(selfX-segX), float64(selfY-segY)) <=
             questArriveRadius {
             return true
+        }
+        // The move start watchdog: a click that started no movement at
+        // all is dead and the route gives up instead of standing out
+        // the rest of the walk budget (the owner rule of the town
+        // walker, see moveStartWindow).
+        if time.Since(clickAt) >= questMoveStartWait &&
+            !l.tracker.SelfWalking() {
+            return false
         }
         pace(questWalkPoll)
     }
