@@ -74,12 +74,26 @@ The UI boots in one of six modes chosen by `GET /api/config`:
    elastic band). The walker rides the curve itself and dwells at the
    same five stops; every effect is a pure function of the loop clock;
    the pick marks and the pause/speed controls match the first gallery.
-   The harness is `tools/repro_path_curve.js`.
+   The rainbow flow variant keeps its hue bands moving toward the
+   destination. The harness is `tools/repro_path_curve.js`.
+7. **Flow and snake speed lab** (`-test-path-ui-v3`, mode
+   `test-path-v3`, `body.mode-test-path-v3`): the follow-up of the
+   smooth curve lab (`web/pathflow.js`). Forty numbered cards on the
+   same Catmull-Rom route, walker and clock: 01-20 the rainbow flow in
+   five palettes (classic, neon, pastel, sunset, aurora) x four hue
+   cycle speeds (16 s, 9 s, 5.2 s, 2.8 s), 21-40 the pulse snake in
+   five crest schemes (magenta, cyan, lime, amber, violet) x four wave
+   periods (1.6 s, 0.95 s, 0.56 s, 0.32 s). The flow hue bands travel
+   from the planning origin to the destination (the phase subtracts
+   the clock, so a fixed band moves ahead), never backwards; the snake
+   crest travels the same way. The pick marks and the pause/speed
+   controls match the two earlier galleries. The harness is
+   `tools/repro_path_flow.js`.
 
 The fight modes hide the whole toolbar; the pathfind mode keeps only
 the map background row of the view menu and hides the bot status
-banner; the walk plan gallery and the smooth curve lab hide the bot
-chrome like the fight modes do.
+banner; the walk plan gallery, the smooth curve lab and the flow lab
+hide the bot chrome like the fight modes do.
 
 ## Layout philosophy
 
@@ -1459,9 +1473,16 @@ plumbing closes that gap:
 - `tools/repro_path_curve.js` for the smooth curve animation lab: the
   30 numbered variants (21 motion / 4 color / 5 stroke), the
   Catmull-Rom base (the curve passes through every stop and bows off
-  the polyline), every variant's engagement and animation, the curve
-  walk timeline, the map tile background, the shared walker, the
-  scroll window and the pick controls.
+  the polyline), the forward direction of the rainbow flow, every
+  variant's engagement and animation, the curve walk timeline, the map
+  tile background, the shared walker, the scroll window and the pick
+  controls.
+- `tools/repro_path_flow.js` for the flow and snake speed lab: the 40
+  numbered cards (20 flow / 20 snake), the five palettes and four
+  speeds of each family, the forward flow and snake direction, every
+  variant's engagement and animation, the curve walk timeline, the map
+  tile background, the shared walker, the scroll window and the pick
+  controls.
 - `tools/repro_bot_switch.js` for the observed bot switch: the map
   resets the previous bot's world (snapshot, runtime objects, social
   masks, combat effects) ahead of the new stream, keeps the fleet
