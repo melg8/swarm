@@ -81,6 +81,27 @@ Recorded the brief and the direction requirement, started the page.
   `webui-harness` skill (twelve harnesses) and the AGENTS.md botless
   mode list.
 
+### 2026-11-12 - variant 12 into the live map
+
+- `web/map.js`: the walk plan line now draws as the pastel flow of
+  variant 12 - `walkFlowHue` runs the lab phase
+  (`frac(fraction * 2 - now / 2800)`) over the hue range
+  `190 + u * 260` at 58% saturation and 78% lightness, and
+  `drawWalkFlow` paints 10 px screen steps over a dark casing
+  (`rgba(27, 36, 48, 0.35)`, 4.5 px) so the light map imagery keeps
+  the line readable. The waypoint dots, the aimed waypoint ring, the
+  hover coordinate label and the destination marker keep the magenta
+  (`mapColors.userPath`).
+- `tools/repro_map_render.js`: the `walk flow` scenario pins the dark
+  casing, the pastel steps, the retired `[7, 4]` dashed magenta line,
+  the kept magenta dots, the forward band direction (`hueAt(0.2, 0)`
+  equals `hueAt(0.325, 700)`), the repaint under `advanceClock(700)`
+  and `needsMoreFrames()`; ALL PASS.
+- All twelve Node harnesses and `go test
+  ./internal/swarm/webserver/ ./cmd/swarm/` are green.
+- `docs/webui.md`: the walk path view and the map harness entry name
+  the flow, the marker reads magenta instead of the stale blue.
+
 ## Status
 
 done: the page is live, the harness gates it, the v2 rainbow flows

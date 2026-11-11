@@ -699,21 +699,27 @@ between the snapshots, stopping itself once every window elapsed.
   the connecting/offline text. The dot pulses while the bot is active
   so the banner reads as live; the pathfind test mode hides it.
 - Walk path view: the map draws the published walk plan
-  (`snapshot.walkPath`) as a blue dashed polyline from the planning
-  origin (`snapshot.walkOrigin`, falling back to the character when
-  absent) through every planned waypoint - the passed ones included,
-  so the drift of the character against its own plan is the debugging
-  signal. The publishWalkPlan path covers every walking phase of the
-  hunt loop, not only the manual move: town trips (the walk to the
-  trader and the walk back to the farm spot) and the deleveling guard
-  walks publish their full geodata segment too, so the map draws the
-  planned path of every autonomous walk. The follower cursor
-  (`snapshot.walkIndex`) carries a small ring on the waypoint the
-  walker currently aims at, and the plan clears on the non walking
+  (`snapshot.walkPath`) as a dark casing under the pastel flow the
+  owner picked in the flow lab (variant 12 there: the two hue bands of
+  `190 + u * 260` at 58% saturation and 78% lightness, a 2.8 s cycle,
+  short screen space steps along the route) from the planning origin
+  (`snapshot.walkOrigin`, falling back to the character when absent)
+  through every planned waypoint - the passed ones included, so the
+  drift of the character against its own plan is the debugging signal.
+  The phase subtracts the clock, so the bands travel from the origin
+  toward the destination, never backwards. The publishWalkPlan path
+  covers every walking phase of the hunt loop, not only the manual
+  move: town trips (the walk to the trader and the walk back to the
+  farm spot) and the deleveling guard walks publish their full geodata
+  segment too, so the map draws the planned path of every autonomous
+  walk. The follower cursor (`snapshot.walkIndex`) carries a small
+  ring on the waypoint the walker currently aims at, the waypoint dots
+  keep their magenta fill, and the plan clears on the non walking
   phases (engage, loot, sell, idle) through the `ClearWalkPlan` call
-  of the tick. The destination marker (the pulsing blue dot) draws at
-  `snapshot.walkDest` (the merchant spawn, the farm spot, the clicked
-  point), falling back to the last waypoint when the plan carries it.
+  of the tick. The destination marker (the pulsing magenta dot) draws
+  at `snapshot.walkDest` (the merchant spawn, the farm spot, the
+  clicked point), falling back to the last waypoint when the plan
+  carries it.
   While a manual move runs, the loop publishes the walk plan into the
   tracker (`state.Bot.SetWalkPlan`: the origin, the full waypoint
   list, the follower cursor and the destination, refreshed every tick,
@@ -1435,8 +1441,10 @@ plumbing closes that gap:
   drawn position of every moving unit per frame and failing on spikes.
 - `tools/repro_map_render.js` (`task repro:map`) for the target links,
   unit markers, the static free camera, the grab semantics of map
-  panning and the fps meter chip (recording canvas in a Node vm
-  sandbox).
+  panning, the walk plan pastel flow (the dark casing, the palette,
+  the forward travelling bands, the kept magenta waypoints and the
+  render loop engagement) and the fps meter chip (recording canvas in
+  a Node vm sandbox).
 - `tools/repro_hud.js` (`task repro:hud`) for the HUD and target panel
   rendering (stub DOM).
 - `tools/repro_buffs.js` (`task repro:buffs`) for the effects panel:

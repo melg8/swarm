@@ -31,7 +31,8 @@ node tools/repro_gear.js         # equipment widget, shop queue,
 node tools/repro_buffs.js        # effects panel: the icon grid, the
                                  # timer strips, the geometry, the
                                  # tooltip card
-node tools/repro_map_render.js   # markers, links, camera, draw order
+node tools/repro_map_render.js   # markers, links, camera, walk plan
+                                 # pastel flow, draw order
 node tools/repro_movement.js     # movement interpolation vs the
                                  # simulated Mobius server
 node tools/repro_stats.js        # statistics tab (fleet + bot views)
