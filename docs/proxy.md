@@ -247,6 +247,11 @@ locally, the healed report transiting again, the moved tracker moving
 the acceptance window, the live report transiting unchanged) and
 internal/swarm/state/self_projected_position_test.go (the projection
 math: the segment interpolation, the arrival clamp, the empty state).
+The live harness sends the same 400 unit report through an attached
+client and then reads the origin of the next movement broadcast the
+server answers with: the server still holds the bot place, so the
+report never reached the out of sync branch
+(TestProxyE2ERealStackClientFlow).
 
 ## The live self state (reconnection correctness)
 
@@ -473,6 +478,15 @@ one):
 
 ```bash
 tools/proxy_e2e.sh   # prints PROXY_E2E_OK
+```
+
+The harness reads the live login server from `SWARM_PROXY_E2E_LOGIN`
+(default `127.0.0.1:2106`); the Windows deployment binds
+`127.0.0.3:2106`, so that host runs it directly:
+
+```bash
+SWARM_PROXY_E2E=1 SWARM_PROXY_E2E_LOGIN=127.0.0.3:2106 \
+    go test ./internal/swarm/proxy/ -run TestProxyE2E -v -count=1
 ```
 
 The real Windows client check follows the same recipe: start the stack,
