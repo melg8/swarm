@@ -80,6 +80,12 @@ const MapView = {
   // (issue #6).
   killMarks: [],
 
+  // The pre-rendered kill mark sprite and the device pixel ratio it
+  // was built at (the ratio drives the sprite resolution).
+  killSprite: null,
+
+  killSpriteDpr: 0,
+
   // The parsed clan masks of the current snapshot (objectId to
   // {low, all}): the low 44 bits carry the clan alphabet as a plain
   // number (the pairwise AND stays a cheap integer op), the all flag
@@ -1268,8 +1274,8 @@ const MapView = {
     // run without a real offscreen canvas). The hunt zones and the
     // kill marks stay per frame on purpose: the zone labels carry the
     // live economy fields (the respawn countdown, the adena rate) and
-    // the kill skulls fade with age - freezing either in a cache
-    // would need a re-render per snapshot and eat the win.
+    // the kill ring changes with every poll - freezing either in a
+    // cache would need a re-render per snapshot and eat the win.
     if (!this.blitBackground(ctx, rect)) {
       ctx.clearRect(0, 0, rect.width, rect.height);
       this.drawMapBackground(ctx, rect);
@@ -2451,18 +2457,16 @@ const MapView = {
     ctx.restore();
   },
 
-  // drawKillMarks paints the fleet wide kill marks: every kill of
-  // every bot (the /api/fleet/kills ring) draws as the dead mob face
-  // (the gray corpse circle with the X eyes - issue #6) and STAYS on
-  // the map: the marks are the session death statistics of the fleet
-  // (a long term collection of the places where mobs die), so nothing
-  // fades and nothing expires by time - the ring only drops its oldest
-  // marks when the server log outgrows its count cap. The layer
-  // survives the bot switches of the view - the marks live in the map,
-  // not in the snapshot of the observed bot. Every mark shares ONE
-  // body fill call and ONE eye stroke call per frame (a single style
-  // needs no bucketing), so a full ring of kills costs two paint
-  // calls instead of one state round trip per mark.
+  // drawKillMarks paints the fleet death statistics: every kill of
+  // every bot (the /api/fleet/kills ring) draws the dead mob skull and
+  // STAYS on the map - the marks are the long term collection of the
+  // places where mobs die, so nothing fades and nothing expires by
+  // time; the ring only drops its oldest marks when the server log
+  // outgrows its count cap. The layer survives the bot switches of the
+  // view - the marks live in the map, not in the snapshot of the
+  // observed bot. The skull comes from one pre-rendered sprite, so a
+  // full ring costs one drawImage per mark instead of a dozen path
+  // operations (the art is variant V01 of docs/design/killmarks.html).
   drawKillMarks(ctx, rect) {
     if (!this.layerChecked("show-kills")) { return; }
     if (!this.killMarks || this.killMarks.length === 0) { return; }
@@ -2477,29 +2481,75 @@ const MapView = {
     }
     if (points.length === 0) { return; }
     ctx.save();
-    // The constant read of the statistics layer: full strength and a
-    // fixed size no matter the age - an hour old kill reads exactly
-    // like the fresh one (issue #6).
-    ctx.globalAlpha = 0.85;
-    const size = 10;
-    // The body pass: the corpse circle in the dead marker gray.
+    // The constant read of the statistics layer: the same strength and
+    // the same size no matter the age, so an hour old kill reads
+    // exactly like a fresh one.
+    ctx.globalAlpha = killMarkAlpha;
+    const sprite = this.killMarkSprite();
+    if (sprite) {
+      const side = killMarkSize * 2;
+      for (const p of points) {
+        ctx.drawImage(sprite, p.x - killMarkSize, p.y - killMarkSize,
+          side, side);
+      }
+    } else {
+      this.drawKillMarkFlat(ctx, points);
+    }
+    ctx.restore();
+  },
+
+  // killMarkSprite renders the skull art once per device pixel ratio:
+  // the sprite carries the mark at the device resolution so the blit
+  // stays crisp on a high density display, and a ratio change rebuilds
+  // it. A document without a canvas returns null and the flat corpse
+  // face paints instead.
+  killMarkSprite() {
+    const dpr = this.viewDpr || 1;
+    if (this.killSprite && this.killSpriteDpr === dpr) {
+      return this.killSprite;
+    }
+    if (typeof document === "undefined" || !document.createElement) {
+      return null;
+    }
+    const size = Math.ceil(killMarkSize * 2 * dpr);
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext && canvas.getContext("2d");
+    if (!ctx) {
+      return null;
+    }
+    // The art paints in the unit box (one unit is the mark radius with
+    // the origin at the mark centre), so the sprite scales with it.
+    ctx.scale(size / 2, size / 2);
+    paintKillMark(ctx);
+    this.killSprite = canvas;
+    this.killSpriteDpr = dpr;
+
+    return canvas;
+  },
+
+  // drawKillMarkFlat is the fallback of a document without a 2d
+  // canvas: the flat corpse face in one body pass and one eye pass
+  // (every mark is the same two shapes, so no state round trip per
+  // mark).
+  drawKillMarkFlat(ctx, points) {
     ctx.fillStyle = killMarkBodyColor;
     ctx.beginPath();
     for (const p of points) {
-      ctx.moveTo(p.x + size, p.y);
-      ctx.arc(p.x, p.y, size, 0, 2 * Math.PI);
+      ctx.moveTo(p.x + killMarkSize, p.y);
+      ctx.arc(p.x, p.y, killMarkSize, 0, 2 * Math.PI);
     }
     ctx.fill();
-    // The face pass: the two X eyes in the dark contrast - the
-    // same proportions the corpse icon of the research carried.
     ctx.strokeStyle = killMarkFaceColor;
-    ctx.lineWidth = Math.max(0.8, 0.08 * size);
+    ctx.lineWidth = Math.max(0.8, 0.08 * killMarkSize);
     ctx.lineCap = "round";
     ctx.beginPath();
     for (const p of points) {
-      const eye = Math.max(0.7, size * 0.16);
-      const eyY = p.y - size * 0.12;
-      for (const eyeX of [p.x - size * 0.32, p.x + size * 0.32]) {
+      const eye = Math.max(0.7, killMarkSize * 0.16);
+      const eyY = p.y - killMarkSize * 0.12;
+      for (const eyeX of [p.x - killMarkSize * 0.32,
+        p.x + killMarkSize * 0.32]) {
         ctx.moveTo(eyeX - eye, eyY - eye);
         ctx.lineTo(eyeX + eye, eyY + eye);
         ctx.moveTo(eyeX + eye, eyY - eye);
@@ -2508,7 +2558,6 @@ const MapView = {
     }
     ctx.stroke();
     ctx.lineCap = "butt";
-    ctx.restore();
   },
 
   // setKillMarks ingests the fleet kill ring of /api/fleet/kills (the
@@ -4475,18 +4524,20 @@ const bgDevicePixels = 4096 * 2560;
 const huntDevicePixels = 4096 * 1440;
 
 
-// killMarkBodyColor is the fill of the fleet kill marks: the same
-// gray the dead unit marker carries (mapColors.dead), so the fleet
-// ring and the corpse of a fresh kill read as one family. The mark
-// IS the dead mob icon of the map (issue #6): the X eyes face lives
-// here, on the persistent death statistics layer, no longer on the
-// transient corpse marker.
+// killMarkSize is the radius of the fleet kill marks in CSS pixels:
+// 10 keeps a camp of a dozen marks readable at the map default zoom
+// without burying the ground under them.
+const killMarkSize = 10;
+
+// killMarkAlpha is the constant strength of the death statistics
+// layer: a mark reads the same whatever its age.
+const killMarkAlpha = 0.85;
+
+// killMarkBodyColor and killMarkFaceColor carry the flat corpse face
+// the map drew before the skull sprite: they stay as the fallback of
+// a document without a 2d canvas.
 const killMarkBodyColor = "#80868b";
 
-// killMarkFaceColor is the stroke of the mark's X eyes: the same
-// dark slate the unit look ticks use (mapColors.tick), readable
-// over the gray body on the light map imagery, theme independent
-// like the rest of the marker palette.
 const killMarkFaceColor = "#39424e";
 
 // killMarkPickRadius bounds the hover pick of a kill mark: a touch
@@ -4505,6 +4556,91 @@ function killAgeText(ms) {
 
   return "killed " + Math.floor(secs / 3600) + "h "
     + Math.floor((secs % 3600) / 60) + "m ago";
+}
+
+// killMarkInk is the outline and face colour of the skull art.
+const killMarkInk = "#242b33";
+
+// killMarkBone builds the bone gradient of the skull over the unit box
+// of paintKillMark (one unit is the mark radius).
+function killMarkBone(ctx) {
+  const grad = ctx.createLinearGradient(0, -0.9, 0.4, 0.9);
+  grad.addColorStop(0, "#f7f2e5");
+  grad.addColorStop(0.55, "#e9e2cf");
+  grad.addColorStop(1, "#c6bca2");
+
+  return grad;
+}
+
+// killMarkSkullPath outlines the cranium with the tapered jaw: one
+// path for the bone fill, the ink casing and the cheek clip.
+function killMarkSkullPath(ctx) {
+  ctx.beginPath();
+  ctx.ellipse(0, -0.06, 0.6, 0.58, 0, Math.PI, 2 * Math.PI);
+  ctx.lineTo(0.48, 0.14);
+  ctx.lineTo(0.37, 0.25);
+  ctx.lineTo(0.33, 0.52);
+  ctx.quadraticCurveTo(0.31, 0.62, 0.19, 0.62);
+  ctx.lineTo(-0.19, 0.62);
+  ctx.quadraticCurveTo(-0.31, 0.62, -0.33, 0.52);
+  ctx.lineTo(-0.37, 0.25);
+  ctx.lineTo(-0.48, 0.14);
+  ctx.closePath();
+}
+
+// paintKillMark paints the plain skull (variant V01 of the mark
+// gallery, docs/design/killmarks.html) in the unit box: one unit is
+// the mark radius and the origin is the mark centre, so the sprite
+// scales with killMarkSize.
+function paintKillMark(ctx) {
+  // The ground shadow holds the mark down on the map imagery.
+  ctx.fillStyle = "rgba(24, 29, 35, 0.3)";
+  ctx.beginPath();
+  ctx.ellipse(0, 0.66, 0.72, 0.22, 0, 0, 2 * Math.PI);
+  ctx.fill();
+  // The bone dome with the jaw, filled and cased in ink.
+  killMarkSkullPath(ctx);
+  ctx.fillStyle = killMarkBone(ctx);
+  ctx.fill();
+  ctx.strokeStyle = killMarkInk;
+  ctx.lineWidth = 0.12;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.stroke();
+  // The empty sockets, the nose and the teeth.
+  ctx.fillStyle = killMarkInk;
+  ctx.beginPath();
+  ctx.ellipse(-0.24, 0.02, 0.155, 0.175, -0.2, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(0.24, 0.02, 0.155, 0.175, 0.2, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(0, 0.2);
+  ctx.lineTo(-0.085, 0.36);
+  ctx.lineTo(0.085, 0.36);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = killMarkInk;
+  ctx.lineWidth = 0.065;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-0.2, 0.43);
+  ctx.lineTo(0.2, 0.43);
+  for (const tx of [-0.105, 0, 0.105]) {
+    ctx.moveTo(tx, 0.43);
+    ctx.lineTo(tx, 0.57);
+  }
+  ctx.stroke();
+  // The cheek shade darkens one side and stops at the outline.
+  ctx.save();
+  killMarkSkullPath(ctx);
+  ctx.clip();
+  ctx.fillStyle = "rgba(120, 104, 76, 0.2)";
+  ctx.beginPath();
+  ctx.ellipse(0.62, 0.42, 0.62, 0.5, 0.3, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.restore();
 }
 
 // socialWindowMs is how long the social animation marker stays visible

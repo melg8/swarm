@@ -58,8 +58,35 @@ that replaces the current corpse face of `drawKillMarks` in
 - The layout is in world units: one map tile is 1024 gallery units, a
   camp spreads over ~150 units, strays reach the tile corners.
 
+### 2026-11-11 - the owner picked V01, the skull ships as a sprite
+
+- The owner chose V01 (the plain skull, `kkShadow` + `kkSkull` at
+  k=1).
+- `map.js`: `paintKillMark` ports the V01 geometry verbatim into the
+  unit box; `killMarkSprite` renders it once per device pixel ratio
+  into a canvas sized `ceil(2 * killMarkSize * dpr)`;
+  `drawKillMarks` blits the sprite per visible mark at the constant
+  alpha 0.85; `drawKillMarkFlat` keeps the gray disc and X eyes as
+  the fallback of a document without a 2d canvas. The sprite is
+  cached in `killSprite`/`killSpriteDpr` and rebuilt only when the
+  ratio changes. The stale "the kill skulls fade with age" comment
+  on the frame cache is corrected: the ring changes with every poll.
+- The port is pixel identical to the gallery V01 (a headless Chrome
+  comparison of the two sprites over a real map tile reports the same
+  bytes).
+- `tools/repro_zone_hover.js`: the recording context grew the
+  ellipse/curve/clip/gradient surface the art needs and a
+  `drawImage` record; the kill scenario now asserts one 20 px blit
+  per mark at alpha 0.85 for every age, the sprite art (a linear
+  gradient bone fill, three ink fills, the ink strokes), the sprite
+  device size, no per frame repaint, the toggle, and the flat face
+  fallback of a canvasless document. The context records fills and
+  strokes of the same path like the canvas does.
+- `docs/webui.md`: the corpse marker paragraph, the fleet kill marks
+  bullet and the cache/paint-cost note read the skull sprite now.
+
 ## Status
 
-The page and the art library are written and reviewed through headless
-Chrome screenshots. Next: hand the owner the variant list and take the
-pick, then port the chosen draw function into `map.js` as a sprite.
+V01 ships in the map and awaits the owner's live verdict (keep it or
+switch to another variant of the gallery). The harnesses pass, the
+port is pixel identical to the gallery art.

@@ -14,11 +14,11 @@ SPDX-License-Identifier: MIT
 // - zone list focus: focusZone pins the camera on the ground, scales
 //   it to fit and lights the zone label; blurZone restores the camera
 //   the user had (the follow flag, the pan anchor, the zoom);
-// - the fleet kill marks: the marks live in the map layer, drawing
-//   the dead mob face (the gray corpse circle with the X eyes - the
-//   same icon the corpse marker carries, issue #6) for every kill of
-//   every bot (the layer lives in the map, not the observed bot's
-//   snapshot), the old marks melt away, the checkbox hides the layer;
+// - the fleet kill marks: the marks live in the map layer, each one
+//   one blit of the pre-rendered skull sprite for every kill of every
+//   bot (the layer lives in the map, not the observed bot's snapshot),
+//   every age reads the same constant style, the checkbox hides the
+//   layer and a canvasless document keeps the flat face;
 // - social links: two npcs of the same clan inside their clan help
 //   range connect with the solid teal line, a pair that only
 //   approaches the range with the dashed amber warning line, npcs of
@@ -76,16 +76,31 @@ function worldToScreen(wx, wy) {
     };
 }
 
-function makeRecordingContext(record) {
+// makeGradient stubs a canvas gradient: the stops record so a
+// scenario can assert the art painted with it.
+function makeGradient(kind) {
+    const grad = { kind, stops: [] };
+    grad.addColorStop = (at, color) => { grad.stops.push([at, color]); };
+
+    return grad;
+}
+
+// makeRecordingContext records the paint passes of one canvas. A
+// context without a blit (withBlit false) stands for the offscreen
+// sprites and the background raster: the map falls back to its direct
+// path there, which is what the sandboxed harness has always done.
+function makeRecordingContext(record, withBlit) {
     let current = null;
     let pending = null;
-    return {
+    const ctx = {
         canvas: { width: CANVAS_W, height: CANVAS_H },
         clearRect: () => {},
         setTransform: () => {},
         save: () => {},
         restore: () => {},
-        beginPath: () => { current = { segments: [], arcs: [] }; },
+        beginPath: () => {
+            current = { segments: [], arcs: [], ellipses: [] };
+        },
         closePath: () => {},
         moveTo: (x, y) => { pending = [x, y]; },
         lineTo: (x, y) => {
@@ -97,35 +112,56 @@ function makeRecordingContext(record) {
         arc: (x, y, r) => {
             if (current) { current.arcs.push([x, y, r]); }
         },
+        ellipse: (x, y, rx, ry) => {
+            if (current) { current.ellipses.push([x, y, rx, ry]); }
+        },
+        quadraticCurveTo: (cx, cy, x, y) => {
+            if (current && pending) {
+                current.segments.push([pending[0], pending[1], x, y]);
+                pending = [x, y];
+            }
+        },
+        bezierCurveTo: () => {},
+        arcTo: () => {},
+        translate: () => {},
+        rotate: () => {},
+        scale: () => {},
+        clip: () => {},
+        createLinearGradient: () => makeGradient("linear"),
+        createRadialGradient: () => makeGradient("radial"),
         stroke: () => {
             if (current) {
                 record.strokes.push({
                     segments: current.segments.slice(),
                     arcs: current.arcs.slice(),
+                    ellipses: current.ellipses.slice(),
                     style: record.style,
                     width: record.width,
                     dash: record.dash.slice()
                 });
             }
-            current = null;
         },
-        // The fill pass records land in record.fills (the skull
-        // marker of the kill layer draws as two fill passes: the
-        // orange body and the dark face), so the scenario can assert
-        // the filled geometry, style and alpha at fill time.
+        // The fill passes land in record.fills, so a scenario can
+        // assert the filled geometry, style and alpha at fill time.
+        // Like the canvas, a fill keeps the path: the stroke of the
+        // same path (the ink casing of the skull) records it again.
         fill: () => {
             if (current) {
                 record.fills.push({
                     segments: current.segments.slice(),
                     arcs: current.arcs.slice(),
+                    ellipses: current.ellipses.slice(),
                     style: record.fillStyle,
                     alpha: record.alpha
                 });
             }
-            current = null;
         },
         fillRect: () => {},
-        drawImage: () => {},
+        // The kill mark sprite blit lands in record.images with the
+        // alpha at call time (the death layer strength).
+        drawImage: (image, x, y, w, h) => {
+            record.images.push({ image, x, y, w, h, alpha: record.alpha });
+        },
         fillText: (text, x, y) => {
             record.texts.push({ text, x, y, style: record.fillStyle });
         },
@@ -153,6 +189,13 @@ function makeRecordingContext(record) {
         get imageSmoothingQuality() { return "high"; },
         set imageSmoothingQuality(v) {}
     };
+    // The offscreen contexts carry no blit: the map validates the
+    // background cache on the presence of drawImage and keeps the
+    // direct static path here, where the scenario reads the main
+    // record only.
+    if (withBlit === false) { delete ctx.drawImage; }
+
+    return ctx;
 }
 
 function makeElementStub(checked) {
@@ -195,9 +238,12 @@ function makeElementStub(checked) {
 // clan mask parsing of the social layer needs it.
 function loadMapJs(mapFile) {
     const record = {
-        strokes: [], fills: [], texts: [], style: "", fillStyle: "",
-        width: 1, alpha: 1, dash: []
+        strokes: [], fills: [], texts: [], images: [], style: "",
+        fillStyle: "", width: 1, alpha: 1, dash: []
     };
+    // The offscreen canvases the map creates (the kill mark sprite and
+    // the background raster attempts), each with its own record.
+    const sprites = [];
     const listeners = { canvas: {}, window: {} };
     const listen = (registry) => (type, fn) => {
         (registry[type] = registry[type] || []).push(fn);
@@ -243,8 +289,23 @@ function loadMapJs(mapFile) {
                 return elements.get(id);
             },
             // The tooltip of an object hit builds its rows through
-            // createElement; a plain stub keeps the DOM work inert.
-            createElement: () => makeElementStub(false)
+            // createElement; the map sprites ask for a canvas and get a
+            // stub with its own recording context.
+            createElement: (tag) => {
+                if (tag !== "canvas") { return makeElementStub(false); }
+                const spriteRecord = {
+                    strokes: [], fills: [], texts: [], images: [],
+                    style: "", fillStyle: "", width: 1, alpha: 1, dash: []
+                };
+                const sprite = {
+                    width: 0, height: 0,
+                    getContext: () => makeRecordingContext(spriteRecord, false),
+                    __record: spriteRecord
+                };
+                sprites.push(sprite);
+
+                return sprite;
+            }
         },
         window: { addEventListener: listen(listeners.window) },
         getComputedStyle: () => ({
@@ -263,7 +324,7 @@ function loadMapJs(mapFile) {
     vm.runInContext("globalThis.__MapView = MapView;", sandbox);
 
     return {
-        MapView: sandbox.__MapView, record, elements, sandbox,
+        MapView: sandbox.__MapView, record, elements, sandbox, sprites,
         fireCanvas: (type, event) => fire(listeners.canvas, type, event),
         fireWindow: (type, event) => fire(listeners.window, type, event)
     };
@@ -657,13 +718,14 @@ function runScenarioSpotHover(mapFile) {
 }
 
 // Scenario 5: the fleet kill marks. The marks live in the map layer
-// independent of the observed bot's snapshot and draw as the dead mob
-// face (the gray corpse circle body with the X eyes in the dark
-// slate, issue #6) that NEVER fades: the marks are the session death
-// statistics, every age reads the same constant style - never a font
-// glyph, never a melt.
+// independent of the observed bot's snapshot and draw as the pre-
+// rendered plain skull (variant V01 of docs/design/killmarks.html)
+// that NEVER fades: the marks are the session death statistics, every
+// age reads the same constant alpha and size - never a font glyph,
+// never a melt - and a frame pays one blit per mark, not the art.
 function runScenarioKillMarks(mapFile) {
-    const { MapView, record, elements, fireCanvas } = loadMapJs(mapFile);
+    const { MapView, record, elements, sandbox, sprites, fireCanvas } =
+        loadMapJs(mapFile);
     MapView.init();
     MapView.update(buildSnapshot());
 
@@ -679,53 +741,79 @@ function runScenarioKillMarks(mapFile) {
         { botId: "a", x: 47000, y: 52000, atMs: -3 * 3600000 }
     ]);
 
-    // The body pass lands as a fill (the corpse circle in the dead
-    // marker gray), the eyes pass as a stroke (the X eyes in the dark
-    // slate). The filters read a few px around the mark point.
-    const bodyFills = (p) => record.fills.filter((fill) =>
-        fill.style === "#80868b"
-        && fill.arcs.some(([ax, ay]) =>
-            Math.hypot(ax - p.x, ay - p.y) < 6));
-    const bodyRadiusOf = (fill, p) => Math.max(...fill.arcs
-        .filter(([ax, ay]) => Math.hypot(ax - p.x, ay - p.y) < 6)
-        .map(([, , ar]) => ar));
-    const eyeStrokes = (p) => record.strokes.filter((stroke) =>
-        stroke.style === "#39424e"
-        && stroke.dash.length === 0
-        && stroke.segments.some(([x1, y1, x2, y2]) =>
-            Math.hypot((x1 + x2) / 2 - p.x, (y1 + y2) / 2 - p.y) < 6));
+    // A mark paints as one sprite blit whose box is centred on the
+    // mark point.
+    const blitsAt = (p) => record.images.filter((image) =>
+        Math.abs(image.x + image.w / 2 - p.x) < 0.01
+        && Math.abs(image.y + image.h / 2 - p.y) < 0.01);
 
-    record.fills.length = 0;
+    record.images.length = 0;
     record.strokes.length = 0;
+    record.fills.length = 0;
     record.texts.length = 0;
     MapView.draw();
 
-    const freshBody = bodyFills(fresh);
-    const freshEyes = eyeStrokes(fresh);
-    const oldBody = bodyFills(old);
-    check(results, "fresh kill draws its corpse body and X eyes",
-        freshBody.length > 0 && freshEyes.length > 0,
-        "body fills " + freshBody.length + ", eye strokes "
-            + freshEyes.length);
-    check(results, "aged kill draws the same constant style",
-        oldBody.length > 0 && freshBody.length > 0
-        && bodyRadiusOf(oldBody[0], old)
-            === bodyRadiusOf(freshBody[0], fresh)
-        && oldBody[0].alpha === freshBody[0].alpha,
-        "aged body radius "
-            + (oldBody.length > 0
-                ? bodyRadiusOf(oldBody[0], old).toFixed(2) : "-")
-            + " vs fresh "
-            + (freshBody.length > 0
-                ? bodyRadiusOf(freshBody[0], fresh).toFixed(2) : "-"));
+    // The sprite canvas is the created canvas the map sized (the
+    // background raster attempts stay 0 wide in this sandbox).
+    const spriteCanvas = sprites.find((canvas) => canvas.width > 0);
+    const spriteArt = spriteCanvas ? spriteCanvas.__record : null;
+    const freshBlit = blitsAt(fresh);
+    check(results, "fresh kill blits its skull sprite",
+        freshBlit.length === 1 && freshBlit[0].w === 20
+        && freshBlit[0].h === 20 && freshBlit[0].image === spriteCanvas,
+        "blits at the mark " + JSON.stringify(freshBlit.map(
+            (b) => [b.w, b.h])));
+    check(results, "the sprite carries the skull art",
+        !!spriteArt && spriteArt.fills.length >= 4
+        && spriteArt.fills.some((fill) => fill.style
+            && fill.style.kind === "linear")
+        && spriteArt.fills.filter((fill) =>
+            fill.style === "#242b33").length >= 3
+        && spriteArt.strokes.length >= 2,
+        "sprite fills " + (spriteArt ? spriteArt.fills.length : "-")
+            + ", strokes " + (spriteArt ? spriteArt.strokes.length : "-"));
+    check(results, "the sprite renders at the mark device size",
+        !!spriteCanvas && spriteCanvas.width === 20
+        && spriteCanvas.height === 20,
+        "sprite is " + (spriteCanvas
+            ? spriteCanvas.width + "x" + spriteCanvas.height : "-"));
+
+    const oldBlit = blitsAt(old);
+    const staleBlit = blitsAt(stale);
+    check(results, "an hours old kill still draws",
+        staleBlit.length === 1,
+        "a session long mark dropped its draw at "
+            + JSON.stringify(stale));
+    check(results, "every age blits the same constant style",
+        oldBlit.length === 1 && freshBlit.length === 1
+        && oldBlit[0].w === freshBlit[0].w
+        && oldBlit[0].alpha === freshBlit[0].alpha
+        && staleBlit[0].alpha === freshBlit[0].alpha,
+        "alphas " + [freshBlit, oldBlit, staleBlit].map(
+            (b) => (b.length > 0 ? b[0].alpha.toFixed(2) : "-"))
+            .join("/"));
+    check(results, "the death layer keeps the constant alpha",
+        freshBlit.length === 1 && freshBlit[0].alpha === 0.85,
+        "alpha " + (freshBlit.length > 0
+            ? freshBlit[0].alpha.toFixed(2) : "-"));
+    check(results, "every mark of the ring blits once per frame",
+        record.images.length === 3,
+        record.images.length + " blits for 3 marks");
     check(results, "no mark rides a font glyph",
         !record.texts.some(
             (t) => (t.text || "").indexOf("\u2620") >= 0),
         "the skull glyph was fillTexted");
-    check(results, "an hours old mark still draws",
-        bodyFills(stale).length > 0 && eyeStrokes(stale).length > 0,
-        "a session long mark dropped its draw at "
-            + JSON.stringify(stale));
+
+    // The art renders once: a second frame blits the same canvas and
+    // repaints nothing of the sprite.
+    const artFills = spriteArt ? spriteArt.fills.length : 0;
+    record.images.length = 0;
+    MapView.draw();
+    check(results, "the sprite never repaints per frame",
+        (spriteArt ? spriteArt.fills.length : -1) === artFills
+        && record.images.length === 3,
+        "art fills " + (spriteArt ? spriteArt.fills.length : "-")
+            + ", blits " + record.images.length);
 
     // The hover pick resolves the fresh mark with its victim data
     // (the empty map ground 60px away resolves nothing).
@@ -780,28 +868,44 @@ function runScenarioKillMarks(mapFile) {
         "hoverMark " + JSON.stringify(MapView.hoverMark)
         + ", added " + tooltip._addedClasses.join(","));
 
-    // The layer toggle hides the fleet ring: the gray body fills and
-    // the eye strokes near the marks drop while the dashed social
-    // warnings keep drawing (the layer isolation of the toggles). The
-    // pristine scene has no corpse object yet - the only gray+eyes
-    // paint near the marks is the fleet layer itself.
+    // The layer toggle hides the fleet ring: no blit lands while the
+    // dashed social warnings keep drawing (the layer isolation of the
+    // toggles).
     elements.get("show-kills").checked = false;
-    record.fills.length = 0;
+    record.images.length = 0;
     record.strokes.length = 0;
     MapView.draw();
-    const hiddenBodies = [fresh, old, stale].flatMap((p) =>
-        bodyFills(p)).length;
-    const hiddenEyes = [fresh, old, stale].flatMap((p) =>
-        eyeStrokes(p)).length;
     const dashedWarn = record.strokes.filter((stroke) =>
         stroke.style === "#e37400" && stroke.dash.length === 2).length;
     check(results, "kills checkbox hides the fleet marks",
-        hiddenBodies === 0 && hiddenEyes === 0,
-        hiddenBodies + " body fills, " + hiddenEyes
-            + " eye strokes still drawn");
+        record.images.length === 0,
+        record.images.length + " blits still drawn");
     check(results, "the social layer ignores the kills toggle",
         dashedWarn > 0, "no dashed warning drew - the check went blind");
     elements.get("show-kills").checked = true;
+
+    // A document without a 2d canvas keeps the flat corpse face as
+    // the fallback: the gray body fills and the dark X eye strokes,
+    // never a crashed frame.
+    const createElement = sandbox.document.createElement;
+    sandbox.document.createElement = () => makeElementStub(false);
+    MapView.killSprite = null;
+    MapView.killSpriteDpr = 0;
+    record.images.length = 0;
+    record.fills.length = 0;
+    record.strokes.length = 0;
+    MapView.draw();
+    const flatBodies = record.fills.filter((fill) =>
+        fill.style === "#80868b").length;
+    const flatEyes = record.strokes.filter((stroke) =>
+        stroke.style === "#39424e").length;
+    check(results, "a canvasless document falls back to the flat face",
+        record.images.length === 0 && flatBodies > 0 && flatEyes > 0,
+        "blits " + record.images.length + ", bodies " + flatBodies
+            + ", eyes " + flatEyes);
+    sandbox.document.createElement = createElement;
+    MapView.killSprite = null;
+    MapView.killSpriteDpr = 0;
 
     // The corpse sits exactly on its own kill mark: the victim
     // tooltip with the kill age wins over the dead unit tooltip (the

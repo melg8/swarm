@@ -149,11 +149,10 @@ colors from the same variables).
   draw the look direction tick only outside the circle; inside the
   radius the marker is a solid fill. Dead units draw no look direction
   at all and carry no special face either: the corpse marker is a
-  plain faded gray circle (issue #6, the persistent kill marks round
-  - the transient X eyes face retired with it). The death read lives
-  on the fleet kill marks layer: every kill of the session stays on
-  the map as the gray circle with the X eyes, so a death place reads
-  there long after the corpse despawned. Overlapping markers never shrink
+  plain faded gray circle. The death read lives on the fleet kill
+  marks layer: every kill of the session stays on the map as the
+  skull sprite, so a death place reads there long after the corpse
+  despawned. Overlapping markers never shrink
   and never merge: the contact pass slides the overlapping units
   apart at their full radii until the circles touch face to face.
   The pass relaxes the whole pack (the accumulated pushes of every
@@ -222,10 +221,11 @@ colors from the same variables).
   `social` toolbar checkbox hides the layer; the tooltips carry the
   clan help range of the hovered npc.
 - Fleet kill marks: every kill of every bot of the session draws as
-  the dead mob face - the gray circle body (`mapColors.dead`) with
-  the two X eyes in the dark slate - and STAYS on the map: the marks
-  are the persistent death statistics of the fleet (issue #6), so
-  nothing fades and nothing expires by time. The ring is count
+  the plain skull - the art of variant V01 of
+  `docs/design/killmarks.html`, pre-rendered once into a sprite and
+  blitted per mark - and STAYS on the map: the marks are the
+  persistent death statistics of the fleet, so nothing fades and
+  nothing expires by time. The ring is count
   capped (400 kills per bot, 2000 merged on the wire) and drops its
   oldest marks only when the hunt outgrows the cap; hovering a mark
   shows the victim tooltip (the name with the level and the kill
@@ -423,10 +423,12 @@ dozen 512px tiles per paint and is visually indistinguishable on
   in one path per style group (all future circles in a single stroke
   call, the heat fills bucketed by alpha) instead of a save/restore,
   two dash arrays and a label concatenation per zone.
-- **The kill marks draw in two paint calls**: the persistent fleet
-  ring renders as ONE body fill pass and ONE eye stroke pass per
-  frame (a single constant style needs no fade bucketing) no matter
-  how many marks the session log holds. The aggro circles skip sub
+- **The kill marks blit a sprite**: the persistent fleet ring paints
+  the skull art once per device pixel ratio (`killMarkSprite`), so a
+  frame pays one `drawImage` per visible mark instead of a dozen path
+  operations, and the sprite resolution follows the display density.
+  A document without a 2d canvas keeps the flat corpse face
+  (`drawKillMarkFlat`). The aggro circles skip sub
   pixel radii at the far zoom - a
   circle that reads as a dot is unreadable clutter anyway, and the
   packed field of the zoomed out view no longer strokes hundreds of
