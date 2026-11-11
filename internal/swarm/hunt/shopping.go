@@ -968,7 +968,7 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
 // unknown one-off order degrade to the same keep-one behavior.
 func isStackPurchase(itemID int32) bool {
     switch npcdata.ItemType(itemID) {
-    case "Weapon", "Armor", "Shield":
+    case itemTypeWeapon, itemTypeArmor, itemTypeShield:
         return false
     default:
         return true

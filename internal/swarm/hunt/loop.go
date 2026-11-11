@@ -437,6 +437,9 @@ const (
     phaseTownReturn phase = "townReturn"
     // phaseDelevel dies at the town guards to lose the excess levels.
     phaseDelevel phase = "delevel"
+    // phaseCityShop runs the blocking city shopping errand: the ride
+    // to the city, the top kit purchase and the ride home.
+    phaseCityShop phase = "cityShop"
     // phaseUser executes a manual command of the web UI (a map click
     // for a walk, an attack or a pickup) until it completes, then the
     // autonomous hunting resumes.
@@ -1026,6 +1029,12 @@ type Loop struct {
     // equip drives the auto equipment: it equips inventory gear that
     // beats the paperdoll of the character (see equip.go).
     equip *equipManager
+    // cityShopping is the seam of the city shopping errand (see
+    // city_shopping.go): off in every production launch, armed only
+    // by the acceptance scenario. cityShoppingTriedAt stamps the last
+    // attempt for the retry cooldown.
+    cityShopping        bool
+    cityShoppingTriedAt time.Time
     // The town trip shopping state (see shopping.go): the frozen
     // purchase plan of the running trip, the merchant stops it
     // distributes into, the request pacing of the buys, the in-flight
@@ -1189,113 +1198,115 @@ type Loop struct {
 // convention), which exceeds the line budget.
 func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
     return &Loop{
-        game:               game,
-        tracker:            tracker,
-        logger:             log.Default(),
-        journal:            nil,
-        autonomous:         true,
-        phase:              phaseEngage,
-        equip:              newEquipManager(gear.MeleeFighter{}),
-        target:             0,
-        lastHit:            time.Time{},
-        fightStartAt:       time.Time{},
-        fightStartFor:      0,
-        kite:               DefaultKiteParams(),
-        lootID:             0,
-        lootAt:             time.Time{},
-        lootMoveAt:         time.Time{},
-        skipped:            make(map[int32]time.Time),
-        restActionAt:       time.Time{},
-        restActionSit:      false,
-        restartAt:          time.Time{},
-        zoneCX:             0,
-        zoneCY:             0,
-        zoneRegion:         "",
-        zoneHalf:           0,
-        navigator:          nil,
-        waypoints:          nil,
-        wpIndex:            0,
-        segmentDest:        pathfind.Vec3{X: 0, Y: 0, Z: 0},
-        segmentStart:       pathfind.Vec3{X: 0, Y: 0, Z: 0},
-        segmentFrameOffset: 0,
-        moveAt:             time.Time{},
-        moveStartAt:        time.Time{},
-        moveStartX:         0,
-        moveStartY:         0,
-        forceStuck:         false,
-        stuckAt:            time.Time{},
-        stuckX:             0,
-        stuckY:             0,
-        stuckWP:            0,
-        stuckBest:          0,
-        stuckFast:          false,
-        skipArmed:          false,
-        skipX:              0,
-        skipY:              0,
-        tripAbortRun:       0,
-        rePaths:            0,
-        extendArmed:        false,
-        segmentRadius:      tripApproachRadius,
-        segmentSearch:      nil,
-        repathX:            0,
-        repathY:            0,
-        frozenRepaths:      0,
-        segmentRefused:     false,
-        refusalVariants:    0,
-        zoneRefusalX:       0,
-        zoneRefusalY:       0,
-        farmX:              0,
-        farmY:              0,
-        farmZ:              0,
-        sellAt:             time.Time{},
-        sellPhaseAt:        time.Time{},
-        merchantID:         0,
-        merchantPick:       time.Time{},
-        merchantDeckUntil:  time.Time{},
-        sold:               make(map[int32]bool),
-        tripPlan:           nil,
-        tripStops:          nil,
-        buysPlanned:        false,
-        buyAt:              time.Time{},
-        buyRequested:       nil,
-        buyConfirmAt:       time.Time{},
-        buyRetries:         0,
-        shoppingPlanAt:     time.Time{},
-        shoppingPlanCache:  nil,
-        shoppingPlanAdena:  0,
-        learnPlanCache:     nil,
-        learnPlanAt:        time.Time{},
-        learnPlanRevision:  0,
-        teacherID:          0,
-        teacherPick:        time.Time{},
-        teacherDeckUntil:   time.Time{},
-        teacherWalkUntil:   time.Time{},
-        learnRequested:     nil,
-        learnConfirmAt:     time.Time{},
-        learnRetries:       0,
-        learnAt:            time.Time{},
-        learnRevision:      0,
-        guideID:            0,
-        guidePick:          time.Time{},
-        guideAt:            time.Time{},
-        guideWalkUntil:     time.Time{},
-        guideRefusedAt:     time.Time{},
-        castAt:             time.Time{},
-        buffAt:             time.Time{},
-        skillReuse:         make(map[int32]time.Time),
-        profilePicked:      false,
-        weaponWaitLogAt:    time.Time{},
-        stagXP:             0,
-        stagXPAt:           time.Time{},
-        stagPosX:           0,
-        stagPosY:           0,
-        stagPosZ:           0,
-        stagPosSet:         false,
-        stagPosAt:          time.Time{},
-        stagPosFires:       0,
-        stagXPFires:        0,
-        stagHardAt:         time.Time{},
-        zoneSegmentLogAt:   time.Time{},
+        game:                game,
+        tracker:             tracker,
+        logger:              log.Default(),
+        journal:             nil,
+        autonomous:          true,
+        phase:               phaseEngage,
+        equip:               newEquipManager(gear.MeleeFighter{}),
+        target:              0,
+        lastHit:             time.Time{},
+        fightStartAt:        time.Time{},
+        fightStartFor:       0,
+        kite:                DefaultKiteParams(),
+        lootID:              0,
+        lootAt:              time.Time{},
+        lootMoveAt:          time.Time{},
+        skipped:             make(map[int32]time.Time),
+        restActionAt:        time.Time{},
+        restActionSit:       false,
+        restartAt:           time.Time{},
+        zoneCX:              0,
+        zoneCY:              0,
+        zoneRegion:          "",
+        zoneHalf:            0,
+        navigator:           nil,
+        waypoints:           nil,
+        wpIndex:             0,
+        segmentDest:         pathfind.Vec3{X: 0, Y: 0, Z: 0},
+        segmentStart:        pathfind.Vec3{X: 0, Y: 0, Z: 0},
+        segmentFrameOffset:  0,
+        moveAt:              time.Time{},
+        moveStartAt:         time.Time{},
+        moveStartX:          0,
+        moveStartY:          0,
+        forceStuck:          false,
+        stuckAt:             time.Time{},
+        stuckX:              0,
+        stuckY:              0,
+        stuckWP:             0,
+        stuckBest:           0,
+        stuckFast:           false,
+        skipArmed:           false,
+        skipX:               0,
+        skipY:               0,
+        tripAbortRun:        0,
+        rePaths:             0,
+        extendArmed:         false,
+        segmentRadius:       tripApproachRadius,
+        segmentSearch:       nil,
+        repathX:             0,
+        repathY:             0,
+        frozenRepaths:       0,
+        segmentRefused:      false,
+        refusalVariants:     0,
+        zoneRefusalX:        0,
+        zoneRefusalY:        0,
+        farmX:               0,
+        farmY:               0,
+        farmZ:               0,
+        sellAt:              time.Time{},
+        sellPhaseAt:         time.Time{},
+        merchantID:          0,
+        merchantPick:        time.Time{},
+        merchantDeckUntil:   time.Time{},
+        sold:                make(map[int32]bool),
+        cityShopping:        false,
+        cityShoppingTriedAt: time.Time{},
+        tripPlan:            nil,
+        tripStops:           nil,
+        buysPlanned:         false,
+        buyAt:               time.Time{},
+        buyRequested:        nil,
+        buyConfirmAt:        time.Time{},
+        buyRetries:          0,
+        shoppingPlanAt:      time.Time{},
+        shoppingPlanCache:   nil,
+        shoppingPlanAdena:   0,
+        learnPlanCache:      nil,
+        learnPlanAt:         time.Time{},
+        learnPlanRevision:   0,
+        teacherID:           0,
+        teacherPick:         time.Time{},
+        teacherDeckUntil:    time.Time{},
+        teacherWalkUntil:    time.Time{},
+        learnRequested:      nil,
+        learnConfirmAt:      time.Time{},
+        learnRetries:        0,
+        learnAt:             time.Time{},
+        learnRevision:       0,
+        guideID:             0,
+        guidePick:           time.Time{},
+        guideAt:             time.Time{},
+        guideWalkUntil:      time.Time{},
+        guideRefusedAt:      time.Time{},
+        castAt:              time.Time{},
+        buffAt:              time.Time{},
+        skillReuse:          make(map[int32]time.Time),
+        profilePicked:       false,
+        weaponWaitLogAt:     time.Time{},
+        stagXP:              0,
+        stagXPAt:            time.Time{},
+        stagPosX:            0,
+        stagPosY:            0,
+        stagPosZ:            0,
+        stagPosSet:          false,
+        stagPosAt:           time.Time{},
+        stagPosFires:        0,
+        stagXPFires:         0,
+        stagHardAt:          time.Time{},
+        zoneSegmentLogAt:    time.Time{},
         shoppingViewCache: state.ShoppingPlanView{
             Entries: nil,
             Adena:   0,
@@ -1664,7 +1675,7 @@ func (l *Loop) Run(ctx context.Context) {
             return
         case <-ticker.C:
             started := time.Now()
-            l.tick()
+            l.tickContext(ctx)
             // The tick duration feeds the statistics view
             // of the web UI: the loop cadence health of a
             // loaded process (NoteHuntTick averages and
@@ -1683,12 +1694,21 @@ func (l *Loop) releaseCellClaim() {
     }
 }
 
-// tick advances the hunt state machine by one decision. The phase
+// tick advances the hunt state machine by one decision outside a
+// session context (the tests and the manual probes drive the loop
+// one decision at a time; the blocking errands see no cancellation).
+func (l *Loop) tick() {
+    l.tickContext(context.Background())
+}
+
+// tickContext advances the hunt state machine by one decision. The phase
 // transitions fall through, so a kill switches into looting and the
 // first pickup happens on the same tick.
 // Pre-consolidation phase debt; the hunt loop cleanup is planned
 // (docs/quality_review_and_agent_prompts.md P07).
-func (l *Loop) tick() { //nolint:cyclop,funlen,gocognit
+//
+//nolint:cyclop,funlen,gocognit // the phase debt waits for the planned split
+func (l *Loop) tickContext(ctx context.Context) {
     // Publish the hunt loop phase to the bot tracker so the web UI
     // can show the human readable activity banner. SetPhase is a
     // no-op when the phase has not changed, so the per tick call
@@ -1842,6 +1862,13 @@ func (l *Loop) tick() { //nolint:cyclop,funlen,gocognit
         l.tickDelevel()
         l.publishWalkPlan()
 
+        return
+    }
+    // The city shopping errand blocks the whole tick: it owns every
+    // move and transaction from the village walk to the return home
+    // (see city_shopping.go). The seam stays off outside the
+    // acceptance scenario.
+    if l.maybeCityShopping(ctx) {
         return
     }
     if l.handleTownTrip() {

@@ -58,6 +58,13 @@ var magicNamePrefixes = []string{
     "Spellbook:", "Amulet:", "Blueprint:",
 }
 
+// The gear families of the generated item tables (npcdata.ItemType).
+const (
+    itemTypeWeapon = "Weapon"
+    itemTypeArmor  = "Armor"
+    itemTypeShield = "Shield"
+)
+
 // merchantWaresCache holds the wares of the resolved merchants: the
 // classification walks the merchant's whole buylist stock and the
 // trip planning asks for it per frozen plan line.
@@ -116,8 +123,8 @@ func merchantWares(templateID int32) MerchantWares {
 // the stock belongs to the grocer.
 func itemWares(itemID int32) MerchantWares {
     stats, hasStats := npcdata.ItemGearStats(itemID)
-    if !hasStats || stats.Type != "Armor" {
-        if hasStats && stats.Type == "Weapon" {
+    if !hasStats || stats.Type != itemTypeArmor {
+        if hasStats && stats.Type == itemTypeWeapon {
             return WaresWeapon
         }
         name := npcdata.ItemName(itemID)
