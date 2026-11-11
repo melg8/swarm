@@ -517,6 +517,13 @@ function curveWave(dist, t, wavelength, periodMs) {
         * Math.PI * 2);
 }
 
+// curveRainbowHue is the hue of the rainbow flow at the curve
+// fraction k: the clock subtracts, so a fixed hue stripe moves toward
+// the destination as time runs.
+function curveRainbowHue(k, t) {
+    return ((k * 320 - t / 11) % 360 + 360) % 360;
+}
+
 // curveNoise is the deterministic 0..1 scatter of the star field: the
 // same index returns the same value, so a repaint never flickers.
 function curveNoise(index) {
@@ -1200,7 +1207,7 @@ const CURVE_VARIANTS = [
                 color: CURVE_FX.magenta, width: 7, alpha: 0.12
             });
             for (let i = 1; i <= steps; i++) {
-                const hue = ((i / steps) * 320 + t / 11) % 360;
+                const hue = curveRainbowHue(i / steps, t);
                 curveStroke(ctx, curveRange(
                     total * (i - 1) / steps, total * i / steps), {
                         color: "hsl(" + hue.toFixed(1)

@@ -19,6 +19,8 @@ SPDX-License-Identifier: MIT
 //   control point (so the walk still stops at the stops), its arc
 //   length differs from the polyline and at least one segment bows
 //   visibly off the straight line;
+// - the rainbow flow direction: a fixed hue stripe moves from the
+//   start to the destination as the clock runs;
 // - every variant engages at four moments of the walk loop: its layer
 //   paints more than the engine baseline (the same clock with a
 //   hook-less null variant);
@@ -246,7 +248,8 @@ function loadCurveJs(pathFile) {
         + " globalThis.__DWELL = CURVE_DWELL_MS;"
         + " globalThis.__SMOOTH = CURVE_SMOOTH;"
         + " globalThis.__STOPS = CURVE_STOP_DIST;"
-        + " globalThis.__POINT = curvePointAtDistance;", sandbox);
+        + " globalThis.__POINT = curvePointAtDistance;"
+        + " globalThis.__RAINBOW = curveRainbowHue;", sandbox);
 
     return {
         PathCurve: sandbox.__PC,
@@ -258,6 +261,7 @@ function loadCurveJs(pathFile) {
         smooth: sandbox.__SMOOTH,
         stops: sandbox.__STOPS,
         point: sandbox.__POINT,
+        rainbowHue: sandbox.__RAINBOW,
         ids,
         created,
         rafCallbacks,
@@ -399,6 +403,29 @@ function runScenarioSmooth(pathFile) {
     }
     check(results, "at least one segment bows off the straight line",
         bow > 0.5, "max bow " + bow.toFixed(2) + " px");
+
+    return results;
+}
+
+// runScenarioRainbow covers the fixed direction of the rainbow flow
+// variant: a fixed hue stripe must move from the start to the
+// destination as the clock runs (the stripe once moved backwards).
+function runScenarioRainbow(pathFile) {
+    const lab = loadCurveJs(pathFile);
+    lab.PathCurve.init();
+
+    const results = [];
+    const k0 = 0.25;
+    const t1 = 440;
+    const k1 = k0 + t1 / 11 / 320;
+    const a = lab.rainbowHue(k0, 0);
+    const b = lab.rainbowHue(k1, t1);
+    check(results, "the rainbow stripe moves toward the destination",
+        Math.abs(a - b) < 1e-9 && k1 > k0,
+        "hue " + a + " -> " + b + " over k " + k0 + " -> " + k1);
+    check(results, "the rainbow stripe recolors a fixed point",
+        lab.rainbowHue(0.25, 0) !== lab.rainbowHue(0.25, 100),
+        "the stripe did not move over the point");
 
     return results;
 }
@@ -715,6 +742,7 @@ function main() {
     const scenarios = [
         ["lab structure", runScenarioStructure(pathFile)],
         ["smooth curve base", runScenarioSmooth(pathFile)],
+        ["rainbow flow direction", runScenarioRainbow(pathFile)],
         ["variant engagement", runScenarioEngagement(pathFile)],
         ["variant animation", runScenarioAnimation(pathFile)],
         ["curve walk timeline", runScenarioTimeline(pathFile)],
