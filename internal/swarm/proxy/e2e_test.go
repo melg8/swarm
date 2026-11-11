@@ -34,13 +34,27 @@ import (
 //
 // tools/proxy_e2e.sh wraps the whole procedure.
 const (
-    e2eLoginAddress = "127.0.0.1:2106"
-    e2eAccount      = "proxye2e"
-    e2ePassword     = "test"
-    e2eOnlineWait   = 60 * time.Second
-    e2eReadTimeout  = 60 * time.Second
-    e2eLiveWait     = 30 * time.Second
+    e2eAccount     = "proxye2e"
+    e2ePassword    = "test"
+    e2eOnlineWait  = 60 * time.Second
+    e2eReadTimeout = 60 * time.Second
+    e2eLiveWait    = 30 * time.Second
 )
+
+// e2eLoginAddress is the live login server: the Linux sandbox binds it
+// on the loopback, the Windows deployment on 127.0.0.3, so the address
+// is overridable (docs/deployment.md).
+var e2eLoginAddress = envOrDefault(
+    "SWARM_PROXY_E2E_LOGIN", "127.0.0.1:2106")
+
+// envOrDefault answers the environment value of key or the fallback.
+func envOrDefault(key, fallback string) string {
+    if value := os.Getenv(key); value != "" {
+        return value
+    }
+
+    return fallback
+}
 
 // TestProxyE2ERealStackClientFlow verifies the full MITM path against
 // the live server: the login emulation, the one character list, the
@@ -51,7 +65,7 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
         t.Skip("set SWARM_PROXY_E2E=1 and deploy the stack with " +
             "tools/swarm_fast_deploy.sh to run the live proxy E2E")
     }
-    requireStackPort(t, 2106)
+    requireStackAddress(t, e2eLoginAddress)
     requireStackPort(t, 7777)
 
     logDir := t.TempDir()
@@ -67,6 +81,9 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
             }
         }
     })
+    // Windows refuses to remove an open file, and the log file outlives
+    // the server shutdown; close it before the temp dir removal.
+    t.Cleanup(func() { _ = logFile.Close() })
 
     server := NewServer(logger,
         WithLoginAddresses("127.0.0.1:0"),
@@ -267,6 +284,54 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
         "the replayed user info carries the live y")
     require.InDelta(t, current.Level, replayUserInfo.Level, 0)
     require.Positive(t, replayUserInfo.Level)
+
+    // The attached client's stale position report must never move the
+    // bot: the proxy compares it against the projected live place of
+    // the session and answers with its own ValidateLocation, so the
+    // report never reaches the Mobius out of sync branch that snaps
+    // the character (ValidatePosition.runImpl).
+    stalePlace := bot.SelfSnapshot()
+    staleReport := buildTestValidatePosition(
+        stalePlace.X+400, stalePlace.Y, stalePlace.Z)
+    reconnectClient.sendPacket(staleReport)
+    correctionPayload := readPacketUntil(t, reconnectClient,
+        10*time.Second,
+        func(payload []byte) bool {
+            return payload[0] == serverOpValidateLocation
+        },
+        "the local position correction of the stale report")
+    require.Equal(t, stalePlace.ObjectID,
+        int32(binary.LittleEndian.Uint32(correctionPayload[1:5])),
+        "the correction carries the played character")
+    require.InDelta(t, stalePlace.X,
+        int32(binary.LittleEndian.Uint32(correctionPayload[5:9])), 150,
+        "the correction carries the live x")
+
+    // The server side proof: the next movement broadcast names the
+    // origin the server holds, and a transited stale report would have
+    // snapped the character 400 units away before this click.
+    walk := []byte{0x01}
+    walk = binary.LittleEndian.AppendUint32(walk,
+        uint32(stalePlace.X+100))
+    walk = binary.LittleEndian.AppendUint32(walk, uint32(stalePlace.Y))
+    walk = binary.LittleEndian.AppendUint32(walk, uint32(stalePlace.Z))
+    walk = binary.LittleEndian.AppendUint32(walk, uint32(stalePlace.X))
+    walk = binary.LittleEndian.AppendUint32(walk, uint32(stalePlace.Y))
+    walk = binary.LittleEndian.AppendUint32(walk, uint32(stalePlace.Z))
+    walk = binary.LittleEndian.AppendUint32(walk, 1)
+    reconnectClient.sendPacket(walk)
+    heldEcho := readPacketUntil(t, reconnectClient, e2eLiveWait,
+        func(payload []byte) bool {
+            return payload[0] == 0x01 && len(payload) >= 29 &&
+                int32(binary.LittleEndian.Uint32(payload[1:5])) ==
+                    stalePlace.ObjectID
+        }, "the own movement echo after the stale report")
+    require.InDelta(t, stalePlace.X,
+        int32(binary.LittleEndian.Uint32(heldEcho[17:21])), 150,
+        "the server still holds the bot place after the stale report")
+    require.InDelta(t, stalePlace.Y,
+        int32(binary.LittleEndian.Uint32(heldEcho[21:25])), 150,
+        "the server still holds the bot y after the stale report")
     require.NoError(t, reconnectClient.conn.Close())
 
     // The proxy log file carries the client session for the debugging
@@ -281,6 +346,8 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
         "the client keepalive must be answered locally, not transitted")
     require.NotContains(t, logText, "Net ping with game time",
         "the net ping answers must stay silent in the session log")
+    require.Contains(t, logText, "correcting the client view",
+        "the stale position report must be corrected locally")
 
     // The shutdown: cancel the bot, the relay winds the client down.
     cancel()
@@ -381,14 +448,20 @@ func requireOnline(t *testing.T, bot *state.Bot) {
 // readiness check binds instead, see AGENTS.md).
 func requireStackPort(t *testing.T, port int) {
     t.Helper()
-    address := fmt.Sprintf("127.0.0.1:%d", port)
+    requireStackAddress(t, fmt.Sprintf("127.0.0.1:%d", port))
+}
+
+// requireStackAddress is the address form of requireStackPort for the
+// hosts the deployment binds elsewhere (the Windows login server).
+func requireStackAddress(t *testing.T, address string) {
+    t.Helper()
     listener, err := net.Listen("tcp", address)
     if err == nil {
         if closeErr := listener.Close(); closeErr != nil {
             t.Fatalf("probe listener close: %v", closeErr)
         }
-        t.Skipf("nothing listens on port %d, deploy the stack with "+
-            "tools/swarm_fast_deploy.sh first", port)
+        t.Skipf("nothing listens on %s, deploy the stack with "+
+            "tools/swarm_fast_deploy.sh first", address)
     }
 }
 

@@ -96,7 +96,20 @@ the gatekeeper, the live 141 unit transit, the report beyond the window
 corrected, the zero report passing through). `docs/proxy.md` carries
 the new contract.
 
+### 2026-11-11 - the live proof on the deployed stack
+
+The proxy E2E attaches a client, sends a position report 400 units away
+(inside the old 2000 unit window, outside the server's one move speed)
+and asserts the local `ValidateLocation`; the click that follows makes
+the server broadcast the origin it holds, so a transited report would
+have snapped the character 400 units away before that click. Green
+against the deployed C1 stack on the Windows host
+(`SWARM_PROXY_E2E=1 SWARM_PROXY_E2E_LOGIN=127.0.0.3:2106`). The login
+address became overridable (`SWARM_PROXY_E2E_LOGIN`, the Windows
+deployment binds 127.0.0.3) and the proxy log file now closes before
+the temp dir removal (Windows refuses to delete an open file).
+
 ## Status
 
-In progress: unit and proxy tests are green, the live check against the
-deployed stack is next.
+In progress: the fix is verified against the live stack; the remaining
+confirmation is the owner rerun with the real C1 client attached.

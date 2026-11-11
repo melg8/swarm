@@ -310,7 +310,7 @@ func TestProxyPacketGrowthRepro(t *testing.T) {
         t.Skip("set SWARM_PROXY_E2E=1 and deploy the stack with " +
             "tools/swarm_fast_deploy.sh to run the packet growth repro")
     }
-    requireStackPort(t, 2106)
+    requireStackAddress(t, e2eLoginAddress)
     requireStackPort(t, 7777)
 
     pingMode := os.Getenv("SWARM_REPRO_PING")
