@@ -367,6 +367,10 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
         require.False(t, stopped,
             "the client move veto transited: the server stopped the bot")
     }
+
+    // The owner symptom was the character never walking: the dropped
+    // veto must leave the walk alive to its destination.
+    waitBotArrived(t, bot, stalePlace.X+100, stalePlace.Y)
     require.NoError(t, reconnectClient.conn.Close())
 
     // The proxy log file carries the client session for the debugging
