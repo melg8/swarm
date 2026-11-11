@@ -11,6 +11,7 @@ import (
 
     "github.com/stretchr/testify/require"
 
+    "github.com/melg8/swarm/internal/swarm/gear"
     "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
 )
@@ -221,8 +222,8 @@ func TestCityShopTradeSellsBeforeTheBuy(t *testing.T) {
     require.Equal(t, cityShopWeaponID, game.buys[0][0].ItemID)
 }
 
-// cityShoppingTestLoop builds a loop with the armed seam, a navigator
-// and the given wallet and bag.
+// cityShoppingTestLoop builds a loop on the default elven ground with
+// a navigator, the melee profile and the given wallet and bag.
 func cityShoppingTestLoop(
     adena int32, bag []state.InventoryItem,
 ) *Loop {
@@ -235,14 +236,14 @@ func cityShoppingTestLoop(
     bot.ApplyItemList(items)
     loop := NewLoop(&fakeGame{}, bot)
     loop.SetNavigator(&fakeNavigator{})
-    loop.SetCityShoppingEnabled(true)
 
     return loop
 }
 
 // TestCityShoppingWantedGate pins the start decision matrix of the
-// errand: the seam, the navigator, the armed weapon, the missing kit,
-// the wallet, the cooldown and the running trip all gate the start.
+// errand: the navigator, the region, the gear profile, the armed
+// weapon, the missing kit, the wallet, the cooldown and the running
+// trip all gate the start.
 func TestCityShoppingWantedGate(t *testing.T) {
     villageSword := state.InventoryItem{
         ObjectID: 2, ItemID: vendorVillageSword, Count: 1,
@@ -272,11 +273,19 @@ func TestCityShoppingWantedGate(t *testing.T) {
             want: true,
         },
         {
-            name:  "the seam off keeps the errand off",
+            name:  "the elven ground runs the errand",
             adena: cityShoppingWallet, bag: []state.InventoryItem{
                 villageSword,
             },
-            setup: func(loop *Loop) { loop.SetCityShoppingEnabled(false) },
+            setup: func(loop *Loop) { loop.zoneRegion = regionElven },
+            want:  true,
+        },
+        {
+            name:  "the dion ground keeps the errand off",
+            adena: cityShoppingWallet, bag: []state.InventoryItem{
+                villageSword,
+            },
+            setup: func(loop *Loop) { loop.zoneRegion = regionDion },
             want:  false,
         },
         {
@@ -363,7 +372,6 @@ func TestCityShoppingWornWeaponArms(t *testing.T) {
     bot.ApplyPaperdoll(paperdollWith(state.PaperdollRHand, 2))
     loop := NewLoop(&fakeGame{}, bot)
     loop.SetNavigator(&fakeNavigator{})
-    loop.SetCityShoppingEnabled(true)
     require.True(t, loop.cityShoppingWanted())
 }
 
@@ -381,8 +389,101 @@ func TestCityShoppingWantedNeedsTheSelfPosition(t *testing.T) {
     })
     loop := NewLoop(&fakeGame{}, bot)
     loop.SetNavigator(&fakeNavigator{})
-    loop.SetCityShoppingEnabled(true)
     require.False(t, loop.cityShoppingWanted())
+}
+
+// TestCityShoppingProfileGate pins the melee fence of the fixed plan:
+// the archer and the caster keep their own gear runs, the melee
+// fighter arms the errand.
+func TestCityShoppingProfileGate(t *testing.T) {
+    cases := []struct {
+        name    string
+        profile gear.Profile
+        want    bool
+    }{
+        {
+            name:    "the melee fighter arms the errand",
+            profile: gear.MeleeFighter{}, want: true,
+        },
+        {
+            name:    "the archer keeps its bow run",
+            profile: gear.Archer{}, want: false,
+        },
+        {
+            name:    "the caster keeps its staff run",
+            profile: gear.MysticFighter{}, want: false,
+        },
+    }
+    for _, testCase := range cases {
+        t.Run(testCase.name, func(t *testing.T) {
+            loop := cityShoppingTestLoop(cityShoppingWallet,
+                []state.InventoryItem{{
+                    ObjectID: 2, ItemID: vendorVillageSword, Count: 1,
+                }})
+            loop.equip.profile = testCase.profile
+            require.Equal(t, testCase.want,
+                loop.cityShoppingProfileAccepts())
+            require.Equal(t, testCase.want,
+                loop.cityShoppingWanted())
+        })
+    }
+}
+
+// TestMaybeCityShoppingHoldsTheFight pins the combat gate of the
+// start: a pending loot and an incoming hit hold the errand off the
+// tick, a merely held target drops before the walk.
+func TestMaybeCityShoppingHoldsTheFight(t *testing.T) {
+    cases := []struct {
+        name        string
+        phase       phase
+        target      int32
+        underAttack bool
+        want        bool
+        wantTarget  int32
+    }{
+        {
+            name:  "a pending loot holds the start",
+            phase: phaseLoot, target: 7, want: false, wantTarget: 7,
+        },
+        {
+            name:  "an incoming hit holds the start",
+            phase: phaseEngage, target: 7, underAttack: true,
+            want: false, wantTarget: 7,
+        },
+        {
+            name:  "a merely held target drops",
+            phase: phaseEngage, target: 7, want: true, wantTarget: 0,
+        },
+    }
+    for _, testCase := range cases {
+        t.Run(testCase.name, func(t *testing.T) {
+            bot := newTestBot()
+            bot.ApplyItemList([]state.InventoryItem{
+                {
+                    ObjectID: 1, ItemID: 57, Count: cityShoppingWallet,
+                    Type2: 4,
+                },
+                {ObjectID: 2, ItemID: vendorVillageSword, Count: 1},
+            })
+            if testCase.underAttack {
+                spawnMob(bot)
+                mobHitsCharacter(bot)
+            }
+            loop := NewLoop(&fakeGame{}, bot)
+            loop.SetNavigator(&fakeNavigator{})
+            loop.phase = testCase.phase
+            loop.target = testCase.target
+            // The closed context fails the started errand at its first
+            // stage instead of walking a live world.
+            ctx, cancel := context.WithCancel(context.Background())
+            cancel()
+
+            ran := loop.maybeCityShopping(ctx)
+
+            require.Equal(t, testCase.want, ran)
+            require.Equal(t, testCase.wantTarget, loop.target)
+        })
+    }
 }
 
 // cityShoppingWallet is the wallet of the scenario: the full Gludio

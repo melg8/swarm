@@ -21,10 +21,9 @@ import (
 // gatekeeper, teleports to Gludio, sells the village weapon and armor
 // the trip replaces, buys the top no-grade weapon and armor set at
 // the town shops, rides back to the Elven Village and resumes the
-// hunt on its own ground. The seam
-// (SetCityShoppingEnabled) stays off in every production launch -
-// the ordinary town trip keeps owning the shopping of the live bots -
-// and only the acceptance scenario arms it.
+// hunt on its own ground. The live bots run it whenever the wallet
+// covers the missing kit; the ordinary town trip keeps the rest of
+// the shopping. The policy and the gates: docs/hunting.md.
 //
 // The route and the stock are live Mobius C1 facts: Mirabel of the
 // Elven Village teleports to Gludio (the only direct link, 9 200
@@ -86,11 +85,13 @@ const (
     cityShopPendingWait = 5 * time.Second
     // cityShopBudget bounds one whole errand: the walk to the
     // gatekeeper, both rides, the two merchant stops, the dress and
-    // the walk back complete in under five minutes on the deployed
-    // stack, so eight cover a slow tick and a re-plan while a hung
-    // errand still ends in minutes, not in the quarter hour the
-    // scenario would otherwise wait.
-    cityShopBudget = 8 * time.Minute
+    // the walk back. The far elven cells sit up to 53 000 units from
+    // the village, so the two walking segments can each run near the
+    // ten minute quest walk timeout; the scroll leg cheapens the
+    // outbound one whenever the ground income justifies it (see
+    // maybeEscapeTo). The budget only bounds a hung errand - every
+    // stage keeps its own shorter timeout.
+    cityShopBudget = 30 * time.Minute
 )
 
 // cityShoppingOutbound is the Elven Village to Gludio hop: the
@@ -182,11 +183,18 @@ func CityShoppingKit() []int32 {
     return kit
 }
 
-// SetCityShoppingEnabled arms or disarms the city shopping errand.
-// The seam exists for the acceptance scenario of the flow; every
-// production launch leaves it off, so the live bots never run it.
-func (l *Loop) SetCityShoppingEnabled(enabled bool) {
-    l.cityShopping = enabled
+// cityShoppingProfileAccepts reports whether the gear profile fights
+// with the fixed plan: the Falchion is a melee sword and the kit ends
+// in a shield, so only the melee fighter buys it. The caster profile
+// scores the C1 sword by its magic attack, so the score alone does
+// not separate the classes.
+func (l *Loop) cityShoppingProfileAccepts() bool {
+    if l.equip == nil {
+        return false
+    }
+    _, melee := l.equip.profile.(gear.MeleeFighter)
+
+    return melee
 }
 
 // cityShopPrice is the Gludio counter price of one kit piece: the
@@ -232,11 +240,17 @@ func (l *Loop) cityShoppingArmed() bool {
 }
 
 // cityShoppingWanted reports whether the errand may start now: the
-// seam is armed, the character owns a village weapon, the top kit is
-// still missing and the wallet covers it, and no trip or cooldown
-// holds the session.
+// character hunts the elven lands with a melee profile, owns a
+// village weapon, the top kit is still missing and the wallet covers
+// it, and no trip or cooldown holds the session.
 func (l *Loop) cityShoppingWanted() bool {
-    if !l.cityShopping || l.navigator == nil || l.tripActive() {
+    if l.navigator == nil || l.tripActive() {
+        return false
+    }
+    if l.zoneRegion != "" && l.zoneRegion != regionElven {
+        return false
+    }
+    if !l.cityShoppingProfileAccepts() {
         return false
     }
     if _, _, _, ok := l.tracker.SelfPosition(); !ok {
@@ -246,25 +260,34 @@ func (l *Loop) cityShoppingWanted() bool {
         time.Since(l.cityShoppingTriedAt) < cityShopCooldown {
         return false
     }
-    if !l.cityShoppingArmed() {
-        return false
-    }
     cost := l.cityShoppingMissingCost()
     if cost <= 0 {
         return false
     }
-
-    return int64(l.tracker.InventoryStats().Adena) >= cost
+    if int64(l.tracker.InventoryStats().Adena) < cost {
+        return false
+    }
+    // The armed scan copies the bag, so it runs last: the steady
+    // state of a poor or fully dressed bot never reaches it.
+    return l.cityShoppingArmed()
 }
 
-// maybeCityShopping runs the errand when it is armed and the
-// character qualifies. The errand blocks the tick: it owns every move
-// and transaction from the village walk to the return, the way the
-// quest trip engine owns a manual loop. It reports true when it ran,
-// so the tick returns without dispatching the hunt phases.
+// maybeCityShopping runs the errand when the character qualifies. The
+// errand blocks the tick: it owns every move and transaction from the
+// village walk to the return, the way the quest trip engine owns a
+// manual loop. It reports true when it ran, so the tick returns
+// without dispatching the hunt phases. A real fight holds the start
+// (a pending loot, the blows landing now); a merely held target drops
+// before the walk, the errand owns the target register.
 func (l *Loop) maybeCityShopping(ctx context.Context) bool {
     if !l.cityShoppingWanted() {
         return false
+    }
+    if l.fightBusy() {
+        if l.phase == phaseLoot || l.tracker.SelfUnderAttack() {
+            return false
+        }
+        l.dropAttackTarget("the city shopping errand owns the way")
     }
     l.startCityShopping(ctx)
 
@@ -347,6 +370,11 @@ func (l *Loop) driveCityShopping(ctx context.Context) error {
     if err := l.EquipBaggedGear(); err != nil {
         return fmt.Errorf("the village dress: %w", err)
     }
+    // The scroll leg replaces the walk to Mirabel whenever the ground
+    // pays the price; the landing is the village respawn beside her.
+    l.maybeEscapeTo(
+        cityShoppingOutbound.Gatekeeper.X,
+        cityShoppingOutbound.Gatekeeper.Y)
     if err := l.driveCityShopTransfer(ctx, cityShoppingOutbound); err != nil {
         return fmt.Errorf("the ride to Gludio: %w", err)
     }

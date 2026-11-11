@@ -74,3 +74,34 @@ Done means:
   the stop cleanup stays one function.
 - Verified: `go build ./...`, the hunt and acceptance package tests,
   `task lint:new` (0 issues).
+
+### 2026-11-11 15:32 UTC - the production gate
+
+- The errand runs on the production trigger: the `cityShopping` flag
+  and `SetCityShoppingEnabled` are gone. `cityShoppingWanted` gates on
+  the elven region (empty counts as elven) and the melee gear profile
+  (the C1 Falchion carries a magic attack, so the weapon score alone
+  would admit the caster). The acceptance scenario now rides the
+  production gate: its hook is removed.
+- The fight gate matches the town trip: a pending loot or an incoming
+  hit holds the start, a merely held target drops
+  (`dropAttackTarget`) before the walk.
+- The scroll of escape leg is reused: `maybeEscapeWithSOE(merchant)`
+  became a wrapper over `maybeEscapeTo(x, y)`, and the errand prices
+  the walk to Mirabel through it. The event text no longer says "walk
+  home" for an outbound leg.
+- `cityShopBudget` 8 -> 30 minutes: the far elven cells sit up to
+  53 000 units from the village, near the 10 minute quest walk
+  timeout per walking segment.
+- The armed scan moved last in `cityShoppingWanted`: it copies the
+  inventory, so a poor or fully dressed bot never allocates on the
+  tick.
+- `docs/hunting.md` carries the production policy section.
+- Tests: the gate matrix gained the elven/Dion and profile fences,
+  the combat hold and drop cases, and a scroll test through the new
+  coordinate entry.
+- Verified: `go build ./...`, the hunt, acceptance and gear package
+  tests, `task fmt`, `task fmt:check`, `task lint:new` (0 issues).
+
+Next: check the stack, run the live `city-shopping` acceptance with
+the production trigger, then `task prepush` and push.

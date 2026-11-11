@@ -19,8 +19,9 @@ import (
 // Elven Village gatekeeper, teleports to Gludio, buys the top
 // no-grade weapon and armor set at the town shops, rides back to the
 // Elven Village and resumes the hunt on the start ground. The errand
-// itself lives in hunt/city_shopping.go behind the
-// SetCityShoppingEnabled seam; this scenario is its only armer.
+// itself lives in hunt/city_shopping.go and starts from the
+// production trigger; the scenario only sets the start state and
+// watches the story.
 
 // cityShoppingScenarioID is the scenario registry id.
 const cityShoppingScenarioID = "city-shopping"
@@ -36,7 +37,7 @@ const (
 
 // cityShoppingTimeout bounds the whole run: the errand stages (the
 // walk to Mirabel, the outbound ride, both merchant stops, the dress,
-// the ride home and the walk back) complete in under five minutes on
+// the ride home and the walk back) complete in under four minutes on
 // the deployed stack, the standard restock trip that follows spends
 // about five, and the resumed farm adds one kill. The watch fails
 // fast on a stopped errand or a silent return ground, so the budget
@@ -44,9 +45,10 @@ const (
 const cityShoppingTimeout = 20 * time.Minute
 
 // cityShoppingErrandWall bounds the errand runtime the watch accepts:
-// the hunt driver budget (8 minutes) fires between the errand stages,
-// a walk that never returns does not, so the watch kills the session
-// when the errand overruns the driver budget by half.
+// the fixture's ground sits 11 000 units from Mirabel and the errand
+// completes in about three minutes on the deployed stack, so the wall
+// catches a hung errand long before the 30 minute driver budget of a
+// far cell would.
 const cityShoppingErrandWall = 12 * time.Minute
 
 // cityShoppingFarmWindow bounds the resumed farm wait after the
@@ -215,16 +217,8 @@ func cityShoppingChecks() []Check {
     }
 }
 
-// cityShoppingHook arms the city shopping seam of the scenario
-// session. Every production launch leaves the seam off (the ordinary
-// town trip keeps owning the live bots), so this hook is the only
-// armer of the errand.
-func cityShoppingHook(loop *hunt.Loop) {
-    loop.SetCityShoppingEnabled(true)
-}
-
-// startCitySession launches the supervised scenario session with the
-// city shopping seam armed.
+// startCitySession launches the supervised scenario session: the
+// production errand trigger finds the start state and runs the story.
 func startCitySession(
     ctx context.Context, m *Manager, test *Test,
 ) (context.CancelFunc, chan error) {
@@ -233,7 +227,7 @@ func startCitySession(
     go func() {
         m.runSessionSupervised(sessionCtx, cityShoppingAccount,
             cityShoppingPassword, cityShoppingAccount, m.proxy,
-            test.appendLog, cityShoppingHook)
+            test.appendLog)
         sessionDone <- nil
     }()
 

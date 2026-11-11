@@ -6,14 +6,14 @@ package hunt
 
 // The Scroll of Escape economy (the owner rule of 2026-09-21): the
 // bot always carries at least one scroll (the shopping queue buys it
-// the moment the last one is gone), and the trip start uses the
-// scroll instead of the long walk home whenever the walking time is
+// the moment the last one is gone), and a long walk to the village
+// uses the scroll instead of walking whenever the walking time is
 // worth more than the scroll costs at the character's measured farm
 // income. The scroll teleports to the nearest village (skill 2013, a
 // 20 second stationary cast the server answers with TeleportToLocation
 // and the connection layer confirms with Appearing), so it replaces
-// the farm spot to village leg only - the shopping stops and the
-// return leg run unchanged behind it.
+// the walk to the village only: the shopping stops, the city errand
+// rides and every return leg run unchanged behind it.
 
 import (
     "math"
@@ -164,12 +164,18 @@ func (l *Loop) escapeWithSOE() bool {
     return false
 }
 
-// maybeEscapeWithSOE arms the scroll leg of the trip start: the
+// maybeEscapeWithSOE arms the scroll leg of the town trip start: the
 // scroll runs only when the bag holds one, the ground pays a trusted
-// income and the walk home is worth more than the scroll. The scroll
-// replaces the walk only on success - every other path keeps the
-// planned walking trip.
+// income and the walk to the merchant is worth more than the scroll.
 func (l *Loop) maybeEscapeWithSOE(merchant townNpc) {
+    l.maybeEscapeTo(merchant.X, merchant.Y)
+}
+
+// maybeEscapeTo arms the scroll leg for a walk to (x, y): the scroll
+// replaces the walk only when the bag holds one, the ground pays a
+// trusted income and the saved walking time is worth the scroll. A
+// failed escape leaves the caller on its planned walking route.
+func (l *Loop) maybeEscapeTo(x int32, y int32) {
     if l.soeCount() < 1 {
         return
     }
@@ -182,13 +188,13 @@ func (l *Loop) maybeEscapeWithSOE(merchant townNpc) {
         return
     }
     walkDist := math.Hypot(
-        float64(merchant.X-selfX), float64(merchant.Y-selfY))
+        float64(x-selfX), float64(y-selfY))
     if !l.soeEscapeProfitable(walkDist, income) {
         return
     }
     if l.escapeWithSOE() {
         l.tracker.RecordEvent("the scroll of escape replaced the walk " +
-            "home (" + strconv.FormatInt(l.soePrice(), 10) + " adena)")
+            "(" + strconv.FormatInt(l.soePrice(), 10) + " adena)")
     }
 }
 

@@ -1029,11 +1029,8 @@ type Loop struct {
     // equip drives the auto equipment: it equips inventory gear that
     // beats the paperdoll of the character (see equip.go).
     equip *equipManager
-    // cityShopping is the seam of the city shopping errand (see
-    // city_shopping.go): off in every production launch, armed only
-    // by the acceptance scenario. cityShoppingTriedAt stamps the last
-    // attempt for the retry cooldown.
-    cityShopping        bool
+    // cityShoppingTriedAt stamps the last city shopping errand
+    // attempt for the retry cooldown (see city_shopping.go).
     cityShoppingTriedAt time.Time
     // The town trip shopping state (see shopping.go): the frozen
     // purchase plan of the running trip, the merchant stops it
@@ -1262,7 +1259,6 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         merchantPick:        time.Time{},
         merchantDeckUntil:   time.Time{},
         sold:                make(map[int32]bool),
-        cityShopping:        false,
         cityShoppingTriedAt: time.Time{},
         tripPlan:            nil,
         tripStops:           nil,
@@ -1866,8 +1862,7 @@ func (l *Loop) tickContext(ctx context.Context) {
     }
     // The city shopping errand blocks the whole tick: it owns every
     // move and transaction from the village walk to the return home
-    // (see city_shopping.go). The seam stays off outside the
-    // acceptance scenario.
+    // (see city_shopping.go).
     if l.maybeCityShopping(ctx) {
         return
     }

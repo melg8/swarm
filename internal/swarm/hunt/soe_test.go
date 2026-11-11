@@ -94,13 +94,10 @@ func TestSoeEscapeProfitable(t *testing.T) {
     require.False(t, loop.soeEscapeProfitable(1000, 100000))
 }
 
-// TestMaybeEscapeUsesTheScroll pins the trip start leg: a profitable
-// escape sends the UseItem request and the simulated teleport landing
-// hands the trip to the village walk planning.
-func TestMaybeEscapeUsesTheScroll(t *testing.T) {
-    loop, game, bot, _ := newTripLoop()
-    addSOE(bot, 1)
-    moveSelfTo(bot, 40000, 52000, -3500)
+// trustTheGround arms the picked cell metric with a rich measured
+// income: the scroll pricing only runs on a trusted rate.
+func trustTheGround(t *testing.T, loop *Loop) {
+    t.Helper()
     loop.SetHuntingCells(ElvenHuntingCells())
     cellHunter := loop.cell
     cellHunter.picked = 0
@@ -113,12 +110,44 @@ func TestMaybeEscapeUsesTheScroll(t *testing.T) {
         t.Skipf("the trusted rate seam differs, the unit pricing " +
             "test above owns the rule")
     }
+}
+
+// landTheScroll simulates the teleport landing of the server after
+// the cast: the character reappears at the village respawn.
+func landTheScroll(bot *state.Bot) {
     go func() {
         time.Sleep(300 * time.Millisecond)
         moveSelfTo(bot, 45475, 48820, -3056)
     }()
+}
+
+// TestMaybeEscapeUsesTheScroll pins the trip start leg: a profitable
+// escape sends the UseItem request and the simulated teleport landing
+// hands the trip to the village walk planning.
+func TestMaybeEscapeUsesTheScroll(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    addSOE(bot, 1)
+    moveSelfTo(bot, 40000, 52000, -3500)
+    trustTheGround(t, loop)
+    landTheScroll(bot)
 
     loop.maybeEscapeWithSOE(townMerchants[3])
+
+    require.NotEmpty(t, game.uses, "the scroll goes out")
+}
+
+// TestMaybeEscapeToTheVillage pins the coordinate entry the city
+// errand rides: the scroll leg of the walk to Mirabel prices the leg
+// against the ground income and sends the UseItem request.
+func TestMaybeEscapeToTheVillage(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    addSOE(bot, 1)
+    moveSelfTo(bot, 36000, 50229, -3456)
+    trustTheGround(t, loop)
+    landTheScroll(bot)
+
+    loop.maybeEscapeTo(cityShoppingOutbound.Gatekeeper.X,
+        cityShoppingOutbound.Gatekeeper.Y)
 
     require.NotEmpty(t, game.uses, "the scroll goes out")
 }
