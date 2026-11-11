@@ -101,6 +101,7 @@ type config struct {
     testFightUI   bool
     testPathUI    bool
     testPathV2UI  bool
+    testPathV3UI  bool
     testFightUIV1 bool
     geodataDir    string
     navmeshDir    string
@@ -223,6 +224,7 @@ func parseFlags() config {
         testFightUI:       false,
         testPathUI:        false,
         testPathV2UI:      false,
+        testPathV3UI:      false,
         testFightUIV1:     false,
         geodataDir:        "",
         navmeshDir:        "",
@@ -285,6 +287,13 @@ func parseFlags() config {
             "connection, a grid of thirty numbered animated ways to "+
             "draw the same Catmull-Rom walk, motion first, then color "+
             "and stroke approach")
+    flag.BoolVar(&cfg.testPathV3UI, "test-path-ui-v3", false,
+        "flow and snake speed lab instead of the bot: no game "+
+            "connection, a grid of forty numbered cards, twenty "+
+            "rainbow flow variants in five palettes at four hue "+
+            "speeds and twenty pulse snake variants in five crest "+
+            "schemes at four wave periods; the flow hue bands travel "+
+            "from the start of the walk to the destination")
     flag.BoolVar(&cfg.testFightUIV1, "test-fight-ui-v1", false,
         "combat animation variant showcase UI (v1 idea set) instead of the "+
             "bot: no game connection, a looping hero versus enemy demo fight "+
@@ -959,6 +968,12 @@ func main() {
         return
     }
 
+    if cfg.testPathV3UI {
+        runTestPathV3UI(cfg)
+
+        return
+    }
+
     if cfg.pathfindTest {
         runPathfindTest(cfg)
 
@@ -1365,6 +1380,37 @@ func runTestPathV2UI(cfg config) {
     <-ctx.Done()
     shutdownWebInterface(web)
     log.Println("Smooth curve lab finished")
+}
+
+// runTestPathV3UI serves the bot less flow and snake speed lab: the
+// web interface answers with the forty variant grid until the process
+// is stopped. No game connection and no geodata is needed - the map
+// background of the lab cells is the static tile pyramid shipped with
+// the web content.
+func runTestPathV3UI(cfg config) {
+    if cfg.webAddress == "" {
+        log.Println("Flow lab needs the web interface, " +
+            "pass a -web address")
+
+        return
+    }
+
+    web := webserver.NewTestPathFlowServer(cfg.webAddress,
+        log.Default())
+    go func() {
+        if err := web.ListenAndServe(); err != nil {
+            log.Println("Web interface failed: " + err.Error())
+        }
+    }()
+
+    log.Println("Flow lab is ready")
+
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+    <-ctx.Done()
+    shutdownWebInterface(web)
+    log.Println("Flow lab finished")
 }
 
 // runPathfindTest serves the bot less map pathfinding test UI: the geodata

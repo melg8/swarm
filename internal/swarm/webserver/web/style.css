@@ -2906,16 +2906,17 @@ canvas.fxg-cell.picked {
   outline-offset: -2px;
 }
 
-/* ---- walk plan gallery and curve lab ----
+/* ---- walk plan gallery, curve lab and flow lab ----
    The comparison grids of the walk plan drawing ideas: numbered card
    heads over a four column grid of canvases, every card animating the
-   same planned route. The body.mode-test-path and body.mode-test-path-v2
-   classes of the index page hide the bot specific chrome exactly like
-   body.mode-test-fight does for the damage gallery. The card atoms
-   (path-card, path-cardhead, pc-num, pc-name, pc-note, path-cell) are
-   shared by both galleries. */
+   same planned route. The body.mode-test-path, body.mode-test-path-v2
+   and body.mode-test-path-v3 classes of the index page hide the bot
+   specific chrome exactly like body.mode-test-fight does for the
+   damage gallery. The card atoms (path-card, path-cardhead, pc-num,
+   pc-name, pc-note, path-cell) are shared by the three galleries. */
 .path-section,
-.curve-section {
+.curve-section,
+.flow-section {
   display: none;
   flex-direction: column;
   min-height: 0;
@@ -2924,6 +2925,7 @@ canvas.fxg-cell.picked {
 
 body.mode-test-path .path-section { display: flex; }
 body.mode-test-path-v2 .curve-section { display: flex; }
+body.mode-test-path-v3 .flow-section { display: flex; }
 
 body.mode-test-path .tabs,
 body.mode-test-path .tab-content,
@@ -2967,8 +2969,30 @@ body.mode-test-path-v2 #foot-fps {
   display: none;
 }
 
+body.mode-test-path-v3 .tabs,
+body.mode-test-path-v3 .tab-content,
+body.mode-test-path-v3 .sidebar,
+body.mode-test-path-v3 .hud-stack,
+body.mode-test-path-v3 .bot-status,
+body.mode-test-path-v3 .chat-box,
+body.mode-test-path-v3 .chat-restore,
+body.mode-test-path-v3 #live-indicator,
+body.mode-test-path-v3 #live-label,
+body.mode-test-path-v3 #foot-packets,
+body.mode-test-path-v3 #foot-objects,
+body.mode-test-path-v3 #foot-uptime,
+body.mode-test-path-v3 #foot-updated,
+body.mode-test-path-v3 #foot-phase,
+body.mode-test-path-v3 #foot-rate,
+body.mode-test-path-v3 #foot-status,
+body.mode-test-path-v3 #foot-cursor,
+body.mode-test-path-v3 #foot-fps {
+  display: none;
+}
+
 .path-bar,
-.curve-bar {
+.curve-bar,
+.flow-bar {
   display: flex;
   align-items: baseline;
   gap: 14px;
@@ -2977,7 +3001,8 @@ body.mode-test-path-v2 #foot-fps {
 }
 
 .path-title,
-.curve-title {
+.curve-title,
+.flow-title {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -2985,13 +3010,15 @@ body.mode-test-path-v2 #foot-fps {
 }
 
 .path-sub,
-.curve-sub {
+.curve-sub,
+.flow-sub {
   font-size: 11px;
   color: var(--text-dim);
 }
 
 .path-controls,
-.curve-controls {
+.curve-controls,
+.flow-controls {
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2999,7 +3026,8 @@ body.mode-test-path-v2 #foot-fps {
 }
 
 .path-select,
-.curve-select {
+.curve-select,
+.flow-select {
   font: inherit;
   font-size: 11px;
   color: var(--text);
@@ -3010,7 +3038,8 @@ body.mode-test-path-v2 #foot-fps {
 }
 
 .path-picked,
-.curve-picked {
+.curve-picked,
+.flow-picked {
   font-family: var(--mono);
   font-size: 10.5px;
   font-weight: 600;
@@ -3022,13 +3051,15 @@ body.mode-test-path-v2 #foot-fps {
 }
 
 .path-hint,
-.curve-hint {
+.curve-hint,
+.flow-hint {
   font-size: 10.5px;
   color: var(--text-dim);
 }
 
 .path-scroll,
-.curve-scroll {
+.curve-scroll,
+.flow-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -3038,7 +3069,8 @@ body.mode-test-path-v2 #foot-fps {
 }
 
 .path-grid,
-.curve-grid {
+.curve-grid,
+.flow-grid {
   display: grid;
   gap: 10px;
   padding: 10px;

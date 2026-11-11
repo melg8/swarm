@@ -198,6 +198,26 @@ SPDX-License-Identifier: MIT
         </div>
       </section>
 
+      <section id="flow-section" class="flow-section">
+        <div class="flow-bar">
+          <div class="flow-title">FLOW AND SNAKE SPEED LAB</div>
+          <div class="flow-sub">one Catmull-Rom walk · 5 stops + destination · 40 ideas · 01-20 rainbow flow (5 palettes × 4 speeds) · 21-40 pulse snake (5 crests × 4 periods)</div>
+          <div class="flow-controls">
+            <button id="flow-pause" class="btn" title="freeze the walk loop">pause</button>
+            <select id="flow-speed" class="flow-select" title="playback speed of the walk loop">
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+            </select>
+            <span id="flow-picked" class="flow-picked">picked: none</span>
+            <span class="flow-hint">click a variant head to mark it</span>
+          </div>
+        </div>
+        <div class="flow-scroll" id="flow-scroll">
+          <div class="flow-grid" id="flow-grid"></div>
+        </div>
+      </section>
+
       <section id="tab-map" class="tab-content active">
         <div class="map-toolbar">
           <label class="check follow-check"><input type="checkbox" id="follow" checked> follow</label>
@@ -761,6 +781,7 @@ SPDX-License-Identifier: MIT
 <script src="fighttest.js"></script>
 <script src="pathtest.js"></script>
 <script src="pathcurve.js"></script>
+<script src="pathflow.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

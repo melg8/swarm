@@ -70,6 +70,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (config && config.mode === "test-path-v3") {
+    document.body.classList.add("mode-test-path-v3");
+    PathFlow.init();
+
+    return;
+  }
+
   initChat();
   initDumpButton();
   initSessionButton();

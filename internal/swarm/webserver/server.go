@@ -44,6 +44,10 @@ const (
     // (NewTestPathCurveServer): the thirty animated variants of the
     // -test-path-ui-v2 flag.
     modeTestPathV2 = "test-path-v2"
+    // modeTestPathV3 is the flow and snake speed lab mode
+    // (NewTestPathFlowServer): the forty rainbow flow and pulse snake
+    // variants of the -test-path-ui-v3 flag.
+    modeTestPathV3 = "test-path-v3"
     // modeFight is the combat animation variant showcase of the
     // -test-fight-ui-v1 run: a looping demo fight on every variant.
     modeFight = "fight"
