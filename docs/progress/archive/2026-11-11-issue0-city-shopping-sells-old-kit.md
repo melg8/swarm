@@ -1,4 +1,4 @@
-# The city shopping errand sells the replaced village gear (status: in progress)
+# The city shopping errand sells the replaced village gear (status: complete)
 
 Started 2026-11-11, branch main, issue #0 (owner request).
 
@@ -63,7 +63,21 @@ run sells the old kit before the replacements land and the new
   Covered by `TestCityShoppingWatchSellsTheOldKit` (the latch, the
   leftover detail, and the ended errand never turning it green).
 
+### 2026-11-11 - the live acceptance run
+
+- `go run ./cmd/swarm -acceptance city-shopping -login 127.0.0.3:2106
+  -web ""` passed all 8 checks in 8m58s
+  (`logs/acceptance/city-shopping-20261111-175117-15172-1.log`).
+- The log proves the timing: at 17:53:28 Sydnia sold the Long Sword
+  (object 164441729, one `RequestSellItem` of 1 entry) and at 17:53:31
+  the Falchion buy went out; at 17:53:31-42 Simplon unequipped and
+  sold the six old armor pieces (one `RequestSellItem` of 6 entries)
+  and at 17:53:44 the armor set buy followed. The errand ended at
+  17:55:52, so the old dress was sold inside the errand; the later
+  restock trip at 17:57:25 found no junk to sell.
+- The `sold` check latched with "the old village gear left the bag at
+  Gludio".
+
 ## Status
 
-The fix and the offline tests are in; the live `city-shopping` run is
-the next step.
+Complete: the fix, the offline tests and the live acceptance are in.

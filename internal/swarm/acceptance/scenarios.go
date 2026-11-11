@@ -128,14 +128,15 @@ func Definitions() []TestDef {
                 "dress with 500 000 adena in the wallet. Flow: the " +
                 "acceptance-only city shopping seam of the hunt " +
                 "loop arms, the bot walks to the Elven Village " +
-                "gatekeeper Mirabel, teleports to Gludio, buys the " +
-                "Falchion from Sydnia and the whole no-grade armor " +
-                "set from Simplon, dresses the new kit, teleports " +
+                "gatekeeper Mirabel, teleports to Gludio, sells the " +
+                "village weapon and armor it replaces at Sydnia and " +
+                "Simplon, buys the Falchion and the whole no-grade " +
+                "armor set there, dresses the new kit, teleports " +
                 "back with Bella and walks to the start ground, " +
                 "where the hunt resumes. Pass: every stage holds - " +
                 "the Gludio arrival, the bought weapon and armor, " +
-                "the worn kit, the return home and a kill after " +
-                "the return.",
+                "the sale of the old dress, the worn kit, the " +
+                "return home and a kill after the return.",
             Scenario: cityShoppingScenario,
         },
         {
