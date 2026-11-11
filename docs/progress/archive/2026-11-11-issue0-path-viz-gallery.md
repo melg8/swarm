@@ -1,4 +1,4 @@
-# Walk plan visualization gallery (status: in progress)
+# Walk plan visualization gallery (status: complete)
 
 Started 2026-11-11, branch feature/path-viz-gallery, issue none.
 
@@ -85,5 +85,7 @@ the pick controls. Documented the mode in `docs/webui.md` and the
 
 ## Status
 
-in progress: the gallery is ready for the owner's pick; the chosen
-variant (or combination) becomes the live `drawWalkPlan` of map.js.
+complete: the owner picked the smooth curve idea (variant 11), which
+became the base of the smooth curve lab and, in the pastel flow form,
+the live `drawWalkPlan` of map.js. The gallery mode and its harness
+stay in the tree as the reference page.

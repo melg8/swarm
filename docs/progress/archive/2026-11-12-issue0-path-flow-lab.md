@@ -1,4 +1,4 @@
-# Flow and snake speed lab (status: in progress)
+# Flow and snake speed lab (status: complete)
 
 Started 2026-11-12, branch feature/path-viz-gallery, issue none.
 The follow-up of `docs/progress/2026-11-11-issue0-path-curve-lab.md`:
@@ -118,6 +118,9 @@ Recorded the brief and the direction requirement, started the page.
 
 ## Status
 
-done: the page is live, the harness gates it, the v2 rainbow flows
-forward; ready to commit and hand over the numbered list.
+complete: the owner picked the pastel flow (variant 12, 2.8 s); it is
+the live walk plan line of map.js with the bead waypoint dots and the
+aim ring, committed on `feature/path-viz-gallery` and merged into
+main. The lab mode and its harness stay in the tree as the reference
+page.
 

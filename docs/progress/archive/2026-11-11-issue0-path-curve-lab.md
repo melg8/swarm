@@ -1,4 +1,4 @@
-# Smooth curve animation lab (status: in progress)
+# Smooth curve animation lab (status: complete)
 
 Started 2026-11-11, branch feature/path-viz-gallery, issue none.
 The follow-up of `docs/progress/2026-11-11-issue0-path-viz-gallery.md`:
@@ -80,5 +80,7 @@ Recorded the brief and the naming constraints, started the page.
 
 ## Status
 
-in progress: the page is live and verified; waiting for the owner to
-pick the animation numbers (or a combination) from 01-30.
+complete: the owner picked the rainbow flow and the pulse snake ideas,
+which became the flow and snake speed lab; the rainbow flow led to the
+pastel flow variant 12 now drawn by the live `drawWalkPlan`. The lab
+mode and its harness stay in the tree as the reference page.
