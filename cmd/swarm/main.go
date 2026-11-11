@@ -100,6 +100,7 @@ type config struct {
     pathfindTest  bool
     testFightUI   bool
     testPathUI    bool
+    testPathV2UI  bool
     testFightUIV1 bool
     geodataDir    string
     navmeshDir    string
@@ -221,6 +222,7 @@ func parseFlags() config {
         pathfindTest:      false,
         testFightUI:       false,
         testPathUI:        false,
+        testPathV2UI:      false,
         testFightUIV1:     false,
         geodataDir:        "",
         navmeshDir:        "",
@@ -278,6 +280,11 @@ func parseFlags() config {
             "connection, a grid of twenty numbered animated ways to "+
             "draw the planned walk of the bot on the map, every cell "+
             "walking the same route with five stops and a destination")
+    flag.BoolVar(&cfg.testPathV2UI, "test-path-ui-v2", false,
+        "smooth curve animation lab instead of the bot: no game "+
+            "connection, a grid of thirty numbered animated ways to "+
+            "draw the same Catmull-Rom walk, motion first, then color "+
+            "and stroke approach")
     flag.BoolVar(&cfg.testFightUIV1, "test-fight-ui-v1", false,
         "combat animation variant showcase UI (v1 idea set) instead of the "+
             "bot: no game connection, a looping hero versus enemy demo fight "+
@@ -946,6 +953,12 @@ func main() {
         return
     }
 
+    if cfg.testPathV2UI {
+        runTestPathV2UI(cfg)
+
+        return
+    }
+
     if cfg.pathfindTest {
         runPathfindTest(cfg)
 
@@ -1321,6 +1334,37 @@ func runTestPathUI(cfg config) {
     <-ctx.Done()
     shutdownWebInterface(web)
     log.Println("Walk plan gallery finished")
+}
+
+// runTestPathV2UI serves the bot less smooth curve animation lab: the
+// web interface answers with the thirty variant grid until the process
+// is stopped. No game connection and no geodata is needed - the map
+// background of the lab cells is the static tile pyramid shipped with
+// the web content.
+func runTestPathV2UI(cfg config) {
+    if cfg.webAddress == "" {
+        log.Println("Curve lab needs the web interface, " +
+            "pass a -web address")
+
+        return
+    }
+
+    web := webserver.NewTestPathCurveServer(cfg.webAddress,
+        log.Default())
+    go func() {
+        if err := web.ListenAndServe(); err != nil {
+            log.Println("Web interface failed: " + err.Error())
+        }
+    }()
+
+    log.Println("Smooth curve lab is ready")
+
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+    <-ctx.Done()
+    shutdownWebInterface(web)
+    log.Println("Smooth curve lab finished")
 }
 
 // runPathfindTest serves the bot less map pathfinding test UI: the geodata

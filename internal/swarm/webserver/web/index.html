@@ -178,6 +178,26 @@ SPDX-License-Identifier: MIT
         </div>
       </section>
 
+      <section id="curve-section" class="curve-section">
+        <div class="curve-bar">
+          <div class="curve-title">SMOOTH CURVE ANIMATION LAB</div>
+          <div class="curve-sub">one Catmull-Rom walk · 5 stops + destination · 30 animated ideas · 01-21 motion · 22-25 color · 26-30 stroke</div>
+          <div class="curve-controls">
+            <button id="curve-pause" class="btn" title="freeze the walk loop">pause</button>
+            <select id="curve-speed" class="curve-select" title="playback speed of the walk loop">
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+            </select>
+            <span id="curve-picked" class="curve-picked">picked: none</span>
+            <span class="curve-hint">click a variant head to mark it</span>
+          </div>
+        </div>
+        <div class="curve-scroll" id="curve-scroll">
+          <div class="curve-grid" id="curve-grid"></div>
+        </div>
+      </section>
+
       <section id="tab-map" class="tab-content active">
         <div class="map-toolbar">
           <label class="check follow-check"><input type="checkbox" id="follow" checked> follow</label>
@@ -740,6 +760,7 @@ SPDX-License-Identifier: MIT
 <script src="fight.js"></script>
 <script src="fighttest.js"></script>
 <script src="pathtest.js"></script>
+<script src="pathcurve.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

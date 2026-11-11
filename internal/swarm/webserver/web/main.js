@@ -63,6 +63,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (config && config.mode === "test-path-v2") {
+    document.body.classList.add("mode-test-path-v2");
+    PathCurve.init();
+
+    return;
+  }
+
   initChat();
   initDumpButton();
   initSessionButton();

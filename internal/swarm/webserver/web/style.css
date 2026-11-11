@@ -2906,13 +2906,16 @@ canvas.fxg-cell.picked {
   outline-offset: -2px;
 }
 
-/* ---- walk plan gallery (the -test-path-ui mode) ----
-   The comparison grid of the walk plan drawing ideas: numbered card
+/* ---- walk plan gallery and curve lab ----
+   The comparison grids of the walk plan drawing ideas: numbered card
    heads over a four column grid of canvases, every card animating the
-   same planned route. The body.mode-test-path class of the index page
-   hides the bot specific chrome exactly like body.mode-test-fight
-   does for the damage gallery. */
-.path-section {
+   same planned route. The body.mode-test-path and body.mode-test-path-v2
+   classes of the index page hide the bot specific chrome exactly like
+   body.mode-test-fight does for the damage gallery. The card atoms
+   (path-card, path-cardhead, pc-num, pc-name, pc-note, path-cell) are
+   shared by both galleries. */
+.path-section,
+.curve-section {
   display: none;
   flex-direction: column;
   min-height: 0;
@@ -2920,6 +2923,7 @@ canvas.fxg-cell.picked {
 }
 
 body.mode-test-path .path-section { display: flex; }
+body.mode-test-path-v2 .curve-section { display: flex; }
 
 body.mode-test-path .tabs,
 body.mode-test-path .tab-content,
@@ -2942,7 +2946,29 @@ body.mode-test-path #foot-fps {
   display: none;
 }
 
-.path-bar {
+body.mode-test-path-v2 .tabs,
+body.mode-test-path-v2 .tab-content,
+body.mode-test-path-v2 .sidebar,
+body.mode-test-path-v2 .hud-stack,
+body.mode-test-path-v2 .bot-status,
+body.mode-test-path-v2 .chat-box,
+body.mode-test-path-v2 .chat-restore,
+body.mode-test-path-v2 #live-indicator,
+body.mode-test-path-v2 #live-label,
+body.mode-test-path-v2 #foot-packets,
+body.mode-test-path-v2 #foot-objects,
+body.mode-test-path-v2 #foot-uptime,
+body.mode-test-path-v2 #foot-updated,
+body.mode-test-path-v2 #foot-phase,
+body.mode-test-path-v2 #foot-rate,
+body.mode-test-path-v2 #foot-status,
+body.mode-test-path-v2 #foot-cursor,
+body.mode-test-path-v2 #foot-fps {
+  display: none;
+}
+
+.path-bar,
+.curve-bar {
   display: flex;
   align-items: baseline;
   gap: 14px;
@@ -2950,26 +2976,30 @@ body.mode-test-path #foot-fps {
   padding: 0 2px 10px 2px;
 }
 
-.path-title {
+.path-title,
+.curve-title {
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--text-bright);
 }
 
-.path-sub {
+.path-sub,
+.curve-sub {
   font-size: 11px;
   color: var(--text-dim);
 }
 
-.path-controls {
+.path-controls,
+.curve-controls {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   margin-left: auto;
 }
 
-.path-select {
+.path-select,
+.curve-select {
   font: inherit;
   font-size: 11px;
   color: var(--text);
@@ -2979,7 +3009,8 @@ body.mode-test-path #foot-fps {
   padding: 2px 6px;
 }
 
-.path-picked {
+.path-picked,
+.curve-picked {
   font-family: var(--mono);
   font-size: 10.5px;
   font-weight: 600;
@@ -2990,12 +3021,14 @@ body.mode-test-path #foot-fps {
   padding: 2px 7px;
 }
 
-.path-hint {
+.path-hint,
+.curve-hint {
   font-size: 10.5px;
   color: var(--text-dim);
 }
 
-.path-scroll {
+.path-scroll,
+.curve-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -3004,7 +3037,8 @@ body.mode-test-path #foot-fps {
   background: var(--bg-panel);
 }
 
-.path-grid {
+.path-grid,
+.curve-grid {
   display: grid;
   gap: 10px;
   padding: 10px;

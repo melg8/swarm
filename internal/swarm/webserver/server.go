@@ -40,6 +40,10 @@ const (
     // modeTestPath is the walk plan visualization gallery mode
     // (NewTestPathServer): the animated cells of the -test-path-ui flag.
     modeTestPath = "test-path"
+    // modeTestPathV2 is the smooth curve animation lab mode
+    // (NewTestPathCurveServer): the thirty animated variants of the
+    // -test-path-ui-v2 flag.
+    modeTestPathV2 = "test-path-v2"
     // modeFight is the combat animation variant showcase of the
     // -test-fight-ui-v1 run: a looping demo fight on every variant.
     modeFight = "fight"
