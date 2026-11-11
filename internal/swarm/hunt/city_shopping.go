@@ -35,6 +35,11 @@ import (
 // MerchantPriceConfig of the castle) prices the kit at 455 760 adena:
 // 292 800 for the weapon and 162 960 for the armor.
 
+// CityShoppingErrand is the name the errand publishes in the tracker
+// errand status: the acceptance watch compares against it to tell the
+// errand it follows from a later one.
+const CityShoppingErrand = "city-shopping"
+
 // The item ids of the top no-grade kit the errand buys.
 const (
     // cityShopWeaponID is the Falchion of Sydnia.
@@ -78,6 +83,13 @@ const (
     // second use request for an equipped item toggles it right back
     // off.
     cityShopPendingWait = 5 * time.Second
+    // cityShopBudget bounds one whole errand: the walk to the
+    // gatekeeper, both rides, the two merchant stops, the dress and
+    // the walk back complete in about three minutes on the deployed
+    // stack, so eight cover a slow tick and a re-plan while a hung
+    // errand still ends in minutes, not in the quarter hour the
+    // scenario would otherwise wait.
+    cityShopBudget = 8 * time.Minute
 )
 
 // cityShoppingOutbound is the Elven Village to Gludio hop: the
@@ -259,12 +271,20 @@ func (l *Loop) maybeCityShopping(ctx context.Context) bool {
 }
 
 // startCityShopping runs one errand: the phase switch, the blocking
-// drive and the state restore. The attempt stamp arms the cooldown
-// whatever the outcome was; the next ordinary tick hunts from the
-// spot the errand ended on.
+// drive under the errand budget and the state restore. The attempt
+// stamp arms the cooldown whatever the outcome was; the next ordinary
+// tick hunts from the spot the errand ended on. The tracker errand
+// status carries the outcome to the acceptance watch.
 func (l *Loop) startCityShopping(ctx context.Context) {
     l.cityShoppingTriedAt = time.Now()
     l.phase = phaseCityShop
+    started := time.Now()
+    l.tracker.SetHuntErrand(state.HuntErrand{
+        Name:      CityShoppingErrand,
+        StartedAt: started,
+        EndedAt:   time.Time{},
+        Err:       "",
+    })
     // The blocking errand outlives the tick, so the tracker phase is
     // published here as well: the deferred publish of the tick runs
     // only after the drive returned.
@@ -276,11 +296,26 @@ func (l *Loop) startCityShopping(ctx context.Context) {
         "top grade kit, walking to Gludio",
         l.tracker.InventoryStats().Adena,
         l.cityShoppingMissingCost())
-    if err := l.driveCityShopping(ctx); err != nil {
+    driveCtx, cancel := context.WithTimeout(ctx, cityShopBudget)
+    err := l.driveCityShopping(driveCtx)
+    cancel()
+    if errors.Is(err, context.DeadlineExceeded) {
+        err = fmt.Errorf("the errand ran past its %s budget",
+            cityShopBudget)
+    }
+    errText := ""
+    if err != nil {
+        errText = err.Error()
         l.logf("Hunt: city shop: the errand stopped: %v", err)
     } else {
         l.logf("Hunt: city shop: the errand finished, the hunt resumes")
     }
+    l.tracker.SetHuntErrand(state.HuntErrand{
+        Name:      CityShoppingErrand,
+        StartedAt: started,
+        EndedAt:   time.Now(),
+        Err:       errText,
+    })
     l.phase = phaseEngage
     l.merchantID = 0
     l.merchantPick = time.Time{}

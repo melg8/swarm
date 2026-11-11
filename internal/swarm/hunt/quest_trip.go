@@ -664,6 +664,11 @@ func (l *Loop) driveQuestTransfer(
         return fmt.Errorf("the walk to %s: %w",
             transfer.Gatekeeper.Name, err)
     }
+    // The arrival generation the conversation starts from: the
+    // server validates every bypass against the links of the page it
+    // sent last, so a page left over from an earlier talk of the same
+    // gatekeeper never satisfies a wait (see the walker gate).
+    _, _, talkGen := l.game.LastHTMLDialogArrival()
     l.logf("quest: talking to the gatekeeper %s (object %d), "+
         "riding the teleport to %s",
         transfer.Gatekeeper.Name, target.ObjectID, transfer.DestLabel)
@@ -681,10 +686,12 @@ func (l *Loop) driveQuestTransfer(
     if err := l.game.InteractPull(target.ObjectID); err != nil {
         return fmt.Errorf("the gatekeeper pull: %w", err)
     }
-    if _, html, err := l.awaitTransferPage(
-        target.ObjectID, "", questTransferArriveWait); err != nil {
+    first, firstGen, err := l.awaitTransferPage(
+        target.ObjectID, "", talkGen, questTransferArriveWait)
+    if err != nil {
         return err
-    } else if FindShowTeleportsButton(ParseGatekeeperHTML(html)) == nil {
+    }
+    if FindShowTeleportsButton(first) == nil {
         return fmt.Errorf(
             "the first page of %s carries no teleport entry",
             transfer.Gatekeeper.Name)
@@ -692,12 +699,15 @@ func (l *Loop) driveQuestTransfer(
 
     // The showTeleports bypass (the button of the open first
     // page) opens the list.
+    pacer := bypassPacer{last: time.Time{}}
+    pacer.wait()
     if err := l.game.SendBypass(fmt.Sprintf(
         "npc_%d_showTeleports", target.ObjectID)); err != nil {
         return fmt.Errorf("the showTeleports send: %w", err)
     }
     buttons, _, err := l.awaitTransferPage(
-        target.ObjectID, transfer.DestLabel, questTransferArriveWait)
+        target.ObjectID, transfer.DestLabel, firstGen,
+        questTransferArriveWait)
     if err != nil {
         return err
     }
@@ -708,40 +718,71 @@ func (l *Loop) driveQuestTransfer(
             "the teleport list of %s carries no %s button",
             transfer.Gatekeeper.Name, transfer.DestLabel)
     }
-    command := fmt.Sprintf("npc_%d_teleport %s %d",
-        target.ObjectID, teleport.ListName, teleport.LocID)
-    l.logf("quest: teleporting to %s", teleport.Label)
-    if err := l.game.SendBypass(command); err != nil {
+    // The evidence of the hop: the command the button carries (sent
+    // verbatim - the server matches the cached page link byte for
+    // byte) and the geometry its interaction distance gate reads.
+    l.logf("quest: teleporting to %s via %q (npc %d, %s)",
+        teleport.Label, teleport.Command, target.ObjectID,
+        l.transferGeometry(target.ObjectID))
+    // The list page arrives one round trip after the showTeleports
+    // bypass: the teleport riding that round trip sits inside the
+    // flood protector window of the previous bypass and is dropped
+    // without an answer (see dialogBypassPace).
+    pacer.wait()
+    if err := l.game.SendBypass(teleport.Command); err != nil {
         return fmt.Errorf("the teleport send: %w", err)
     }
 
     return l.awaitTransferArrival(ctx, transfer)
 }
 
-// awaitTransferPage waits for the dialog of the gatekeeper to carry
-// the wanted button (a teleport button whose label contains
-// destLabel; any page when destLabel is empty - the first page
-// wait). It returns the parsed buttons of the matching page and the
-// raw html.
+// transferGeometry renders the server range check of a teleport
+// bypass: RequestBypassToServer drops a command silently when the
+// character stands farther than Npc.INTERACTION_DISTANCE (250 units,
+// 3D) from the page origin, so a stuck hop needs the two points in
+// the log.
+func (l *Loop) transferGeometry(npcObjID int32) string {
+    npcX, npcY, npcZ, npcOK := l.tracker.ObjectPosition(npcObjID)
+    selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
+    if !npcOK || !selfOK {
+        return "geometry unknown"
+    }
+    dx := float64(selfX - npcX)
+    dy := float64(selfY - npcY)
+    dz := float64(selfZ - npcZ)
+
+    return fmt.Sprintf(
+        "self %d,%d,%d npc %d,%d,%d 2d %.0f 3d %.0f",
+        selfX, selfY, selfZ, npcX, npcY, npcZ,
+        math.Hypot(dx, dy), math.Sqrt(dx*dx+dy*dy+dz*dz))
+}
+
+// awaitTransferPage waits for a dialog page of the gatekeeper that
+// arrived past minGen and carries the wanted button (the
+// showTeleports entry for the first page wait; a teleport button whose
+// label contains destLabel otherwise). The generation gate keeps a
+// page left over from an earlier talk of the same gatekeeper from
+// satisfying the wait. It returns the parsed buttons of the matching
+// page and the arrival generation of that page.
 func (l *Loop) awaitTransferPage(
-    npcObjID int32, destLabel string, wait time.Duration,
-) ([]BypassButton, string, error) {
+    npcObjID int32, destLabel string, minGen uint64, wait time.Duration,
+) ([]BypassButton, uint64, error) {
     deadline := time.Now().Add(wait)
     for {
-        id, html := l.game.LastHTMLDialog()
-        if id == npcObjID && html != "" {
+        id, html, gen := l.game.LastHTMLDialogArrival()
+        if id == npcObjID && html != "" && gen > minGen {
             buttons := ParseGatekeeperHTML(html)
             if destLabel == "" {
-                if len(buttons) > 0 {
-                    return buttons, html, nil
+                if FindShowTeleportsButton(buttons) != nil {
+                    return buttons, gen, nil
                 }
             } else if FindTeleportButton(
                 buttons, "NORMAL", destLabel) != nil {
-                return buttons, html, nil
+                return buttons, gen, nil
             }
         }
         if time.Now().After(deadline) {
-            return nil, "", fmt.Errorf(
+            return nil, 0, fmt.Errorf(
                 "the gatekeeper dialog with %q never arrived",
                 destLabel)
         }
@@ -772,8 +813,17 @@ func (l *Loop) awaitTransferArrival(
             return nil
         }
         if time.Now().After(deadline) {
+            if !ok {
+                return fmt.Errorf(
+                    "the teleport to %s never landed and the self "+
+                        "position is unknown", transfer.DestLabel)
+            }
+
             return fmt.Errorf(
-                "the teleport to %s never landed", transfer.DestLabel)
+                "the teleport to %s never landed: the character "+
+                    "stands at %d,%d, the square is %d,%d",
+                transfer.DestLabel, selfX, selfY,
+                transfer.ArriveX, transfer.ArriveY)
         }
         pace(questWalkPoll)
     }

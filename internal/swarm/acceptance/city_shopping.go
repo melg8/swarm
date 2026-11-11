@@ -34,10 +34,25 @@ const (
     cityShoppingPassword = "temp25"
 )
 
-// cityShoppingTimeout bounds the whole run: the walk to the village
-// gatekeeper, the two rides, the two merchant stops, the dress and
-// the walk home fit well inside a half hour.
-const cityShoppingTimeout = 30 * time.Minute
+// cityShoppingTimeout bounds the whole run: the errand stages (the
+// walk to Mirabel, the outbound ride, both merchant stops, the dress,
+// the ride home and the walk back) complete in about three minutes on
+// the deployed stack, and the resumed farm adds one kill. The watch
+// fails fast on a stopped errand or a silent return ground, so the
+// budget only catches a session that never reaches either gate.
+const cityShoppingTimeout = 15 * time.Minute
+
+// cityShoppingErrandWall bounds the errand runtime the watch accepts:
+// the hunt driver budget (8 minutes) fires between the errand stages,
+// a walk that never returns does not, so the watch kills the session
+// when the errand overruns the driver budget by half.
+const cityShoppingErrandWall = 12 * time.Minute
+
+// cityShoppingFarmWindow bounds the resumed farm wait after the
+// return: the Kaboo ground of the start holds enough mobs to land the
+// first kill inside a minute, so a silent ground is a failure of the
+// return, not a slow spawn.
+const cityShoppingFarmWindow = 4 * time.Minute
 
 // The start state of the errand: the level 15 vitals on the Kaboo
 // Orc Grunt SW-5 cell (elven-hex-104), where the cell median of 9
@@ -247,6 +262,7 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
         armorBought:  false,
         homeAtMs:     0,
         homeExp:      0,
+        farmDone:     false,
     }
     for {
         if ctx.Err() != nil {
@@ -256,6 +272,12 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
             return fmt.Errorf("cancelled: %w", ctx.Err())
         }
         watch.evaluate(tracker, test)
+        if err := watch.abort(tracker, test); err != nil {
+            cancelSession()
+            joinSessionDone(sessionDone)
+
+            return err
+        }
         if allChecksDone(test) {
             test.appendLog("acceptance: the kit is worn and the hunt " +
                 "resumed, stopping the bot")
@@ -280,12 +302,13 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
 
 // cityShoppingWatch accumulates the latches of the scenario: the
 // purchase flags gate the return watch, the home stamp gates the
-// resumed farm check.
+// resumed farm check, the farm flag retires the farm window.
 type cityShoppingWatch struct {
     weaponBought bool
     armorBought  bool
     homeAtMs     int64
     homeExp      int32
+    farmDone     bool
 }
 
 // evaluate rewrites the check list from one live tracker snapshot.
@@ -351,20 +374,58 @@ func (w *cityShoppingWatch) evaluateFarming(
             break
         }
     }
+    done := killed || grown
+    detail := "waiting for the first kill after the return"
     switch {
     case killed && grown:
-        test.updateCheck(checkCityShopFarm, true,
-            "a kill landed and the experience grew after the return")
+        detail = "a kill landed and the experience grew after the return"
     case killed:
-        test.updateCheck(checkCityShopFarm, true,
-            "a kill landed after the return")
+        detail = "a kill landed after the return"
     case grown:
-        test.updateCheck(checkCityShopFarm, true,
-            "the experience grew after the return")
-    default:
-        test.updateCheck(checkCityShopFarm, false,
-            "waiting for the first kill after the return")
+        detail = "the experience grew after the return"
     }
+    w.farmDone = done
+    test.updateCheck(checkCityShopFarm, done, detail)
+}
+
+// abort reports the terminal failure of the run: the errand the watch
+// follows stopped with an error, the errand overran its driver budget
+// without an answer, or the return ground produced no farm inside the
+// window. A stopped errand never fixes itself, so the scenario ends at
+// once instead of idling out its own budget.
+func (w *cityShoppingWatch) abort(
+    tracker *state.Bot, test *Test,
+) error {
+    errand := tracker.HuntErrand()
+    if errand.Name == hunt.CityShoppingErrand &&
+        !errand.StartedAt.IsZero() {
+        if !errand.EndedAt.IsZero() && errand.Err != "" {
+            return fmt.Errorf("the city shopping errand stopped: %s",
+                errand.Err)
+        }
+        if errand.EndedAt.IsZero() &&
+            time.Since(errand.StartedAt) > cityShoppingErrandWall {
+            return fmt.Errorf(
+                "the city shopping errand runs for %s without an "+
+                    "answer, past the %s wall",
+                time.Since(errand.StartedAt).Round(time.Second),
+                cityShoppingErrandWall)
+        }
+    }
+    if w.homeAtMs == 0 || w.farmDone {
+        return nil
+    }
+    since := time.Since(time.UnixMilli(w.homeAtMs))
+    if since > cityShoppingFarmWindow {
+        test.updateCheck(checkCityShopFarm, false,
+            "no kill landed inside the farm window of the return")
+
+        return fmt.Errorf(
+            "the hunt did not resume within %s of the return",
+            cityShoppingFarmWindow)
+    }
+
+    return nil
 }
 
 // cityShoppingBagDetail counts the pieces of the slot range the bag

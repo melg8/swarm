@@ -70,6 +70,61 @@ Next: commit the round, then run the live scenario with
 `-acceptance city-shopping` against the deployed stack and confirm
 every check reaches done.
 
+### 2026-11-11 14:45 UTC - the homebound teleport and the fail fast
+
+What the live run showed (13:57-14:31 UTC, account temp25): the walk
+to Mirabel, the outbound ride (arrived 13:59:28), both merchant stops
+(13:59:58), the dress (14:00:00) all landed; the ride home failed at
+14:00:49 with `the teleport to Elven Village never landed`, and the
+bot then idled out the remaining half hour of the scenario budget
+without a single log line.
+
+Root cause (source verified in `RequestBypassToServer` and
+`FloodProtectorAction`): the homebound teleport bypass rode the
+`showTeleports` bypass inside the server bypass flood protector
+window (3 game ticks of 100 ms = 300 ms), so the server dropped it
+before the `npc_` branch - no `ActionFailed`, no teleport. The
+outbound hop passed only because its list page arrived late enough
+(the run lost four `ActionFailed` on that page); the homebound round
+trip was fast enough to ride under the window.
+
+What changed:
+
+- `bypassPacer` in `hunt/quest_walker.go`: one pace of
+  `dialogBypassPace` (3.2 s) between the bypass sends of a
+  conversation, shared by `DriveDialog` and `driveQuestTransfer`.
+- `driveQuestTransfer` gates both page waits on the html arrival
+  generation (a page left from an earlier talk never satisfies a
+  wait), sends the teleport command the list button carries verbatim,
+  and logs the geometry (`via "npc_..._teleport ..."`, self/npc
+  coords, 2D/3D distance) so a stuck hop names the flood, the
+  250-unit 3D range gate or a stale page.
+- The arrival failure names the character position against the
+  arrival square.
+- `state.HuntErrand` (name, start, end, error) plus
+  `SetHuntErrand`/`HuntErrand` and the session reset: the errand
+  publishes its status race-free; the acceptance watch reads it.
+- Fail fast: the driver runs under `cityShopBudget` (8 minutes) and
+  reports `the errand ran past its ... budget`; the watch aborts on a
+  stopped errand, an errand past `cityShoppingErrandWall` (12
+  minutes) or a return ground silent for `cityShoppingFarmWindow` (4
+  minutes); the scenario budget drops 30 -> 15 minutes.
+- New tests: the pacer spacing, the stale-page gate, the errand
+  status publication (a tracker with no self position fails the
+  errand and publishes the error), the errand status round trip and
+  session reset, and the watch abort matrix.
+
+Note: `DriveGatekeeperTeleport` in `gatekeeper_step.go` carries the
+same unpaced two-send pattern but is not wired into the tick machine;
+left untouched.
+
+Verified: `go build ./...`, the hunt, state and acceptance package
+tests, `task fmt`, `task fmt:check`, `task lint:new` (0 issues),
+`task prepush`.
+
+Next: commit, then rerun `-acceptance city-shopping` live.
+
 ## Status
 
-In progress: code complete and green offline, the live run pending.
+In progress: the pacing fix, the diagnostics and the fail fast are
+green offline; the live rerun is pending.

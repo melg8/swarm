@@ -38,22 +38,28 @@ const bellaListPage = "<html><body>Region where teleporting is possible<br><br>"
 
 // transferGame serves the gatekeeper flow: the ClickObject talk opens
 // the first page, the showTeleports bypass opens the list, the
-// teleport bypass moves the character to the arrival square.
+// teleport bypass moves the character to the arrival square. Every
+// page is delivered through setHTMLDialog, so the arrival generation
+// advances the way the connection layer does.
 type transferGame struct {
     *fakeGame
-    bot     *state.Bot
-    stage   int
-    noMove  bool
-    arriveX int32
-    arriveY int32
+    bot       *state.Bot
+    stage     int
+    noMove    bool
+    staleOnly bool
+    npc       int32
+    arriveX   int32
+    arriveY   int32
 }
 
 func (g *transferGame) ClickObject(objectID int32) error {
     if err := g.fakeGame.ClickObject(objectID); err != nil {
         return err
     }
-    g.htmlNPC = objectID
-    g.htmlBody = bellaFirstPage
+    g.npc = objectID
+    if !g.staleOnly {
+        g.setHTMLDialog(objectID, bellaFirstPage)
+    }
 
     return nil
 }
@@ -65,7 +71,7 @@ func (g *transferGame) SendBypass(command string) error {
     switch g.stage {
     case 0:
         if command == "npc_11_showTeleports" {
-            g.htmlBody = bellaListPage
+            g.setHTMLDialog(g.npc, bellaListPage)
             g.stage = 1
         }
     case 1:
@@ -88,6 +94,8 @@ func (g *transferGame) SendBypass(command string) error {
 // showTeleports bypass, the destination button lookup and the
 // teleport arrival at the destination square.
 func TestDriveQuestTransferFlow(t *testing.T) {
+    shortenDialogSeams(t)
+
     bot := newTestBot()
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 11, TemplateID: 1007256, Attackable: false,
@@ -130,6 +138,7 @@ func TestDriveQuestTransferFlow(t *testing.T) {
 // production 20 s wait can only lapse - its expiry path is what the
 // assertion pins (the sibling stuck arrival test shrinks it too).
 func TestDriveQuestTransferMissingDestination(t *testing.T) {
+    shortenDialogSeams(t)
     original := questTransferArriveWait
     questTransferArriveWait = 200 * time.Millisecond
     t.Cleanup(func() { questTransferArriveWait = original })
@@ -158,6 +167,7 @@ func TestDriveQuestTransferMissingDestination(t *testing.T) {
 // teleport that never lands fails the hop (the stuck page flow left
 // the character in Gludio).
 func TestDriveQuestTransferStuckArrival(t *testing.T) {
+    shortenDialogSeams(t)
     original := questTransferArriveWait
     questTransferArriveWait = 200 * time.Millisecond
     t.Cleanup(func() { questTransferArriveWait = original })
@@ -182,6 +192,63 @@ func TestDriveQuestTransferStuckArrival(t *testing.T) {
     }
     err := loop.driveQuestTransfer(context.Background(), transfer)
     require.ErrorContains(t, err, "never landed")
+}
+
+// TestDriveQuestTransferStalePageGate pins the arrival generation
+// gate: a first page the store still holds from an earlier talk of
+// the same gatekeeper never satisfies the wait, so no bypass rides a
+// dialog the server did not just send.
+func TestDriveQuestTransferStalePageGate(t *testing.T) {
+    shortenDialogSeams(t)
+    original := questTransferArriveWait
+    questTransferArriveWait = 200 * time.Millisecond
+    t.Cleanup(func() { questTransferArriveWait = original })
+
+    bot := newTestBot()
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 11, TemplateID: 1007256, Attackable: false,
+        X: 45050, Y: 50050, Z: -3500, Name: "Bella",
+    })
+    game := &transferGame{fakeGame: &fakeGame{}, bot: bot, staleOnly: true}
+    // The stale page of yesterday's talk sits in the store with the
+    // generation the new talk starts from.
+    game.setHTMLDialog(11, bellaFirstPage)
+    loop := NewLoop(game, bot)
+
+    transfer := QuestTransfer{
+        Gatekeeper: QuestNpc{
+            TemplateID: 7256, Name: "Bella",
+            X: 45050, Y: 50050, Z: -3500,
+        },
+        DestLabel: "The Village of Gludin",
+        ArriveX:   -80826, ArriveY: 149775, ArriveZ: -3043,
+    }
+    err := loop.driveQuestTransfer(context.Background(), transfer)
+    require.ErrorContains(t, err, "never arrived")
+    require.Empty(t, game.bypasses,
+        "the stale page must not send a single bypass")
+}
+
+// TestBypassPacerSpacesTheSends pins the flood protector pace: the
+// first bypass of a conversation goes out at once, the second waits
+// the full dialog bypass window.
+func TestBypassPacerSpacesTheSends(t *testing.T) {
+    var waits []time.Duration
+    originalPace := pace
+    pace = func(wait time.Duration) { waits = append(waits, wait) }
+    t.Cleanup(func() { pace = originalPace })
+    originalBypassPace := dialogBypassPace
+    dialogBypassPace = time.Hour
+    t.Cleanup(func() { dialogBypassPace = originalBypassPace })
+
+    pacer := bypassPacer{}
+    pacer.wait()
+    require.Empty(t, waits,
+        "the first bypass of a conversation sends at once")
+    pacer.wait()
+    require.Len(t, waits, 1,
+        "the second bypass waits out the flood window")
+    require.Positive(t, waits[0])
 }
 
 // TestRestBetweenFightsSitsAndStands pins the rest: a tired character

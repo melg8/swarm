@@ -5,6 +5,7 @@
 package hunt
 
 import (
+    "context"
     "testing"
     "time"
 
@@ -140,14 +141,14 @@ func TestCityShoppingWantedGate(t *testing.T) {
     }{
         {
             name:  "the dressed wallet runs the errand",
-            adena: cityShoppingBudget, bag: []state.InventoryItem{
+            adena: cityShoppingWallet, bag: []state.InventoryItem{
                 villageSword,
             },
             want: true,
         },
         {
             name:  "the seam off keeps the errand off",
-            adena: cityShoppingBudget, bag: []state.InventoryItem{
+            adena: cityShoppingWallet, bag: []state.InventoryItem{
                 villageSword,
             },
             setup: func(loop *Loop) { loop.SetCityShoppingEnabled(false) },
@@ -155,7 +156,7 @@ func TestCityShoppingWantedGate(t *testing.T) {
         },
         {
             name:  "no navigator holds the start",
-            adena: cityShoppingBudget, bag: []state.InventoryItem{
+            adena: cityShoppingWallet, bag: []state.InventoryItem{
                 villageSword,
             },
             setup: func(loop *Loop) { loop.SetNavigator(nil) },
@@ -163,7 +164,7 @@ func TestCityShoppingWantedGate(t *testing.T) {
         },
         {
             name:  "a bare handed character keeps the weapon run",
-            adena: cityShoppingBudget, bag: nil, want: false,
+            adena: cityShoppingWallet, bag: nil, want: false,
         },
         {
             name:  "the wallet one adena short holds the start",
@@ -183,7 +184,7 @@ func TestCityShoppingWantedGate(t *testing.T) {
         },
         {
             name:  "the retry cooldown holds the start",
-            adena: cityShoppingBudget, bag: []state.InventoryItem{
+            adena: cityShoppingWallet, bag: []state.InventoryItem{
                 villageSword,
             },
             setup: func(loop *Loop) {
@@ -193,7 +194,7 @@ func TestCityShoppingWantedGate(t *testing.T) {
         },
         {
             name:  "the expired cooldown releases the start",
-            adena: cityShoppingBudget, bag: []state.InventoryItem{
+            adena: cityShoppingWallet, bag: []state.InventoryItem{
                 villageSword,
             },
             setup: func(loop *Loop) {
@@ -204,7 +205,7 @@ func TestCityShoppingWantedGate(t *testing.T) {
         },
         {
             name:  "a running town trip owns the session",
-            adena: cityShoppingBudget, bag: []state.InventoryItem{
+            adena: cityShoppingWallet, bag: []state.InventoryItem{
                 villageSword,
             },
             setup: func(loop *Loop) { loop.phase = phaseTownWalk },
@@ -228,7 +229,7 @@ func TestCityShoppingWantedGate(t *testing.T) {
 func TestCityShoppingWornWeaponArms(t *testing.T) {
     bot := newTestBot()
     bot.ApplyItemList([]state.InventoryItem{
-        {ObjectID: 1, ItemID: 57, Count: cityShoppingBudget, Type2: 4},
+        {ObjectID: 1, ItemID: 57, Count: cityShoppingWallet, Type2: 4},
         {
             ObjectID: 2, ItemID: vendorVillageSword, Count: 1,
             Equipped: true,
@@ -247,7 +248,7 @@ func TestCityShoppingWornWeaponArms(t *testing.T) {
 func TestCityShoppingWantedNeedsTheSelfPosition(t *testing.T) {
     bot := state.NewBot("fresh")
     bot.ApplyItemList([]state.InventoryItem{
-        {ObjectID: 1, ItemID: 57, Count: cityShoppingBudget, Type2: 4},
+        {ObjectID: 1, ItemID: 57, Count: cityShoppingWallet, Type2: 4},
         {
             ObjectID: 2, ItemID: vendorVillageSword, Count: 1,
             Equipped: true,
@@ -259,6 +260,30 @@ func TestCityShoppingWantedNeedsTheSelfPosition(t *testing.T) {
     require.False(t, loop.cityShoppingWanted())
 }
 
-// cityShoppingBudget is the wallet of the scenario: the full Gludio
+// cityShoppingWallet is the wallet of the scenario: the full Gludio
 // kit price leaves 44 240 adena behind.
-const cityShoppingBudget = int32(500000)
+const cityShoppingWallet = int32(500000)
+
+// TestStartCityShoppingPublishesTheErrandStatus pins the fail fast
+// hand-off of the errand: the tracker status carries the start and
+// the terminal error, so the acceptance watch never idles out its
+// own budget on an errand that already stopped.
+func TestStartCityShoppingPublishesTheErrandStatus(t *testing.T) {
+    // The bare tracker has no self position: the errand fails at its
+    // first check instead of walking a live world.
+    bot := state.NewBot("unittest1")
+    loop := NewLoop(&fakeGame{}, bot)
+
+    loop.startCityShopping(context.Background())
+
+    errand := bot.HuntErrand()
+    require.Equal(t, CityShoppingErrand, errand.Name)
+    require.False(t, errand.StartedAt.IsZero(),
+        "the errand must stamp its start")
+    require.False(t, errand.EndedAt.IsZero(),
+        "the terminal status must stamp its end")
+    require.Contains(t, errand.Err, "no self position",
+        "the terminal error must reach the watch")
+    require.Equal(t, phaseEngage, loop.phase,
+        "the loop returns to engage after the errand")
+}

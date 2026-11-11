@@ -43,20 +43,34 @@ const questDialogPoll = 250 * time.Millisecond
 var dialogClickPause = selectPeriod
 
 // dialogBypassPace is the minimum pause between two bypass sends of
-// one conversation: the server bypass flood protector
-// (FloodProtectorServerBypassInterval = 3 of the deployed
-// FloodProtector.ini - 3 game ticks of 100 ms each, 300 ms, not
-// the 3 seconds the old comment read into it) drops a bypass that
-// arrives inside the interval. The live Q00406 accept run of
-// 2026-09-12 that birthed this pace lost its second page to the
-// STALE PAGE race the arrival generation gate below now closes
-// (the bypass went out before the fresh page arrived), but the
-// page-arrival pacing of the walker alone can ride under 300 ms
-// (one round trip), so the pace stays: the proven 3.2 s margin is
-// cheap next to a dropped bypass and shortening it is a live
-// measurement task of its own. The var (not a const) is a test
-// seam.
+// one conversation: the deployed FloodProtectorServerBypassInterval
+// (3 game ticks of 100 ms each, 300 ms) drops a bypass that arrives
+// inside the window without any answer. The page-arrival pacing of
+// the walker alone rides under 300 ms (one round trip), so the fast
+// 3.2 s margin stays: cheap next to a dropped bypass. The var (not a
+// const) is a test seam.
 var dialogBypassPace = 3200 * time.Millisecond
+
+// bypassPacer spaces the bypass sends of one conversation: the
+// server drops a command that arrives inside the flood protector
+// window of the previous one, and the answer page of that previous
+// command arrives one round trip later, so pacing the page wait
+// alone can ride under the window. The zero pacer sends at once -
+// the first bypass of a conversation has no predecessor.
+type bypassPacer struct {
+    last time.Time
+}
+
+// wait blocks until the next bypass may go out and arms the window
+// from the current moment.
+func (p *bypassPacer) wait() {
+    if !p.last.IsZero() {
+        if wait := dialogBypassPace - time.Since(p.last); wait > 0 {
+            pace(wait)
+        }
+    }
+    p.last = time.Now()
+}
 
 // DialogStep is one link choice of a dialog route: the walker picks
 // the link whose visible text contains LinkText and sends the
@@ -134,7 +148,7 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
         return fmt.Errorf("dialog: the talk entry failed: %w", err)
     }
     lastGen := talkGen
-    lastBypass := time.Time{}
+    pacer := bypassPacer{last: time.Time{}}
     for i := range steps {
         html, gen, err := l.awaitNewDialogPage(npcObjID, lastGen)
         if err != nil {
@@ -157,12 +171,7 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
         }
         // The bypass flood protector pace: a bypass riding the
         // previous one inside the 300 ms window is dropped silently.
-        if !lastBypass.IsZero() {
-            if wait := dialogBypassPace - time.Since(lastBypass); wait > 0 {
-                pace(wait)
-            }
-        }
-        lastBypass = time.Now()
+        pacer.wait()
         l.logf("dialog: step %d sends %q", i+1, link.Command)
         if err := l.game.SendBypass(link.Command); err != nil {
             return fmt.Errorf(

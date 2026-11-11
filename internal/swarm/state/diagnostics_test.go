@@ -319,6 +319,44 @@ func TestDiagnosticsResetSession(t *testing.T) {
     require.Equal(t, int64(0), snapshot.Diagnostics.Hunt.TickAgoMs)
 }
 
+// TestHuntErrandRoundTrip pins the errand status publication: the
+// accessors return the last set status and the session reset clears
+// the status of the dead session.
+func TestHuntErrandRoundTrip(t *testing.T) {
+    bot := NewBot("acc1")
+    require.Equal(t, HuntErrand{}, bot.HuntErrand(),
+        "a fresh tracker carries no errand")
+
+    started := time.Now().Add(-time.Minute)
+    bot.SetHuntErrand(HuntErrand{
+        Name:      "city-shopping",
+        StartedAt: started,
+        EndedAt:   time.Time{},
+        Err:       "",
+    })
+    open := bot.HuntErrand()
+    require.Equal(t, "city-shopping", open.Name)
+    require.Equal(t, started, open.StartedAt)
+    require.True(t, open.EndedAt.IsZero(),
+        "an errand in flight carries no end stamp")
+    require.Empty(t, open.Err)
+
+    ended := time.Now()
+    bot.SetHuntErrand(HuntErrand{
+        Name:      "city-shopping",
+        StartedAt: started,
+        EndedAt:   ended,
+        Err:       "the ride home failed",
+    })
+    stopped := bot.HuntErrand()
+    require.Equal(t, ended, stopped.EndedAt)
+    require.Equal(t, "the ride home failed", stopped.Err)
+
+    bot.ResetSession()
+    require.Equal(t, HuntErrand{}, bot.HuntErrand(),
+        "the session reset drops the errand of the dead session")
+}
+
 // TestDiagnosticsVerbatimCopy pins that the snapshot copy carries
 // the diagnostics of the live view unchanged.
 func TestDiagnosticsVerbatimCopy(t *testing.T) {

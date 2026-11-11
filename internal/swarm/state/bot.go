@@ -495,6 +495,10 @@ type Bot struct {
     // carries.
     huntLastAction   string
     huntLastActionAt time.Time
+    // huntErrand is the status of the blocking errand of the loop
+    // (the city shopping round): the acceptance runner reads it to
+    // fail fast on an errand that already stopped.
+    huntErrand HuntErrand
     // actionFailedAt records the arrival time of the last
     // ActionFailed (0x35) answer of the server: the server refuses
     // a request - a move click its geodata collapses, an action
@@ -679,6 +683,7 @@ func NewBot(id string) *Bot {
         huntPublishedAt:    time.Time{},
         huntLastAction:     "",
         huntLastActionAt:   time.Time{},
+        huntErrand:         HuntErrand{}, //nolint:exhaustruct_v5 // zero
         packetWindow: packetRateWindow{
             second: 0, filled: 0, counts: [packetRateSeconds]int32{},
         },
@@ -1663,6 +1668,7 @@ func (b *Bot) ResetSession() {
     b.huntPublishedAt = time.Time{}
     b.huntLastAction = ""
     b.huntLastActionAt = time.Time{}
+    b.huntErrand = HuntErrand{} //nolint:exhaustruct_v5 // zero resets
     b.status = StatusConnecting
     b.touch()
 }

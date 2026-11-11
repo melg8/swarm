@@ -175,6 +175,18 @@ func AgeMs(d time.Duration) int64 {
     return int64(d/time.Second) * 1000
 }
 
+// HuntErrand is the status of a blocking errand of the hunt loop (the
+// city shopping round): the name, the start and end stamps and the
+// terminal error. The acceptance runner reads it to end a scenario at
+// once when the errand it follows already stopped, instead of idling
+// out its own budget. An open errand carries the zero EndedAt.
+type HuntErrand struct {
+    Name      string    `json:"name"`
+    StartedAt time.Time `json:"startedAt"`
+    EndedAt   time.Time `json:"endedAt"`
+    Err       string    `json:"err"`
+}
+
 // packetRateSeconds is the width of the packet rate window.
 const packetRateSeconds = 10
 
@@ -272,6 +284,23 @@ func (b *Bot) NoteLastAction(message string) {
     defer b.mu.Unlock()
     b.huntLastAction = message
     b.huntLastActionAt = time.Now()
+}
+
+// SetHuntErrand publishes the status of the blocking hunt errand in
+// flight or its terminal result.
+func (b *Bot) SetHuntErrand(errand HuntErrand) {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    b.huntErrand = errand
+}
+
+// HuntErrand returns the last published hunt errand status (the zero
+// value when no errand ran in this session).
+func (b *Bot) HuntErrand() HuntErrand {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.huntErrand
 }
 
 // worldCounts is the per kind tally of the world object array: the

@@ -6,6 +6,7 @@ package acceptance
 
 import (
     "testing"
+    "time"
 
     "github.com/stretchr/testify/require"
 
@@ -138,4 +139,112 @@ func TestCityShoppingWornDetail(t *testing.T) {
     count, detail = cityShoppingWornDetail(village)
     require.Zero(t, count)
     require.Equal(t, "0 of 7 slots", detail)
+}
+
+// TestCityShoppingWatchAbort pins the fail fast matrix of the watch:
+// a stopped errand, an errand past its wall and a silent return
+// ground end the run at once, while an errand in flight inside the
+// wall, a finished one and a paid return ground keep it alive.
+func TestCityShoppingWatchAbort(t *testing.T) {
+    now := time.Now()
+    finished := state.HuntErrand{
+        Name:      hunt.CityShoppingErrand,
+        StartedAt: now.Add(-5 * time.Minute),
+        EndedAt:   now.Add(-time.Minute),
+        Err:       "",
+    }
+    stopped := state.HuntErrand{
+        Name:      hunt.CityShoppingErrand,
+        StartedAt: now.Add(-5 * time.Minute),
+        EndedAt:   now.Add(-time.Minute),
+        Err: "the ride home: the teleport to Elven Village " +
+            "never landed",
+    }
+    cases := []struct {
+        name       string
+        errand     state.HuntErrand
+        homeAgo    time.Duration
+        farmDone   bool
+        wantErr    string
+        wantDetail string
+    }{
+        {
+            name:   "no errand ever ran",
+            errand: state.HuntErrand{},
+        },
+        {
+            name: "another errand ran",
+            errand: state.HuntErrand{
+                Name:      "town-trip",
+                StartedAt: now.Add(-time.Hour),
+                EndedAt:   now.Add(-59 * time.Minute),
+                Err:       "another errand failed",
+            },
+        },
+        {
+            name:   "the errand finished",
+            errand: finished,
+        },
+        {
+            name:    "the errand stopped",
+            errand:  stopped,
+            wantErr: "never landed",
+        },
+        {
+            name: "the errand overran its wall",
+            errand: state.HuntErrand{
+                Name: hunt.CityShoppingErrand,
+                StartedAt: now.Add(
+                    -cityShoppingErrandWall - time.Minute),
+            },
+            wantErr: "without an answer",
+        },
+        {
+            name: "the errand is inside its wall",
+            errand: state.HuntErrand{
+                Name:      hunt.CityShoppingErrand,
+                StartedAt: now.Add(-time.Minute),
+            },
+        },
+        {
+            name:       "a silent return ground",
+            errand:     finished,
+            homeAgo:    cityShoppingFarmWindow + time.Minute,
+            wantErr:    "did not resume",
+            wantDetail: "no kill landed",
+        },
+        {
+            name:     "a paid return ground",
+            errand:   finished,
+            homeAgo:  cityShoppingFarmWindow + time.Minute,
+            farmDone: true,
+        },
+    }
+    for _, testCase := range cases {
+        t.Run(testCase.name, func(t *testing.T) {
+            bot := state.NewBot(cityShoppingAccount)
+            bot.SetHuntErrand(testCase.errand)
+            watch := &cityShoppingWatch{farmDone: testCase.farmDone}
+            if testCase.homeAgo > 0 {
+                watch.homeAtMs = now.Add(
+                    -testCase.homeAgo).UnixMilli()
+            }
+            test := &Test{}
+            test.setChecks(cityShoppingChecks())
+
+            err := watch.abort(bot, test)
+            if testCase.wantErr == "" {
+                require.NoError(t, err)
+            } else {
+                require.ErrorContains(t, err, testCase.wantErr)
+            }
+            if testCase.wantDetail == "" {
+                return
+            }
+            require.Contains(t, test.checks[6].Detail,
+                testCase.wantDetail)
+            require.Equal(t, checkCityShopFarm, test.checks[6].ID)
+            require.False(t, test.checks[6].Done)
+        })
+    }
 }
