@@ -2537,7 +2537,9 @@ const MapView = {
       return null;
     }
     // The art paints in the unit box (one unit is the mark radius with
-    // the origin at the mark centre), so the sprite scales with it.
+    // the origin at the mark centre): the sprite moves the origin to
+    // its middle and scales the box to the full raster.
+    ctx.translate(size / 2, size / 2);
     ctx.scale(size / 2, size / 2);
     paintKillMark(ctx);
     this.killSprite = canvas;

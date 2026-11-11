@@ -101,9 +101,22 @@ that replaces the current corpse face of `drawKillMarks` in
   integer size from rounding up). `killMarkAt` picks within the
   larger of the fixed 13 px and the drawn radius.
 - `tools/repro_zone_hover.js`: the scenario measures the live in
-  combat mob circle of the same frame and asserts the skull bone
-  equals its radius, at the default zoom and at the zoom cap.
+  combat mob circle of the same frame and asserts the skull bone spans
+  its diameter, at the default zoom and at the zoom cap.
 - `docs/webui.md`: the size rule and the sprite resolution note.
+
+### 2026-11-11 - the sprite centres the art in its raster
+
+- Owner feedback: only the bottom right quarter of the skull showed on
+  the map. The art paints around the unit origin, and the sprite
+  builder scaled it without moving the origin to the middle of the
+  raster, so three quarters fell outside the canvas.
+- `map.js`: `killMarkSprite` translates to `size / 2` before the
+  scale; the blit is unchanged.
+- `tools/repro_zone_hover.js`: the recording context records
+  `translate` calls and the scenario asserts the sprite moves the
+  origin to its exact middle, so the quadrant bug cannot come back
+  silently.
 
 ## Status
 

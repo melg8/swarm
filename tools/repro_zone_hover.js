@@ -123,7 +123,7 @@ function makeRecordingContext(record, withBlit) {
         },
         bezierCurveTo: () => {},
         arcTo: () => {},
-        translate: () => {},
+        translate: (x, y) => { record.translates.push([x, y]); },
         rotate: () => {},
         scale: () => {},
         clip: () => {},
@@ -238,8 +238,8 @@ function makeElementStub(checked) {
 // clan mask parsing of the social layer needs it.
 function loadMapJs(mapFile) {
     const record = {
-        strokes: [], fills: [], texts: [], images: [], style: "",
-        fillStyle: "", width: 1, alpha: 1, dash: []
+        strokes: [], fills: [], texts: [], images: [], translates: [],
+        style: "", fillStyle: "", width: 1, alpha: 1, dash: []
     };
     // The offscreen canvases the map creates (the kill mark sprite and
     // the background raster attempts), each with its own record.
@@ -295,7 +295,8 @@ function loadMapJs(mapFile) {
                 if (tag !== "canvas") { return makeElementStub(false); }
                 const spriteRecord = {
                     strokes: [], fills: [], texts: [], images: [],
-                    style: "", fillStyle: "", width: 1, alpha: 1, dash: []
+                    translates: [], style: "", fillStyle: "", width: 1,
+                    alpha: 1, dash: []
                 };
                 const sprite = {
                     width: 0, height: 0,
@@ -777,6 +778,15 @@ function runScenarioKillMarks(mapFile) {
         && spriteCanvas.height === 64,
         "sprite is " + (spriteCanvas
             ? spriteCanvas.width + "x" + spriteCanvas.height : "-"));
+    // The art draws around its origin: without the move to the middle
+    // of the raster only the bottom right quadrant of the skull lands
+    // in the sprite.
+    check(results, "the skull is centred in the sprite",
+        !!spriteArt && spriteArt.translates.length === 1
+        && spriteArt.translates[0][0] === spriteCanvas.width / 2
+        && spriteArt.translates[0][1] === spriteCanvas.height / 2,
+        "translates " + JSON.stringify(spriteArt
+            ? spriteArt.translates : null));
 
     const oldBlit = blitsAt(old);
     const staleBlit = blitsAt(stale);
