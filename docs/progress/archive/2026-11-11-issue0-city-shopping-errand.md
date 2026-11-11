@@ -1,4 +1,4 @@
-# The acceptance city shopping errand (status: in progress)
+# The acceptance city shopping errand (status: complete)
 
 Started 2026-11-11, branch main, issue #0 (owner request).
 
@@ -161,8 +161,21 @@ now latches them (`gludioSeen`/`wornSeen` with their details) and a
 later move or gear swap never reopens them. New test
 `TestCityShoppingWatchLatchesTheStory` pins the latch.
 
+### 2026-11-11 15:36 UTC - the final live run: PASS
+
+The final run (15:21-15:30 UTC) passed in 8m52s: the Gludio hop
+landed 15:23:15, both merchant stops and the dress completed by
+15:23:47, the homebound hop landed 15:24:19, the walk back reached
+the ground and the errand finished 15:25:54, the standard restock
+trip followed, and the first kill landed 15:30:20 - the farming check
+latched and the scenario stopped the bot. The run log records
+`[verdict] PASSED after 8m52.109s`, 7 of 7 checks done.
+
+Acceptance criteria met. The seam stays off in every production
+launch (`SetCityShoppingEnabled` is armed only by the scenario hook),
+so the live bots keep the ordinary town trip.
+
 ## Status
 
-In progress: the errand is live green through the return, the farm
-kill landed, and the check latches are fixed; the final live run is
-pending.
+Complete: the live `city-shopping` scenario passes every stage of the
+owner story; the fragment moves to the archive.
