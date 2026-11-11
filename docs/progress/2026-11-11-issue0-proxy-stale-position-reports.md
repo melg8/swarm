@@ -143,9 +143,23 @@ standing out the 10 minute walk budget. Tests:
 `quest_waypoint_blocked_test.go` (the skip of every waypoint, the
 walked plan untouched, the fast dead click, the running walk).
 
+### 2026-11-11 - the live proof of the veto drop and the errand rerun
+
+The live proxy E2E now drives the captured veto scene too: the fake
+client sends `CannotMoveAnymore` 400 units off the projected bot place
+right after its walk click, the proxy answers the local
+`ValidateLocation`, the session log carries the veto drop line and no
+`client -> server 0x36` transit, and no `StopMove` for the played
+object reaches the client within 800 ms. Green twice against the
+deployed C1 stack (`SWARM_PROXY_E2E_LOGIN=127.0.0.3:2106`, 17:14 and
+17:15). The `city-shopping` acceptance rerun (bot alone, temp25,
+17:15:54-17:24:40, 8m46s) passed all 7 checks (online, gludio, weapon,
+armor, worn, home, farming; 2296 received and 660 sent packets, none
+dropped), so the quest walker watchdog did not regress the errand.
+
 ## Status
 
-In progress: both fixes are in the tree with offline tests and the
-earlier proxy position fix is verified against the live stack; the
-remaining confirmation is the live proxy E2E rerun and the owner rerun
+In progress: both fixes carry offline tests, the live proxy E2E proves
+the veto never reaches the server, and the bot-alone `city-shopping`
+acceptance stays green; the remaining confirmation is the owner rerun
 with the real C1 client attached.

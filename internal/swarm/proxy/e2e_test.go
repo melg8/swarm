@@ -332,6 +332,41 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
     require.InDelta(t, stalePlace.Y,
         int32(binary.LittleEndian.Uint32(heldEcho[21:25])), 150,
         "the server still holds the bot y after the stale report")
+
+    // The client move veto must never reach the server: the Mobius
+    // CannotMoveAnymore handler cancels the move intention, so a
+    // transited veto stops the walk the bot just started. The proxy
+    // answers the veto with the local correction instead.
+    reconnectClient.sendPacket(buildTestCannotMoveAnymore(
+        stalePlace.X+400, stalePlace.Y, stalePlace.Z))
+    vetoCorrection := readPacketUntil(t, reconnectClient,
+        10*time.Second,
+        func(payload []byte) bool {
+            return payload[0] == serverOpValidateLocation
+        },
+        "the local correction of the client veto")
+    require.Equal(t, stalePlace.ObjectID,
+        int32(binary.LittleEndian.Uint32(vetoCorrection[1:5])),
+        "the veto correction carries the played character")
+
+    // The server side proof: a transited veto would broadcast StopMove
+    // for the character right away.
+    stopDeadline := time.Now().Add(800 * time.Millisecond)
+    for {
+        require.NoError(t, reconnectClient.conn.SetReadDeadline(stopDeadline))
+        payload, err := readWirePacket(
+            reconnectClient.conn, reconnectClient.readBuf)
+        if err != nil {
+            break
+        }
+        reconnectClient.readBuf = payload
+        reconnectClient.crypt.Decrypt(payload)
+        stopped := payload[0] == 0x59 && len(payload) >= 5 &&
+            int32(binary.LittleEndian.Uint32(payload[1:5])) ==
+                stalePlace.ObjectID
+        require.False(t, stopped,
+            "the client move veto transited: the server stopped the bot")
+    }
     require.NoError(t, reconnectClient.conn.Close())
 
     // The proxy log file carries the client session for the debugging
@@ -348,6 +383,10 @@ func TestProxyE2ERealStackClientFlow(t *testing.T) {
         "the net ping answers must stay silent in the session log")
     require.Contains(t, logText, "correcting the client view",
         "the stale position report must be corrected locally")
+    require.Contains(t, logText, "client move veto at",
+        "the client move veto must be answered locally")
+    require.NotContains(t, logText, "client -> server 0x36",
+        "the client move veto must never transit")
 
     // The shutdown: cancel the bot, the relay winds the client down.
     cancel()
