@@ -99,6 +99,7 @@ type config struct {
     hunt          bool
     pathfindTest  bool
     testFightUI   bool
+    testPathUI    bool
     testFightUIV1 bool
     geodataDir    string
     navmeshDir    string
@@ -219,6 +220,7 @@ func parseFlags() config {
         hunt:              false,
         pathfindTest:      false,
         testFightUI:       false,
+        testPathUI:        false,
         testFightUIV1:     false,
         geodataDir:        "",
         navmeshDir:        "",
@@ -271,6 +273,11 @@ func parseFlags() config {
             "connection, a horizontal grid of numbered damage "+
             "visualization variants, each shown with the enemy "+
             "above, below, left and right of the character")
+    flag.BoolVar(&cfg.testPathUI, "test-path-ui", false,
+        "walk plan visualization gallery instead of the bot: no game "+
+            "connection, a grid of twenty numbered animated ways to "+
+            "draw the planned walk of the bot on the map, every cell "+
+            "walking the same route with five stops and a destination")
     flag.BoolVar(&cfg.testFightUIV1, "test-fight-ui-v1", false,
         "combat animation variant showcase UI (v1 idea set) instead of the "+
             "bot: no game connection, a looping hero versus enemy demo fight "+
@@ -933,6 +940,12 @@ func main() {
         return
     }
 
+    if cfg.testPathUI {
+        runTestPathUI(cfg)
+
+        return
+    }
+
     if cfg.pathfindTest {
         runPathfindTest(cfg)
 
@@ -1278,6 +1291,36 @@ func runTestFightUI(cfg config) {
     <-ctx.Done()
     shutdownWebInterface(web)
     log.Println("Fight FX test finished")
+}
+
+// runTestPathUI serves the bot less walk plan visualization gallery:
+// the web interface answers with the animated variant grid until the
+// process is stopped. No game connection and no geodata is needed -
+// the map background of the gallery cells is the static tile pyramid
+// shipped with the web content.
+func runTestPathUI(cfg config) {
+    if cfg.webAddress == "" {
+        log.Println("Path gallery needs the web interface, " +
+            "pass a -web address")
+
+        return
+    }
+
+    web := webserver.NewTestPathServer(cfg.webAddress, log.Default())
+    go func() {
+        if err := web.ListenAndServe(); err != nil {
+            log.Println("Web interface failed: " + err.Error())
+        }
+    }()
+
+    log.Println("Walk plan gallery is ready")
+
+    ctx, stop := signal.NotifyContext(context.Background(),
+        syscall.SIGINT, syscall.SIGTERM)
+    defer stop()
+    <-ctx.Done()
+    shutdownWebInterface(web)
+    log.Println("Walk plan gallery finished")
 }
 
 // runPathfindTest serves the bot less map pathfinding test UI: the geodata

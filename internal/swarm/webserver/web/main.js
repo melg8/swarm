@@ -56,6 +56,13 @@ window.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (config && config.mode === "test-path") {
+    document.body.classList.add("mode-test-path");
+    PathTest.init();
+
+    return;
+  }
+
   initChat();
   initDumpButton();
   initSessionButton();

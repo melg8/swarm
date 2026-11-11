@@ -2906,6 +2906,174 @@ canvas.fxg-cell.picked {
   outline-offset: -2px;
 }
 
+/* ---- walk plan gallery (the -test-path-ui mode) ----
+   The comparison grid of the walk plan drawing ideas: numbered card
+   heads over a four column grid of canvases, every card animating the
+   same planned route. The body.mode-test-path class of the index page
+   hides the bot specific chrome exactly like body.mode-test-fight
+   does for the damage gallery. */
+.path-section {
+  display: none;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+body.mode-test-path .path-section { display: flex; }
+
+body.mode-test-path .tabs,
+body.mode-test-path .tab-content,
+body.mode-test-path .sidebar,
+body.mode-test-path .hud-stack,
+body.mode-test-path .bot-status,
+body.mode-test-path .chat-box,
+body.mode-test-path .chat-restore,
+body.mode-test-path #live-indicator,
+body.mode-test-path #live-label,
+body.mode-test-path #foot-packets,
+body.mode-test-path #foot-objects,
+body.mode-test-path #foot-uptime,
+body.mode-test-path #foot-updated,
+body.mode-test-path #foot-phase,
+body.mode-test-path #foot-rate,
+body.mode-test-path #foot-status,
+body.mode-test-path #foot-cursor,
+body.mode-test-path #foot-fps {
+  display: none;
+}
+
+.path-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 0 2px 10px 2px;
+}
+
+.path-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-bright);
+}
+
+.path-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.path-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.path-select {
+  font: inherit;
+  font-size: 11px;
+  color: var(--text);
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.path-picked {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-bright);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 7px;
+}
+
+.path-hint {
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.path-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-panel);
+}
+
+.path-grid {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  width: max-content;
+}
+
+.path-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.path-cardhead {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding: 6px 9px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.path-cardhead:hover { background: var(--bg-panel-2); }
+
+.path-card.picked { border-color: var(--accent); }
+.path-cardhead.picked { background: rgba(217, 119, 6, 0.12); }
+
+.pc-num {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-bright);
+  background: var(--bg-panel-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.path-cardhead.picked .pc-num {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.pc-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.pc-note {
+  font-size: 10px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+canvas.path-cell {
+  display: block;
+  background: #e8e2d2;
+}
+
 /* ---- item status tooltip (paperdoll + inventory hover) ----
    A custom DOM tooltip rendered on hover over any equipment widget
    cell. The native title attribute cannot carry the multi line,

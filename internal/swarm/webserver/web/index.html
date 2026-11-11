@@ -158,6 +158,26 @@ SPDX-License-Identifier: MIT
         </div>
       </section>
 
+      <section id="path-section" class="path-section">
+        <div class="path-bar">
+          <div class="path-title">WALK PLAN GALLERY</div>
+          <div class="path-sub">one planned walk · 5 stops + destination · 20 animated drawing ideas · the walker dwells at every stop</div>
+          <div class="path-controls">
+            <button id="path-pause" class="btn" title="freeze the walk loop">pause</button>
+            <select id="path-speed" class="path-select" title="playback speed of the walk loop">
+              <option value="0.5">0.5x</option>
+              <option value="1" selected>1x</option>
+              <option value="2">2x</option>
+            </select>
+            <span id="path-picked" class="path-picked">picked: none</span>
+            <span class="path-hint">click a variant head to mark it</span>
+          </div>
+        </div>
+        <div class="path-scroll" id="path-scroll">
+          <div class="path-grid" id="path-grid"></div>
+        </div>
+      </section>
+
       <section id="tab-map" class="tab-content active">
         <div class="map-toolbar">
           <label class="check follow-check"><input type="checkbox" id="follow" checked> follow</label>
@@ -719,6 +739,7 @@ SPDX-License-Identifier: MIT
 <script src="pathfind.js"></script>
 <script src="fight.js"></script>
 <script src="fighttest.js"></script>
+<script src="pathtest.js"></script>
 <script src="main.js"></script>
 </body>
 </html>

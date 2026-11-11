@@ -37,6 +37,9 @@ const (
     // modeTestFight is the fight FX comparison gallery mode
     // (NewTestFightServer): the static cells of the -test-fight-ui flag.
     modeTestFight = "test-fight"
+    // modeTestPath is the walk plan visualization gallery mode
+    // (NewTestPathServer): the animated cells of the -test-path-ui flag.
+    modeTestPath = "test-path"
     // modeFight is the combat animation variant showcase of the
     // -test-fight-ui-v1 run: a looping demo fight on every variant.
     modeFight = "fight"
