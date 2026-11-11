@@ -105,3 +105,17 @@ Done means:
 
 Next: check the stack, run the live `city-shopping` acceptance with
 the production trigger, then `task prepush` and push.
+
+### 2026-11-11 15:44 UTC - the live acceptance: PASS
+
+The production-trigger run of `-acceptance city-shopping` on the
+deployed stack passed the whole check list: the Gludio arrival, the
+Falchion purchase, the armor set purchase, the sale of the replaced
+village pieces, the worn kit, the walk home and the resumed farm.
+The bot then left the world gracefully (`Acceptance: PASS`). The
+scenario armed nothing: the errand started from `cityShoppingWanted`
+on the first eligible tick, and the standard restock trip plus the
+first kills followed the return.
+
+Next: `task prepush`, rebase on `origin/main`, push the round, then
+move the fragment to the archive.
