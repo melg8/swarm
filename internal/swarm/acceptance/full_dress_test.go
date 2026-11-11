@@ -62,15 +62,16 @@ func TestFullDressDefinition(t *testing.T) {
     }
     require.True(t, found, "the full-dress scenario is registered")
     // The newest round owns the head of the list the web UI serves
-    // (the kite timing probe and the archer fleet audit do now, the
-    // archer kite round follows, the plaza Herbiel round after it).
-    require.Equal(t, kiteProbeScenarioID, Definitions()[0].ID)
-    require.Equal(t, archerFleetScenarioID, Definitions()[1].ID)
-    require.Equal(t, archerKiteScenarioID, Definitions()[2].ID)
-    require.Equal(t, "plaza-herbiel", Definitions()[3].ID)
-    require.Equal(t, "delevel", Definitions()[4].ID)
-    require.Equal(t, "church-entry", Definitions()[5].ID)
-    require.Equal(t, "full-dress", Definitions()[6].ID)
+    // (the city shopping errand does now, the kite timing probe and
+    // the archer fleet audit follow, then the archer kite round).
+    require.Equal(t, cityShoppingScenarioID, Definitions()[0].ID)
+    require.Equal(t, kiteProbeScenarioID, Definitions()[1].ID)
+    require.Equal(t, archerFleetScenarioID, Definitions()[2].ID)
+    require.Equal(t, archerKiteScenarioID, Definitions()[3].ID)
+    require.Equal(t, "plaza-herbiel", Definitions()[4].ID)
+    require.Equal(t, "delevel", Definitions()[5].ID)
+    require.Equal(t, "church-entry", Definitions()[6].ID)
+    require.Equal(t, "full-dress", Definitions()[7].ID)
 }
 
 // TestFullDressResetNakedWithTheWholeBag pins the injected start
