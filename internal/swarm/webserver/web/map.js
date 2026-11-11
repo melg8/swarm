@@ -374,10 +374,11 @@ const MapView = {
       aggressive: "#e37400",
       combat: "#d93025",
       dead: "#80868b",
-      // The manual command feedback of the user: the walk plan line and
-      // the destination marker use a bright magenta so they read on
-      // both the light map imagery and the dark fill, and stay
-      // distinct from the blue self marker and the red combat path.
+      // The manual command feedback of the user: the walk plan
+      // waypoint dots and the destination marker use a bright magenta
+      // so they read on both the light map imagery and the dark fill,
+      // and stay distinct from the blue self marker and the red combat
+      // path; the plan line itself carries the pastel flow.
       userPath: "#ff44cc",
       userMark: "#ff44cc",
       // The outline and the direction tick of the markers: a middle
@@ -3169,8 +3170,8 @@ const MapView = {
 
     // The server side walk of the character gets the same dashed
     // destination line as every other moving object (the paths
-    // toggle): the manual walk plan line of drawWalkPlan adds the
-    // full planned route on top of it.
+    // toggle): the manual walk plan of drawWalkPlan adds the full
+    // planned route on top of it.
     if (document.getElementById("show-dest").checked && c.moving) {
       const d = this.worldToScreen(c.destX, c.destY);
       ctx.save();
@@ -3579,15 +3580,73 @@ const MapView = {
     this.drawUserMarker(ctx, p.x, p.y, performance.now(), fade);
   },
 
+  // walkFlowHue is the pastel hue of the plan flow at one route
+  // fraction: the clock subtracts inside the band phase, so a fixed
+  // hue appears farther toward the destination as time runs (the one
+  // direction rule of the flow lab).
+  walkFlowHue(fraction, nowMs) {
+    const phase = fraction * walkFlowBands - nowMs / walkFlowPeriodMs;
+    const u = phase - Math.floor(phase);
+
+    return walkFlowFrom + u * walkFlowSpan;
+  },
+
+  // drawWalkFlow paints the plan polyline as a dark casing under short
+  // screen space flow steps: every step takes the hue of its midpoint
+  // fraction, so the bands follow the route length and a corner never
+  // breaks the ramp.
+  drawWalkFlow(ctx, points, nowMs) {
+    let total = 0;
+    for (let i = 1; i < points.length; i++) {
+      total += Math.hypot(points[i].x - points[i - 1].x,
+        points[i].y - points[i - 1].y);
+    }
+    if (total <= 0) { return; }
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y);
+    }
+    ctx.strokeStyle = "rgba(27, 36, 48, 0.35)";
+    ctx.lineWidth = 4.5;
+    ctx.stroke();
+    ctx.lineWidth = 2.6;
+    let walked = 0;
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1];
+      const b = points[i];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      const steps = Math.max(1, Math.ceil(len / walkFlowStepPx));
+      for (let s = 0; s < steps; s++) {
+        const t0 = s / steps;
+        const t1 = (s + 1) / steps;
+        const hue = this.walkFlowHue(
+          (walked + len * (t0 + t1) / 2) / total, nowMs);
+        ctx.strokeStyle = "hsl(" + hue.toFixed(1) + ", " + walkFlowSat +
+          "%, " + walkFlowLight + "%)";
+        ctx.beginPath();
+        ctx.moveTo(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0);
+        ctx.lineTo(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1);
+        ctx.stroke();
+      }
+      walked += len;
+    }
+    ctx.restore();
+  },
+
   // drawWalkPlan renders the walk plan of a running leg: while the
   // paths toggle is on (always on by default now), the full planned
-  // line draws as a bright magenta dashed polyline from the planning
-  // origin through every waypoint (the passed ones included - the
-  // drift of the character against its plan is the debugging signal),
-  // each waypoint carries a filled dot with a white outline and a
-  // text label of its (x, y) coordinates, the waypoint the follower
-  // aims at carries a larger ring and the destination itself carries
-  // the pulsing marker.
+  // route draws as the pastel flow of the flow lab (variant 12) from
+  // the planning origin through every waypoint (the passed ones
+  // included - the drift of the character against its plan is the
+  // debugging signal), each waypoint carries a filled magenta dot with
+  // a white outline and a text label of its (x, y) coordinates, the
+  // waypoint the follower aims at carries a larger ring and the
+  // destination itself carries the pulsing marker.
   drawWalkPlan(ctx) {
     const plan = this.lastSnap.walkPath;
     if (!plan || plan.length === 0) { return; }
@@ -3598,12 +3657,6 @@ const MapView = {
     const dest = this.lastSnap.walkDest ||
       plan[plan.length - 1];
     if (document.getElementById("show-dest").checked) {
-      ctx.save();
-      ctx.strokeStyle = this.mapColors.userPath;
-      ctx.globalAlpha = 0.95;
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([7, 4]);
-      ctx.beginPath();
       let head;
       if (origin) {
         head = this.worldToScreen(origin.x, origin.y);
@@ -3613,18 +3666,18 @@ const MapView = {
         head = this.worldToScreen(
           rt ? rt.drawX : (c && c.x) || 0, rt ? rt.drawY : (c && c.y) || 0);
       }
-      ctx.moveTo(head.x, head.y);
+      const points = [head];
       for (const wp of plan) {
-        const q = this.worldToScreen(wp.x, wp.y);
-        ctx.lineTo(q.x, q.y);
+        points.push(this.worldToScreen(wp.x, wp.y));
       }
-      ctx.stroke();
+      this.drawWalkFlow(ctx, points, performance.now());
       // The waypoint dots: a filled magenta disc with a white outline
       // at every waypoint. The coordinate labels draw on hover only
       // (the constant labels littered every planned walk) - the
       // hovered waypoint prints its full x y z triple in the dump walk
       // line format, paste ready; the footer cursor chip and the
       // ctrl+c copy carry the same values.
+      ctx.save();
       ctx.setLineDash([]);
       ctx.lineWidth = 2;
       ctx.font = "11px Consolas, \"Liberation Mono\", monospace";
@@ -4708,6 +4761,22 @@ const socialWarnColor = "#e37400";
 // draws as approaching (the dashed line), so a spreading pack warns
 // before it actually links.
 const socialWarnFactor = 1.25;
+
+// The live walk plan flow (variant 12 of the flow lab, pastel flow
+// 2.8 s): the pastel palette, two hue cycles across the plan and a
+// 2.8 s band cycle. The phase subtracts the clock, so the bands travel
+// from the planning origin to the destination, never backwards.
+const walkFlowFrom = 190;
+const walkFlowSpan = 260;
+const walkFlowSat = 58;
+const walkFlowLight = 78;
+const walkFlowBands = 2;
+const walkFlowPeriodMs = 2800;
+
+// walkFlowStepPx is the screen length of one color step: short enough
+// to keep the hue ramp smooth at the close zoom, long enough to bound
+// the per frame stroke count of a long plan.
+const walkFlowStepPx = 10;
 
 // swing a second, so the effects of a running fight never overlap
 // into one smear).
