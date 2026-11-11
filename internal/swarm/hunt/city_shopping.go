@@ -85,7 +85,7 @@ const (
     cityShopPendingWait = 5 * time.Second
     // cityShopBudget bounds one whole errand: the walk to the
     // gatekeeper, both rides, the two merchant stops, the dress and
-    // the walk back complete in about three minutes on the deployed
+    // the walk back complete in under five minutes on the deployed
     // stack, so eight cover a slow tick and a re-plan while a hung
     // errand still ends in minutes, not in the quarter hour the
     // scenario would otherwise wait.

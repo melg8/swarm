@@ -124,7 +124,26 @@ tests, `task fmt`, `task fmt:check`, `task lint:new` (0 issues),
 
 Next: commit, then rerun `-acceptance city-shopping` live.
 
+### 2026-11-11 15:05 UTC - the live rerun: the errand passed
+
+The rerun (14:46-14:54 UTC, account temp25) proved the pacing fix: the
+outbound hop logged `via "npc_268439795_teleport NORMAL 0"` (self/npc
+2d 199, 3d 200) and landed at 14:48:14; Sydnia sold the Falchion and
+Simplon the six armor pieces by 14:48:43; the dress completed at
+14:48:45; the homebound hop logged `via "npc_268441673_teleport NORMAL
+5"` and landed at 14:49:18; the walk back reached the start ground and
+the errand finished at 14:50:53. Every errand stage is now live green.
+
+The resumed farm check then failed at 14:54:36 with `the hunt did not
+resume within 4m0s of the return`: the ordinary hunt opened the
+standard restock trip right after the errand (the pull Bow, arrows,
+the Scroll of Escape, the Newbie Guide buffs) and was still walking
+back to the ground when the window lapsed. The restock is real bot
+behavior, not a failure of the errand, so the farm window grows to
+cover it: `cityShoppingFarmWindow` 4 -> 10 minutes, scenario budget
+15 -> 20 minutes.
+
 ## Status
 
-In progress: the pacing fix, the diagnostics and the fail fast are
-green offline; the live rerun is pending.
+In progress: the errand is live green through the return; the live
+farm check with the widened window is pending.

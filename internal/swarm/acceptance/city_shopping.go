@@ -36,11 +36,12 @@ const (
 
 // cityShoppingTimeout bounds the whole run: the errand stages (the
 // walk to Mirabel, the outbound ride, both merchant stops, the dress,
-// the ride home and the walk back) complete in about three minutes on
-// the deployed stack, and the resumed farm adds one kill. The watch
-// fails fast on a stopped errand or a silent return ground, so the
-// budget only catches a session that never reaches either gate.
-const cityShoppingTimeout = 15 * time.Minute
+// the ride home and the walk back) complete in under five minutes on
+// the deployed stack, the standard restock trip that follows spends
+// about five, and the resumed farm adds one kill. The watch fails
+// fast on a stopped errand or a silent return ground, so the budget
+// only catches a session that never reaches either gate.
+const cityShoppingTimeout = 20 * time.Minute
 
 // cityShoppingErrandWall bounds the errand runtime the watch accepts:
 // the hunt driver budget (8 minutes) fires between the errand stages,
@@ -49,10 +50,12 @@ const cityShoppingTimeout = 15 * time.Minute
 const cityShoppingErrandWall = 12 * time.Minute
 
 // cityShoppingFarmWindow bounds the resumed farm wait after the
-// return: the Kaboo ground of the start holds enough mobs to land the
-// first kill inside a minute, so a silent ground is a failure of the
-// return, not a slow spawn.
-const cityShoppingFarmWindow = 4 * time.Minute
+// return: the ordinary hunt opens the standard restock trip right
+// after the errand (the pull bow, arrows, the escape scroll and the
+// Newbie Guide buffs - a walk across the town and back), so the
+// window covers that trip plus the first kill on the Kaboo ground. A
+// bot that never comes back to the ground stays silent past it.
+const cityShoppingFarmWindow = 10 * time.Minute
 
 // The start state of the errand: the level 15 vitals on the Kaboo
 // Orc Grunt SW-5 cell (elven-hex-104), where the cell median of 9
