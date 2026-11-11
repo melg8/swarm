@@ -372,7 +372,7 @@ process (accounts `test2`..`testN` are auto-created):
 task run:app              # or: go run ./cmd/swarm -web 127.0.0.1:8080
 ```
 
-The botless modes (`-pathfind-test`, `-test-fight-ui`,
+The botless modes (`-pathfind-test`, `-test-fight-ui`, `-test-path-ui`,
 `-test-fight-ui-v1`, `-show-navmesh[=21_19]`) are described in
 docs/webui.md, docs/pathfinding.md and docs/navmesh.md.
 

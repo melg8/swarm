@@ -10,9 +10,9 @@ keep it that way (embedded via go:embed). Watch out: top level `const`
 declarations are not `window` properties, so cross script references
 must use the bare binding name.
 
-## The four launch modes
+## The five launch modes
 
-The UI boots in one of four modes chosen by `GET /api/config`:
+The UI boots in one of five modes chosen by `GET /api/config`:
 
 1. **Bot control** (the default; `-web 127.0.0.1:8080`, `-web ""`
    disables it): the mode described in this document.
@@ -44,10 +44,27 @@ The UI boots in one of four modes chosen by `GET /api/config`:
    loop (hit, take, crit, take crit, regen), the background is the real
    map tile of the hunting grounds and the strip scrolls horizontally.
    Both pages stay side by side until one idea set wins.
+5. **Walk plan gallery** (`-test-path-ui`, mode `test-path`,
+   `body.mode-test-path`): the design decision aid for the walk plan
+   drawing - twenty numbered animated ideas in a four column card
+   grid (`web/pathtest.js`). Every card walks the same route (the
+   planning origin, five stops and the destination) with the same
+   walker and clock: the walker dwells at every stop, holds at the
+   destination and the loop restarts. The variants separate the three
+   axes complaint of the live plan (static line, fat stop dots, no
+   direction): the line (dash flow, comet tail, chevron conveyor,
+   beads, casing, road median, railway, energy beam...), the stop
+   marker (specks, ticks, diamonds, numbers, rings) and the
+   destination marker (ring, pin, diamond, bullseye). Clicking a
+   variant head marks it and the toolbar lists the picked numbers, so
+   a combination is easy to name. The pause button and the speed
+   select drive the loop, only the cards in the viewport repaint. The
+   harness is `tools/repro_path_gallery.js`.
 
 The fight modes hide the whole toolbar; the pathfind mode keeps only
 the map background row of the view menu and hides the bot status
-banner.
+banner; the path gallery hides the bot chrome like the fight modes
+do.
 
 ## Layout philosophy
 
@@ -1420,6 +1437,10 @@ plumbing closes that gap:
   distribution, the timeline strip), the window switch and the
   polling stop.
 - `tools/repro_fight_ui.js` for the fight FX gallery harness.
+- `tools/repro_path_gallery.js` for the walk plan gallery harness
+  (the 20 numbered animated variants, the shared walk timeline with
+  the stop dwells, the map tile background, the shared walker, the
+  scroll window and the pick controls).
 - `tools/repro_bot_switch.js` for the observed bot switch: the map
   resets the previous bot's world (snapshot, runtime objects, social
   masks, combat effects) ahead of the new stream, keeps the fleet
