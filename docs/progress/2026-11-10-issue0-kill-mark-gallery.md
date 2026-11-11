@@ -88,12 +88,14 @@ that replaces the current corpse face of `drawKillMarks` in
 ### 2026-11-11 - the mark takes the mob size and follows the zoom
 
 - Owner feedback: the skulls were too small and ignored the map zoom.
-- `map.js`: `killMarkRadius()` sizes a mark as the mob marker of the
+- `map.js`: `killMarkRadius()` sizes a mark from the mob marker of the
   kill - the skull bone spans `radiusOf` of an in combat npc (radius
-  6) times the shared `unitScale` - so the marks grow and shrink with
-  the camera exactly like the mobs. `unitScaleMin`/`unitScaleMax`
-  became named constants (computeUnitScale clamps with them), and
-  `killMarkMaxRadius` derives the sprite resolution from the cap.
+  6) times `killMarkSizeFactor` (2, the thin bone art reads lighter
+  than the solid circle) times the shared `unitScale` - so the marks
+  grow and shrink with the camera exactly like the mobs.
+  `unitScaleMin`/`unitScaleMax` became named constants
+  (computeUnitScale clamps with them), and `killMarkMaxRadius` derives
+  the sprite resolution from the cap.
 - `killMarkSprite` renders at the largest blit of the zoom range, so
   the zoom never rebuilds the raster (a pixel epsilon keeps the exact
   integer size from rounding up). `killMarkAt` picks within the
