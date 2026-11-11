@@ -184,14 +184,20 @@ the fix both phases stay at the ambient world rate.
 
 The C1 client also reports its local view of the played character
 periodically (`ValidatePosition`, 0x48) and the Mobius handler trusts
-it with no distance bound: a report more than one move speed (~150
-units) from the server side position hits the "Check out of sync"
-branch of `ValidatePosition.runImpl` and the server **snaps the
-character to the reported place**. A client that rides the proxy as a
+it: a report more than one move speed (125 units for the level 15 elf,
+`getStat().getMoveSpeed()` of `ValidatePosition.runImpl`) from the
+server side position hits the "Check out of sync" branch and the
+server **snaps the character to the reported place**. The observation
+branch above it only answers a correction to a report 500 or more
+units away (or one with a >200 z gap), so a stale view in the band
+between the two is snapped with no correction at all - and a view
+stuck on client side geometry keeps reporting the same place even when
+the 500+ unit correction arrives. A client that rides the proxy as a
 spectator of a bot-driven character holds a local view the bot's own
 actions leave behind - the death spot held across the bot's village
 restart (the client pawn freezes at the guard post), the frozen view
-of a teleport screen, the stale spot of a long walk - and every
+of a teleport screen, the stale spot of a long walk, the railing of
+the village stairs while the bot walks to the gatekeeper - and every
 periodic report then dragged the server side character back to that
 stale place.
 
@@ -210,22 +216,37 @@ timeouts marked both guards as tried, the delevel aborted, and the
 return walk stalled in the same ping pong - the reported "bot stands
 and does nothing for a long time".
 
+The same loop broke the city shopping errand with a real client
+attached: the client pawn froze on the Elven Village stair railing, the
+bot stood at the gatekeeper ~500 units away (inside the old 2000 unit
+window), the transiting report snapped the character back to the
+railing, the already open teleport menu stayed up, and the teleport
+bypass failed the 250 unit `Npc.INTERACTION_DISTANCE` gate silently -
+the errand timed out the arrival wait and fell through to the ordinary
+shop trip.
+
 The fix severs that loop with the same seam the keepalive uses: a
-client position report is compared against the live tracker position
-of the attached bot session, and a report that contradicts it beyond
-one walk segment plus slack (2000 units - a live client that follows the
-own character through the broadcasts stays within one segment even mid
-movement) never transits. Instead the proxy answers the client
-locally with the same `ValidateLocation` (0x76) correction the server
-itself sends for an out of sync report, carrying the live place of the
-played character - the client view heals, the next reports come back
-in range and transit again, and the diverged report never reaches the
-out of sync branch. In-sync reports transit unchanged (the manual
-control of the client keeps the full server contract). Covered by
+client position report is compared against the **projected live place**
+of the attached bot session - the last broadcast place advanced along
+the walk segment at the live run speed, mirroring the server's
+`Creature.updatePosition` loop (`state.Bot.SelfProjectedPosition`, 3D
+like the server check) - and a report farther than one move speed plus
+a tick of slack never transits. The last broadcast place alone cannot
+be the reference: while the character moves it sits a whole walk
+segment behind, so the old 2000 unit window let a railing view
+transit. Instead the proxy answers the client locally with the same
+`ValidateLocation` (0x76) correction the server itself sends for an
+out of sync report, carrying the projected place of the played
+character - the client view heals, the next reports come back in range
+and transit again, and the diverged report never reaches the out of
+sync branch. In-sync reports transit unchanged (the manual control of
+the client keeps the full server contract). Covered by
 internal/swarm/proxy/validateposition_test.go (the stale report
-corrected locally and never transiting, the healed report transiting
-again, the moved tracker moving the acceptance window, the live
-report transiting unchanged).
+corrected locally and never transiting, the railing view corrected
+locally, the healed report transiting again, the moved tracker moving
+the acceptance window, the live report transiting unchanged) and
+internal/swarm/state/self_projected_position_test.go (the projection
+math: the segment interpolation, the arrival clamp, the empty state).
 
 ## The live self state (reconnection correctness)
 

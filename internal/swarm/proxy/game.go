@@ -134,16 +134,15 @@ const (
     serverOpValidateLocation = 0x76
 )
 
-// validateDivergenceLimit is the 2D distance beyond which a client
-// position report contradicts the world the attached bot session
-// observes. A live client follows the own character through the
-// server broadcasts, so its reports stay within one walk segment of the
-// bot's tracker position even mid movement; a stale spectator view
-// (a death spot held across the bot's village restart, a frozen pawn
-// after a teleport screen) reports thousands of units away, and the
-// Mobius out of sync branch would accept it as the truth and snap
-// the server side character there - fighting every bot walk request.
-const validateDivergenceLimit = 2000.0
+// validateDivergenceSlack widens the server out of sync rule for the
+// projection error: the continuous self projection runs ahead of the
+// server's 100 ms movement tick by up to one tick of travel, and the
+// client report describes a view one network hop old. The rule itself
+// is the live move speed: a report farther than that from the server
+// side place snaps the character, and the server corrects the client
+// only above 500 units (or a >200 z gap), so the band under 500 is the
+// silent snap window this check closes.
+const validateDivergenceSlack = 25.0
 
 // validateLogPeriod bounds the divergence logging: a client whose
 // view stays stale reports once per second, one log line per report
@@ -710,22 +709,20 @@ func (gc *gameConn) answerNetPingLocally() {
 }
 
 // clientViewDiverged reports whether one client position report
-// contradicts the world the attached bot session observes. The Mobius
-// ValidatePosition handler trusts the client beyond one move speed of
-// the server side position: an out of sync report snaps the character
-// to the reported place with no distance bound. A client that rides
-// the bot session as a spectator holds a local view the bot's own
-// actions (a death restart to the village, a walk segment, a hunt teleport)
-// can leave thousands of units behind - the death spot held across
-// the restart, the frozen pawn of a teleport screen - and its periodic
-// reports would drag the character away from every bot decision. The
-// check compares the report against the bot tracker position: within
-// one walk segment plus slack the client is live (its view follows the
-// broadcasts of its own movement), beyond that the report is stale.
-// An unreadable or empty report and a session without a known
-// position transit untouched: the server stays the authority there.
+// contradicts the place the server holds the played character at. The
+// Mobius ValidatePosition handler snaps the character to the reported
+// place whenever the 3D distance exceeds one move speed, and it only
+// answers a correction to a report 500 or more units away - so a stale
+// spectator view in the band between the two drags the character back
+// with no correction at all, and a view stuck on client side geometry
+// keeps reporting the same stale place even when the correction
+// arrives (the railing case: the frozen pawn of the stair railing held
+// the character off the gatekeeper and the teleport bypass failed the
+// interaction range silently). The compared place is the projected
+// live position, not the last broadcast origin, because the origin
+// sits a whole walk segment behind a moving character.
 func (gc *gameConn) clientViewDiverged(payload []byte) bool {
-    if len(payload) < 9 {
+    if len(payload) < 13 {
         return false
     }
     reportX := int32(binary.LittleEndian.Uint32(payload[1:5]))
@@ -738,13 +735,17 @@ func (gc *gameConn) clientViewDiverged(payload []byte) bool {
     if session == nil {
         return false
     }
-    selfX, selfY, _, ok := session.tracker.SelfPosition()
+    selfX, selfY, selfZ, ok := session.tracker.SelfProjectedPosition()
     if !ok {
         return false
     }
-    dist := math.Hypot(float64(reportX-selfX), float64(reportY-selfY))
+    reportZ := int32(binary.LittleEndian.Uint32(payload[9:13]))
+    dx := float64(reportX) - selfX
+    dy := float64(reportY) - selfY
+    dz := float64(reportZ) - selfZ
+    limit := session.tracker.SelfRunSpeed() + validateDivergenceSlack
 
-    return dist > validateDivergenceLimit
+    return math.Sqrt(dx*dx+dy*dy+dz*dz) > limit
 }
 
 // correctClientView answers one diverged position report exactly the
@@ -762,27 +763,35 @@ func (gc *gameConn) correctClientView(payload []byte) {
     if session == nil {
         return
     }
-    self := session.tracker.SelfSnapshot()
-    if self.ObjectID == 0 {
+    objectID := session.tracker.SelfObjectID()
+    if objectID == 0 {
+        return
+    }
+    selfX, selfY, selfZ, ok := session.tracker.SelfProjectedPosition()
+    if !ok {
         return
     }
     reportX := int32(binary.LittleEndian.Uint32(payload[1:5]))
     reportY := int32(binary.LittleEndian.Uint32(payload[5:9]))
+    x := int32(selfX)
+    y := int32(selfY)
+    z := int32(selfZ)
     if gc.viewLogAt.IsZero() || time.Since(gc.viewLogAt) > validateLogPeriod {
         gc.viewLogAt = time.Now()
         gc.server.logger.Printf(
             "game#%d: client position report %d %d is stale "+
                 "against the bot at "+
                 "%d %d, correcting the client view",
-            gc.id, reportX, reportY, self.X, self.Y)
+            gc.id, reportX, reportY, x, y)
     }
     answer := make([]byte, 21)
     answer[0] = serverOpValidateLocation
-    binary.LittleEndian.PutUint32(answer[1:5], uint32(self.ObjectID))
-    binary.LittleEndian.PutUint32(answer[5:9], uint32(self.X))
-    binary.LittleEndian.PutUint32(answer[9:13], uint32(self.Y))
-    binary.LittleEndian.PutUint32(answer[13:17], uint32(self.Z))
-    binary.LittleEndian.PutUint32(answer[17:21], uint32(self.Heading))
+    binary.LittleEndian.PutUint32(answer[1:5], uint32(objectID))
+    binary.LittleEndian.PutUint32(answer[5:9], uint32(x))
+    binary.LittleEndian.PutUint32(answer[9:13], uint32(y))
+    binary.LittleEndian.PutUint32(answer[13:17], uint32(z))
+    binary.LittleEndian.PutUint32(answer[17:21],
+        uint32(session.tracker.SelfHeading()))
     _ = gc.sendToClient(answer)
 }
 
