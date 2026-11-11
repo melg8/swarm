@@ -238,6 +238,11 @@ const MapView = {
   // through it.
   viewDpr: 1,
 
+  // unitScale is the zoom factor of the world markers (framed by
+  // computeUnitScale): the unit markers and the kill marks share it,
+  // so a mark reads as big as the mob it replaced at every zoom.
+  unitScale: 1,
+
   // The live combat animation layer: the server observed swings and
   // damage landings replayed as short canvas effects (see
   // spawnCombatAnim). lastCombatSeq dedupes the events across the
@@ -1637,7 +1642,7 @@ const MapView = {
   computeUnitScale() {
     const factor = Math.pow(this.scale / 0.12, 0.6);
 
-    return Math.max(0.3, Math.min(1.6, factor));
+    return Math.max(unitScaleMin, Math.min(unitScaleMax, factor));
   },
 
   // drawHuntingZone paints the hunting grounds of the deployment
@@ -2470,11 +2475,13 @@ const MapView = {
   drawKillMarks(ctx, rect) {
     if (!this.layerChecked("show-kills")) { return; }
     if (!this.killMarks || this.killMarks.length === 0) { return; }
+    const radius = this.killMarkRadius();
+    const margin = radius + 2;
     const points = [];
     for (const mark of this.killMarks) {
       const p = this.worldToScreen(mark.x, mark.y);
-      if (p.x < -14 || p.y < -14
-        || p.x > rect.width + 14 || p.y > rect.height + 14) {
+      if (p.x < -margin || p.y < -margin
+        || p.x > rect.width + margin || p.y > rect.height + margin) {
         continue;
       }
       points.push(p);
@@ -2482,27 +2489,35 @@ const MapView = {
     if (points.length === 0) { return; }
     ctx.save();
     // The constant read of the statistics layer: the same strength and
-    // the same size no matter the age, so an hour old kill reads
+    // the same zoom size no matter the age, so an hour old kill reads
     // exactly like a fresh one.
     ctx.globalAlpha = killMarkAlpha;
     const sprite = this.killMarkSprite();
     if (sprite) {
-      const side = killMarkSize * 2;
+      const side = radius * 2;
       for (const p of points) {
-        ctx.drawImage(sprite, p.x - killMarkSize, p.y - killMarkSize,
-          side, side);
+        ctx.drawImage(sprite, p.x - radius, p.y - radius, side, side);
       }
     } else {
-      this.drawKillMarkFlat(ctx, points);
+      this.drawKillMarkFlat(ctx, points, radius);
     }
     ctx.restore();
   },
 
-  // killMarkSprite renders the skull art once per device pixel ratio:
-  // the sprite carries the mark at the device resolution so the blit
-  // stays crisp on a high density display, and a ratio change rebuilds
-  // it. A document without a canvas returns null and the flat corpse
-  // face paints instead.
+  // killMarkRadius is the on screen mark radius: the skull's bone
+  // spans the in combat mob marker scaled by the same unit scale the
+  // unit markers use, so a kill reads as big as the mob it replaced at
+  // every zoom.
+  killMarkRadius() {
+    return killMarkMobRadius * (this.unitScale || 1)
+      / killMarkBoneHalfWidth;
+  },
+
+  // killMarkSprite renders the skull art once per device pixel ratio
+  // at the largest blit of the zoom range: the art is detailed bone
+  // and ink, so one crisp raster downscales well through the whole
+  // range and the zoom never rebuilds it. A document without a canvas
+  // returns null and the flat corpse face paints instead.
   killMarkSprite() {
     const dpr = this.viewDpr || 1;
     if (this.killSprite && this.killSpriteDpr === dpr) {
@@ -2511,7 +2526,9 @@ const MapView = {
     if (typeof document === "undefined" || !document.createElement) {
       return null;
     }
-    const size = Math.ceil(killMarkSize * 2 * dpr);
+    // The epsilon keeps an exact integer size from rounding up on the
+    // float error of the radius division.
+    const size = Math.ceil(killMarkMaxRadius * 2 * dpr - 1e-6);
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
@@ -2533,23 +2550,22 @@ const MapView = {
   // canvas: the flat corpse face in one body pass and one eye pass
   // (every mark is the same two shapes, so no state round trip per
   // mark).
-  drawKillMarkFlat(ctx, points) {
+  drawKillMarkFlat(ctx, points, radius) {
     ctx.fillStyle = killMarkBodyColor;
     ctx.beginPath();
     for (const p of points) {
-      ctx.moveTo(p.x + killMarkSize, p.y);
-      ctx.arc(p.x, p.y, killMarkSize, 0, 2 * Math.PI);
+      ctx.moveTo(p.x + radius, p.y);
+      ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
     }
     ctx.fill();
     ctx.strokeStyle = killMarkFaceColor;
-    ctx.lineWidth = Math.max(0.8, 0.08 * killMarkSize);
+    ctx.lineWidth = Math.max(0.8, 0.08 * radius);
     ctx.lineCap = "round";
     ctx.beginPath();
     for (const p of points) {
-      const eye = Math.max(0.7, killMarkSize * 0.16);
-      const eyY = p.y - killMarkSize * 0.12;
-      for (const eyeX of [p.x - killMarkSize * 0.32,
-        p.x + killMarkSize * 0.32]) {
+      const eye = Math.max(0.7, radius * 0.16);
+      const eyY = p.y - radius * 0.12;
+      for (const eyeX of [p.x - radius * 0.32, p.x + radius * 0.32]) {
         ctx.moveTo(eyeX - eye, eyY - eye);
         ctx.lineTo(eyeX + eye, eyY + eye);
         ctx.moveTo(eyeX + eye, eyY - eye);
@@ -3778,7 +3794,7 @@ const MapView = {
     if (!this.layerChecked("show-kills")) { return null; }
     if (!this.killMarks || this.killMarks.length === 0) { return null; }
     let best = null;
-    let bestDist = killMarkPickRadius;
+    let bestDist = Math.max(killMarkPickRadius, this.killMarkRadius());
     for (const mark of this.killMarks) {
       const p = this.worldToScreen(mark.x, mark.y);
       const dist = Math.hypot(p.x - mx, p.y - my);
@@ -4524,10 +4540,26 @@ const bgDevicePixels = 4096 * 2560;
 const huntDevicePixels = 4096 * 1440;
 
 
-// killMarkSize is the radius of the fleet kill marks in CSS pixels:
-// 10 keeps a camp of a dozen marks readable at the map default zoom
-// without burying the ground under them.
-const killMarkSize = 10;
+// unitScaleMin and unitScaleMax bound the marker zoom factor of
+// computeUnitScale: the unit markers and the kill marks share it.
+const unitScaleMin = 0.3;
+const unitScaleMax = 1.6;
+
+// killMarkMobRadius is the map radius of the mob marker a kill leaves
+// behind: a mob in combat (radiusOf at unitScale 1) is the state the
+// bot sees right before the kill, so the skull reads as big as the
+// mob it replaced.
+const killMarkMobRadius = 6;
+
+// killMarkBoneHalfWidth is the half width of the skull cranium in the
+// unit box of paintKillMark: the blit scales the art so the bone spans
+// the mob diameter.
+const killMarkBoneHalfWidth = 0.6;
+
+// killMarkMaxRadius is the largest on screen mark radius the zoom
+// range asks for (the unitScaleMax cap), the resolution of the sprite.
+const killMarkMaxRadius = killMarkMobRadius * unitScaleMax
+  / killMarkBoneHalfWidth;
 
 // killMarkAlpha is the constant strength of the death statistics
 // layer: a mark reads the same whatever its age.
@@ -4591,7 +4623,7 @@ function killMarkSkullPath(ctx) {
 // paintKillMark paints the plain skull (variant V01 of the mark
 // gallery, docs/design/killmarks.html) in the unit box: one unit is
 // the mark radius and the origin is the mark centre, so the sprite
-// scales with killMarkSize.
+// scales with killMarkRadius.
 function paintKillMark(ctx) {
   // The ground shadow holds the mark down on the map imagery.
   ctx.fillStyle = "rgba(24, 29, 35, 0.3)";

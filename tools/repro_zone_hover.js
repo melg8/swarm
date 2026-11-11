@@ -759,8 +759,8 @@ function runScenarioKillMarks(mapFile) {
     const spriteArt = spriteCanvas ? spriteCanvas.__record : null;
     const freshBlit = blitsAt(fresh);
     check(results, "fresh kill blits its skull sprite",
-        freshBlit.length === 1 && freshBlit[0].w === 20
-        && freshBlit[0].h === 20 && freshBlit[0].image === spriteCanvas,
+        freshBlit.length === 1 && freshBlit[0].h === freshBlit[0].w
+        && freshBlit[0].image === spriteCanvas,
         "blits at the mark " + JSON.stringify(freshBlit.map(
             (b) => [b.w, b.h])));
     check(results, "the sprite carries the skull art",
@@ -772,9 +772,9 @@ function runScenarioKillMarks(mapFile) {
         && spriteArt.strokes.length >= 2,
         "sprite fills " + (spriteArt ? spriteArt.fills.length : "-")
             + ", strokes " + (spriteArt ? spriteArt.strokes.length : "-"));
-    check(results, "the sprite renders at the mark device size",
-        !!spriteCanvas && spriteCanvas.width === 20
-        && spriteCanvas.height === 20,
+    check(results, "the sprite renders at the largest mark size",
+        !!spriteCanvas && spriteCanvas.width === 32
+        && spriteCanvas.height === 32,
         "sprite is " + (spriteCanvas
             ? spriteCanvas.width + "x" + spriteCanvas.height : "-"));
 
@@ -814,6 +814,50 @@ function runScenarioKillMarks(mapFile) {
         && record.images.length === 3,
         "art fills " + (spriteArt ? spriteArt.fills.length : "-")
             + ", blits " + record.images.length);
+
+    // The mark must be the size of the mob it replaced: a mob in
+    // combat draws radiusOf('combat') * unitScale (the red circle),
+    // and the skull bone spans that radius at every zoom.
+    const combatSnap = buildSnapshot();
+    combatSnap.objects = combatSnap.objects.map(
+        (obj) => Object.assign({}, obj, { inCombat: true }));
+    MapView.update(combatSnap);
+    const mobAt = (point) => record.fills.find((fill) =>
+        fill.style === "#d93025" && fill.arcs.length === 1
+        && Math.hypot(fill.arcs[0][0] - point.x,
+            fill.arcs[0][1] - point.y) < 0.5);
+    record.images.length = 0;
+    record.fills.length = 0;
+    MapView.draw();
+    const orcAt = MapView.worldToScreen(WORLD.orcA.x, WORLD.orcA.y);
+    const mobFill = mobAt(orcAt);
+    const mobRadius = mobFill ? mobFill.arcs[0][2] : 0;
+    const boneHalf = freshBlit.length === 1 ? freshBlit[0].w / 2 * 0.6 : 0;
+    check(results, "the mark is the size of the mob it replaced",
+        mobRadius > 0 && Math.abs(boneHalf - mobRadius) < 0.05,
+        "skull bone half " + boneHalf.toFixed(2)
+            + " vs mob radius " + mobRadius.toFixed(2));
+
+    // The marks follow the zoom exactly like the unit markers: at the
+    // zoom cap the skull bone still spans the radius of a live mob.
+    MapView.scale = 0.48;
+    record.images.length = 0;
+    record.fills.length = 0;
+    MapView.draw();
+    const zoomMark = MapView.worldToScreen(45100, 50100);
+    const zoomBlit = blitsAt(zoomMark);
+    const zoomOrc = MapView.worldToScreen(WORLD.orcA.x, WORLD.orcA.y);
+    const zoomMob = mobAt(zoomOrc);
+    const zoomScale = MapView.computeUnitScale();
+    check(results, "the mark grows with the zoom like the mobs",
+        zoomScale > 1 && zoomBlit.length === 1 && !!zoomMob
+        && Math.abs(zoomBlit[0].w / 2 * 0.6 - zoomMob.arcs[0][2]) < 0.05,
+        "mark bone half " + (zoomBlit.length > 0
+            ? (zoomBlit[0].w / 2 * 0.6).toFixed(2) : "-")
+            + " vs mob radius " + (zoomMob
+                ? zoomMob.arcs[0][2].toFixed(2) : "-")
+            + " at unit scale " + zoomScale.toFixed(2));
+    MapView.scale = 0.12;
 
     // The hover pick resolves the fresh mark with its victim data
     // (the empty map ground 60px away resolves nothing).

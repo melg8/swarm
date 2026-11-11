@@ -225,7 +225,11 @@ colors from the same variables).
   `docs/design/killmarks.html`, pre-rendered once into a sprite and
   blitted per mark - and STAYS on the map: the marks are the
   persistent death statistics of the fleet, so nothing fades and
-  nothing expires by time. The ring is count
+  nothing expires by time. A mark is the size of the mob it replaced
+  (`killMarkRadius`): the skull's bone spans the in combat mob marker
+  radius (`radiusOf`) at the same zoom factor the unit markers ride,
+  so the marks grow and shrink with the camera exactly like the mobs.
+  The ring is count
   capped (400 kills per bot, 2000 merged on the wire) and drops its
   oldest marks only when the hunt outgrows the cap; hovering a mark
   shows the victim tooltip (the name with the level and the kill
@@ -424,11 +428,13 @@ dozen 512px tiles per paint and is visually indistinguishable on
   call, the heat fills bucketed by alpha) instead of a save/restore,
   two dash arrays and a label concatenation per zone.
 - **The kill marks blit a sprite**: the persistent fleet ring paints
-  the skull art once per device pixel ratio (`killMarkSprite`), so a
-  frame pays one `drawImage` per visible mark instead of a dozen path
-  operations, and the sprite resolution follows the display density.
-  A document without a 2d canvas keeps the flat corpse face
-  (`drawKillMarkFlat`). The aggro circles skip sub
+  the skull art once per device pixel ratio (`killMarkSprite`) at the
+  largest blit the zoom range asks for, so a frame pays one
+  `drawImage` per visible mark instead of a dozen path operations, the
+  zoom only chooses the blit box of the cached raster, and the sprite
+  resolution follows the display density. A document without a 2d
+  canvas keeps the flat corpse face (`drawKillMarkFlat`). The aggro
+  circles skip sub
   pixel radii at the far zoom - a
   circle that reads as a dot is unreadable clutter anyway, and the
   packed field of the zoomed out view no longer strokes hundreds of

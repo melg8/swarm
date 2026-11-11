@@ -85,8 +85,27 @@ that replaces the current corpse face of `drawKillMarks` in
 - `docs/webui.md`: the corpse marker paragraph, the fleet kill marks
   bullet and the cache/paint-cost note read the skull sprite now.
 
+### 2026-11-11 - the mark takes the mob size and follows the zoom
+
+- Owner feedback: the skulls were too small and ignored the map zoom.
+- `map.js`: `killMarkRadius()` sizes a mark as the mob marker of the
+  kill - the skull bone spans `radiusOf` of an in combat npc (radius
+  6) times the shared `unitScale` - so the marks grow and shrink with
+  the camera exactly like the mobs. `unitScaleMin`/`unitScaleMax`
+  became named constants (computeUnitScale clamps with them), and
+  `killMarkMaxRadius` derives the sprite resolution from the cap.
+- `killMarkSprite` renders at the largest blit of the zoom range, so
+  the zoom never rebuilds the raster (a pixel epsilon keeps the exact
+  integer size from rounding up). `killMarkAt` picks within the
+  larger of the fixed 13 px and the drawn radius.
+- `tools/repro_zone_hover.js`: the scenario measures the live in
+  combat mob circle of the same frame and asserts the skull bone
+  equals its radius, at the default zoom and at the zoom cap.
+- `docs/webui.md`: the size rule and the sprite resolution note.
+
 ## Status
 
 V01 ships in the map and awaits the owner's live verdict (keep it or
 switch to another variant of the gallery). The harnesses pass, the
-port is pixel identical to the gallery art.
+port is pixel identical to the gallery art, the mark is the mob size
+and follows the zoom.
