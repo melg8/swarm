@@ -2175,8 +2175,9 @@ function runScenarioWalkCursor(mapFile) {
 // draws as the pastel flow of the flow lab variant 12 the owner
 // picked for the live map - the dark casing under short hue steps,
 // the bands travelling from the planning origin toward the
-// destination, the magenta waypoint dots and the pulsing destination
-// marker kept intact.
+// destination, the waypoint dots in the deeper hue of their own route
+// fraction (no white outline), the breathing halo of the aimed
+// waypoint and the pulsing destination marker.
 function runScenarioWalkFlow(mapFile) {
     const { MapView, record, elements, advanceClock } = loadMapJs(mapFile);
     MapView.init();
@@ -2188,6 +2189,7 @@ function runScenarioWalkFlow(mapFile) {
         { x: WORLD.self.x, y: WORLD.self.y + 1200, z: -3520 }
     ];
     snap.walkDest = snap.walkPath[1];
+    snap.walkIndex = 0;
     MapView.update(snap);
     record.strokes.length = 0;
     record.fills.length = 0;
@@ -2239,17 +2241,65 @@ function runScenarioWalkFlow(mapFile) {
         oldLine.length + " old strokes, dashes "
         + JSON.stringify(record.dashes));
 
-    // The waypoint dots and the destination marker keep the magenta:
-    // a filled 3.5 px disc per waypoint and the marker on the goal.
-    const dots = record.fills.filter((fill) =>
-        fill.style === "#ff44cc" && fill.arcs.length === 1
+    // The waypoint dots: the flow hue of the own route fraction, a
+    // step deeper than the ribbon (72% saturation, 66% lightness), no
+    // white outline any more.
+    const dotFills = (fills) => fills.filter((fill) =>
+        /^hsl\(\d+(\.\d+)?, 72%, 66%\)$/.test(fill.style)
+            && fill.arcs.length === 1
             && Math.abs(fill.arcs[0][2] - 3.5) < 0.001);
-    const dotAt = (p) => dots.filter((fill) =>
+    const dotAt = (fills, p) => fills.filter((fill) =>
         Math.hypot(fill.arcs[0][0] - p.x, fill.arcs[0][1] - p.y) < 1);
-    check(results, "the waypoint dots stay magenta",
-        dotAt(wp0).length === 1 && dotAt(wp1).length >= 1,
-        dots.length + " dots at " + JSON.stringify(dots.map((fill) =>
-            fill.arcs[0].slice(0, 2))));
+    const frac0 = Math.hypot(wp0.x - head.x, wp0.y - head.y) / total;
+    const nearHue = (hue, expected) => Math.abs(hue - expected) < 0.11;
+    const dots = dotFills(record.fills);
+    check(results, "the waypoints carry the palette hue of their fraction",
+        dotAt(dots, wp0).length === 1 && dotAt(dots, wp1).length === 1
+            && nearHue(hueOf(dotAt(dots, wp0)[0]),
+                MapView.walkFlowHue(frac0, 0))
+            && nearHue(hueOf(dotAt(dots, wp1)[0]),
+                MapView.walkFlowHue(1, 0)),
+        JSON.stringify(dots.map((fill) => fill.style)));
+
+    // The white outline of the dots is retired: no white stroke arc on
+    // either waypoint (the destination marker keeps its own, lighter
+    // white ring at 0.9 alpha).
+    const whiteOutline = record.strokes.filter((stroke) =>
+        stroke.style === "rgba(255, 255, 255, 0.95)"
+            && stroke.arcs.some((arc) =>
+                Math.abs(arc[2] - 3.5) < 0.001
+                && (Math.hypot(arc[0] - wp0.x, arc[1] - wp0.y) < 1
+                    || Math.hypot(arc[0] - wp1.x, arc[1] - wp1.y) < 1)));
+    check(results, "the white waypoint outlines are gone",
+        whiteOutline.length === 0,
+        JSON.stringify(whiteOutline.map((stroke) => stroke.arcs)));
+
+    // The destination marker keeps the magenta read.
+    const destFill = record.fills.filter((fill) =>
+        fill.style === "#ff44cc" && fill.arcs.length === 1
+            && Math.abs(fill.arcs[0][2] - 3.5) < 0.001
+            && Math.hypot(fill.arcs[0][0] - wp1.x,
+                fill.arcs[0][1] - wp1.y) < 1);
+    check(results, "the destination marker stays magenta",
+        destFill.length === 1, destFill.length + " marker fills");
+
+    // The aimed waypoint (walkIndex 0) pulses a ring in the hue of
+    // its own dot: the radius starts mid swing and the same ring is at
+    // another radius after the clock advances.
+    const halos = (strokes) => strokes.filter((stroke) =>
+        /^hsl\(\d+(\.\d+)?, 70%, 66%\)$/.test(stroke.style)
+            && stroke.width === 1.6 && stroke.arcs.length === 1);
+    const ringAt = (items, p) => items.filter((item) =>
+        Math.hypot(item.arcs[0][0] - p.x, item.arcs[0][1] - p.y) < 1);
+    const firstHalo = ringAt(halos(record.strokes), wp0);
+    check(results, "the aimed waypoint pulses a ring",
+        firstHalo.length === 1
+            && firstHalo[0].arcs[0][2] > 5.4
+            && firstHalo[0].arcs[0][2] < 9.1
+            && nearHue(hueOf(firstHalo[0]),
+                MapView.walkFlowHue(frac0, 0)),
+        firstHalo.length ? firstHalo[0].style + " r "
+            + firstHalo[0].arcs[0][2].toFixed(2) : "no ring");
 
     // The direction rule: after a quarter of the 2.8 s cycle (700 ms)
     // the hue that sat at fraction 0.2 sits one quarter band farther
@@ -2273,6 +2323,16 @@ function runScenarioWalkFlow(mapFile) {
             && firstColors.join("|") !== laterColors.join("|"),
         firstColors[0] + " -> " + laterColors[0]
         + " (" + firstColors.length + " steps)");
+
+    // The in/out pulse: the same aimed ring sits at another radius
+    // once the clock advanced, so the breathing never freezes.
+    const laterHalo = ringAt(halos(record.strokes), wp0);
+    const firstRadius = firstHalo.length ? firstHalo[0].arcs[0][2] : 0;
+    const laterRadius = laterHalo.length ? laterHalo[0].arcs[0][2] : 0;
+    check(results, "the aimed ring pulses in and out",
+        laterHalo.length === 1
+            && Math.abs(laterRadius - firstRadius) > 0.5,
+        firstRadius.toFixed(2) + " -> " + laterRadius.toFixed(2));
 
     check(results, "the walk plan keeps the render loop alive",
         MapView.needsMoreFrames() === true,
