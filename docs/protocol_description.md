@@ -338,6 +338,28 @@ and the first mouse-mode walk returns it (see
 | 13 | 4 | Heading |
 | 17 | 4 | Vehicle id (0 on foot) |
 
+### CannotMoveAnymore (0x36)
+
+The local walk veto of the official client: the client pawn stopped
+against the client side geometry and the client tells the server. The
+Mobius handler (`CannotMoveAnymore.runImpl` ->
+`PlayerAI.notifyActionArrivedBlocked`) throws the reported place away
+and cancels the player's move intention (`setIntentionIdle` ->
+`clientStopMoving` -> `stopMove`), which stops the character at the
+place the **server** holds - the reported coordinates never update the
+world position. The bot itself never sends it; the proxy drops the
+packet of an attached spectator client (the local collision of a
+client that drives no movement has no authority over the bot session,
+see `docs/proxy.md`).
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x36 |
+| 1 | 4 | X (client side position) |
+| 5 | 4 | Y |
+| 9 | 4 | Z |
+| 13 | 4 | Heading |
+
 ### Appearing (0x30)
 
 The teleport confirmation of the official client: the server keeps the

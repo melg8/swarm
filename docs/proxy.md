@@ -253,6 +253,33 @@ server answers with: the server still holds the bot place, so the
 report never reached the out of sync branch
 (TestProxyE2ERealStackClientFlow).
 
+## The client move veto (`CannotMoveAnymore`)
+
+The C1 client streams `CannotMoveAnymore` (0x36) whenever its own pawn
+stops against the client side geometry, and the Mobius handler
+(`CannotMoveAnymore.runImpl` -> `notifyActionArrivedBlocked`) throws
+the reported place away and cancels the player's move intention: the
+server stops the character at the place the **server** holds, the
+reported coordinates never reach the world. With a spectator client
+riding the bot session that cancel lands on the bot's own walk - the
+frozen pawn on the village stair railing vetoed every bot click within
+5 ms of it, the server answered each click with a `StopMove` at the
+server place, and the bot's planner re-planned the identical waypoint
+every 5.5 s (the city shopping stuck run).
+
+The proxy drops every client veto and answers it with the same
+`ValidateLocation` correction it sends for a diverged position report:
+a spectator client drives no movement, so its local collision has no
+authority over the bot session, and the correction ends the client's
+local walk so the following reports ride the bot again. A distance
+test cannot classify the veto (the live run reported a legal 47 unit
+walk position, well inside any lag window), and the server ignores the
+reported place anyway - the cancel itself is the damage - so the drop
+is unconditional. Covered by internal/swarm/proxy/cannotmove_test.go
+(the captured payload of the stuck run never transits, the correction
+carries the bot place, a veto matching the bot place is dropped too,
+the following position report transits again).
+
 ## The live self state (reconnection correctness)
 
 The replay answers one hard question: *where is the character right

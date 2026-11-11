@@ -109,7 +109,21 @@ address became overridable (`SWARM_PROXY_E2E_LOGIN`, the Windows
 deployment binds 127.0.0.3) and the proxy log file now closes before
 the temp dir removal (Windows refuses to delete an open file).
 
-## Status
+### 2026-11-11 - the stuck run root cause: the client move veto
 
-In progress: the fix is verified against the live stack; the remaining
-confirmation is the owner rerun with the real C1 client attached.
+The owner rerun with the real client still stuck: the bot at
+(45651, 51288, -2832) re-planned the identical waypoint every ~5.5 s.
+The packet log (`logs/acceptance/city-shopping-20261111-162140-2212-1.log`,
+lines ~825-1000) shows the client pawn frozen at (45604, 51295) sending
+`CannotMoveAnymore` (0x36) 5 ms after every bot click, then the server
+answering `StopMove` at the bot place. The Mobius handler
+(`CannotMoveAnymore.runImpl` -> `notifyActionArrivedBlocked` ->
+`setIntentionIdle` -> `clientStopMoving` -> `stopMove`) cancels the
+player's move intention and ignores the reported place, so the client's
+local collision vetoed the bot's own walk. The proxy now drops every
+veto and answers it with the same `ValidateLocation` correction the
+server sends for an out of sync report (`discardClientVeto`, the
+correction sender extracted into `sendViewCorrection`). Tests:
+`cannotmove_test.go` with the captured payload of the stuck run. The
+veto policy and the reason a distance test cannot classify it are in
+`docs/proxy.md`, the packet layout in `docs/protocol_description.md`.

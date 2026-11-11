@@ -76,9 +76,11 @@ type gameConn struct {
 
     // viewLogAt bounds the client view divergence logging of the
     // ValidatePosition interception (the corrections themselves may
-    // repeat with every report). Owned by the read loop: the transits
+    // repeat with every report), vetoLogAt the same for the dropped
+    // CannotMoveAnymore vetoes. Owned by the read loop: the transits
     // all run there.
     viewLogAt time.Time
+    vetoLogAt time.Time
 
     // relayLive, autoSelect and enterWorldCh are guarded by mu:
     // relayLive marks the relay goroutine as the owner of the
@@ -125,13 +127,15 @@ const (
     gameOpCharCreateFail = 0x26
 )
 
-// Client game packet opcode of the periodic position report
+// Client game packet opcodes of the periodic position report
 // (ValidatePosition, 0x48 of the Mobius ClientPackets enum) and the
-// server packet opcode of the position correction answer
-// (ValidateLocation, 0x76 of the Mobius ServerPackets enum).
+// local walk veto (CannotMoveAnymore, 0x36), and the server packet
+// opcode of the position correction answer (ValidateLocation, 0x76 of
+// the Mobius ServerPackets enum).
 const (
-    clientOpValidatePosition = 0x48
-    serverOpValidateLocation = 0x76
+    clientOpValidatePosition  = 0x48
+    clientOpCannotMoveAnymore = 0x36
+    serverOpValidateLocation  = 0x76
 )
 
 // validateDivergenceSlack widens the server out of sync rule for the
@@ -195,6 +199,7 @@ func (s *Server) handleGameConn(conn net.Conn) {
         charSelectedSeq: 0,
         queue:           nil,
         viewLogAt:       time.Time{},
+        vetoLogAt:       time.Time{},
         relayLive:       false,
         autoSelect:      nil,
         enterWorldCh:    make(chan int64, 1),
@@ -669,6 +674,16 @@ func (gc *gameConn) transitToServer(payload []byte) error {
 
         return nil
     }
+    if payload[0] == clientOpCannotMoveAnymore {
+        // The client vetoes its local walk: the Mobius handler throws
+        // the reported place away and cancels the player's move
+        // intention, which stops the bot's own server side walk at
+        // the server place. A spectator client drives no movement, so
+        // its local collision has no authority over the bot session.
+        gc.discardClientVeto(payload)
+
+        return nil
+    }
     transformed, ok := gc.server.transformer.ClientToServer(payload)
     if !ok {
         gc.server.logger.Printf("game#%d: dropped client packet 0x%02x",
@@ -748,34 +763,23 @@ func (gc *gameConn) clientViewDiverged(payload []byte) bool {
     return math.Sqrt(dx*dx+dy*dy+dz*dz) > limit
 }
 
-// correctClientView answers one diverged position report exactly the
-// way the Mobius server answers an out of sync client: a ValidateLocation
-// packet carrying the live place of the played character. The answer
-// heals the client's stale pawn view (the next reports come back in
-// sync and transit again), and the diverged report itself never
-// reaches the server, severing the position feedback loop that
+// correctClientView drops one diverged position report and answers it
+// the way the Mobius server answers an out of sync client: a
+// ValidateLocation carrying the live place of the played character.
+// The answer heals the client's stale pawn view (the next reports come
+// back in sync and transit again), and the diverged report itself
+// never reaches the server, severing the position feedback loop that
 // snapped the character between the bot's walk requests and the
 // client's stale view. The correction may repeat with every stale
 // report (the client heals after one, a stubborn view keeps getting
 // corrected once per report), the log line is rate limited instead.
 func (gc *gameConn) correctClientView(payload []byte) {
-    session := gc.currentSession()
-    if session == nil {
-        return
-    }
-    objectID := session.tracker.SelfObjectID()
-    if objectID == 0 {
-        return
-    }
-    selfX, selfY, selfZ, ok := session.tracker.SelfProjectedPosition()
+    reportX := int32(binary.LittleEndian.Uint32(payload[1:5]))
+    reportY := int32(binary.LittleEndian.Uint32(payload[5:9]))
+    x, y, ok := gc.sendViewCorrection()
     if !ok {
         return
     }
-    reportX := int32(binary.LittleEndian.Uint32(payload[1:5]))
-    reportY := int32(binary.LittleEndian.Uint32(payload[5:9]))
-    x := int32(selfX)
-    y := int32(selfY)
-    z := int32(selfZ)
     if gc.viewLogAt.IsZero() || time.Since(gc.viewLogAt) > validateLogPeriod {
         gc.viewLogAt = time.Now()
         gc.server.logger.Printf(
@@ -784,6 +788,58 @@ func (gc *gameConn) correctClientView(payload []byte) {
                 "%d %d, correcting the client view",
             gc.id, reportX, reportY, x, y)
     }
+}
+
+// discardClientVeto drops one client CannotMoveAnymore (0x36) and
+// answers it with the same correction the server sends an out of sync
+// client. The Mobius handler throws the reported place away and
+// cancels the player's move intention (CannotMoveAnymore.runImpl ->
+// notifyActionArrivedBlocked -> setIntentionIdle), which stops the
+// bot's server side walk at the server place - the frozen pawn of an
+// attached client vetoed every click the bot sent and the character
+// never walked. The veto never transits: the local collision of a
+// spectator client has no authority over the bot session, and the
+// correction ends the client's local walk too, so the following
+// reports ride the bot again.
+func (gc *gameConn) discardClientVeto(payload []byte) {
+    if len(payload) < 13 {
+        return
+    }
+    reportX := int32(binary.LittleEndian.Uint32(payload[1:5]))
+    reportY := int32(binary.LittleEndian.Uint32(payload[5:9]))
+    x, y, ok := gc.sendViewCorrection()
+    if !ok {
+        return
+    }
+    if gc.vetoLogAt.IsZero() || time.Since(gc.vetoLogAt) > validateLogPeriod {
+        gc.vetoLogAt = time.Now()
+        gc.server.logger.Printf(
+            "game#%d: client move veto at %d %d dropped, the bot "+
+                "walks at %d %d",
+            gc.id, reportX, reportY, x, y)
+    }
+}
+
+// sendViewCorrection hands the client a ValidateLocation carrying the
+// live place of the played character, the same answer the Mobius
+// server sends an out of sync client. It reports the place it sent and
+// false when the current session carries no usable one.
+func (gc *gameConn) sendViewCorrection() (int32, int32, bool) {
+    session := gc.currentSession()
+    if session == nil {
+        return 0, 0, false
+    }
+    objectID := session.tracker.SelfObjectID()
+    if objectID == 0 {
+        return 0, 0, false
+    }
+    selfX, selfY, selfZ, ok := session.tracker.SelfProjectedPosition()
+    if !ok {
+        return 0, 0, false
+    }
+    x := int32(selfX)
+    y := int32(selfY)
+    z := int32(selfZ)
     answer := make([]byte, 21)
     answer[0] = serverOpValidateLocation
     binary.LittleEndian.PutUint32(answer[1:5], uint32(objectID))
@@ -793,6 +849,8 @@ func (gc *gameConn) correctClientView(payload []byte) {
     binary.LittleEndian.PutUint32(answer[17:21],
         uint32(session.tracker.SelfHeading()))
     _ = gc.sendToClient(answer)
+
+    return x, y, true
 }
 
 // noteNetPingGameTime harvests the game time of one suppressed NetPing
