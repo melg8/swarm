@@ -566,22 +566,7 @@ func (l *Loop) followWaypoint(
 
             continue
         }
-        // The click carries the geodata height of the waypoint, not
-        // the stale self height: the server validates the click z
-        // against its own geodata (the same run stalled on the
-        // segment west of Gludio - an 864 unit rise with every click
-        // riding the self z, every request ActionFailed). The height
-        // rides the server frame transport (see click_frame.go): the
-        // mesh height plus the measured vintage shift of the
-        // segment's standing surface, so the click names the walked
-        // surface's layer in the server frame wherever the packs
-        // disagree about absolute heights.
-        clickZ := selfZ
-        if wp.Z != 0 {
-            clickZ = int32(anchorZToServerFrame(wp.Z, frameOffset))
-        }
-        if err := l.game.WalkTo(
-            int32(wp.X), int32(wp.Y), clickZ); err != nil {
+        if err := l.clickQuestWaypoint(wp, frameOffset, selfZ); err != nil {
             l.logf("quest: the waypoint walk failed: %v", err)
 
             return waypointFailed
@@ -592,6 +577,22 @@ func (l *Loop) followWaypoint(
         l.questWalkAt = now
         pace(questWalkPoll)
     }
+}
+
+// clickQuestWaypoint clicks one waypoint of the quest walk. The click
+// carries the geodata height of the waypoint, not the stale self
+// height (the server validates it against its own geodata: the 864
+// unit rise west of Gludio refused every self z click), transported
+// into the server frame of the walked surface (see click_frame.go).
+func (l *Loop) clickQuestWaypoint(
+    wp pathfind.Vec3, frameOffset float64, selfZ int32,
+) error {
+    clickZ := selfZ
+    if wp.Z != 0 {
+        clickZ = int32(anchorZToServerFrame(wp.Z, frameOffset))
+    }
+
+    return l.game.WalkTo(int32(wp.X), int32(wp.Y), clickZ)
 }
 
 // awaitSegmentProgress waits until the character moves a meaningful
@@ -750,50 +751,10 @@ func (l *Loop) driveQuestTransfer(
         "riding the teleport to %s",
         transfer.Gatekeeper.Name, target.ObjectID, transfer.DestLabel)
 
-    // The talk opens the first page (the walk-in gate of the
-    // html action cache). The attack analog pull follows one pace
-    // later: when the walk landed outside the interaction distance
-    // the plain click only selected the gatekeeper and the pull
-    // hands the close walk to the server - the dialog opens on its
-    // arrival; within the distance it re-opens the same page.
-    if err := l.game.ClickObject(target.ObjectID); err != nil {
-        return fmt.Errorf("the gatekeeper click: %w", err)
-    }
-    pace(dialogClickPause)
-    if err := l.game.InteractPull(target.ObjectID); err != nil {
-        return fmt.Errorf("the gatekeeper pull: %w", err)
-    }
-    first, firstGen, err := l.awaitTransferPage(
-        target.ObjectID, "", talkGen, questTransferArriveWait)
-    if err != nil {
-        return err
-    }
-    if FindShowTeleportsButton(first) == nil {
-        return fmt.Errorf(
-            "the first page of %s carries no teleport entry",
-            transfer.Gatekeeper.Name)
-    }
-
-    // The showTeleports bypass (the button of the open first
-    // page) opens the list.
     pacer := bypassPacer{last: time.Time{}}
-    pacer.wait()
-    if err := l.game.SendBypass(fmt.Sprintf(
-        "npc_%d_showTeleports", target.ObjectID)); err != nil {
-        return fmt.Errorf("the showTeleports send: %w", err)
-    }
-    buttons, _, err := l.awaitTransferPage(
-        target.ObjectID, transfer.DestLabel, firstGen,
-        questTransferArriveWait)
+    teleport, err := l.openTransferList(target, transfer, talkGen, &pacer)
     if err != nil {
         return err
-    }
-    teleport := FindTeleportButton(
-        buttons, "NORMAL", transfer.DestLabel)
-    if teleport == nil {
-        return fmt.Errorf(
-            "the teleport list of %s carries no %s button",
-            transfer.Gatekeeper.Name, transfer.DestLabel)
     }
     // The evidence of the hop: the command the button carries (sent
     // verbatim - the server matches the cached page link byte for
@@ -811,6 +772,57 @@ func (l *Loop) driveQuestTransfer(
     }
 
     return l.awaitTransferArrival(ctx, transfer)
+}
+
+// openTransferList opens the teleport list of the gatekeeper and
+// returns the destination button: the talk that opens the first page,
+// the showTeleports bypass and the list page wait. The pacer carries
+// the flood protector window across the bypass sends of the hop.
+func (l *Loop) openTransferList(
+    target state.AttackTarget, transfer QuestTransfer, talkGen uint64,
+    pacer *bypassPacer,
+) (*BypassButton, error) {
+    // The talk opens the first page (the walk-in gate of the html
+    // action cache); the attack analog pull follows one pace later,
+    // so a walk that landed outside the interaction distance still
+    // opens the dialog on its approach.
+    if err := l.game.ClickObject(target.ObjectID); err != nil {
+        return nil, fmt.Errorf("the gatekeeper click: %w", err)
+    }
+    pace(dialogClickPause)
+    if err := l.game.InteractPull(target.ObjectID); err != nil {
+        return nil, fmt.Errorf("the gatekeeper pull: %w", err)
+    }
+    first, firstGen, err := l.awaitTransferPage(
+        target.ObjectID, "", talkGen, questTransferArriveWait)
+    if err != nil {
+        return nil, err
+    }
+    if FindShowTeleportsButton(first) == nil {
+        return nil, fmt.Errorf(
+            "the first page of %s carries no teleport entry",
+            transfer.Gatekeeper.Name)
+    }
+    pacer.wait()
+    if err := l.game.SendBypass(fmt.Sprintf(
+        "npc_%d_showTeleports", target.ObjectID)); err != nil {
+        return nil, fmt.Errorf("the showTeleports send: %w", err)
+    }
+    buttons, _, err := l.awaitTransferPage(
+        target.ObjectID, transfer.DestLabel, firstGen,
+        questTransferArriveWait)
+    if err != nil {
+        return nil, err
+    }
+    teleport := FindTeleportButton(
+        buttons, "NORMAL", transfer.DestLabel)
+    if teleport == nil {
+        return nil, fmt.Errorf(
+            "the teleport list of %s carries no %s button",
+            transfer.Gatekeeper.Name, transfer.DestLabel)
+    }
+
+    return teleport, nil
 }
 
 // transferGeometry renders the server range check of a teleport

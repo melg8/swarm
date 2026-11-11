@@ -273,19 +273,7 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
         "village dress and 500 000 adena, watching the city shopping " +
         "errand")
 
-    watch := &cityShoppingWatch{
-        weaponBought: false,
-        armorBought:  false,
-        gludioSeen:   false,
-        gludioDetail: "",
-        soldSeen:     false,
-        soldDetail:   "",
-        wornSeen:     false,
-        wornDetail:   "",
-        homeAtMs:     0,
-        homeExp:      0,
-        farmDone:     false,
-    }
+    watch := &cityShoppingWatch{}
     for {
         if ctx.Err() != nil {
             cancelSession()

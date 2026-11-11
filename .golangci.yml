@@ -149,6 +149,10 @@ linters:
         - .*state\.WalkPlan$
         - .*acceptance\.characterReset$
         - .*acceptance\.fullDressWatch$
+        # The city shopping watch: every latch (the purchases, the
+        # visit, the sale and the dress) starts at its not-yet state,
+        # so the empty literal is the documented start.
+        - .*acceptance\.cityShoppingWatch$
         # The archer kite telemetry aggregates: the log counter, the
         # monitor watch, the verdict view and the observation sample
         # all carry documented zero starts (the counters, the

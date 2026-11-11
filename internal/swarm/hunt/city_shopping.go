@@ -385,6 +385,42 @@ func (l *Loop) driveCityShopTransfer(
     return l.driveQuestTransfer(ctx, transfer)
 }
 
+// cityShopOpen installs the plan of one city stop for the visit: the
+// purchases ride the frozen plan, the sold map records the sell
+// offers, the replacement state starts clean and the stop list holds
+// the single merchant of the visit.
+func (l *Loop) cityShopOpen(stop cityShopStop) {
+    buys := l.cityShopBuys(stop)
+    l.tripPlan = buys
+    l.sold = make(map[int32]bool)
+    l.resetReplacementSales()
+    l.tripStops = []tripStop{{
+        merchant: stop.merchant,
+        buys:     buys,
+        sell:     false,
+        teach:    false,
+        guide:    false,
+    }}
+    l.merchantID = 0
+    l.merchantPick = time.Time{}
+    l.merchantDeckUntil = time.Time{}
+    l.sellPhaseAt = time.Now()
+    l.resetBuyRequest()
+}
+
+// cityShopClose clears the stop state of the visit whatever the
+// outcome.
+func (l *Loop) cityShopClose() {
+    l.tripStops = nil
+    l.tripPlan = nil
+    l.resetReplacementSales()
+    l.resetBuyRequest()
+    l.clearServerSelection()
+    l.merchantID = 0
+    l.merchantPick = time.Time{}
+    l.merchantDeckUntil = time.Time{}
+}
+
 // cityShopAt runs one merchant stop: the walk to the customer stand,
 // the sell first step of the pieces the stop displaces, the stop
 // shopping pipeline of the ordinary town trip and the inventory
@@ -406,36 +442,8 @@ func (l *Loop) cityShopAt(
         questWalkTimeout); err != nil {
         return fmt.Errorf("the walk to %s: %w", stop.merchant.Name, err)
     }
-    // The stop sells the equipped pieces its purchases displace (the
-    // village dress) before the replacements land: the tripPlan carries
-    // the SellFirst lines and the sold map records the offers, the same
-    // pair the town trip hands its sell first step.
-    buys := l.cityShopBuys(stop)
-    l.tripPlan = buys
-    l.sold = make(map[int32]bool)
-    l.resetReplacementSales()
-    l.tripStops = []tripStop{{
-        merchant: stop.merchant,
-        buys:     buys,
-        sell:     false,
-        teach:    false,
-        guide:    false,
-    }}
-    l.merchantID = 0
-    l.merchantPick = time.Time{}
-    l.merchantDeckUntil = time.Time{}
-    l.sellPhaseAt = time.Now()
-    l.resetBuyRequest()
-    defer func() {
-        l.tripStops = nil
-        l.tripPlan = nil
-        l.resetReplacementSales()
-        l.resetBuyRequest()
-        l.clearServerSelection()
-        l.merchantID = 0
-        l.merchantPick = time.Time{}
-        l.merchantDeckUntil = time.Time{}
-    }()
+    l.cityShopOpen(stop)
+    defer l.cityShopClose()
     deadline := time.Now().Add(cityShopStopTimeout)
     for {
         if err := ctx.Err(); err != nil {
