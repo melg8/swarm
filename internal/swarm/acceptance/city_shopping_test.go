@@ -248,3 +248,58 @@ func TestCityShoppingWatchAbort(t *testing.T) {
         })
     }
 }
+
+// TestCityShoppingWatchLatchesTheStory pins the latch of the visit
+// and dress checks: the bot must leave Gludio and swaps gear on the
+// later town trips, so a live position or paperdoll predicate would
+// reopen facts the run already proved and the scenario could never
+// reach all checks done.
+func TestCityShoppingWatchLatchesTheStory(t *testing.T) {
+    bot := state.NewBot(cityShoppingAccount)
+    bot.SetCharacter(cityShoppingAccount, 100, 18,
+        cityShoppingSpawnX, cityShoppingSpawnY, -3456,
+        level15HP, level15MP)
+    bot.SetOnline(cityShoppingAccount)
+    items := make([]state.InventoryItem, 0, len(cityShoppingSlots))
+    var doll [state.PaperdollSlots]int32
+    for index, piece := range cityShoppingSlots {
+        objectID := int32(2000 + index)
+        doll[piece.slot] = objectID
+        items = append(items, state.InventoryItem{
+            ObjectID: objectID, ItemID: piece.itemID, Count: 1,
+            Equipped: true,
+        })
+    }
+    bot.ApplyItemList(items)
+
+    watch := &cityShoppingWatch{}
+    test := &Test{}
+    test.setChecks(cityShoppingChecks())
+
+    // In Gludio with the whole kit worn: both facts latch.
+    bot.ApplyUserInfo(state.UserInfo{
+        Name: cityShoppingAccount, Level: 15, ClassID: 18,
+        X: cityShoppingGludioX, Y: cityShoppingGludioY, Z: -3114,
+        MaxHP: level15HP, CurHP: level15HP,
+        MaxMP: level15MP, CurMP: level15MP,
+    })
+    bot.ApplyPaperdoll(doll)
+    watch.evaluate(bot, test)
+    require.True(t, test.checks[1].Done, "the Gludio arrival latches")
+    require.True(t, test.checks[4].Done, "the worn kit latches")
+
+    // Back home with the paperdoll emptied: the live predicates are
+    // false, the latched checks stay done.
+    bot.ApplyUserInfo(state.UserInfo{
+        Name: cityShoppingAccount, Level: 15, ClassID: 18,
+        X: cityShoppingSpawnX, Y: cityShoppingSpawnY, Z: -3456,
+        MaxHP: level15HP, CurHP: level15HP,
+        MaxMP: level15MP, CurMP: level15MP,
+    })
+    bot.ApplyPaperdoll([state.PaperdollSlots]int32{})
+    watch.evaluate(bot, test)
+    require.True(t, test.checks[1].Done,
+        "the Gludio arrival stays proven after the return")
+    require.True(t, test.checks[4].Done,
+        "the worn kit stays proven after a gear swap")
+}

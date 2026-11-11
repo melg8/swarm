@@ -263,6 +263,10 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
     watch := &cityShoppingWatch{
         weaponBought: false,
         armorBought:  false,
+        gludioSeen:   false,
+        gludioDetail: "",
+        wornSeen:     false,
+        wornDetail:   "",
         homeAtMs:     0,
         homeExp:      0,
         farmDone:     false,
@@ -305,10 +309,17 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
 
 // cityShoppingWatch accumulates the latches of the scenario: the
 // purchase flags gate the return watch, the home stamp gates the
-// resumed farm check, the farm flag retires the farm window.
+// resumed farm check, the visit, dress and farm flags retire their
+// checks once the story reached them - the bot leaves Gludio and
+// swaps gear on the later town trips, so a live position or paperdoll
+// predicate would reopen a fact the run already proved.
 type cityShoppingWatch struct {
     weaponBought bool
     armorBought  bool
+    gludioSeen   bool
+    gludioDetail string
+    wornSeen     bool
+    wornDetail   string
     homeAtMs     int64
     homeExp      int32
     farmDone     bool
@@ -325,8 +336,16 @@ func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
             float64(selfX-cityShoppingGludioX),
             float64(selfY-cityShoppingGludioY),
         ) <= cityShoppingGludioRadius
-        test.updateCheck(checkCityShopGludio, arrived,
-            fmt.Sprintf("standing at %d,%d", selfX, selfY))
+        if arrived {
+            w.gludioSeen = true
+            w.gludioDetail = fmt.Sprintf(
+                "standing at %d,%d", selfX, selfY)
+        }
+        detail := w.gludioDetail
+        if detail == "" {
+            detail = fmt.Sprintf("standing at %d,%d", selfX, selfY)
+        }
+        test.updateCheck(checkCityShopGludio, w.gludioSeen, detail)
     }
     w.weaponBought = tracker.InventoryHasItem(
         cityShoppingSlots[0].itemID)
@@ -338,8 +357,14 @@ func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
     w.armorBought = armorBought == len(cityShoppingSlots)-1
     test.updateCheck(checkCityShopArmor, w.armorBought, armorDetail)
     worn, wornDetail := cityShoppingWornDetail(tracker)
-    test.updateCheck(checkCityShopWorn, worn == len(cityShoppingSlots),
-        wornDetail)
+    if worn == len(cityShoppingSlots) {
+        w.wornSeen = true
+        w.wornDetail = wornDetail
+    }
+    if w.wornDetail != "" {
+        wornDetail = w.wornDetail
+    }
+    test.updateCheck(checkCityShopWorn, w.wornSeen, wornDetail)
     if !w.weaponBought || !w.armorBought || !posOK {
         return
     }

@@ -143,7 +143,26 @@ behavior, not a failure of the errand, so the farm window grows to
 cover it: `cityShoppingFarmWindow` 4 -> 10 minutes, scenario budget
 15 -> 20 minutes.
 
+### 2026-11-11 15:20 UTC - the second live rerun: the latches
+
+The rerun (14:59-15:19 UTC) repeated the whole errand green: outbound
+hop landing 15:01:16, both merchant stops by 15:01:46, the dress at
+15:01:48, the homebound hop landing 15:02:20, the errand finished
+15:03:56, the restock trip back on the ground 15:08:04 and kills at
+15:08:18, 15:08:32 and 15:08:43. The farm check latched at 15:08:18
+("the experience grew after the return").
+
+The run still hit the 20 minute budget: the `gludio` and `worn`
+checks were live predicates, so leaving Gludio reopened `gludio`
+(15:02:20) and the paperdoll swaps on the later town trips reopened
+`worn` (15:09:14, 15:09:44, 15:14:52), leaving `allChecksDone` false
+forever. Both are history facts the run already proved, so the watch
+now latches them (`gludioSeen`/`wornSeen` with their details) and a
+later move or gear swap never reopens them. New test
+`TestCityShoppingWatchLatchesTheStory` pins the latch.
+
 ## Status
 
-In progress: the errand is live green through the return; the live
-farm check with the widened window is pending.
+In progress: the errand is live green through the return, the farm
+kill landed, and the check latches are fixed; the final live run is
+pending.
