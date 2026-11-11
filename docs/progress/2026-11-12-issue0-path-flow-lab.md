@@ -102,6 +102,20 @@ Recorded the brief and the direction requirement, started the page.
 - `docs/webui.md`: the walk path view and the map harness entry name
   the flow, the marker reads magenta instead of the stale blue.
 
+### 2026-11-12 - the bead dots and the aim pulse
+
+- `web/map.js`: the waypoint dots lose the white outline and take the
+  flow hue of their own route fraction (`hsl(hue, 72%, 66%)`, a step
+  deeper than the ribbon's 58/78), so every dot reads as a bead of the
+  line palette; the aimed waypoint (`walkIndex`) pulses a soft ring
+  (radius 5.5 to 9 px, fading as it swells) instead of the old white
+  target ring.
+- `tools/repro_map_render.js`: the `walk flow` scenario pins the
+  fraction hues, the retired white outlines, the magenta destination
+  marker, the ring hue and its in/out radius change; ALL PASS.
+- `docs/webui.md`: the walk path view and the harness entry describe
+  the bead dots and the aim pulse.
+
 ## Status
 
 done: the page is live, the harness gates it, the v2 rainbow flows

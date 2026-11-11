@@ -712,14 +712,17 @@ between the snapshots, stopping itself once every window elapsed.
   move: town trips (the walk to the trader and the walk back to the
   farm spot) and the deleveling guard walks publish their full geodata
   segment too, so the map draws the planned path of every autonomous
-  walk. The follower cursor (`snapshot.walkIndex`) carries a small
-  ring on the waypoint the walker currently aims at, the waypoint dots
-  keep their magenta fill, and the plan clears on the non walking
-  phases (engage, loot, sell, idle) through the `ClearWalkPlan` call
-  of the tick. The destination marker (the pulsing magenta dot) draws
-  at `snapshot.walkDest` (the merchant spawn, the farm spot, the
-  clicked point), falling back to the last waypoint when the plan
-  carries it.
+  walk. Every waypoint dot carries the flow hue of its own route
+  fraction - a step deeper than the ribbon (72% saturation, 66%
+  lightness) and without the retired white outline, so the dots read
+  as beads on the line; the follower cursor (`snapshot.walkIndex`)
+  pulses a soft ring around the aimed dot (the radius swings 5.5 to
+  9 px and fades as it swells, the in/out read of the live target)
+  and the plan clears on the non walking phases (engage, loot, sell,
+  idle) through the `ClearWalkPlan` call of the tick. The destination
+  marker (the pulsing magenta dot) draws at `snapshot.walkDest` (the
+  merchant spawn, the farm spot, the clicked point), falling back to
+  the last waypoint when the plan carries it.
   While a manual move runs, the loop publishes the walk plan into the
   tracker (`state.Bot.SetWalkPlan`: the origin, the full waypoint
   list, the follower cursor and the destination, refreshed every tick,
@@ -1442,9 +1445,10 @@ plumbing closes that gap:
 - `tools/repro_map_render.js` (`task repro:map`) for the target links,
   unit markers, the static free camera, the grab semantics of map
   panning, the walk plan pastel flow (the dark casing, the palette,
-  the forward travelling bands, the kept magenta waypoints and the
-  render loop engagement) and the fps meter chip (recording canvas in
-  a Node vm sandbox).
+  the forward travelling bands, the palette waypoint dots without the
+  white outline, the pulsing aim ring and the render loop
+  engagement) and the fps meter chip (recording canvas in a Node vm
+  sandbox).
 - `tools/repro_hud.js` (`task repro:hud`) for the HUD and target panel
   rendering (stub DOM).
 - `tools/repro_buffs.js` (`task repro:buffs`) for the effects panel:
