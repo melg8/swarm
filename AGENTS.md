@@ -372,9 +372,10 @@ process (accounts `test2`..`testN` are auto-created):
 task run:app              # or: go run ./cmd/swarm -web 127.0.0.1:8080
 ```
 
-The botless modes (`-pathfind-test`, `-test-fight-ui`, `-test-path-ui`,
-`-test-fight-ui-v1`, `-show-navmesh[=21_19]`) are described in
-docs/webui.md, docs/pathfinding.md and docs/navmesh.md.
+The botless modes (`-pathfind-test`, `-test-fight-ui`,
+`-test-path-ui`, `-test-path-ui-v2`, `-test-fight-ui-v1`,
+`-show-navmesh[=21_19]`) are described in docs/webui.md,
+docs/pathfinding.md and docs/navmesh.md.
 
 `task lint:new` is the seconds-fast changed-code verdict (`task lint`
 is the full-tree gate); run the matching pair before considering work

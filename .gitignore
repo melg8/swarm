@@ -82,3 +82,8 @@ runs/fleet-*/
 # baseline is runs/coverage-latest.txt).
 runs/cover
 runs/cover-func.txt
+
+# The local gallery server log and the headless screenshots of the
+# visual checks (machine local byproducts, never a repository input).
+runs/pathgallery.log
+runs/shots/

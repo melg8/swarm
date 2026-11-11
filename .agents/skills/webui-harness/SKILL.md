@@ -2,7 +2,7 @@
 name: webui-harness
 description: >-
   How to change the swarm web UI (plain HTML/CSS/JS in
-  internal/swarm/webserver/web) safely: the six Node repro harnesses,
+  internal/swarm/webserver/web) safely: the eleven Node repro harnesses,
   the vm-sandbox constraints, the keyed rendering rules and the
   end-to-end path of a snapshot field. Use for any map, HUD, equipment
   widget, chat, fight FX gallery or style change, for adding snapshot
@@ -18,7 +18,7 @@ framework, no bundler, no npm.
 
 ## The verification loop
 
-Nine harnesses load the REAL `web/app.js` / `web/map.js` (and the
+Eleven harnesses load the REAL `web/app.js` / `web/map.js` (and the
 panel modules) into a Node vm sandbox with a stub DOM and recording
 canvas. They exit 1 while their bug is present, so they are
 regression gates:
@@ -41,6 +41,9 @@ node tools/repro_fight_ui.js     # the fight FX gallery: the 18x4
 node tools/repro_path_gallery.js # the walk plan gallery: the 20
                                  # animated variants, the shared walk
                                  # timeline, the pick controls
+node tools/repro_path_curve.js   # the smooth curve lab: the 30
+                                 # variants, the Catmull-Rom base,
+                                 # the animation and curve timeline
 node tools/repro_bot_switch.js   # the map state reset at the bot
                                  # switch
 node tools/repro_zone_hover.js   # the hover, social and fleet kill
