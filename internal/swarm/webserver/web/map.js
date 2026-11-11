@@ -374,11 +374,12 @@ const MapView = {
       aggressive: "#e37400",
       combat: "#d93025",
       dead: "#80868b",
-      // The manual command feedback of the user: the walk plan
-      // waypoint dots and the destination marker use a bright magenta
-      // so they read on both the light map imagery and the dark fill,
-      // and stay distinct from the blue self marker and the red combat
-      // path; the plan line itself carries the pastel flow.
+      // The manual command feedback of the user: the destination
+      // marker and the hovered waypoint label use a bright magenta so
+      // they read on both the light map imagery and the dark fill, and
+      // stay distinct from the blue self marker and the red combat
+      // path; the plan line and the waypoint dots carry the pastel
+      // flow.
       userPath: "#ff44cc",
       userMark: "#ff44cc",
       // The outline and the direction tick of the markers: a middle
@@ -3643,17 +3644,16 @@ const MapView = {
   // route draws as the pastel flow of the flow lab (variant 12) from
   // the planning origin through every waypoint (the passed ones
   // included - the drift of the character against its plan is the
-  // debugging signal), each waypoint carries a filled magenta dot with
-  // a white outline and a text label of its (x, y) coordinates, the
-  // waypoint the follower aims at carries a larger ring and the
-  // destination itself carries the pulsing marker.
+  // debugging signal), each waypoint carries a dot in the flow hue of
+  // its own route fraction (deeper than the line, so a bead reads
+  // apart from the ribbon), the waypoint the follower aims at
+  // pulses a soft ring and the destination itself carries the
+  // pulsing marker.
   drawWalkPlan(ctx) {
     const plan = this.lastSnap.walkPath;
     if (!plan || plan.length === 0) { return; }
     const origin = this.lastSnap.walkOrigin;
-    const target = this.lastSnap.walkIndex >= 0 &&
-      this.lastSnap.walkIndex < plan.length
-      ? plan[this.lastSnap.walkIndex] : null;
+    const aim = this.lastSnap.walkIndex;
     const dest = this.lastSnap.walkDest ||
       plan[plan.length - 1];
     if (document.getElementById("show-dest").checked) {
@@ -3670,28 +3670,52 @@ const MapView = {
       for (const wp of plan) {
         points.push(this.worldToScreen(wp.x, wp.y));
       }
-      this.drawWalkFlow(ctx, points, performance.now());
-      // The waypoint dots: a filled magenta disc with a white outline
-      // at every waypoint. The coordinate labels draw on hover only
-      // (the constant labels littered every planned walk) - the
-      // hovered waypoint prints its full x y z triple in the dump walk
-      // line format, paste ready; the footer cursor chip and the
-      // ctrl+c copy carry the same values.
+      const nowMs = performance.now();
+      this.drawWalkFlow(ctx, points, nowMs);
+      // The route fractions of the waypoints: the same screen length
+      // measure the flow steps use, so a dot carries the hue of the
+      // ribbon under it.
+      const dists = [0];
+      let total = 0;
+      for (let i = 1; i < points.length; i++) {
+        total += Math.hypot(points[i].x - points[i - 1].x,
+          points[i].y - points[i - 1].y);
+        dists.push(total);
+      }
+      // The waypoint dots and the breathing ring of the aimed one. The
+      // coordinate labels draw on hover only (the constant labels
+      // littered every planned walk) - the hovered waypoint prints its
+      // full x y z triple in the dump walk line format, paste ready;
+      // the footer cursor chip and the ctrl+c copy carry the same
+      // values.
       ctx.save();
-      ctx.setLineDash([]);
-      ctx.lineWidth = 2;
       ctx.font = "11px Consolas, \"Liberation Mono\", monospace";
       ctx.textBaseline = "middle";
       ctx.textAlign = "left";
       for (let i = 0; i < plan.length; i++) {
         const wp = plan[i];
         const q = this.worldToScreen(wp.x, wp.y);
+        const fraction = total > 0 ? dists[i + 1] / total : 0;
+        const hue = this.walkFlowHue(fraction, nowMs).toFixed(1);
+        if (i === aim) {
+          // The in/out pulse: the colored ring around the waypoint
+          // the follower walks to swells and fades, so the eye finds
+          // the live target among the passed dots.
+          const breathe = 0.5 + 0.5 * Math.sin(nowMs / 260);
+          ctx.globalAlpha = 0.6 - 0.38 * breathe;
+          ctx.strokeStyle = "hsl(" + hue + ", " + (walkFlowSat + 12) +
+            "%, " + (walkFlowLight - 12) + "%)";
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.arc(q.x, q.y, 5.5 + 3.5 * breathe, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
         ctx.beginPath();
-        ctx.fillStyle = this.mapColors.userPath;
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+        ctx.fillStyle = "hsl(" + hue + ", " + (walkFlowSat + 14) +
+          "%, " + (walkFlowLight - 12) + "%)";
         ctx.arc(q.x, q.y, 3.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.stroke();
         if (i !== this.hoverWp) { continue; }
         const label = Math.round(wp.x) + " " + Math.round(wp.y) + " " +
           Math.round(wp.z);
@@ -3703,12 +3727,6 @@ const MapView = {
         ctx.fillStyle = this.mapColors.userPath;
         ctx.fillText(label, q.x + 8, q.y - 11);
         ctx.restore();
-      }
-      if (target && plan.length > 1) {
-        const t = this.worldToScreen(target.x, target.y);
-        ctx.beginPath();
-        ctx.arc(t.x, t.y, 6, 0, Math.PI * 2);
-        ctx.stroke();
       }
       ctx.restore();
     }
