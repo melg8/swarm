@@ -1,4 +1,4 @@
-# The city shopping errand runs on the live bots (status: in progress)
+# The city shopping errand runs on the live bots (status: complete)
 
 Started 2026-11-11, branch main, issue #0 (owner request: continue the
 city shopping work, but now let the real bots use it - if they have
@@ -119,3 +119,12 @@ first kills followed the return.
 
 Next: `task prepush`, rebase on `origin/main`, push the round, then
 move the fragment to the archive.
+
+## Status
+
+Complete: the production gate (the elven region and melee profile
+fences, the combat hold, the scroll leg, the 30 minute budget) is in
+`hunt/city_shopping.go`; the `city-shopping` acceptance passes on the
+production trigger, and `docs/hunting.md` carries the policy. The
+four round commits are pushed on `main`; the acceptance scenario no
+longer arms anything.
