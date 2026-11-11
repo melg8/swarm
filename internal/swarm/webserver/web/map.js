@@ -2505,12 +2505,12 @@ const MapView = {
   },
 
   // killMarkRadius is the on screen mark radius: the skull's bone
-  // spans the in combat mob marker times the size factor, scaled by the
-  // same unit scale the unit markers use, so the marks grow and shrink
-  // with the camera exactly like the mobs.
+  // spans the in combat mob marker, scaled by the same unit scale the
+  // unit markers use, so the marks grow and shrink with the camera
+  // exactly like the mobs.
   killMarkRadius() {
-    return killMarkMobRadius * killMarkSizeFactor
-      * (this.unitScale || 1) / killMarkBoneHalfWidth;
+    return killMarkMobRadius * (this.unitScale || 1)
+      / killMarkBoneHalfWidth;
   },
 
   // killMarkSprite renders the skull art once per device pixel ratio
@@ -4552,11 +4552,6 @@ const unitScaleMax = 1.6;
 // bot sees right before the kill.
 const killMarkMobRadius = 6;
 
-// killMarkSizeFactor sizes the mark against that footprint: the thin
-// bone art reads lighter than the solid mob circle, so the skull takes
-// twice the mob diameter to carry the same death read.
-const killMarkSizeFactor = 2;
-
 // killMarkBoneHalfWidth is the half width of the skull cranium in the
 // unit box of paintKillMark: the blit scales the art so the bone spans
 // the mob diameter.
@@ -4564,8 +4559,8 @@ const killMarkBoneHalfWidth = 0.6;
 
 // killMarkMaxRadius is the largest on screen mark radius the zoom
 // range asks for (the unitScaleMax cap), the resolution of the sprite.
-const killMarkMaxRadius = killMarkMobRadius * killMarkSizeFactor
-  * unitScaleMax / killMarkBoneHalfWidth;
+const killMarkMaxRadius = killMarkMobRadius * unitScaleMax
+  / killMarkBoneHalfWidth;
 
 // killMarkAlpha is the constant strength of the death statistics
 // layer: a mark reads the same whatever its age.

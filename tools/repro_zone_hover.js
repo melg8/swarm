@@ -774,8 +774,8 @@ function runScenarioKillMarks(mapFile) {
         "sprite fills " + (spriteArt ? spriteArt.fills.length : "-")
             + ", strokes " + (spriteArt ? spriteArt.strokes.length : "-"));
     check(results, "the sprite renders at the largest mark size",
-        !!spriteCanvas && spriteCanvas.width === 64
-        && spriteCanvas.height === 64,
+        !!spriteCanvas && spriteCanvas.width === 32
+        && spriteCanvas.height === 32,
         "sprite is " + (spriteCanvas
             ? spriteCanvas.width + "x" + spriteCanvas.height : "-"));
     // The art draws around its origin: without the move to the middle
@@ -842,13 +842,13 @@ function runScenarioKillMarks(mapFile) {
     const orcAt = MapView.worldToScreen(WORLD.orcA.x, WORLD.orcA.y);
     const mobFill = mobAt(orcAt);
     const mobRadius = mobFill ? mobFill.arcs[0][2] : 0;
-    // The skull bone takes twice the mob diameter: the thin bone art
-    // reads lighter than the solid circle.
+    // The skull bone spans the mob footprint exactly: the mark reads as
+    // the mob it replaced.
     const boneHalf = freshBlit.length === 1 ? freshBlit[0].w / 2 * 0.6 : 0;
-    check(results, "the mark is the mob footprint doubled",
-        mobRadius > 0 && Math.abs(boneHalf - 2 * mobRadius) < 0.05,
+    check(results, "the mark is the size of the mob it replaced",
+        mobRadius > 0 && Math.abs(boneHalf - mobRadius) < 0.05,
         "skull bone half " + boneHalf.toFixed(2)
-            + " vs doubled mob radius " + (2 * mobRadius).toFixed(2));
+            + " vs mob radius " + mobRadius.toFixed(2));
 
     // The marks follow the zoom exactly like the unit markers: at the
     // zoom cap the skull bone still spans the radius of a live mob.
@@ -863,12 +863,11 @@ function runScenarioKillMarks(mapFile) {
     const zoomScale = MapView.computeUnitScale();
     check(results, "the mark grows with the zoom like the mobs",
         zoomScale > 1 && zoomBlit.length === 1 && !!zoomMob
-        && Math.abs(zoomBlit[0].w / 2 * 0.6
-            - 2 * zoomMob.arcs[0][2]) < 0.05,
+        && Math.abs(zoomBlit[0].w / 2 * 0.6 - zoomMob.arcs[0][2]) < 0.05,
         "mark bone half " + (zoomBlit.length > 0
             ? (zoomBlit[0].w / 2 * 0.6).toFixed(2) : "-")
-            + " vs doubled mob radius " + (zoomMob
-                ? (2 * zoomMob.arcs[0][2]).toFixed(2) : "-")
+            + " vs mob radius " + (zoomMob
+                ? zoomMob.arcs[0][2].toFixed(2) : "-")
             + " at unit scale " + zoomScale.toFixed(2));
     MapView.scale = 0.12;
 

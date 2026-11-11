@@ -90,19 +90,17 @@ that replaces the current corpse face of `drawKillMarks` in
 - Owner feedback: the skulls were too small and ignored the map zoom.
 - `map.js`: `killMarkRadius()` sizes a mark from the mob marker of the
   kill - the skull bone spans `radiusOf` of an in combat npc (radius
-  6) times `killMarkSizeFactor` (2, the thin bone art reads lighter
-  than the solid circle) times the shared `unitScale` - so the marks
-  grow and shrink with the camera exactly like the mobs.
-  `unitScaleMin`/`unitScaleMax` became named constants
-  (computeUnitScale clamps with them), and `killMarkMaxRadius` derives
-  the sprite resolution from the cap.
+  6) times the shared `unitScale` - so the marks grow and shrink with
+  the camera exactly like the mobs. `unitScaleMin`/`unitScaleMax`
+  became named constants (computeUnitScale clamps with them), and
+  `killMarkMaxRadius` derives the sprite resolution from the cap.
 - `killMarkSprite` renders at the largest blit of the zoom range, so
   the zoom never rebuilds the raster (a pixel epsilon keeps the exact
   integer size from rounding up). `killMarkAt` picks within the
   larger of the fixed 13 px and the drawn radius.
 - `tools/repro_zone_hover.js`: the scenario measures the live in
-  combat mob circle of the same frame and asserts the skull bone spans
-  its diameter, at the default zoom and at the zoom cap.
+  combat mob circle of the same frame and asserts the skull bone
+  equals its radius, at the default zoom and at the zoom cap.
 - `docs/webui.md`: the size rule and the sprite resolution note.
 
 ### 2026-11-11 - the sprite centres the art in its raster
@@ -117,6 +115,15 @@ that replaces the current corpse face of `drawKillMarks` in
   `translate` calls and the scenario asserts the sprite moves the
   origin to its exact middle, so the quadrant bug cannot come back
   silently.
+
+### 2026-11-11 - the mark drops back to the plain mob footprint
+
+- Owner feedback: with the whole skull visible the doubled bone read
+  too large, so the mark halved.
+- `map.js`: `killMarkSizeFactor` is gone; `killMarkRadius()` and
+  `killMarkMaxRadius` read the in combat mob marker radius directly,
+  so the skull bone spans exactly the mob diameter at every zoom and
+  the sprite drops back to 32 px (64 at dpr 2).
 
 ## Status
 

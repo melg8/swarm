@@ -225,12 +225,11 @@ colors from the same variables).
   `docs/design/killmarks.html`, pre-rendered once into a sprite and
   blitted per mark - and STAYS on the map: the marks are the
   persistent death statistics of the fleet, so nothing fades and
-  nothing expires by time. A mark takes the footprint of the mob it
-  replaced, doubled (`killMarkRadius`): the skull's bone spans twice
-  the in combat mob marker radius (`radiusOf`), because the thin bone
-  art reads lighter than the solid circle, at the same zoom factor the
-  unit markers ride - the marks grow and shrink with the camera
-  exactly like the mobs. The ring is count
+  nothing expires by time. A mark is the size of the mob it replaced
+  (`killMarkRadius`): the skull's bone spans the in combat mob marker
+  radius (`radiusOf`) at the same zoom factor the unit markers ride -
+  the marks grow and shrink with the camera exactly like the mobs.
+  The ring is count
   capped (400 kills per bot, 2000 merged on the wire) and drops its
   oldest marks only when the hunt outgrows the cap; hovering a mark
   shows the victim tooltip (the name with the level and the kill
