@@ -716,7 +716,8 @@ function statsRenderBotBadges(payload) {
 // The phase colors of the timeline strip.
 const STATS_PHASE_COLORS = {
   engage: "green", loot: "gold", townWalk: "blue", townSell: "violet",
-  townReturn: "blue", delevel: "gray", user: "accent", idle: "gray"
+  townReturn: "blue", cityShop: "violet", delevel: "gray",
+  user: "accent", idle: "gray"
 };
 
 // statsDrawPhaseTimeline draws the horizontal phase band of the bot

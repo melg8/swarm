@@ -440,6 +440,8 @@ function botActivityLabel(bot) {
     return { kind: "town", text: "selling" };
   case "townReturn":
     return { kind: "return", text: "walking to farm spot" };
+  case "cityShop":
+    return { kind: "town", text: "city shopping" };
   case "delevel": {
     // The compact deleveling banner carries the target level the
     // diagnostics publish (the same message the map HUD detail
@@ -593,16 +595,15 @@ function renderSnapshot() {
 
 // phaseLabel maps the hunt loop phase (snap.phase, the same string the
 // hunt package uses internally: engage, loot, townWalk, townSell,
-// townReturn, delevel, user, idle) to a short human readable activity
-// text. The session status (snap.status: connecting, online, offline)
-// takes precedence when the loop has not published a phase yet - a
-// manual only session never sets the phase, so its banner stays on
-// the status text. The label is the headline of the bot status
-// banner; the detail adds the next step (e.g. "heading to the
-// trader") so the user sees at a glance what every bot is doing
-// right now. The detail stays straight to the point: the measured
-// progress (the waypoints, the trip age, the eta) and the goal,
-// nothing else.
+// townReturn, cityShop, delevel, user, idle) to a short human readable
+// activity text. The session status (snap.status: connecting, online,
+// offline) takes precedence when the loop has not published a phase
+// yet - a manual only session never sets the phase, so its banner
+// stays on the status text. The label is the headline of the bot
+// status banner; the detail adds the next step (e.g. "heading to the
+// trader") so the user sees at a glance what every bot is doing right
+// now. The detail stays straight to the point: the measured progress
+// (the waypoints, the trip age, the eta) and the goal, nothing else.
 function phaseLabel(snap) {
   const status = snap.status;
   if (status === "offline") {
@@ -638,6 +639,9 @@ function phaseLabel(snap) {
     // only the measured progress of the trip.
     return { kind: "return", text: "walking to farm spot",
       detail: walkDetail("", hunt) };
+  case "cityShop":
+    return { kind: "town", text: "city shopping",
+      detail: walkDetail("buying the top grade kit in Gludio", hunt) };
   case "delevel": {
     // The deleveling message: the target level and the trigger
     // evidence (the start level against the median mob level of the

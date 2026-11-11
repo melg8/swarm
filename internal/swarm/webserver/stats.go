@@ -57,6 +57,7 @@ const (
     phaseTownWalk
     phaseTownSell
     phaseTownReturn
+    phaseCityShop
     phaseDelevel
     phaseUser
     phaseIdle
@@ -71,6 +72,7 @@ var phaseCodes = map[string]uint8{
     "townWalk":   phaseTownWalk,
     "townSell":   phaseTownSell,
     "townReturn": phaseTownReturn,
+    "cityShop":   phaseCityShop,
     "delevel":    phaseDelevel,
     "user":       phaseUser,
     "idle":       phaseIdle,
@@ -79,7 +81,7 @@ var phaseCodes = map[string]uint8{
 // phaseNames maps the sample codes back to the published strings.
 var phaseNames = [phaseCount]string{
     "", "engage", "loot", "townWalk", "townSell", "townReturn",
-    "delevel", "user", "idle",
+    "cityShop", "delevel", "user", "idle",
 }
 
 // phaseCode resolves the sample code of a phase string.
