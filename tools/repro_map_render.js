@@ -2171,6 +2171,116 @@ function runScenarioWalkCursor(mapFile) {
     return results;
 }
 
+// runScenarioWalkFlow covers the living walk plan line: the plan
+// draws as the pastel flow of the flow lab variant 12 the owner
+// picked for the live map - the dark casing under short hue steps,
+// the bands travelling from the planning origin toward the
+// destination, the magenta waypoint dots and the pulsing destination
+// marker kept intact.
+function runScenarioWalkFlow(mapFile) {
+    const { MapView, record, elements, advanceClock } = loadMapJs(mapFile);
+    MapView.init();
+    elements.get("show-dest").checked = true;
+    const snap = buildSnapshot(0, false);
+    snap.walkOrigin = { x: WORLD.self.x, y: WORLD.self.y, z: -3500 };
+    snap.walkPath = [
+        { x: WORLD.self.x + 600, y: WORLD.self.y, z: -3510 },
+        { x: WORLD.self.x, y: WORLD.self.y + 1200, z: -3520 }
+    ];
+    snap.walkDest = snap.walkPath[1];
+    MapView.update(snap);
+    record.strokes.length = 0;
+    record.fills.length = 0;
+    record.dashes.length = 0;
+    MapView.draw();
+
+    const results = [];
+    const flowStrokes = (strokes) => strokes.filter((stroke) =>
+        /^hsl\(\d+(\.\d+)?, 58%, 78%\)$/.test(stroke.style));
+    const hueOf = (stroke) => parseFloat(stroke.style.slice(4));
+
+    // The casing spans the whole plan: the origin, the first waypoint
+    // and the goal give two screen segments under every flow step.
+    const casing = record.strokes.filter((stroke) =>
+        stroke.style === "rgba(27, 36, 48, 0.35)");
+    check(results, "the plan draws the dark casing under the flow",
+        casing.length === 1 && casing[0].width === 4.5
+            && casing[0].segments.length === 2,
+        JSON.stringify(casing.map((stroke) =>
+            [stroke.width, stroke.segments.length])));
+
+    // The flow steps: the pastel palette at the variant 12 saturation
+    // and lightness, short enough to follow the route length.
+    const flow = flowStrokes(record.strokes);
+    const head = worldToScreen(WORLD.self.x, WORLD.self.y);
+    const wp0 = worldToScreen(WORLD.self.x + 600, WORLD.self.y);
+    const wp1 = worldToScreen(WORLD.self.x, WORLD.self.y + 1200);
+    const total = Math.hypot(wp0.x - head.x, wp0.y - head.y)
+        + Math.hypot(wp1.x - wp0.x, wp1.y - wp0.y);
+    check(results, "the plan line carries the pastel flow steps",
+        flow.length >= Math.ceil(total / 10)
+            && flow.every((stroke) => stroke.width === 2.6)
+            && flow.every((stroke) => {
+                const hue = hueOf(stroke);
+
+                return hue >= 190 && hue <= 450;
+            }),
+        flow.length + " steps, hues " + flow.map(hueOf).slice(0, 3).join(",")
+        + ".." + flow.map(hueOf).slice(-3).join(","));
+
+    // The retired dashed magenta line: no plan stroke in the old
+    // color and width, no [7, 4] dash recorded anywhere.
+    const oldLine = record.strokes.filter((stroke) =>
+        stroke.style === "#ff44cc" && stroke.width === 2.5);
+    check(results, "the old dashed plan line is gone",
+        oldLine.length === 0
+            && !record.dashes.some((dash) =>
+                dash.length === 2 && dash[0] === 7 && dash[1] === 4),
+        oldLine.length + " old strokes, dashes "
+        + JSON.stringify(record.dashes));
+
+    // The waypoint dots and the destination marker keep the magenta:
+    // a filled 3.5 px disc per waypoint and the marker on the goal.
+    const dots = record.fills.filter((fill) =>
+        fill.style === "#ff44cc" && fill.arcs.length === 1
+            && Math.abs(fill.arcs[0][2] - 3.5) < 0.001);
+    const dotAt = (p) => dots.filter((fill) =>
+        Math.hypot(fill.arcs[0][0] - p.x, fill.arcs[0][1] - p.y) < 1);
+    check(results, "the waypoint dots stay magenta",
+        dotAt(wp0).length === 1 && dotAt(wp1).length >= 1,
+        dots.length + " dots at " + JSON.stringify(dots.map((fill) =>
+            fill.arcs[0].slice(0, 2))));
+
+    // The direction rule: after a quarter of the 2.8 s cycle (700 ms)
+    // the hue that sat at fraction 0.2 sits one quarter band farther
+    // along (0.125 of the route), so the flow runs toward the goal.
+    const hueAt = (fraction, t) => MapView.walkFlowHue(fraction, t);
+    check(results, "the hue bands travel toward the destination",
+        Math.abs(hueAt(0.2, 0) - hueAt(0.325, 700)) < 0.01,
+        hueAt(0.2, 0).toFixed(3) + " vs " + hueAt(0.325, 700).toFixed(3));
+
+    // The repaint moves: the same plan paints a different hue
+    // sequence once the clock advances.
+    const firstColors = flow.map((stroke) => stroke.style);
+    advanceClock(700);
+    record.strokes.length = 0;
+    record.fills.length = 0;
+    MapView.draw();
+    const laterColors = flowStrokes(record.strokes).map(
+        (stroke) => stroke.style);
+    check(results, "the pastel flow animates with the clock",
+        firstColors.length === laterColors.length
+            && firstColors.join("|") !== laterColors.join("|"),
+        firstColors[0] + " -> " + laterColors[0]
+        + " (" + firstColors.length + " steps)");
+
+    check(results, "the walk plan keeps the render loop alive",
+        MapView.needsMoreFrames() === true,
+        "needsMoreFrames " + MapView.needsMoreFrames());
+
+    return results;
+}
+
 // runScenarioDeadFace covers the corpse marker of the persistent
 // kill marks round (issue #6, the review round): the transient
 // corpse marker is a plain faded gray circle - no look direction
@@ -2282,6 +2392,7 @@ function main() {
         ["dead face", runScenarioDeadFace(mapFile)],
         ["hunting zone", runScenarioHuntingZone(mapFile)],
         ["walk cursor", runScenarioWalkCursor(mapFile)],
+        ["walk flow", runScenarioWalkFlow(mapFile)],
         ["hunt zones view", runScenarioHuntZonesView(mapFile)],
         ["hunt layer cache", runScenarioHuntLayerCache(mapFile)],
         ["fps meter", runScenarioFpsMeter(mapFile)],
