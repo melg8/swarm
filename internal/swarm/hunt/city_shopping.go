@@ -18,9 +18,10 @@ import (
 
 // The city shopping errand: a character that already owns a village
 // dress and has saved enough adena walks to the Elven Village
-// gatekeeper, teleports to Gludio, buys the top no-grade weapon and
-// armor set at the town shops, rides back to the Elven Village and
-// resumes the hunt on its own ground. The seam
+// gatekeeper, teleports to Gludio, sells the village weapon and armor
+// the trip replaces, buys the top no-grade weapon and armor set at
+// the town shops, rides back to the Elven Village and resumes the
+// hunt on its own ground. The seam
 // (SetCityShoppingEnabled) stays off in every production launch -
 // the ordinary town trip keeps owning the shopping of the live bots -
 // and only the acceptance scenario arms it.
@@ -385,12 +386,12 @@ func (l *Loop) driveCityShopTransfer(
 }
 
 // cityShopAt runs one merchant stop: the walk to the customer stand,
-// the stop shopping pipeline of the ordinary town trip and the
-// inventory verification of the stop items. The stop installs a
-// single trip stop for the duration of the visit, so the buys ride
-// the same merchant selection and buy confirmation gates the town
-// trips use; the stop and the in flight batch are cleared whatever
-// the outcome.
+// the sell first step of the pieces the stop displaces, the stop
+// shopping pipeline of the ordinary town trip and the inventory
+// verification of the stop items. The stop installs a single trip
+// stop for the duration of the visit, so the buys ride the same
+// merchant selection and buy confirmation gates the town trips use;
+// the stop and the in flight batch are cleared whatever the outcome.
 func (l *Loop) cityShopAt(
     ctx context.Context, stop cityShopStop,
 ) error {
@@ -405,9 +406,17 @@ func (l *Loop) cityShopAt(
         questWalkTimeout); err != nil {
         return fmt.Errorf("the walk to %s: %w", stop.merchant.Name, err)
     }
+    // The stop sells the equipped pieces its purchases displace (the
+    // village dress) before the replacements land: the tripPlan carries
+    // the SellFirst lines and the sold map records the offers, the same
+    // pair the town trip hands its sell first step.
+    buys := l.cityShopBuys(stop)
+    l.tripPlan = buys
+    l.sold = make(map[int32]bool)
+    l.resetReplacementSales()
     l.tripStops = []tripStop{{
         merchant: stop.merchant,
-        buys:     cityShopBuys(stop),
+        buys:     buys,
         sell:     false,
         teach:    false,
         guide:    false,
@@ -419,6 +428,8 @@ func (l *Loop) cityShopAt(
     l.resetBuyRequest()
     defer func() {
         l.tripStops = nil
+        l.tripPlan = nil
+        l.resetReplacementSales()
         l.resetBuyRequest()
         l.clearServerSelection()
         l.merchantID = 0
@@ -430,7 +441,8 @@ func (l *Loop) cityShopAt(
         if err := ctx.Err(); err != nil {
             return fmt.Errorf("cancelled: %w", err)
         }
-        if l.tickStopShopping(time.Now()) {
+        now := time.Now()
+        if l.cityShopTrade(now) {
             break
         }
         if time.Now().After(deadline) {
@@ -453,12 +465,27 @@ func (l *Loop) cityShopAt(
     return nil
 }
 
+// cityShopTrade runs one tick of a merchant stop: the sell first step
+// of the displaced pieces before the buys, so a replacement never
+// lands while the piece it replaces still sits in the paperdoll. It
+// reports true when the stop is done.
+func (l *Loop) cityShopTrade(now time.Time) bool {
+    if !l.replaceDone && l.stepReplacementSales(now) {
+        l.replaceDone = true
+    }
+
+    return l.replaceDone && l.tickStopShopping(now)
+}
+
 // cityShopBuys builds the frozen purchase lines of one stop: one
 // entry per item id, all riding the stop buylist (one transaction
-// request) at the Gludio price.
-func cityShopBuys(stop cityShopStop) []gear.Purchase {
+// request) at the Gludio price, each carrying the equipped piece of
+// its slot as the sell first target.
+func (l *Loop) cityShopBuys(stop cityShopStop) []gear.Purchase {
+    equipment := l.equipment()
     buys := make([]gear.Purchase, 0, len(stop.itemIDs))
     for _, itemID := range stop.itemIDs {
+        credit, sellFirst := gear.DisplacedByItem(equipment, itemID)
         buys = append(buys, gear.Purchase{
             ItemID:             itemID,
             ListID:             stop.listID,
@@ -467,8 +494,8 @@ func cityShopBuys(stop cityShopStop) []gear.Purchase {
             OwnedStack:         0,
             Price:              cityShopPrice(itemID),
             Reason:             "the top grade kit of the city shop",
-            SellFirst:          nil,
-            SellCredit:         0,
+            SellFirst:          sellFirst,
+            SellCredit:         credit,
             Gain:               0,
             Affordable:         true,
             Missing:            0,

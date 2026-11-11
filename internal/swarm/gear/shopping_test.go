@@ -343,6 +343,34 @@ func TestPlanPurchasesNoCreditWithoutEquippedGear(t *testing.T) {
     }
 }
 
+// TestDisplacedByItemPricesTheWornOccupant pins the fixed plan helper:
+// a purchase displaces the paperdoll occupant of its bodypart slot at
+// half the reference price, an empty slot and an unsellable starter
+// piece displace nothing.
+func TestDisplacedByItemPricesTheWornOccupant(t *testing.T) {
+    equipment := equipmentWith(
+        []state.InventoryItem{
+            item(100, 2), item(101, 24), item(102, 10),
+        },
+        map[Slot]int32{SlotRHand: 102, SlotChest: 101})
+    credit, sellFirst := DisplacedByItem(equipment, 68)
+    require.Zero(t, credit, "the starter sword is unsellable")
+    require.Empty(t, sellFirst)
+
+    credit, sellFirst = DisplacedByItem(equipment, 26)
+    require.Equal(t, npcdata.ItemPrice(24)/2, credit)
+    require.Equal(t, []int32{101}, sellFirst,
+        "the worn Bone Breastplate is displaced")
+
+    credit, sellFirst = DisplacedByItem(equipment, 34)
+    require.Zero(t, credit, "the empty legs slot displaces nothing")
+    require.Empty(t, sellFirst)
+
+    credit, sellFirst = DisplacedByItem(equipment, 17)
+    require.Zero(t, credit, "a consumable displaces nothing")
+    require.Empty(t, sellFirst)
+}
+
 // TestPlanPurchaseQueueMatchesPlainPlan pins the queue walker against
 // the plain planner: the affordable prefix of a purchase queue holds
 // exactly the PlanPurchases picks (same items, same order), the

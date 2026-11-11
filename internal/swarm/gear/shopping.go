@@ -1533,3 +1533,21 @@ func displacedValue(equipment Equipment, slots []Slot) (int64, []int32) {
 
     return credit, ids
 }
+
+// DisplacedByItem prices the equipped pieces a purchase of the item
+// replaces: the paperdoll occupants of the item's bodypart slots at
+// their sell value (see displacedValue). A fixed purchase plan (the
+// city shopping errand) derives the same SellFirst credit the planner
+// reads from its virtual paperdoll.
+func DisplacedByItem(equipment Equipment, itemID int32) (int64, []int32) {
+    stats, ok := npcdata.ItemGearStats(itemID)
+    if !ok {
+        return 0, nil
+    }
+    slots := SlotsForBodyPart(stats.BodyPart)
+    if len(slots) == 0 {
+        return 0, nil
+    }
+
+    return displacedValue(equipment, slots)
+}

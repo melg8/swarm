@@ -105,6 +105,7 @@ func TestCityShoppingCheckStory(t *testing.T) {
         checkCityShopGludio,
         checkCityShopWeapon,
         checkCityShopArmor,
+        checkCityShopSold,
         checkCityShopWorn,
         checkCityShopHome,
         checkCityShopFarm,
@@ -241,10 +242,10 @@ func TestCityShoppingWatchAbort(t *testing.T) {
             if testCase.wantDetail == "" {
                 return
             }
-            require.Contains(t, test.checks[6].Detail,
+            require.Contains(t, test.checks[7].Detail,
                 testCase.wantDetail)
-            require.Equal(t, checkCityShopFarm, test.checks[6].ID)
-            require.False(t, test.checks[6].Done)
+            require.Equal(t, checkCityShopFarm, test.checks[7].ID)
+            require.False(t, test.checks[7].Done)
         })
     }
 }
@@ -286,7 +287,7 @@ func TestCityShoppingWatchLatchesTheStory(t *testing.T) {
     bot.ApplyPaperdoll(doll)
     watch.evaluate(bot, test)
     require.True(t, test.checks[1].Done, "the Gludio arrival latches")
-    require.True(t, test.checks[4].Done, "the worn kit latches")
+    require.True(t, test.checks[5].Done, "the worn kit latches")
 
     // Back home with the paperdoll emptied: the live predicates are
     // false, the latched checks stay done.
@@ -300,6 +301,82 @@ func TestCityShoppingWatchLatchesTheStory(t *testing.T) {
     watch.evaluate(bot, test)
     require.True(t, test.checks[1].Done,
         "the Gludio arrival stays proven after the return")
-    require.True(t, test.checks[4].Done,
+    require.True(t, test.checks[5].Done,
         "the worn kit stays proven after a gear swap")
+}
+
+// TestCityShoppingWatchSellsTheOldKit pins the sale latch: the old
+// village gear must leave the bag while the errand is open, and the
+// restock trip after the errand cannot turn the check green.
+func TestCityShoppingWatchSellsTheOldKit(t *testing.T) {
+    newBot := func(oldGear bool) *state.Bot {
+        bot := state.NewBot(cityShoppingAccount)
+        bot.SetCharacter(cityShoppingAccount, 100, 18,
+            cityShoppingGludioX, cityShoppingGludioY, -3114,
+            level15HP, level15MP)
+        bot.SetOnline(cityShoppingAccount)
+        items := make([]state.InventoryItem, 0, len(cityShoppingSlots)+1)
+        for index, piece := range cityShoppingSlots {
+            items = append(items, state.InventoryItem{
+                ObjectID: int32(3000 + index), ItemID: piece.itemID,
+                Count: 1,
+            })
+        }
+        if oldGear {
+            items = append(items, state.InventoryItem{
+                ObjectID: 4000, ItemID: 2, Count: 1,
+            })
+        }
+        bot.ApplyItemList(items)
+        bot.ApplyUserInfo(state.UserInfo{
+            Name: cityShoppingAccount, Level: 15, ClassID: 18,
+            X: cityShoppingGludioX, Y: cityShoppingGludioY, Z: -3114,
+            MaxHP: level15HP, CurHP: level15HP,
+            MaxMP: level15MP, CurMP: level15MP,
+        })
+
+        return bot
+    }
+    openErrand := state.HuntErrand{
+        Name:      hunt.CityShoppingErrand,
+        StartedAt: time.Now(),
+        EndedAt:   time.Time{},
+        Err:       "",
+    }
+
+    // The old gear left the bag while the errand runs: the check
+    // latches.
+    sold := newBot(false)
+    sold.SetHuntErrand(openErrand)
+    watch := &cityShoppingWatch{}
+    test := &Test{}
+    test.setChecks(cityShoppingChecks())
+    watch.evaluate(sold, test)
+    require.True(t, test.checks[4].Done, "the sale latches")
+    require.Equal(t, checkCityShopSold, test.checks[4].ID)
+
+    // A leftover old piece keeps the check open with its count.
+    leftover := newBot(true)
+    leftover.SetHuntErrand(openErrand)
+    watch = &cityShoppingWatch{}
+    test = &Test{}
+    test.setChecks(cityShoppingChecks())
+    watch.evaluate(leftover, test)
+    require.False(t, test.checks[4].Done)
+    require.Contains(t, test.checks[4].Detail, "1 of 7 old pieces")
+
+    // The restock trip after the errand sells the leftover: the
+    // ended errand never turns the check green.
+    leftover.ApplyInventoryUpdate([]state.InventoryItem{
+        {ObjectID: 4000, ItemID: 2, Count: 0, Change: 3},
+    })
+    leftover.SetHuntErrand(state.HuntErrand{
+        Name:      hunt.CityShoppingErrand,
+        StartedAt: openErrand.StartedAt,
+        EndedAt:   time.Now(),
+        Err:       "",
+    })
+    watch.evaluate(leftover, test)
+    require.False(t, test.checks[4].Done,
+        "the post errand junk sale never masks the defect")
 }

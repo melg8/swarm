@@ -89,6 +89,9 @@ const (
     // checkCityShopArmor holds once every armor piece of the kit is
     // in the bag.
     checkCityShopArmor = "armor"
+    // checkCityShopSold holds once the replaced village gear left the
+    // bag during the errand.
+    checkCityShopSold = "sold"
     // checkCityShopWorn holds once the whole kit fills its paperdoll
     // slots.
     checkCityShopWorn = "worn"
@@ -118,6 +121,11 @@ var cityShoppingVillageKit = []ResetItem{
     {ItemID: 876, Count: 1}, // Ring of Anguish (left finger)
     {ItemID: 907, Count: 1}, // Necklace of Anguish
 }
+
+// cityShoppingOldGear is the village weapon, armor set and shield the
+// errand replaces and must sell at the Gludio merchants (the starter
+// jewels are kept).
+var cityShoppingOldGear = []int32{2, 24, 31, 44, 50, 38, 102}
 
 // cityShoppingSlot is one piece of the top kit and the paperdoll
 // slot it must fill: the worn check maps every slot object id back
@@ -182,6 +190,11 @@ func cityShoppingChecks() []Check {
         {
             ID:    checkCityShopArmor,
             Label: "Simplon sold the whole no-grade armor set",
+            Done:  false, Detail: "",
+        },
+        {
+            ID:    checkCityShopSold,
+            Label: "the replaced weapon and armor were sold",
             Done:  false, Detail: "",
         },
         {
@@ -265,6 +278,8 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
         armorBought:  false,
         gludioSeen:   false,
         gludioDetail: "",
+        soldSeen:     false,
+        soldDetail:   "",
         wornSeen:     false,
         wornDetail:   "",
         homeAtMs:     0,
@@ -318,6 +333,8 @@ type cityShoppingWatch struct {
     armorBought  bool
     gludioSeen   bool
     gludioDetail string
+    soldSeen     bool
+    soldDetail   string
     wornSeen     bool
     wornDetail   string
     homeAtMs     int64
@@ -356,6 +373,7 @@ func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
         tracker, cityShoppingSlots[1:])
     w.armorBought = armorBought == len(cityShoppingSlots)-1
     test.updateCheck(checkCityShopArmor, w.armorBought, armorDetail)
+    w.evaluateSales(tracker, test)
     worn, wornDetail := cityShoppingWornDetail(tracker)
     if worn == len(cityShoppingSlots) {
         w.wornSeen = true
@@ -382,6 +400,43 @@ func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
     test.updateCheck(checkCityShopHome, true,
         fmt.Sprintf("back at %d,%d after the city run", selfX, selfY))
     w.evaluateFarming(tracker, test)
+}
+
+// evaluateSales latches the sale of the replaced village gear: the
+// old pieces must leave the bag while the errand still runs, because
+// the later restock trip sells the leftovers as junk and would mask
+// the missing sell first step.
+func (w *cityShoppingWatch) evaluateSales(
+    tracker *state.Bot, test *Test,
+) {
+    if w.soldSeen {
+        test.updateCheck(checkCityShopSold, true, w.soldDetail)
+
+        return
+    }
+    errand := tracker.HuntErrand()
+    if errand.Name != hunt.CityShoppingErrand || !errand.EndedAt.IsZero() {
+        return
+    }
+    if !w.weaponBought || !w.armorBought {
+        return
+    }
+    carried := 0
+    for _, itemID := range cityShoppingOldGear {
+        if tracker.InventoryHasItem(itemID) {
+            carried++
+        }
+    }
+    if carried > 0 {
+        test.updateCheck(checkCityShopSold, false, fmt.Sprintf(
+            "%d of %d old pieces still in the bag", carried,
+            len(cityShoppingOldGear)))
+
+        return
+    }
+    w.soldSeen = true
+    w.soldDetail = "the old village gear left the bag at Gludio"
+    test.updateCheck(checkCityShopSold, true, w.soldDetail)
 }
 
 // evaluateFarming reports whether the hunt of the return ground paid

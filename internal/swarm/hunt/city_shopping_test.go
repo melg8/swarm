@@ -80,8 +80,9 @@ func TestCityShopPrice(t *testing.T) {
 // one line per item, the whole stop riding its own buylist, one
 // unit per line at the Gludio price.
 func TestCityShopBuysShape(t *testing.T) {
+    loop, _, _, _ := newTripLoop()
     for _, stop := range cityShoppingStops {
-        buys := cityShopBuys(stop)
+        buys := loop.cityShopBuys(stop)
         require.Len(t, buys, len(stop.itemIDs))
         for index, purchase := range buys {
             require.Equal(t, stop.itemIDs[index], purchase.ItemID)
@@ -94,6 +95,130 @@ func TestCityShopBuysShape(t *testing.T) {
             require.True(t, purchase.Affordable)
         }
     }
+}
+
+// TestCityShopBuysCarryTheDisplacedKit pins the sell first wiring of
+// the errand: every kit purchase names the worn village piece of its
+// slot and its sell credit, so the stop sells the old dress before
+// the replacement lands.
+func TestCityShopBuysCarryTheDisplacedKit(t *testing.T) {
+    loop, _, bot, _ := newTripLoop()
+    bot.ApplyItemList([]state.InventoryItem{
+        {ObjectID: 100, ItemID: 2, Count: 1, Equipped: true, Change: 1},
+        {ObjectID: 101, ItemID: 24, Count: 1, Equipped: true, Change: 1},
+        {ObjectID: 102, ItemID: 31, Count: 1, Equipped: true, Change: 1},
+        {ObjectID: 103, ItemID: 44, Count: 1, Equipped: true, Change: 1},
+        {ObjectID: 104, ItemID: 50, Count: 1, Equipped: true, Change: 1},
+        {ObjectID: 105, ItemID: 38, Count: 1, Equipped: true, Change: 1},
+        {ObjectID: 106, ItemID: 102, Count: 1, Equipped: true, Change: 1},
+    })
+    paperdoll := [state.PaperdollSlots]int32{}
+    for _, piece := range []struct {
+        objectID int32
+        slot     int
+    }{
+        {100, state.PaperdollRHand},
+        {101, state.PaperdollChest},
+        {102, state.PaperdollLegs},
+        {103, state.PaperdollHead},
+        {104, state.PaperdollGloves},
+        {105, state.PaperdollFeet},
+        {106, state.PaperdollLHand},
+    } {
+        paperdoll[piece.slot] = piece.objectID
+    }
+    bot.ApplyPaperdoll(paperdoll)
+
+    weaponBuys := loop.cityShopBuys(cityShoppingStops[0])
+    require.Len(t, weaponBuys, 1)
+    require.Equal(t, []int32{100}, weaponBuys[0].SellFirst,
+        "the worn village sword is displaced by the Falchion")
+    require.Equal(t, npcdata.ItemPrice(2)/2, weaponBuys[0].SellCredit)
+
+    armorBuys := loop.cityShopBuys(cityShoppingStops[1])
+    require.Len(t, armorBuys, len(cityShoppingStops[1].itemIDs))
+    displaced := make([][]int32, 0, len(armorBuys))
+    for _, purchase := range armorBuys {
+        require.Len(t, purchase.SellFirst, 1,
+            "the purchase of %s displaces one village piece",
+            npcdata.ItemName(purchase.ItemID))
+        require.Positive(t, purchase.SellCredit)
+        displaced = append(displaced, purchase.SellFirst)
+    }
+    require.Equal(t,
+        [][]int32{{101}, {102}, {103}, {104}, {105}, {106}},
+        displaced, "every armor slot sells its own village piece")
+}
+
+// TestCityShopTradeSellsBeforeTheBuy pins the stop wiring: the worn
+// weapon is unequipped and sold, and only the confirmed sale lets the
+// replacement buy request out.
+func TestCityShopTradeSellsBeforeTheBuy(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    bot.ApplyItemList([]state.InventoryItem{
+        {ObjectID: 100, ItemID: 2, Count: 1, Equipped: true, Change: 1},
+        {ObjectID: 999, ItemID: 57, Count: cityShoppingWallet, Type2: 4},
+    })
+    paperdoll := [state.PaperdollSlots]int32{}
+    paperdoll[state.PaperdollRHand] = 100
+    bot.ApplyPaperdoll(paperdoll)
+    stop := cityShoppingStops[0]
+    arriveAtMerchantStand(bot, stop.merchant)
+    spawnMerchantNPC(bot, stop.merchant, 61)
+
+    buys := loop.cityShopBuys(stop)
+    require.Equal(t, []int32{100}, buys[0].SellFirst)
+    loop.tripPlan = buys
+    loop.sold = make(map[int32]bool)
+    loop.resetReplacementSales()
+    loop.tripStops = []tripStop{{
+        merchant: stop.merchant,
+        buys:     buys,
+        sell:     false,
+        teach:    false,
+        guide:    false,
+    }}
+    loop.sellPhaseAt = time.Now()
+
+    now := time.Now()
+    require.False(t, loop.cityShopTrade(now))
+    require.Equal(t, []int32{100}, loop.replaceQueue,
+        "the worn village sword is queued for the sale")
+    require.Empty(t, game.buys, "no buy while the piece sells")
+
+    require.False(t, loop.cityShopTrade(now))
+    require.Equal(t, []int32{100}, game.uses,
+        "the displaced sword is unequipped first")
+    require.Empty(t, game.sells)
+    require.Empty(t, game.buys)
+
+    bot.ApplyInventoryUpdate([]state.InventoryItem{{
+        ObjectID: 100, ItemID: 2, Count: 1, Equipped: false, Change: 2,
+    }})
+    loop.sellAt = time.Time{}
+    require.False(t, loop.cityShopTrade(now))
+    require.NotEmpty(t, game.sells, "the displaced sword sells first")
+    require.Empty(t, game.buys, "the buy waits for the confirmed sale")
+
+    bot.ApplyInventoryUpdate([]state.InventoryItem{{
+        ObjectID: 100, ItemID: 2, Count: 0, Change: 3,
+    }})
+    loop.sellAt = now.Add(-transactionPause - time.Second)
+    loop.merchantID = 0
+    loop.merchantPick = now.Add(-2 * time.Second)
+    require.False(t, loop.cityShopTrade(now))
+    require.Equal(t, int32(61), loop.merchantID,
+        "the buy picks the weapon merchant")
+
+    loop.merchantPick = now.Add(-2 * time.Second)
+    require.False(t, loop.cityShopTrade(now))
+    require.Contains(t, game.forces, int32(61),
+        "the buy selects the weapon merchant")
+    bot.ApplySelfTarget(61)
+    loop.merchantPick = now.Add(-2 * time.Second)
+    require.False(t, loop.cityShopTrade(now))
+    require.NotEmpty(t, game.buys, "the replacement buy follows the sale")
+    require.Equal(t, cityShopWeaponID, game.buys[0][0].ItemID)
 }
 
 // cityShoppingTestLoop builds a loop with the armed seam, a navigator
