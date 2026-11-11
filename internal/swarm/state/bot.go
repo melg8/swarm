@@ -894,6 +894,52 @@ func (b *Bot) SelfPosition() (int32, int32, int32, bool) {
     return b.char.X, b.char.Y, b.char.Z, true
 }
 
+// SelfProjectedPosition estimates where the server holds the played
+// character right now: a standing character keeps its broadcast place,
+// a moving one advances along its segment at the live run speed. The
+// proxy compares the attached client reports against it, because the
+// server snaps a character whose report is more than one move speed
+// away. The estimate is 3D like the server check; the object scans use
+// the 2D projectedPosition.
+func (b *Bot) SelfProjectedPosition() (float64, float64, float64, bool) {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    if b.selfID == 0 {
+        return 0, 0, 0, false
+    }
+    x, y, z := b.char.projectedPosition(time.Now())
+
+    return x, y, z, true
+}
+
+// projectedPosition estimates the current place of the character from
+// its movement broadcast: the Mobius Creature.updatePosition loop
+// steps a mover toward the destination at the effective speed every
+// game tick, so the straight segment interpolates by the traveled 3D
+// distance. The clamped fraction makes a lost arrival broadcast end at
+// the destination instead of running past it.
+func (c CharacterState) projectedPosition(now time.Time) (
+    float64, float64, float64,
+) {
+    x := float64(c.X)
+    y := float64(c.Y)
+    z := float64(c.Z)
+    if !c.Moving || c.MoveAt.IsZero() || c.RunSpeed <= 0 {
+        return x, y, z
+    }
+    dx := float64(c.DestX) - x
+    dy := float64(c.DestY) - y
+    dz := float64(c.DestZ) - z
+    dist := math.Sqrt(dx*dx + dy*dy + dz*dz)
+    elapsed := now.Sub(c.MoveAt).Seconds()
+    if dist < 1 || elapsed <= 0 {
+        return x, y, z
+    }
+    frac := math.Min(c.RunSpeed*elapsed, dist) / dist
+
+    return x + dx*frac, y + dy*frac, z + dz*frac
+}
+
 // SelfHeading returns the last observed heading of the played
 // character (the client position validation reports it alongside the
 // placement, the server stores it as the client heading).
