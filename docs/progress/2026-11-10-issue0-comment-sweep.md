@@ -289,6 +289,24 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.4 percent, 499 blocks,
   1,228 history markers.
 
+### 2026-11-12 - hunt/quest_chains.go keeps the data, the pages move to the doc
+
+- 39 blocks compress or leave: the package header drops from 21 lines
+  to 8, the field comments keep the load-bearing facts (the display id
+  plus 1000000 offset, the 2.5 s delayed quest drop, the onEvent versus
+  onTalk setCond split) and the round stories drop.
+- The per stage dialog narrative (page numbers, setCond values, item
+  transfers, the accept event, the class change pages) moves to
+  `docs/quest_protocol.md`, which now lists both chains' registered
+  items and talk pages per cond; the code keeps the values only.
+- The doc contradiction found en route: the return Gludin hop is
+  Richlin (30320, 7300 adena), not Trisha (30059, the Dion gatekeeper);
+  the geography section and the gatekeeper row are corrected.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.3 percent, 498 blocks,
+  1,224 history markers; `quest_chains.go` fell from 45.6 to
+  35.2 percent (160 comment lines).
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -298,8 +316,8 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `acceptance/archer_fleet.go`, `pathfind/search.go`,
 `pathfind/navmesh/hierarchy.go`, `state/scans.go`, `hunt/zones.go` and
 `hunt/town.go`, `hunt/kite.go` and `hunt/cell_policy.go` (both second
-passes), `hunt/delevel.go` and the `hunt/loop_state.go` field registry
-(the share of a struct file stays high by nature). Next:
-`hunt/quest_trip.go` (253 comment lines), `hunt/shopping.go` (249),
-`hunt/quest_chains.go` (246, 45.6 percent); the share and the block count
-are re-measured at the end.
+passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
+share of a struct file stays high by nature) and `hunt/quest_chains.go`.
+Next: `hunt/quest_trip.go` (253 comment lines), `hunt/shopping.go` (249)
+and `acceptance/archer_kite.go` (240, 28.3 percent); the share and the
+block count are re-measured at the end.

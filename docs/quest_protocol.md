@@ -365,6 +365,14 @@ change itself, walked end to end from the sources. Every npc
 position below is the spawn entry of the live stack (the
 `dist/game/data/spawns/**.xml` files).
 
+The talk entry of every station: a first double click of an npc
+without an `ON_NPC_FIRST_TALK` listener opens the static trainer
+page (`data/html/trainer/<npcid>.htm`), whose "Quest" link (the bare
+`bypass Script` command) runs `ScriptLink.showQuestWindow` - a
+station of exactly one quest resolves straight to the quest page of
+the current cond (the choose window only appears for npcs offering
+several quests).
+
 ### Q00406 Path to an Elven Knight (quest id 406)
 
 Script: `dist/game/data/scripts/quests/Q00406_PathOfTheElvenKnight/
@@ -384,10 +392,20 @@ static trainer html `data/html/trainer/30327.htm` with the
 | 6 | return to Kluto | cond 6 + Kluto's Box (1203) |
 | 7 | return to Sorius | Elven Knight Brooch (1204) + 3200 xp + 2280 sp, `exitQuest(true, true)` |
 
-The registered quest items (removed on exit) are the letter, the
-box, the memo and the two piece types - **the brooch 1204 is not
-registered, so it survives the quest exit** and stays in the
-inventory as the class change proof.
+The registered quest items (removed on exit) are Sorius' Letter
+1202, Kluto's Box 1203, Kluto's Memo 1276 and the two piece types
+(Topaz 1205, Emerald 1206) - **the brooch 1204 is not registered,
+so it survives the quest exit** and stays in the inventory as the
+class change proof.
+
+The pages the talk stages answer: cond 1 -> 30327-07 (no pieces) or
+30327-08, cond 2 -> 30327-09 (setCond(3), the letter 1202 given),
+cond 3 -> 30317-01 with the favor link (event 30317-02.htm:
+setCond(4), the letter taken, Kluto's Memo 1276 given), cond 4 ->
+30317-03 or 30317-04, cond 5 -> 30317-05 (setCond(6), all pieces
+taken, Kluto's Box 1203 given) and cond 6 -> 30327-10 (the box and
+the memo taken, the brooch 1204 given, 3200 xp + 2280 sp,
+`exitQuest(true, true)`).
 
 ### Q00407 Path to an Elven Scout (quest id 407)
 
@@ -402,6 +420,23 @@ research draft's "bugbear" was the name error; the Bugbear is npc 20133 and no q
 this chain kills it)
 and the Ol Mahum Sentry 27031 spawns around Prias (-8700, 72362;
 `Others/19_20.xml`). The proof item: Reisa's Recommendation (1217).
+The registered quest items (removed on exit): Reisa's Letter 1207,
+the four torn letter pieces 1208-1211 (one per kill, in id order),
+Moretti's Herb 1212, Moretti's Letter 1214, Prias' Letter 1215, the
+Honorary Guard token 1216 and the Rusted Key 1293; the
+recommendation 1217 survives the exit.
+
+The accept link `30328-05` does the whole start (`startQuest` plus
+Reisa's Letter 1207; Q00406 needs two clicks). The pages the talk
+stages answer: cond 1 -> the second link's event 30337-03.htm
+(setCond(2), the letter taken), cond 3 -> 30337-06 (setCond(4), the
+pieces taken, the herb 1212 and Moretti's Letter 1214 given), cond
+4 -> 30426-01 (setCond(5)), cond 6 -> 30426-02 (setCond(7), the
+key, the herb and the letter taken, Prias' Letter 1215 given), cond
+7 -> 30337-07 (setCond(8), Prias' letter taken, the Honorary Guard
+token 1216 given) and cond 8 -> 30328-07 (the token taken, the
+recommendation 1217 given, 3200 xp + 1000 sp,
+`exitQuest(true, true)`).
 
 ### The class change (ElfHumanFighterChange1)
 
@@ -423,6 +458,10 @@ and Ramos (30373, Gludin). The dialog chain at Rains:
    `player.setPlayerClass(19)` + `setBaseClass(19)` +
    `broadcastUserInfo()` + the after-change page 30288-35.htm.
 
+Page 30288-15.htm carries the scout change link (`bypass -h Script
+ElfHumanFighterChange1 22`); the same `ClassChangeRequested` takes
+the Reisa's Recommendation (1217) and flips the class to 22.
+
 The class id change surfaces in the `UserInfo` (0x04) block the
 bot already parses (`SelfClassID`), and in the character selection
 packet of the next login - the M2 acceptance criterion.
@@ -443,8 +482,9 @@ none of this. The reachable segments:
   of units of geodata.
 - Gludio -> Gludin: the Gludio gatekeeper **Bella (30256**, Gludio
   -12736, 122816, -3114) teleports to the Gludin village square
-  for 7300 adena; the Gludin gatekeeper Trisha (30059) covers the
-  return hop for 3400.
+  for 7300 adena; the Gludin gatekeeper **Richlin (30320**, -80752,
+  149776, -3044) covers the return hop for 7300 (Trisha 30059 is
+  the Dion gatekeeper, not this hop).
 - The Ruins of Agony and the Ol Mahum camps are walking distance
   of the two towns (the 20_xx/19_2x spawn regions).
 
@@ -539,4 +579,4 @@ it).
 | the elven scout quest | `data/scripts/quests/Q00407_PathOfTheElvenScout/` |
 | the class change | `data/scripts/village_master/ElfHumanFighterChange1/` (script + pages 30288-*.htm) |
 | the spawn geography | `data/spawns/Gludio/GludioNPCs.xml`, `Gludin/GludinVillageNPCs.xml`, `Others/18_22.xml`, `Others/19_20.xml`, `ElvenTerritory/ElvenVillageNPCs.xml` |
-| the gatekeeper network | `data/teleporters/town/30146.xml` (Mirabel, Elven Village), `30256.xml` (Bella, Gludio), `30059.xml` (Trisha, Gludin) |
+| the gatekeeper network | `data/teleporters/town/30146.xml` (Mirabel, Elven Village), `30256.xml` (Bella, Gludio), `30320.xml` (Richlin, Gludin) |
