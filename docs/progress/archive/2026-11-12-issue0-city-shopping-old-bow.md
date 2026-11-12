@@ -1,4 +1,4 @@
-# The city shopping errand sells the replaced bow (status: in progress)
+# The city shopping errand sells the replaced bow (status: complete)
 
 Started 2026-11-12, branch main, issue #0 (owner report).
 
@@ -76,7 +76,20 @@ Done means:
   `task verify`.
 - Next: the live acceptance run on the deployed stack.
 
+### 2026-11-12 - the live acceptance run
+
+- `go run ./cmd/swarm -acceptance city-shopping -login
+  127.0.0.3:2106 -web ""` passed all 9 checks in 7m52s
+  (`logs/acceptance/city-shopping-20261112-145518-24936-1.log`).
+- The log proves the sale: the bow stop opened at 14:57:46 with 1 of
+  8 old pieces left (the Forest Bow), the stop offered it for sale at
+  14:57:47, the `sold` check latched at 14:57:48 and the Composition
+  Bow buy went out at 14:57:49; no inventory print after the sale
+  carries the item 272.
+- The round record is `docs/devlog/2026-11-12-issue0-city-shopping-old-bow.md`.
+
 ## Status
 
-In progress: offline green, the live `city-shopping` acceptance run
-next, then the commit and push.
+Complete: the fix, the offline tests, the acceptance update and the
+live run are in; the fragment moves to the archive with the last
+commit.
