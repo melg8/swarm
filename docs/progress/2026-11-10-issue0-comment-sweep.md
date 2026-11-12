@@ -235,6 +235,22 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.5 percent, 522 blocks,
   1,261 history markers.
 
+### 2026-11-12 - hunt/town.go keeps the trip gates and numbers only
+
+- 37 blocks compress: the trip lifecycle keeps the numbers (the 50
+  percent slot and weight triggers, the five minute trip cooldown, the
+  45 s weapon/guide/debt window, the 10 s skill list wait, the 20 minute
+  trip timeout, the 2 tolerated aborts and the doubling cooldown capped
+  at the hour, the 2 damage fists, the referencePrice/2 sell pricing)
+  and the round stories drop.
+- The duplicate "a bot outside the zone returns first" block goes: two
+  copies sat in `maybeStartTownTrip`, the first one stale (it did not
+  know the weapon and guide exceptions); one gate comment carries the
+  rule now.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.5 percent, 509 blocks,
+  1,250 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -242,8 +258,8 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `shopping.go`, `cell_policy.go`, `user.go`, `quest_trip.go`,
 `town_walk.go` (twice), `loop_state.go`, `town_stuck.go`,
 `acceptance/archer_fleet.go`, `pathfind/search.go`,
-`pathfind/navmesh/hierarchy.go`, `state/scans.go` and `hunt/zones.go`.
-Next: `hunt/town.go` (272 comment lines), `hunt/kite.go` (371, the
-second pass), `hunt/cell_policy.go` (288, the second pass),
-`hunt/loop_state.go` (268) and `hunt/delevel.go` (259); the share and
-the block count are re-measured at the end.
+`pathfind/navmesh/hierarchy.go`, `state/scans.go`, `hunt/zones.go` and
+`hunt/town.go`. Next: `hunt/kite.go` (371 comment lines, the second
+pass), `hunt/cell_policy.go` (288, the second pass), `hunt/loop_state.go`
+(268), `hunt/delevel.go` (259) and `hunt/quest_trip.go` (253); the share
+and the block count are re-measured at the end.
