@@ -69,7 +69,26 @@ change: `go build ./...`, `go vet`, `go test ./internal/swarm/hunt/...
 -count=1` (97.5 s) and `golangci-lint run ./internal/swarm/hunt/...`
 (0 issues) green.
 
+### 2026-11-12 - hunt: group the loop state by concern
+`Loop` is no longer one flat field block: the 250 concern fields moved
+into fourteen embedded sub-structs declared in `loop_state.go` (819
+lines, one block per concern): `combatState` 33 fields, `lootState` 4,
+`restState` 3, `questState` 3, `travelState` 49, `townState` 11,
+`shopState` 24, `learnState` 17, `delevelState` 12, `groundState` 12,
+`safetyState` 15, `diagState` 13, `userState` 21, `gearState` 2,
+`kiteState` 31. The blocks are embedded, so the names are promoted and
+not a single call site of the 474 `Loop` methods changed. `loop.go`
+dropped to 122 lines: the package doc, the composition, the constructor
+and the setters. `NewLoop` lost the 228 line flat literal: it now sets
+the six core fields and the nine non-zero starts (the five maps, the
+equip manager, the kite defaults, the trip approach radius and the
+`zoneDeathCap` -1), every other field keeps its documented zero value
+(byte for byte the values the literal spelled out). Verified: `go
+build ./...`, `go vet ./...`, `task fmt:check`, `go test
+./internal/swarm/hunt/... -count=1` (97.6 s), `golangci-lint run
+./internal/swarm/hunt/...` (0 issues).
+
 ## Status
 
-Commit 1 done. Next: field grouping into per-concern embedded
-sub-structs (commit 2), then the `tickContext` and `engage` splits.
+Commits 1 and 2 done. Next: the `tickContext` split (commit 3), then
+the `engage` split (commit 4), full verify and E2E.
