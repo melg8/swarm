@@ -1803,6 +1803,43 @@ The short form:
   still talks from wherever the character stands when the 3D distance
   fits the interaction gate (the 2026-09-11 05:45 z gap rule), a
   teacher on a deck the ring cannot reach skips the stop.
+- **The exact merchant segment** (`startWalkExactSegment`): the
+  merchant stops plan through the mesh corridor search with the
+  approach radius zero - the plan must arrive at the destination cell,
+  whatever walkable cell the mesh resolves it onto. The approach ring
+  catches the first deck polygon inside its radius and ends the plan
+  short: the shop quarter report held the wide ring plans 147-232
+  units from the merchant, on the outer railing side of the stall, and
+  the talk fired from there (or slid along the railing forever). The
+  exact search answers the customer cell across the counter instead:
+  the merchant's own cell sits on ground the mesh never walks onto (the
+  counter row), so the corridor ends at the closest walkable floor cell
+  to the npc. The ring fallback owns exactly one failure class - the
+  plan resolved onto a foreign deck (a connected roof over the shop
+  answers the closest layer of the destination cell): the conservative
+  ring stop on the surrounding deck is the safe answer there. A hard
+  navigator error or a corridor-less mesh answer fails the ring search
+  the same way (the reachable component is the same for both goals), so
+  the callers skip the fallback and the trip attempt keeps its one
+  search cost. After a ring walk completes, `exactApproachWanted` runs
+  the exact final approach when the merchant sits beyond the customer
+  ring but inside the exact distance gate - near enough for the bounded
+  search, far enough that the talk would fire from the ring edge
+  instead of the counter.
+- **The npc arrival handoff** (`stopNpcArrivalMet`): a running segment
+  hands the merchant stop to the talk machinery once the character
+  stands within the wide arrive radius of the segment destination (the
+  customer stand point) AND within the interaction distance of the
+  merchant npc. The tight verification of the plan's final cell can
+  grind forever against the vintage geodata disagreement - the live
+  server resolves the clicked destination onto its own surface (the
+  pack holds cells 64 units off the live floor, the creation building
+  interior among them) - and the stuck ladder would burn the whole
+  escalation down to the trip abort while the character stands ready to
+  trade. The stop exists to bring the talk within reach, not to verify
+  the pack's cell; the teach stops keep their own walk contract (the
+  hall rows need the real arrival) and the non merchant segments answer
+  false.
 - The npc talk selection clears when the conversation ends: the
   merchant select and the teacher talk click leave the villager
   selected server side (the server never clears a selection, only the

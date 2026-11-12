@@ -662,6 +662,21 @@ corner probe is a length, not a leg at all.
   lint:new`. `shopping_candidates.go` fell from 28.5 to 18.7 percent
   (111 comment lines), no block above 8 lines.
 
+### 2026-11-12 - hunt/town_segment.go moves the segment ladder to the doc
+
+- 12 blocks compress: the 26 line `startWalkExactSegment` header (the
+  approach zero customer cell answer, the 147-232 unit ring report, the
+  foreign deck fallback), the npc rung ladder, the `stopNpcArrivalMet`
+  handoff (the 64 unit pack disagreement, the creation building
+  interior), the priced approach planners, the `replanTownWalkSegment`
+  contract, the `armTownWalkSegment` frame measurement and the refusal
+  budget re-arm. `docs/hunting.md` gained the exact merchant segment
+  bullet (the ring fallback failure class, the exact final approach
+  gate) and the npc arrival handoff bullet in the same commit.
+- Verified: `task fmt`, `go build ./...`, the hunt tests, `task
+  lint:new`. `town_segment.go` fell from 40.0 to 29.2 percent (109
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -680,8 +695,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
 `pathfind/navmesh/pocket.go`, `pathfind/capsule.go`, `hunt/loop_avoid.go`,
 `hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go`,
-`hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go` and
-`gear/shopping_candidates.go` (second passes). Next: a fresh
-`task comment:audit --top 10` pick (the `proxy/game.go` and
-`hunt/loop_state.go` entries stay untouched while their fragments are
-active); the share and the block count are re-measured at the end.
+`hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go`,
+`gear/shopping_candidates.go` and `hunt/town_segment.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
+`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
+their fragments are active); the share and the block count are
+re-measured at the end.
