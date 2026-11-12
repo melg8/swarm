@@ -690,6 +690,19 @@ corner probe is a length, not a leg at all.
   lint:new`. `plaza_herbiel.go` fell from 29.1 to 18.4 percent (38
   comment lines), no block above 8 lines.
 
+### 2026-11-12 - pathfind/click_validate.go moves the server rules to the doc
+
+- 5 blocks compress: the 24 line `ValidateClick` header (the cancel
+  mechanism, the far click rule, the Bresenham line, the climb limit and
+  step-over, the anti corner cut, the final layer match), the raster
+  difference against the search supercover, the height resolution, the
+  anti corner flanks and the step-over escape. A new `## The server
+  click validation port` section of `docs/pathfinding.md` carries the
+  port rules and the four answer classes in the same commit.
+- Verified: `task fmt`, `go build ./...`, the pathfind tests, `task
+  lint:new`. `click_validate.go` fell from 23.5 to 18.3 percent (59
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -709,8 +722,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `pathfind/navmesh/pocket.go`, `pathfind/capsule.go`, `hunt/loop_avoid.go`,
 `hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go`,
 `hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go`,
-`gear/shopping_candidates.go`, `hunt/town_segment.go` and
-`acceptance/plaza_herbiel.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the `proxy/game.go` and
-`hunt/loop_state.go` entries stay untouched while their fragments are
-active); the share and the block count are re-measured at the end.
+`gear/shopping_candidates.go`, `hunt/town_segment.go`,
+`acceptance/plaza_herbiel.go` and `pathfind/click_validate.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
+`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
+their fragments are active); the share and the block count are
+re-measured at the end.

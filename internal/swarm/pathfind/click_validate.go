@@ -34,30 +34,14 @@ const (
     clickMinimumDistance = 1.0
 )
 
-// ValidateClick answers what the game server would do with a
-// mouse-mode MoveToLocation click from one world point to another: it
-// returns the destination the server would actually walk to and
-// whether the click runs at all. The walk answers false when the
-// server cancels the click - its geodata validation collapses the
-// target onto the walker (distance below the cancellation limit), the
-// observed mechanism of the town walk stuck: the bot re-clicks the
-// same waypoint, every answer is ActionFailed and the character
-// freezes until the re-path budget aborts the trip.
-//
-// The port follows Creature.moveToLocation with a failing server
-// pathfinder (the pessimistic live-observed branch: the correction
-// path of getValidLocation below): the far click rule beyond
-// clickFarDistance skips the validation (the server accepts far
-// targets as clicked), everything else walks the Bresenham cell line
-// the server's GridLineIterator2D produces with the running height
-// resolution of getNearestZ, the height increase limit with its
-// neighbour layer step-over, the completely blocked cell check and
-// the anti corner cut rule of checkNearestNsweAntiCornerCut on every
-// step, and the final layer match: a line that arrives at the target
-// cell on a different layer than the target z names collapses the
-// destination back onto the walker. A partial result (the walk stops
-// short at the last valid cell of the line) is a RUNNING click: the
-// server moves the character to the returned point.
+// ValidateClick answers what the server would do with a mouse-mode
+// MoveToLocation click: the destination it actually walks to and whether the
+// click runs at all. A click the geodata correction collapses onto the walker
+// is canceled, and the bot re-clicking the same waypoint freezes until the
+// re-path budget aborts the trip. The port follows Creature.moveToLocation with
+// a failing server pathfinder: the far click rule, the Bresenham line with the
+// running height resolution, the climb limit and step-over, the blocked cell
+// and anti corner cut checks, the final layer match (docs/pathfinding.md).
 func (e *Engine) ValidateClick(from, to Vec3) (Vec3, bool) {
     if e == nil {
         return to, true
@@ -123,11 +107,9 @@ func (e *Engine) validLocation(
     return clickWorldOf(to.X, to.Y, nearestTo)
 }
 
-// clickLine is a verbatim port of the server GridLineIterator2D: the
-// Bresenham raster whose diagonal double steps the anti corner cut
-// rule of the server applies to (the t/k supercover raster of the
-// search splits the same line into cardinal steps - a segment the search
-// verifies can still fail the server walk).
+// clickLine is a verbatim port of the server GridLineIterator2D: the Bresenham
+// raster whose diagonal double steps the anti corner cut rule applies to (the
+// search raster splits the same line into cardinal steps).
 type clickLine struct {
     curX, curY     int32
     tgtX, tgtY     int32
@@ -236,9 +218,8 @@ func clickWorldOf(cx, cy int32, z int16) (int32, int32, int32) {
         cy*cellSize + worldMinY + cellSize/2, int32(z)
 }
 
-// nearestCellZ resolves the layer height of the cell closest to z,
-// the getNearestZ resolution of the server (a missing region keeps z:
-// the server reads no geodata from it and corrects nothing).
+// nearestCellZ resolves the layer height of the cell closest to z (a missing
+// region keeps z: the server reads no geodata from it and corrects nothing).
 func (e *Engine) nearestCellZ(cell Point, z int16) int16 {
     entry, err := e.entry(CellToRegion(cell))
     if err != nil {
@@ -278,11 +259,9 @@ func (e *Engine) cellBlocked(cell Point, z int16) bool {
     return e.cellNswe(cell, z)&nsweAll == 0
 }
 
-// antiCornerCut is the checkNearestNsweAntiCornerCut port: a diagonal
-// step needs both flanking cells to allow the crossing - the vertical
-// flank (x, y+1) of the SW step must allow moving west into the target
-// column and the horizontal flank (x-1, y) must allow moving south
-// into the target row; a cardinal step only checks the source wall.
+// antiCornerCut is the checkNearestNsweAntiCornerCut port: a diagonal step
+// needs both flanking cells to allow the crossing, a cardinal step only checks
+// the source wall.
 func (e *Engine) antiCornerCut(geoX, geoY int32, z int16, nswe uint8) bool {
     const (
         nsweEast  uint8 = 1 << 0
@@ -311,10 +290,9 @@ func (e *Engine) antiCornerCut(geoX, geoY int32, z int16, nswe uint8) bool {
     return canMove && e.nsweAllows(Point{X: geoX, Y: geoY}, z, nswe)
 }
 
-// neighbourLayerNear is the hasNeighbourLayerNear port: the step-over
-// escape of the height limit - a cell whose own nearest layer sits far
-// above still continues the surface when a neighbour has a layer at
-// the running height.
+// neighbourLayerNear is the hasNeighbourLayerNear port: the step-over escape of
+// the height limit - a cell whose own nearest layer sits far above still
+// continues the surface when a neighbour has a layer at the running height.
 func (e *Engine) neighbourLayerNear(
     geoX, geoY int32, z int16, tolerance int16,
 ) bool {

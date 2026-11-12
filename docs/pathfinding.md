@@ -116,6 +116,36 @@ them - the water is walkable, the slowdown honest.
   diagonals - a supercover-legal segment can still be refused by the
   server, so a planned segment must survive the server rules themselves.
 
+## The server click validation port
+
+`Engine.ValidateClick` answers what the Mobius C1 server would do with a
+mouse-mode `MoveToLocation` click: the destination the server actually
+walks to and whether the click runs at all. It is the planner's mirror
+of `Creature.moveToLocation` with a failing server pathfinder (the
+pessimistic live-observed branch of `GeoEngine.getValidLocation`):
+
+- a click at or beyond `clickFarDistance` 3000 skips the geodata
+  correction ("Should be able to click far away and move"), so the
+  server moves as clicked;
+- every closer click walks the Bresenham cell line of the server
+  `GridLineIterator2D` with the running height resolution
+  (`getNearestZ`), the `clickHeightIncreaseLimit` 40 climb limit with
+  its `clickLayerTolerance` 16 neighbour layer step-over, the
+  completely blocked cell check and the `checkNearestNsweAntiCornerCut`
+  rule on every step;
+- a line that arrives on a different layer than the target z names
+  collapses the destination back onto the walker, and a destination
+  within `clickMinimumDistance` 1 of the walker cancels the click -
+  the server answers `ActionFailed` and the character freezes while
+  the bot keeps re-clicking the same waypoint;
+- a partial answer (the walk stops at the last legal cell of the line)
+  is a RUNNING click: the server moves the character to that point.
+
+The raster matters: the search's supercover raster splits a diagonal
+into cardinal steps, so a segment the search verifies can still fail
+the server walk - the diagonal double steps are what the anti corner
+cut rule sees.
+
 ## Capsule clearance
 
 The server never checks the character capsule against the geodata: the
