@@ -143,10 +143,24 @@ corner probe is a length, not a leg at all.
   interaction distance.
 - Verified: `task fmt`, the hunt tests, `task lint:new`.
 
+### 2026-11-12 - town_walk.go keeps the transport arithmetic only
+
+- The second pass over `town_walk.go` compresses 33 blocks: the 15
+  line `waypointDistanceAnchored` doc and the 22 line
+  `clickForwardJump` doc become four lines each, and the arrival and
+  pass radii (50 and 150 units), the 100 unit corridor, the 16 unit
+  step floor, the rescue floor, the delivery test and the one-oracle
+  gate survive. The file leaves the audit top list.
+- Verified: `task fmt`, the hunt tests, `task lint:new`. The tree
+  share reads 13.9 percent, 586 blocks, 1,330 history markers.
+
 ## Status
 
-The tool, the rule and the renames are in. The kite header and the
-`town_walk.go` long docs are compressed. Next: `loop_state.go` (63.0
-percent comment share), then `shopping.go`, `cell_policy.go`,
-`user.go`, one commit each; the share and the block count are
-re-measured at the end.
+The tool, the rule and the renames are in. The worst files are
+compressed one commit each: `town.go`, `loop.go`, `kite.go`,
+`shopping.go`, `cell_policy.go`, `user.go`, `quest_trip.go`,
+`town_walk.go` (twice) and `loop_state.go`. Next: `town_stuck.go`
+(46.4 percent comment share), `acceptance/archer_fleet.go`,
+`pathfind/search.go`, `pathfind/navmesh/hierarchy.go`,
+`state/scans.go`; the share and the block count are re-measured at
+the end.
