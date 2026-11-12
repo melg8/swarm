@@ -84,3 +84,37 @@ The same gate: `go build ./...`, `go vet`, `golangci-lint run
 
 Both commits are verified. Next: `task verify`, the live E2E, then
 archive the fragment.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0: build, vet, the full tree lint (0 issues), the
+whole test suite (`internal/swarm/hunt` 97.9 s, `webserver` 9.0 s,
+`fleetprofile` 45.5 s, `connection` 10.9 s, the rest cached) and
+`fmt:check`.
+
+The live run on the Windows stack: the binary built with the `-ldflags`
+identity of `68cbe495`, `-login 127.0.0.3:2106 -hunt -web "" -bots 1`,
+65 s in world, then a Ctrl+Break through the console process group
+helper. The log shows the level 17 character farming (kills, loots,
+the ground switch across the Kaboo line), no panic and
+`Leaving the game world with test1` / `Bot finished`, exit code 0.
+The town trip itself does not fire in 65 s (the inventory needs the
+50 percent trigger), and its live acceptance scenarios run minutes
+each (`plaza-herbiel`, `building-entry`) - the byte preserving move
+plus the 1500 lines of `town_test.go` / `town_repro_test.go` are the
+evidence for the walker, so the short run answers the boot and
+shutdown question and no long acceptance was spent on a pure move.
+
+### 2026-11-12 - the stale doc paths
+The split left four live documents naming files that no longer hold
+the named declaration, fixed in their own commit: `merchantStands`
+and `dionMerchants` now point at `town_merchants.go`, `skipMoveFresh`
+at `town_stuck.go`, and the two combat-safety / roam headers at
+`loop_safety.go` and `loop_zone.go` (the stale `hunt/loop.go` paths
+of the previous round). The frozen logs keep their historical paths
+untouched.
+
+## Status
+
+Complete: three commits on `main` (the split, the stand guard move,
+the doc paths), `task verify` and the live run green. The P07 walker
+unification stays open as the next round.
