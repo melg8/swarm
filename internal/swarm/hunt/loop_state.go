@@ -17,33 +17,25 @@ import (
 // recovery.
 type combatState struct {
     target int32
-    // lastActionAt is the pacing stamp of the last action the loop
-    // initiated (a pick, an engage attempt, a trip start, a walk):
-    // every action gate of the package reads it against its own
-    // period, so two actions of the loop never share one window.
+    // lastActionAt paces every action the loop initiates: each gate
+    // reads it against its own period, so two actions never share one
+    // window.
     lastActionAt time.Time
     // fightStartAt and fightStartFor hold the start of the CURRENT
-    // fight: set when the server confirms the running fight of a
-    // new target, keyed by the target id (a stale pair is ignored).
-    // engageAt re-anchors on every live fight activity for the
-    // stuck timeout, so it cannot measure the fight length.
+    // fight, keyed by target id; engageAt re-anchors on live fight
+    // activity for the stuck timeout and cannot measure its length.
     fightStartAt  time.Time
     fightStartFor int32
     engageAt      time.Time
-    // targetSkip holds the mobs the target search holds out, each
-    // on its own expiry deadline (the same convention as itemSkip,
-    // the ground drop list of lootState).
+    // targetSkip holds the mobs the target search holds out, each on
+    // its own expiry deadline.
     targetSkip map[int32]time.Time
-    // The lure is the ranged luring state of the current pick (nil when
-    // no lure runs): the melee answer to a covered target, see
-    // lure.go.
+    // The ranged lure of the current pick, nil when no lure runs
+    // (lure.go).
     lure *lureState
-    // The corpse record of the last kill: the ranged kills (the bow
-    // lure, the caster spells) die far from the character, the drops
-    // land at the corpse and their broadcast can trail the death
-    // packet - the loot phase walks to the corpse and waits the grace
-    // window out instead of leaving the loot on the ground (see
-    // loop_actions.go).
+    // The corpse record of the last kill: the ranged kills drop far
+    // from the character, so the loot phase walks to the corpse and
+    // waits the drop broadcast out (loop_actions.go).
     killX        int32
     killY        int32
     killZ        int32
@@ -51,60 +43,45 @@ type combatState struct {
     killPosKnown bool
     killWalked   bool
     killLooted   bool
-    // The blind engage recovery state (see loop_los.go): the armed
-    // reposition walk, its planned geodata waypoints and the attempt
-    // budget for the current target.
+    // The blind engage recovery (loop_los.go): the armed reposition
+    // walk, its waypoints and the target attempt budget.
     losAt        time.Time
     losWaypoints []pathfind.Vec3
     losWpIndex   int
     losMoveAt    time.Time
     losTried     int
-    // skipScratch is the reused dense skip list of the target
-    // searches: activeSkips rebuilds it in place every call, so
-    // the per tick search filter costs no allocation (the old
-    // per call map allocation ran on every engage tick).
+    // skipScratch is the reused dense skip list of the target search:
+    // activeSkips rebuilds it in place, so the tick filter allocates
+    // nothing.
     skipScratch []int32
     // avoidScratch is the reused threat buffer of the aggro-aware
-    // walk steering (see loop_avoid.go): the scan refills it in
-    // place, so the per segment danger pass costs no allocation.
+    // walk steer (loop_avoid.go), refilled in place.
     avoidScratch []state.AggroThreat
-    // avoidLogAt paces the detour diagnostic of the walk steering:
-    // a busy corridor bends every segment, the log names it once per
-    // period instead of every request.
+    // avoidLogAt paces the detour diagnostic of the walk steer: one
+    // line per period.
     avoidLogAt time.Time
-    // combatAvoidScanAt paces the impending-add threat scan of the
-    // running fight (see avoidImpendingAdd): the engage ticks four
-    // times a second, the scan pass over the hot records runs at the
+    // combatAvoidScanAt paces the impending-add threat scan at the
     // target search cadence.
     combatAvoidScanAt time.Time
-    // combatAvoidAt paces the reposition steps away from an impending
-    // aggressive add: one step per period, the walk costs the fight a
-    // second of swings.
+    // combatAvoidAt paces the impending-add reposition steps: one per
+    // period.
     combatAvoidAt time.Time
-    // combatAvoidUntil marks the movement window the impending-add
-    // step owns: a forced attack request interrupts a running walk
-    // server-side, so the engage holds its re-requests until the step
-    // finished. The kite step of the archer (see kite.go) shares the
-    // window: one movement owner per fight step.
+    // combatAvoidUntil is the movement window the impending-add step
+    // or the kite step owns; one movement owner per fight step.
     combatAvoidUntil time.Time
     // combatAvoidHoldAt paces the walled-pocket diagnostic of the
-    // impending-add step (see avoidImpendingAdd): a fight whose every
-    // sidestep lane is walled, over water or outside the leash holds
-    // the ground, and the log names it once per period.
+    // impending-add step.
     combatAvoidHoldAt time.Time
-    // The combat casting state (see combat_skills.go): the pacing
-    // timestamps of the strike and spell requests and of the self
-    // buff casts, plus the locally tracked reuse windows of the
-    // cast skills (the server clock of the real windows starts at
-    // the cast start, the local one carries a jitter margin).
+    // The combat casting state (combat_skills.go): the strike, spell
+    // and self buff pacing plus the local reuse windows (the server
+    // clock starts at the cast start, the local one keeps a jitter
+    // margin).
     castAt        time.Time
     buffAt        time.Time
     skillReuse    map[int32]time.Time
     profilePicked bool
-    // healFlightUntil bounds the in-flight window of the recovery
-    // self heal (see recovery_heal.go): the sit request waits it
-    // out because the server refuses the sit of a casting
-    // character.
+    // healFlightUntil bounds the in-flight recovery self heal: the
+    // sit request waits it out (recovery_heal.go).
     healFlightUntil time.Time
     engLastDist     float64
     engDistAt       time.Time
@@ -152,186 +129,97 @@ type travelState struct {
     segmentDest  pathfind.Vec3
     segmentStart pathfind.Vec3
     // segmentFrameOffset is the measured z frame offset of the current
-    // segment plan (see click_frame.go): the difference between the
-    // server vouched standing z and the mesh frame height of the same
-    // cell, calibrated when a fresh plan is accepted and re-measured
-    // by every re-path (each plan starts at the cell the character
-    // actually stands on). Every plan derived click z rides it into
-    // the server frame before the click guards and the wire see it
-    // (clickWaypoint, the route samples, the escape hops, the varied
-    // aims); a plan without a measurable offset keeps it zero and
-    // rides the raw mesh z.
+    // plan (click_frame.go): every plan derived click z rides it into
+    // the server frame, a plan without a measurable offset keeps zero.
     segmentFrameOffset float64
     moveAt             time.Time
-    // flowScanAt paces the corner pre-click scans: at most one scan
-    // per flowPreClickGap whatever its answer, so a route point no
-    // far target serves cannot turn the ring into a per tick probe.
+    // flowScanAt paces the corner pre-click scans: at most one per
+    // flowPreClickGap whatever the answer.
     flowScanAt time.Time
     stuckAt    time.Time
     stuckX     int32
     stuckY     int32
-    // stuckWP is the waypoint cursor the stuck window opened at: a
-    // cursor advance is net progress whatever the geometry (a
-    // passed waypoint is ground covered).
+    // stuckWP is the cursor the stuck window opened at: a cursor
+    // advance is net progress.
     stuckWP int
-    // stuckBest is the best distance to the current waypoint seen
-    // inside the stuck window: only an improvement beyond the
-    // progress margin resets the window, so an oscillation that
-    // moves without closing on its target stays stuck.
+    // stuckBest is the best distance to the waypoint inside the
+    // window; only an improvement past the margin resets it.
     stuckBest float64
-    // stuckFast arms after the first stuck skip of a trip: subsequent
-    // stuck detections use the shorter stuckFastTimeout so the walker
-    // cycles through the remaining waypoints quickly instead of waiting
-    // the full stuckTimeout for each one. resetTownTrip and
-    // startWalkSegment clear it.
+    // stuckFast arms after the first stuck skip of a trip: later
+    // detections use stuckFastTimeout.
     stuckFast bool
-    // skipX/skipY/skipArmed record the cell the last waypoint skip of
-    // the frozen episode left the character on (the stuck skip of
-    // stuckTownWalk and the aggro circle skip of clickWaypoint both
-    // run through skipMoveFresh): a repeat skip on the same cell is
-    // denied, because a skip that moved the character nothing proved
-    // the click transport dead on this ground - repeating it only
-    // marches the cursor (and the eventual chord walk) away from the
-    // plan while the character stands still (the 2026-09-21 town walk
-    // report: 49 stuck skips advanced the cursor 15 -> 63 of 87, the
-    // aim 18,000 units out, through 3.5 frozen minutes without a unit
-    // of movement or a single re-path) and starves the recovery ladder
-    // that owns the dead click transport.
+    // skipX/skipY record the cell the last waypoint skip left the
+    // character on: a repeat skip on the same cell is denied, because
+    // it proved the click transport dead there.
     skipArmed bool
     skipX     int32
     skipY     int32
-    // moveStartAt/X/Y are the move start watchdog of the walker (see
-    // noteMoveStart): the deadline arms when a walk click goes out,
-    // a position change or the server movement broadcast clears it
-    // and a deadline that passes with the character still standing
-    // on the baseline cell names the click dead - the recovery
-    // ladder fast forwards instead of waiting the full stuck window
-    // (the owner rule of the 2026-09-19 round: a movement command
-    // that did not start the movement switches the recovery mode at
-    // once).
+    // moveStartAt/X/Y are the move start watchdog (noteMoveStart): a
+    // click that leaves the character on the baseline cell names the
+    // transport dead and fast forwards the recovery ladder.
     moveStartAt time.Time
     moveStartX  int32
     moveStartY  int32
-    // forceStuck arms when the move start watchdog names a fresh
-    // click dead: the next walkStuck verdict runs the recovery at
-    // once (the stuck window check is skipped for that one verdict)
-    // instead of standing out the remaining window.
+    // forceStuck runs the next walkStuck verdict's recovery at once.
     forceStuck bool
     rePaths    int
-    // extendArmed arms the short click extension of the town walk
-    // follower: it flips on the first stuck that finds no clear
-    // successor waypoint (the pinned cursor - the plain clicks of
-    // the segment proved they do not move the character) and clears at
-    // the trip boundaries. While armed, the clicks whose primary
-    // target sits under the server rescue floor (minWalkClick) or
-    // behind the character on the route re-aim at the forward
-    // route samples (the 2026-09-11 11:34 village return dump: the
-    // 22 unit first waypoint click froze the character through two
-    // whole trip cycles - a collapsed click under the findPath
-    // rescue threshold is silently canceled by the server).
+    // extendArmed arms the short click extension: a stuck with no
+    // clear successor re-aims under-floor and backward targets at the
+    // forward route samples (docs/hunting.md).
     extendArmed   bool
     repathX       int32
     repathY       int32
     frozenRepaths int
-    // cursorEscape carries the cursor key escape of a click-refusing
-    // cell (see beginCursorKeyEscape): the armed state, the claimed
-    // dry steps toward the escape aim, the claim cursor and the
-    // follow bookkeeping. The escape emulates the arrow keys of the
-    // official client - the movement mode 0 arm plus the claimed
-    // ValidatePosition stream the server follows without any click
-    // validation - because the 2026-09-14 15:10 report proved the
-    // user's server answers NO mouse click from the dump cell at
-    // all: even the official client stood frozen on the plaza cell
-    // until the player walked it out with the arrows.
+    // cursorEscape is the cursor key escape of a click-refusing cell
+    // (beginCursorKeyEscape): the arrow key emulation the server
+    // follows without any click validation.
     cursorEscape cursorEscapeState
-    // cursorEscapes counts the cursor key escape attempts spent by
-    // the current town trip: a server that ignores the claims too
-    // (keyboard movement disabled, a build without the cursor key
-    // branch) burns the attempts and the trip aborts with the
-    // honest reason instead of grinding the escape ladder forever.
+    // cursorEscapes counts the escape attempts of the trip: a server
+    // that ignores the claims too aborts the trip instead of grinding.
     cursorEscapes int
-    // segmentRefused latches the online refusal evidence of the current
-    // segment: the server answered a click of this segment with
-    // ActionFailed while the character stood still (see
-    // refusalEvidence). The varied aim machinery reads it - a
-    // segment the server refused needs its targets varied, not the
-    // same aim re-clicked (the 2026-09-14 10:18 dump: the server
-    // refused every click for its own reasons). It clears on the
-    // segment boundaries with the other segment state.
+    // segmentRefused latches the online refusal evidence of the
+    // current segment: the server answered ActionFailed while the
+    // character stood still (refusalEvidence).
     segmentRefused bool
-    // segmentRefusedX/Y remember the cell where the segment's first refusal
-    // verdict latched (see latchSegmentRefused): a stuck verdict with
-    // refusal evidence ON THAT VERY CELL names a refusing pocket -
-    // the server answers no click from the ground the character
-    // stands on (the 2026-09-14 15:10 report: even the official
-    // client's mouse clicks died on the plaza cell) - and the cursor
-    // key escape owns the recovery at once, the varied aims only
-    // grind more refused clicks from the same ground. It clears on
-    // the trip boundaries with the segmentRefused latch.
+    // segmentRefusedX/Y remember the cell the first refusal latched
+    // at: a stuck verdict there names a refusing pocket, and the
+    // cursor escape owns it before the varied aims.
     segmentRefusedX int32
     segmentRefusedY int32
-    // refusalVariants counts the varied aim attempts spent on the
-    // current segment (see stuckTownWalk): the refusal answer of the
-    // server is target specific - a shorter prefix or a sideways
-    // offset of the same waypoint often walks where the plain click
-    // was refused - so the stuck verdict varies the aim before it
-    // re-paths the whole segment.
+    // refusalVariants counts the varied aims spent on the segment: the
+    // refusal is target specific.
     refusalVariants int
-    // zoneRefusalX/Y remembers the cell where the server's refusal
-    // answers last stalled the direct zone segments: a later refusal
-    // stall on the very same cell (no ground covered in between)
-    // holds the return backoff instead of re-arming the cycle the
-    // server keeps refusing (see noteZoneSegmentStall).
+    // zoneRefusalX/Y remember where the refusal answers last stalled
+    // the direct zone segments (noteZoneSegmentStall).
     zoneRefusalX int32
     zoneRefusalY int32
-    // segmentRadius is the approach radius the current town segment searches
-    // its route within: the npc search radius (npcApproachRadius) for
-    // the npc destinations (the merchant stops, the teacher stops, the
-    // delevel guard walks - the plan ends at the npc's own point, the
-    // user rule of the 2026-09-20 report: a wide ring ends the plan at
-    // the first walkable surface inside its ball - the shop edge - and
-    // the character never enters the shop), the wide trip ring
-    // (tripApproachRadius) for the returns. The re-paths of the segment
-    // inherit it.
+    // segmentRadius is the approach radius of the current segment's
+    // search: the npc radius for npc destinations, the trip ring for
+    // the returns.
     segmentRadius float64
-    // segmentSearch is the mesh search contract the current segment's plan
-    // answered (the approach radius startWalkSegmentSearch ran with):
-    // the walk plan view publishes it,
-    // so the 3D pathfind link rebuilds the very search the walk
-    // follows instead of a lookalike (the 2026-09-19 route mismatch:
-    // the viewer rebuilt a dry zone return with the swim filter and
-    // folded the answer into a straight water blind chord). Nil for
-    // the direct segments no mesh search produced.
+    // segmentSearch is the mesh search contract of the current
+    // segment's plan, published by the walk plan view; nil for the
+    // direct segments.
     segmentSearch *state.WalkSearch
     farmX         int32
     farmY         int32
     farmZ         int32
     zoneReturn    bool
     zoneFails     int
-    // zoneSegmentAt/zoneSegmentX/zoneSegmentY hold the no-movement
-    // window of the direct zone segments (see noteZoneSegmentStall):
-    // the baseline arms on
-    // the first segment send, a cell change re-baselines it and a hold
-    // past the stuck timeout re-arms the pathfound zone return.
+    // zoneSegmentAt/X/Y hold the no-movement window of the direct zone
+    // segments (noteZoneSegmentStall).
     zoneSegmentAt time.Time
     zoneSegmentX  int32
     zoneSegmentY  int32
     roadFights    int
-    // zoneSegmentLogAt paces the walled direct segment diagnostic of the
-    // zone return escalation (see guardZoneSegmentClick): the refusal
-    // repeats every second while the character stands in the
-    // pocket, the log names the wall once per period.
+    // zoneSegmentLogAt paces the walled direct segment diagnostic.
     zoneSegmentLogAt time.Time
 }
 
 // townState is the town trip: the merchant stops and the sell pacing.
 type townState struct {
-    // tripAbortRun counts the consecutive aborted trips of this
-    // session: past the escalation threshold the trip cooldown
-    // doubles per abort (capped), so a deployment whose paths never
-    // validate stops burning a tick every five minutes (the observed
-    // six hour run: 47 identical "no walkable path" aborts). A trip
-    // that ends any other way resets the streak.
+    // tripAbortRun counts the consecutive aborted trips: past the
+    // escalation threshold the cooldown doubles per abort (capped).
     tripAbortRun      int
     sellAt            time.Time
     sellPhaseAt       time.Time
@@ -339,11 +227,10 @@ type townState struct {
     merchantPick      time.Time
     merchantDeckUntil time.Time
     // merchantPull paces the attack analog pull ladder of the deck
-    // wait (one click per select period, see approachMerchant).
+    // wait (approachMerchant).
     merchantPull time.Time
     // merchantPulled holds the object id the post selection pull
-    // already fired for (the practice fires once per merchant, a
-    // re-pick to a different object id arms it again).
+    // already fired for.
     merchantPulled int32
     sold           map[int32]bool
     tripStart      time.Time
@@ -353,49 +240,35 @@ type townState struct {
 // shopState is the town shopping: the frozen purchase plan, the buy
 // confirmations and the replacement sales.
 type shopState struct {
-    // cityShoppingTriedAt stamps the last city shopping errand
-    // attempt for the retry cooldown (see city_shopping.go).
+    // cityShoppingTriedAt stamps the last city shopping errand attempt
+    // for the retry cooldown (city_shopping.go).
     cityShoppingTriedAt time.Time
-    // The town trip shopping state (see shopping.go): the frozen
-    // purchase plan of the running trip, the merchant stops it
-    // distributes into, the request pacing of the buys, the in-flight
-    // buy batch awaiting its inventory confirmation and the cached
-    // plan of the shopping trigger.
+    // The town trip shopping (shopping.go): the frozen purchase plan,
+    // its merchant stops, the buy pacing and the in-flight batch.
     tripPlan     []gear.Purchase
     tripStops    []tripStop
     buysPlanned  bool
     buyAt        time.Time
     buyRequested []gear.Purchase
-    // buyBaseline holds the owned stack count of every item id of the
-    // in-flight batch at the moment the request went out: the
-    // stackable orders arrive as a count growth (the server merges
-    // the delivery into the carried stack), so the arrival gate
-    // compares the live count against the baseline plus the order.
+    // buyBaseline holds the owned stack count of every in-flight item
+    // at the request: the confirmation compares the live count against
+    // baseline plus order.
     buyBaseline       map[int32]int32
     buyConfirmAt      time.Time
     buyRetries        int
     shoppingPlanAt    time.Time
     shoppingPlanCache []gear.Purchase
-    // shoppingPlanAdena holds the adena the cached queue was planned
-    // against: the widget view shows the planning wallet, not the
-    // live one drifting with the loot of the same tick.
+    // shoppingPlanAdena is the adena the cached queue was planned
+    // against: the widget shows the planning wallet, not the live one.
     shoppingPlanAdena int64
-    // shoppingViewCache holds the built ShoppingPlanView that
-    // corresponds to shoppingPlanCache. The view is rebuilt from the
-    // cached plan every tick (200ms) without this cache, which on the
-    // 100 bot fleet is the dominant allocation source (44 percent of
-    // all heap allocations under live profiling): each rebuild
-    // allocates a []ShoppingEntryView slice plus runs six npcdata
-    // dictionary lookups per entry. Caching the built view alongside
-    // the plan collapses the per tick view cost to a pointer copy
-    // for the 25 ticks between plan recomputes.
+    // shoppingViewCache is the built view of shoppingPlanCache:
+    // rebuilding it every 200 ms tick was 44 percent of the fleet heap
+    // allocations, a pointer copy now serves the 25 ticks between
+    // recomputes.
     shoppingViewCache state.ShoppingPlanView
-    // The sell first step of the replacement purchases (see
-    // stepReplacementSales): the planned purchases that displace
-    // equipped gear sell the displaced pieces before buying, so the
-    // queue holds the object ids to unequip, replaceSelling the
-    // collected sale batch and the flags pace the unequip requests
-    // and mark the step done.
+    // The sell first step of the replacement purchases
+    // (stepReplacementSales): the object ids to unequip, the collected
+    // sale batch and the pacing flags.
     replacePlanned   bool
     replaceDone      bool
     replaceQueue     []int32
@@ -404,54 +277,39 @@ type shopState struct {
     replaceUnequipAt time.Time
     replaceWaitAt    time.Time
     replaceTried     int
-    // tripGearStart snapshots the paperdoll object ids the trip
-    // started with (and their item ids) so the trip exits can arm
-    // the gear debt: a slot the trip left empty whose piece is
-    // gone from the inventory was sold for a replacement that
-    // never landed (see gearDebtCheck, the 2026-09-12 pantsless
-    // dump report).
+    // tripGearStart snapshots the paperdoll object ids and item ids the
+    // trip started with: a slot the trip left empty whose piece is gone
+    // arms the gear debt (gearDebtCheck).
     tripGearStart    [state.PaperdollSlots]int32
     tripGearStartIDs [state.PaperdollSlots]int32
-    // gearDebt holds the paperdoll slot indexes the town trip
-    // machinery stranded (the map value is the item id of the lost
-    // piece for the logs): the debt survives the trip end and runs
-    // the refill trip on the gear run cooldown until the slot is
-    // dressed again (gearGapRunWanted clears the refilled entries).
+    // gearDebt holds the paperdoll slot indexes the trip stranded with
+    // the lost item id; the debt survives the trip and runs the refill
+    // trip until the slot is dressed again.
     gearDebt map[int]int32
 }
 
 // learnState is the skill learning: the teacher stops, the lesson
 // confirmations and the guide buff stops.
 type learnState struct {
-    // The skill learning state (see learning.go): the cached learning
-    // queue of the trip trigger, the selected village teacher with
-    // its click pacing and deck retry window, and the in-flight
-    // lesson awaiting its SkillList confirmation with the retry
-    // budget.
+    // The skill learning (learning.go): the cached queue, the selected
+    // teacher with its pacing and the in-flight lesson.
     learnPlanCache    []state.SkillPlanEntry
     learnPlanAt       time.Time
     learnPlanRevision uint64
     teacherID         int32
     teacherPick       time.Time
     teacherDeckUntil  time.Time
-    // teacherWalkUntil bounds the whole close approach of the teach
-    // stop: the ring walk clicks the npc approach point until the
-    // character stands right by the teacher, and the window answers
-    // the two dead ends - the ring the server refuses to walk (the
-    // talk then fires from wherever within the interaction distance)
-    // and the teacher on a deck the ring cannot reach (the stop
-    // skips, the trip continues).
+    // teacherWalkUntil bounds the close approach of the teach stop:
+    // the ring walk until standing by the teacher, or the stop skips.
     teacherWalkUntil time.Time
     learnRequested   *lessonTarget
     learnConfirmAt   time.Time
     learnRetries     int
     learnAt          time.Time
     learnRevision    uint64
-    // The Newbie Guide support magic state (see guide_buffs.go): the
-    // found guide npc with its pick pacing, the dialog anchor and
-    // the close approach window, plus the refusal cooldown the stop
-    // arms when the expected buffs never land (the cooldown outlives
-    // the trip - the gate of the server stays refused for a while).
+    // The Newbie Guide support magic (guide_buffs.go): the found npc,
+    // its pacing, the approach window and the refusal cooldown that
+    // outlives the trip.
     guideID        int32
     guidePick      time.Time
     guideAt        time.Time
@@ -463,10 +321,8 @@ type learnState struct {
 // budget and the abort backoff.
 type delevelState struct {
     delevelTarget int32
-    // delevelMedian is the live median mob level of the held ground
-    // at the deleveling start: the trigger evidence the webui
-    // message renders next to the target level (the character level
-    // is too high for exactly this ground).
+    // delevelMedian is the live median mob level of the held ground at
+    // the deleveling start, the trigger evidence.
     delevelMedian  int32
     delevelGuard   int32
     delevelTried   map[string]bool
@@ -477,145 +333,103 @@ type delevelState struct {
     delevelFree    int
     delevelWait    time.Time
     delevelCounted bool
-    // delevelAborts counts the consecutive ABORTED delevelings (no
-    // completed one in between): every abort arms the escalating
-    // wait through delevelAbortWait, only a finished deleveling
-    // resets the streak - the systemic guard against the farm and
-    // village commute of never completing attempts.
+    // delevelAborts counts the consecutive aborted delevelings: each
+    // abort escalates the wait through delevelAbortWait, only a
+    // finished one resets the streak.
     delevelAborts int
 }
 
 // groundState is the hunting ground registry: the zone list, the held
 // cell and the per-zone death bookkeeping.
 type groundState struct {
-    // The multi zone hunting state (see zones.go): the registry of the
-    // deployment, the picked and the manually overridden zone. The
-    // cell mode (see cell_policy.go) replaces the registry with the
-    // Voronoi partition alternative - the zone fields then mirror
-    // the patrol square of the held cell.
+    // The multi zone hunting (zones.go): the registry, the cell mode
+    // partition (cell_policy.go) and the picked zone.
     zones []HuntingZone
     cell  *cellHunter
-    // cellPin is the pending ground lock of SetCellPin: the pin the
-    // acceptance fleet installs BEFORE the registry exists lands
-    // here and SetHuntingCells re-applies it when the registry
-    // arrives (the hunter itself carries the live copy).
+    // cellPin is the pending ground lock of SetCellPin: it lands
+    // before the registry exists and SetHuntingCells re-applies it.
     cellPin      string
     zoneRegion   string
     zonePickedID string
     zoneCheckAt  time.Time
-    // The death regression bookkeeping of the multi zone hunting (see
-    // zones.go): the per zone death counts of the session, the band
-    // cap a demoted zone installs (negative = no cap) and the character
-    // level the bookkeeping last reset at.
+    // The death regression bookkeeping (zones.go): the per zone death
+    // counts, the band cap a demoted zone installs (negative = no cap)
+    // and the level it last reset at.
     zoneDeaths     map[string]int32
     zoneDeathCap   int32
     zoneDeathLevel int32
-    // zoneEmptySince arms the rotation of a cleared-out square (see
-    // zones.go): the timestamp the square turned mob-less, zero while
-    // mobs remain or the character fights, rests or walks.
+    // zoneEmptySince arms the rotation of a cleared-out square: the
+    // moment it turned mob-less, zero while mobs remain or the
+    // character is busy.
     zoneEmptySince time.Time
-    // zoneEmptyUntil holds the empty cooldown of the rotated-away
-    // squares (see zones.go): the zone stays out of the rotation
-    // contest until its expiry so the sweep moves forward through
-    // the band instead of ping ponging between two squares.
+    // zoneEmptyUntil is the empty cooldown of the rotated-away squares:
+    // they stay out of the rotation until it expires.
     zoneEmptyUntil map[string]time.Time
-    // zoneMobPriority holds the engage bias of the picked zone (see
-    // zones.go): the template id to priority map built from the mob
-    // list of the active ground, nil for zones without mob data.
+    // zoneMobPriority is the template id to priority engage bias of the
+    // picked zone, nil without mob data.
     zoneMobPriority map[int32]int32
 }
 
 // safetyState is the defensive layer: the flee episode, the escape
 // watchdogs, the pile up run and the post relogin settle.
 type safetyState struct {
-    // fleeAt paces the escape walk requests: the escape must not
-    // wait out the attack request pacing of the engage (the last
-    // forced attack fired moments before the threshold crossed).
+    // fleeAt paces the escape walk requests, independent of the engage
+    // pacing.
     fleeAt time.Time
-    // fleeSince tracks the start of the running flee episode: the
-    // escape segments never stop the chase by themselves when the
-    // pursuing pack is fast, and past the fleeLogoutAfter budget
-    // the session logs out to reset the aggro instead of running
-    // forever. A recovered health or a fresh fight clears it.
+    // fleeSince is the start of the running flee episode: past
+    // fleeLogoutAfter the session logs out to reset the aggro.
     fleeSince time.Time
-    // fleeGapAt and fleeGap anchor the closure-rate watchdog of the
-    // escape: the moment the probe opened and the threat distance
-    // then. A chaser that keeps pace holds the gap flat while the
-    // character walks the whole budget (the 14:03:09 dump: 21 s at
-    // ~19 units), so a window that fails to widen the gap ends the
-    // session early instead (see escapeNotOpening).
+    // fleeGapAt and fleeGap are the closure-rate watchdog of the
+    // escape: the probe moment and the threat distance then; a window
+    // that fails to widen the gap ends the session early
+    // (escapeNotOpening).
     fleeGapAt time.Time
     fleeGap   float64
-    // escapeAnchorAt/X/Y anchor the escape no-progress watchdog: the
-    // spot and the moment the current observation window opened. A
-    // window that lapses with less than escapeNoProgressDistance
-    // covered names a dead escape (the H-006 silent drop, a walk
-    // with no accepted segment) and logs the session out instead of
-    // standing in the blows. Every accepted window re-anchors.
+    // escapeAnchorAt/X/Y are the no-progress watchdog: a window that
+    // covers less than escapeNoProgressDistance names a dead escape
+    // (the H-006 silent drop) and logs out.
     escapeAnchorAt time.Time
     escapeAnchorX  int32
     escapeAnchorY  int32
-    // escapeWalkAt stamps the last escape walk issued in the current
-    // episode: the no-progress window only opens with an issued walk,
-    // so the stand-up settle of a sitting character is never
-    // mistaken for a stalled escape.
+    // escapeWalkAt stamps the last escape walk: the no-progress window
+    // only opens with an issued walk.
     escapeWalkAt time.Time
-    // panicAt marks the armed pile up run (the loop run between
-    // the social pile up and its deferred logout): zero while no
-    // pile up forced one, otherwise the moment the pack was
-    // spotted. The run is committed once armed - the logout
-    // happens at panicRunDistance from the panic point no matter
-    // how the pack thins out on the way (see panicPileUpRun).
+    // panicAt marks the armed pile up run (panicPileUpRun): zero while
+    // none forced one, else the moment the pack was spotted.
     panicAt time.Time
-    // panicX and panicY anchor the pile up run: the aggro point
-    // the character was standing on when the pack piled up. The
-    // logout fires only after the run opened panicRunDistance
-    // units between the character and this point.
+    // panicX and panicY anchor the pile up run: the logout fires past
+    // panicRunDistance from the aggro point.
     panicX int32
     panicY int32
-    // logoutDone marks the one shot emergency logout: the session
-    // unwinds within a second of the request, the flag keeps the
-    // dying ticks quiet.
+    // logoutDone marks the one shot emergency logout so the dying ticks
+    // stay quiet.
     logoutDone bool
-    // spawnSettle arms the post relogin settle (see settle.go): the
-    // supervisor enables it on every fresh session, the tests and
-    // the manual sessions keep it off.
+    // spawnSettle arms the post relogin settle (settle.go): the
+    // supervisor sets it on every fresh session.
     spawnSettle bool
-    // settled marks the one shot spawn settle: the hold, the
-    // regeneration and the first strike run once per session, the
-    // flag ends them for good.
+    // settled ends the one shot spawn settle: the hold, the
+    // regeneration and the first strike run once per session.
     settled bool
-    // settleHoldAt stamps the start of the settle hold: the entry
-    // log line fires once, the field keeps it from repeating.
+    // settleHoldAt stamps the start of the settle hold; the entry log
+    // fires once.
     settleHoldAt time.Time
 }
 
-// diagState is the diagnostics: the stagnation watch and the paced log gates.
+// diagState is the diagnostics: the stagnation watch and the paced log
+// gates.
 type diagState struct {
-    // noTargetSince tracks when the target search last came up
-    // empty: the patrol toward the zone center waits out the
-    // patience before it walks.
+    // noTargetSince is the moment the target search last came up empty:
+    // the patrol waits out the patience before it walks.
     noTargetSince time.Time
-    // noPickLogAt paces the targetless diagnostic log (see
-    // logNoPickableTargets): zero means the next empty pick logs
-    // at once, a successful pick re-arms it.
+    // noPickLogAt paces the targetless diagnostic; zero logs at once, a
+    // successful pick re-arms it.
     noPickLogAt time.Time
-    // weaponWaitLogAt paces the bare-handed hold log of the engage
-    // gate (see logWeaponWait): the hold spans the weapon run
-    // cooldown window, one line per period keeps the log readable.
+    // weaponWaitLogAt paces the bare-handed hold log of the engage gate
+    // (logWeaponWait).
     weaponWaitLogAt time.Time
-    // The stagnation watch state (see stagnation.go): the last
-    // observed experience with the moment it last changed, and
-    // the last observed position with the moment the character
-    // last stood elsewhere. A value that stops moving for its
-    // window logs the livelock line (the web UI event feed and
-    // the bot log both carry it, the state dump diagnostics show
-    // the stall ages) and drives the recovery escalation: the
-    // fire counters climb while a window keeps re-firing and a
-    // movement or an experience change resets them, the soft
-    // reset clears the frozen loop state on the first position
-    // fire and the hard reset rebuilds the session through the
-    // emergency logout once the soft reset proved not enough.
+    // The stagnation watch (stagnation.go): the last experience and
+    // position with their change moments; a stalled value logs the
+    // livelock line and drives the soft and hard reset escalation.
     stagXP       int32
     stagXPAt     time.Time
     stagPosX     int32
@@ -628,7 +442,8 @@ type diagState struct {
     stagHardAt   time.Time
 }
 
-// userState is the manual web UI command: the walk plan and its follower state.
+// userState is the manual web UI command: the walk plan and its
+// follower state.
 type userState struct {
     userKind   string
     userX      int32
@@ -639,40 +454,26 @@ type userState struct {
     userPlanZ  int32
     userTarget int32
     userStart  time.Time
-    // userDeadline is the priced budget deadline of the current
-    // manual mesh route (see userMoveBudget): zero for the direct
-    // server routed walk, which keeps the base window.
+    // userDeadline is the priced budget deadline of the manual mesh
+    // route (userMoveBudget); zero for the direct walk.
     userDeadline  time.Time
     userMoveAt    time.Time
     userWaypoints []pathfind.Vec3
     userWpIndex   int
     userPathTried bool
-    // userSearch is the mesh search contract of the manual walk plan
-    // (the swim filter, the user approach radius - see planUserWalk):
-    // the walk plan view publishes it, the 3D pathfind link rebuilds
-    // the very search. Nil for the direct manual walks no mesh search
-    // produced.
+    // userSearch is the mesh search contract of the manual plan
+    // (planUserWalk), published by the walk plan view; nil for the
+    // direct walk.
     userSearch *state.WalkSearch
-    // userFrameOffset is the measured z frame offset of the manual
-    // walk plan (the segmentFrameOffset of the user follower, see
-    // click_frame.go): calibrated when planUserWalk accepts a fresh
-    // mesh route and ridden by the follower's waypoint clicks.
+    // userFrameOffset is the measured z frame offset of the manual plan
+    // (click_frame.go).
     userFrameOffset float64
-    // userRedirect marks a manual command that replaced a walk
-    // still running on the server: the next walk request fires at
-    // once instead of waiting for the old walk to finish.
+    // userRedirect marks a command that replaced a walk still running
+    // server-side: the next request fires at once.
     userRedirect bool
-    // userRefusalVariants counts the varied aim attempts the manual
-    // walk follower spent on the current waypoint (the user walk
-    // answer to a refused click, see sendUserVariedAim): the refusal
-    // of the server is target specific, a shorter prefix or a
-    // sideways offset of the same waypoint often validates where the
-    // plain aim bounced (the temple entrance round: the first click
-    // walked the character onto the porch, the server stopped its own
-    // walk at the door frame and answered every straight re-click
-    // from the porch with ActionFailed - the east sideways aim
-    // crosses the door opening and walks). It resets on the plan
-    // boundaries and on every waypoint the follower advances past.
+    // userRefusalVariants counts the varied aims the manual follower
+    // spent on the waypoint: the refusal is target specific, a sideways
+    // aim often crosses where the straight one bounces.
     userRefusalVariants int
     userDeferred        []state.Command
     userLastDist        float64
@@ -683,97 +484,60 @@ type userState struct {
 // inventory confirmations.
 type gearState struct {
     // equip drives the auto equipment: it equips inventory gear that
-    // beats the paperdoll of the character (see equip.go).
+    // beats the paperdoll (equip.go).
     equip *equipManager
-    // The pending server confirmations of the in flight inventory
-    // actions, keyed by object id (see markInventoryAction,
-    // inventoryItemAllowed and gateInventoryCommand): the burst plan
-    // of the auto equipment and the manual commands share the map,
-    // each action holds only its own item and write set back.
+    // pendingActions holds the pending server confirmations of the
+    // in-flight inventory actions, keyed by object id.
     pendingActions map[int32]pendingInventory
 }
 
 // kiteState is the archer kite: the retreat cycle, the deferred
 // click, the motion ledger and the tunable block.
 type kiteState struct {
-    // kiteAt paces the archer kite steps (see kite.go): one retreat
-    // per period, the rest of the cycle stands and shoots.
+    // kiteAt paces the kite steps: one retreat per period.
     kiteAt time.Time
-    // kiteClickAt schedules the deferred retreat click of the live
-    // shot cycle (see kiteClickWalk, kite.go - the issue #70
-    // findings): the server saves a MoveToLocation issued inside
-    // the bow windup and replays it only at the disable end, where
-    // the re-shot cancels it, so the retreat click waits the windup
-    // end plus the safety lead before it goes out. The zero value
-    // disarms the schedule.
+    // kiteClickAt schedules the deferred retreat click of the shot
+    // cycle (kiteClickWalk): the server replays a MoveToLocation
+    // issued inside the bow windup only at the disable end; zero
+    // disarms.
     kiteClickAt time.Time
-    // kiteClickFor is the fight the deferred click belongs to (see
-    // kite.go): a target switch - the old target died, a fresh pick
-    // - disarms the schedule, the retreat serves the fight that
-    // armed it.
+    // kiteClickFor is the fight the deferred click belongs to; a
+    // target switch disarms it.
     kiteClickFor int32
-    // kiteClickUntil bounds the walk window of the deferred click:
-    // the disable end of the arming shot plus the re-engage delay -
-    // the walk owns the reuse tail (the windup end to the disable
-    // end) and the forced attack re-request fires the moment the
-    // window lapses.
+    // kiteClickUntil bounds the walk window of the deferred click: the
+    // disable end plus the re-engage delay.
     kiteClickUntil time.Time
-    // kiteFor is the fight the kite streak counts for (the hunt
-    // target): a fresh target resets the streak (kiteStreak). The
-    // armed threat may be a train member - the streak still counts
-    // the steps of the running fight.
+    // kiteFor is the fight the kite streak counts for; a fresh target
+    // resets it.
     kiteFor int32
-    // kiteStreak counts the consecutive kite steps of the kiteFor
-    // target: crossing kiteStreakLimit names the unwinnable race
-    // (a chaser at least as fast as the character) in the log - a
-    // DIAGNOSTIC since the round-14 always-run redesign, the
-    // retreat keeps running straight (the standing "fight it out"
-    // answer is gone).
+    // kiteStreak counts the consecutive kite steps: crossing
+    // kiteStreakLimit names the unwinnable race in the log, a
+    // diagnostic only.
     kiteStreak int
-    // kiteHeldFor is the target the cornered hold belongs to (see
-    // kite.go): the hold of one target never paces another.
+    // kiteHeldFor is the target the cornered hold belongs to.
     kiteHeldFor int32
-    // kiteHeldAt stamps the last cornered-hold probe (see kite.go):
-    // the hold re-probes at the kite period, not every tick, and the
-    // diagnostic line lands once per hold episode.
+    // kiteHeldAt stamps the last cornered-hold probe: it re-probes at
+    // the kite period.
     kiteHeldAt time.Time
-    // kiteWalkX/Y/Z carry the endpoint of the in-flight kite retreat
-    // walk: the re-click ladder (see kiteReclickWalk, kite.go, issue
-    // #60 the second round) re-issues the click toward exactly this
-    // cell while the movement window runs and the character stands
-    // still on the issue cell - the single click of the first round
-    // died silently too often (the stance transition swallow, the
-    // endpoint cell refusal, the H-006 silent drop) and the
-    // character stood through the whole bow reload the owner's dump
-    // reports. The fields arm through kiteIssueWalk and clear with
-    // the ladder (a fresh step re-arms them whole).
+    // kiteWalkX/Y/Z are the endpoint of the in-flight retreat walk:
+    // the re-click ladder re-issues the click toward exactly this cell
+    // while the character stands still (kiteReclickWalk).
     kiteWalkX int32
     kiteWalkY int32
     kiteWalkZ int32
-    // kiteWalkUntil bounds the re-click ladder with the same window
-    // the kite step set (kiteStepWindow plus the re-engage delay):
-    // past it the forced attack re-request owns the tick, and a
-    // re-click would only fight the re-engage for the movement. The
-    // zero value disarms the ladder.
+    // kiteWalkUntil bounds the re-click ladder; past it the forced
+    // attack re-request owns the tick.
     kiteWalkUntil time.Time
-    // kiteFightFor/X/Y anchor the current fight's own ground (the
-    // round-14 location-general redesign): the position of the
-    // fight target at the fight's FIRST retreat resolution (see
-    // kiteResolveAndClick, kite.go). The retreat leash
-    // (kiteTerrainLane) reads the anchor INSTEAD of the
-    // hunting-square registry, so the kite works on any map, any
-    // ground, with or without a zone registry - the generated
-    // elven/dion tables own the target economy alone, never the
-    // fight. A fresh target re-anchors.
+    // kiteFightFor/X/Y anchor the fight's own ground: the target
+    // position at the first retreat resolution. The retreat leash
+    // reads this anchor instead of the zone registry, so the kite works
+    // on any ground.
     kiteFightFor int32
     kiteFightX   int32
     kiteFightY   int32
-    // The kite motion ledger of the current fight (see
-    // kite_ledger.go, the round-14 feedback ask): the per-fight
-    // standing/moving accounting that answers "does the archer run
-    // all the time" directly in the live log at the fight end -
-    // every standing second is named by its reason (the windup the
-    // server forces, the hold verdict, the unattributed idle).
+    // The motion ledger of the fight (kite_ledger.go): the standing
+    // and moving accounting that names every standing second by its
+    // reason.
     kiteMotionFor     int32
     kiteMotionAt      time.Time
     kiteMotionMoving  time.Duration
@@ -782,45 +546,28 @@ type kiteState struct {
     kiteMotionIdle    time.Duration
     kiteMotionHPStart float64
     kiteMotionHPMin   float64
-    // kiteWalkBaseX/Y is the cell the kite walk was issued from -
-    // the ladder's dead-click oracle: a character still standing on
-    // this cell past the probe pace never moved whatever the
-    // next dump says about the clicks, and a character that left it
-    // tells the ladder the click moved something after all.
+    // kiteWalkBaseX/Y is the cell the kite walk was issued from - the
+    // ladder's dead-click oracle.
     kiteWalkBaseX int32
     kiteWalkBaseY int32
-    // kiteReclickAt stamps the last click of the ladder (the initial
-    // click included): the kiteReclickPeriod pacing rides it, and the
-    // refusal correlation (kiteClickRefused) reads it as the send
-    // baseline of the ActionFailed attribution.
+    // kiteReclickAt stamps the last click of the ladder: the re-click
+    // pacing and the refusal correlation ride it.
     kiteReclickAt time.Time
-    // kiteWalkIssuedAt stamps the moment the kite walk went out: the
-    // silent probe of the ladder measures the walk age from it (a
-    // walk unanswered past kiteProbeElapsed with the character still
-    // on the issue cell names the endpoint dead without any refusal
-    // evidence - the H-006 silent drop signature).
+    // kiteWalkIssuedAt stamps the moment the walk went out: the silent
+    // probe measures the walk age from it.
     kiteWalkIssuedAt time.Time
-    // kiteReclicks counts the re-clicks spent on the current kite
-    // walk: the click bound reads it (the packet budget of a dead
-    // transport).
+    // kiteReclicks counts the re-clicks of the current walk: the click
+    // bound reads it.
     kiteReclicks int
-    // kiteWalkDead latches the dead-endpoint verdict of the current
-    // walk (the refusal evidence or the silent probe set it): one
-    // diagnostic line per walk, the hold follows the latch.
+    // kiteWalkDead latches the dead-endpoint verdict of the walk: one
+    // diagnostic line, then the hold follows.
     kiteWalkDead bool
-    // kiteBearings is the scratch of the retreat direction: the
-    // planar bearings of the chaser train the last resolution
-    // collected (kiteTrainDirection fills it every call - the
-    // centroid sum and the encircled gap read the same enumeration).
-    // A train wider than the array keeps its farthest members out of
-    // the gap geometry only (the sum stays whole) - a train that
-    // wide is the flee machinery's logout case, not a kite shape.
+    // kiteBearings is the scratch of the retreat direction: the planar
+    // bearings of the chaser train; a train wider than the array keeps
+    // its farthest members out of the gap geometry only.
     kiteBearings [kiteMaxTrainMembers]float64
-    // kite carries the tunable block of the kite fight (see
-    // kite.go): the loop starts at DefaultKiteParams - the shipped
-    // tuning the acceptance scenario pins - and the launch config
-    // overrides it per bot spec (SetKiteParams, the tuning knobs of
-    // owner issue #29). The zero value never leaks: NewLoop fills
-    // the defaults before the first tick.
+    // kite is the tunable block of the kite fight: DefaultKiteParams,
+    // overridden per bot spec (SetKiteParams); NewLoop fills it before
+    // the first tick.
     kite KiteParams
 }

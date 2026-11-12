@@ -83,6 +83,18 @@ corner probe is a length, not a leg at all.
   sight gate and names the click transport as that one oracle.
 - Verified: `task fmt`, the hunt tests, `task lint:new`.
 
+### 2026-11-12 - loop_state.go keeps the field facts only
+
+- The 521 comment lines of `loop_state.go` (63.0 percent of the file)
+  compress to the one fact a field name cannot say: the pacing
+  relation, the ownership of a window, the reason a latch exists. The
+  struct narratives and the round evidence drop; the field registry
+  keeps pointing at the explaining file (`zones.go`, `kite.go`,
+  `settle.go`).
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The file leaves the audit top list; the tree share
+  reads 14.4 percent, 663 blocks, 1,385 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The kite header and the
