@@ -1,4 +1,4 @@
-# P07: one waypoint walker and the tidy hunt Loop (status: in progress)
+# P07: one waypoint walker and the tidy hunt Loop (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner instruction: continue
 the refactor after the loop and town splits).
@@ -56,7 +56,10 @@ Landing the town split (`9892c250`, `68cbe495`, `80921f0e`,
 
 ## Status
 
-Slice 1 (the walk parameters in one file) in progress.
+Complete: three slices on `main` (the walk parameters, the shared
+click/cursor core, the action pacing and skip names), `task verify`
+green and the live run clean. The follower consolidation carries to the
+next round with the reasons recorded above.
 
 ### 2026-11-12 - slice 1: the walk parameters in one file
 `walk_params.go` now holds the 33 walk machinery constants: the click
@@ -137,3 +140,13 @@ walker is a blocking sleep loop with its own potion cadence, the town
 and manual walkers are tick driven with different recovery
 ladders); it needs its own round with a live acceptance of the town
 trip, so the fragment closes here.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole suite,
+`fmt:check`). The live run on the Windows stack: the binary carries
+the `-ldflags` identity of `a08314f0`, `-login 127.0.0.3:2106 -hunt
+-web ""`, 65 s in world, then Ctrl+Break through the console process
+group helper - the level 17 character farmed (the kite ledger line,
+the Power Strike finishing blow, the kills and loots), the socket
+closed with `Leaving the game world with test1` / `Bot finished`,
+exit code 0.
