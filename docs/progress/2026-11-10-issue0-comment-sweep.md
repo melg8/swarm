@@ -154,6 +154,17 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, the hunt tests, `task lint:new`. The tree
   share reads 13.9 percent, 586 blocks, 1,330 history markers.
 
+### 2026-11-12 - town_stuck.go keeps the recovery ladder rules only
+
+- 23 blocks compress: the 25 line `refusalEvidence` doc and the 39
+  line `escalateFrozenSegment` doc become four lines each; the blocks
+  keep the 15 s and 4 s stuck windows, the target-specific refusal
+  ladder, the stood-on-cell skip gate, the frozen re-path limit and
+  the claimed-walk route contract. `town_stuck.go` leaves the audit
+  top list.
+- Verified: `task fmt`, the hunt tests, `task lint:new`. The tree
+  share reads 13.8 percent, 571 blocks, 1,299 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
