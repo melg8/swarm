@@ -2765,13 +2765,14 @@ const MapView = {
     ctx.fillText(label, lx, ly);
   },
 
-  // drawAggroRanges draws the aggression radius circles of the
-  // living aggressive mobs around their drawn (interpolated)
-  // positions: the circle is the range the mob attacks a passing
-  // player from, so the hunter reads which camps to steer around.
-  // The aggro checkbox of the toolbar hides the layer - a full pack
-  // of overlapping circles clutters the far zoom. A fighting mob
-  // reads red (it already holds a target), the idle ones amber.
+  // drawAggroRanges draws the on-sight trigger circles of the
+  // living attackable aggressive mobs around their drawn
+  // (interpolated) positions: the circle is the effective server
+  // aggro radius (the xml template value clamped at MaxAggroRange),
+  // so the hunter reads which camps to steer around. The aggro
+  // checkbox of the toolbar hides the layer - a full pack of
+  // overlapping circles clutters the far zoom. A fighting mob reads
+  // red (it already holds a target), the idle ones amber.
   drawAggroRanges(ctx, rect) {
     if (!document.getElementById("show-aggro").checked) { return; }
     if (!this.lastSnap || !this.lastSnap.objects) { return; }
@@ -2779,11 +2780,13 @@ const MapView = {
     // save/restore pairs (a full state vector round trip each) used
     // to cost more than the arcs themselves on a packed field.
     ctx.save();
-    ctx.globalAlpha = 0.35;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 6]);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
     for (const obj of this.lastSnap.objects) {
-      if (obj.kind !== "npc" || !obj.aggressive || obj.dead) { continue; }
+      if (obj.kind !== "npc" || !obj.attackable || !obj.aggressive
+        || obj.dead) {
+        continue;
+      }
       if (!obj.aggroRange || obj.aggroRange <= 0) { continue; }
       const rt = this.runtime.get(obj.objectId);
       const x = rt ? rt.drawX : obj.x;
@@ -2798,10 +2801,19 @@ const MapView = {
       // clutter anyway - skipping it keeps the packed field of the
       // zoomed out view from stroking hundreds of dot circles.
       if (radius < 4) { continue; }
-      ctx.strokeStyle = obj.inCombat
+      const color = obj.inCombat
         ? this.mapColors.combat : this.mapColors.aggressive;
+      // A faint fill marks the whole danger zone and the strong
+      // stroke keeps the border readable over the light map imagery.
       ctx.beginPath();
       ctx.arc(c.x, c.y, radius, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.1;
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, radius, 0, Math.PI * 2);
+      ctx.globalAlpha = 0.85;
+      ctx.strokeStyle = color;
       ctx.stroke();
     }
     ctx.setLineDash([]);
@@ -3798,9 +3810,9 @@ const MapView = {
       "facing: " + deg + "° " + cardinalOf(obj.heading),
       obj.kind !== "item" && obj.maxHp > 0
         ? "hp: " + Math.round(obj.curHp) + "/" + Math.round(obj.maxHp) : "",
-      obj.kind === "npc" && obj.aggroRange > 0
-        ? "aggro range: " + obj.aggroRange
-          + (obj.aggressive ? " (attacks on sight)" : " (defensive)") : "",
+      obj.kind === "npc" && obj.attackable && obj.aggroRange > 0
+        ? "aggro radius: " + obj.aggroRange
+          + (obj.aggressive ? " (attacks on sight)" : " (passive)") : "",
       obj.kind === "npc" && obj.clanHelpRange > 0
         ? "clan help range: " + obj.clanHelpRange : "",
       obj.moving

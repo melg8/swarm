@@ -243,16 +243,20 @@ colors from the same variables).
   the pointer-hover labels) and the same toolbar `hunt zones` toggle
   hides both layers.
 - Threat data: the npc level, `aggroRange` and `isAggressive` ai flags
-  come from the generated `internal/swarm/npcdata` maps (the C1 data
-  pack marks every monster `isAggressive=false`: they only defend). The
-  resolved aggro range caps at the server wide MaxAggroRange 450 of the
-  Mobius C1 NPC.ini (the NpcTemplate constructor clamps every xml
-  aggroRange, most monsters carry 1000, down to it before the
-  AttackableAI on-sight check ever runs), so the circles draw the
-  radius the server actually attacks from. The map draws the aggression
-  radius of every living aggressive mob as a dashed circle around its
-  drawn position (amber idle, red once it fights; the `aggro` toolbar
-  checkbox hides the layer).
+  come from the generated `internal/swarm/npcdata` maps, which carry
+  the effective server values. The template constructor clamps the xml
+  `aggroRange` at the Mobius C1 MaxAggroRange (NPC.ini ships 450)
+  for the `Monster` type only; every other type keeps its raw xml
+  value. The effective on-sight flag of `AttackableAI` is true only
+  for a monster class template (`Monster`, `RaidBoss`, `GrandBoss`)
+  with a true `isAggressive` flag (the default when the xml omits it)
+  and a positive effective range: guards and friendly mobs attack only
+  players with karma and folk never attack, so a town npc draws no
+  threat circle. The map draws the on-sight radius of every living
+  attackable aggressive mob as a dashed circle around its drawn
+  position (2 px stroke at 0.85 alpha plus a faint zone fill; amber
+  idle, red once it fights; the `aggro` toolbar checkbox hides the
+  layer).
 - Social links: every living npc carries its ai `clanHelpRange` and
   clan bitmask in the snapshot (`clanMask` rides the wire as a decimal
   string - the ALL clan bit of the top exceeds the safe integer range

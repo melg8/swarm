@@ -67,8 +67,22 @@ deployed `NPC.ini`, and emit the effective range and on-sight flag
 (type aware). Regenerated `names.go`: 1837 display templates, 326
 on-sight aggressors (all effective 450), zero mismatches against an
 independent xml scan. Updated `npcdata.go`, its tests, the state
-comments and the hunting doc.
+comments and the hunting doc. Commit `6f38f199`.
+
+### 2026-11-12 - web: draw the server on-sight circles
+
+The map circle layer now requires an attackable aggressive npc, draws
+a 2 px `[6, 4]` dashed stroke at 0.85 alpha plus a 0.1 alpha zone
+fill, and the tooltip shows the radius only for attackable npcs. The
+render harness asserts the strong stroke, the fill and the absence of
+a circle at a non-attackable town npc. `docs/webui.md` carries the
+effective data model, the devlog fragment records the root cause.
+
+Verification: `go test ./internal/swarm/npcdata/
+./internal/swarm/state/ ./internal/swarm/webserver/
+./internal/swarm/hunt/`, the three map harnesses, `task lint:new`,
+`task fmt:check`.
 
 ## Status
 
-In progress: the map circle filter and the stronger style are next.
+Complete: both commits landed, the fragment moves to the archive.

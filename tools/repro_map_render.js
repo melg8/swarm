@@ -1530,6 +1530,16 @@ function runScenarioHuntZonesView(mapFile) {
         dead: false, attackable: true, aggressive: true, aggroRange: 400,
         inCombat: false, level: 4
     });
+    // A town npc (a guard, a merchant, a pet) is not attackable: even
+    // when the raw template flags suggest aggression, the server
+    // never fires the on-sight branch for it, so no circle may draw.
+    snap.objects.push({
+        objectId: 501, kind: "npc", name: "Town Guard",
+        x: WORLD.self.x - 500, y: WORLD.self.y + 300, z: -3500,
+        heading: 0, moving: false, speed: 0, targetId: 0,
+        dead: false, attackable: false, aggressive: true, aggroRange: 1000,
+        inCombat: false, level: 20
+    });
     MapView.update(snap);
     MapView.draw();
 
@@ -1553,6 +1563,25 @@ function runScenarioHuntZonesView(mapFile) {
         && Math.abs(stroke.arcs[0][2] - radius) < 3);
     check(results, "aggressive mob draws its aggro radius circle",
         circles.length > 0, "no circle at the mob position");
+    check(results, "aggro radius circle uses the strong stroke",
+        circles.some((stroke) => stroke.width === 2),
+        "expected a 2 px circle stroke");
+    const fills = record.fills.filter((fill) =>
+        fill.style === MARK.aggressive && fill.arcs.length === 1
+        && Math.hypot(fill.arcs[0][0] - center.x,
+            fill.arcs[0][1] - center.y) < 3
+        && Math.abs(fill.arcs[0][2] - radius) < 3);
+    check(results, "aggro radius circle carries the faint zone fill",
+        fills.length > 0, "no fill at the mob position");
+
+    const guardCenter = worldToScreen(
+        WORLD.self.x - 500, WORLD.self.y + 300);
+    const guardCircles = record.strokes.filter((stroke) =>
+        stroke.style === MARK.aggressive && stroke.arcs.length === 1
+        && Math.hypot(stroke.arcs[0][0] - guardCenter.x,
+            stroke.arcs[0][1] - guardCenter.y) < 3);
+    check(results, "non attackable town npc draws no aggro circle",
+        guardCircles.length === 0, "unexpected circle at a town npc");
 
     // Both toggles hide their layers: flip them, clear the record and
     // redraw the same snapshot.
