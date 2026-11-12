@@ -431,6 +431,18 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `kite.go` fell from 31.1 to 25.8 percent (264
   comment lines).
 
+### 2026-11-12 - hunt/cell_policy.go keeps the economy numbers
+
+- 54 blocks compress: the 15-20 s elven respawn, the 20/40/60 s
+  patience ladder, the 5 minute minimum stay and 90 s starved stay,
+  the 1.25 switch margin and the 5 minute starve cooldown, the 15
+  minute death regression, the 8 level adena slack, the 500 unit
+  drift floor and the 2 s drift period, the 400 mark map cap. The
+  field registry keeps its per-field comments.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. `cell_policy.go` fell from 23.7 to 20.5 percent
+  (225 comment lines); the tree share reads 13.1 percent.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -444,7 +456,7 @@ passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`, `hunt/shopping.go`,
 `hunt/loop_params.go`, `acceptance/archer_kite.go`, `hunt/user.go`,
-`hunt/loop_movement.go` and `hunt/kite.go`. Next:
-`hunt/cell_policy.go` (271, 23.7 percent) and then a fresh
-`task comment:audit --top 10` pick; the share and the block count are
-re-measured at the end.
+`hunt/loop_movement.go`, `hunt/kite.go` and `hunt/cell_policy.go`. Next: a
+fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/loop_state.go` entries stay untouched while their fragments are
+active); the share and the block count are re-measured at the end.
