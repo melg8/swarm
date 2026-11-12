@@ -19,10 +19,13 @@ SPDX-License-Identifier: MIT
 //       rule, 1 s broadcast throttle, MoveToPawn chase re-issue) drives
 //       the map and every frame is compared against the simulated server
 //       truth. Metrics per move: the maximum position error (drawn vs
-//       server, world units), the error at the arrival delivery and the
+//       server, world units), the error at the arrival delivery, the
 //       largest frame speed spike (frame speed as a multiple of the unit
-//       speed). --frames prints the frame log of every tenth frame.
-//       Exit 1 when a threshold breaks.
+//       speed) and the largest backwards step of the drawn marker along
+//       its walk line (the visible jump back). One scenario re-issues
+//       the mob MoveToPawn position samples with a stale moveAt, the
+//       state bug shape the map must absorb. --frames prints the frame
+//       log of every tenth frame. Exit 1 when a threshold breaks.
 //
 //   node tools/repro_movement.js --record <seconds> [outfile] [url] [bot]
 //       Records the live SSE snapshot stream of a running bot to a JSON
@@ -32,7 +35,12 @@ SPDX-License-Identifier: MIT
 //       Replays a recording through the real map at 60 fps virtual time.
 //       Logs the drawn position of every moving unit frame by frame
 //       (--frames prints every frame, the default logs spikes) and
-//       reports speed spikes. Exit 1 on spikes > 2.5x.
+//       reports speed spikes, DRAWN-BACK steps (the marker moving
+//       against its walk line) and TARGET-BACK re-anchors (a late
+//       position sample putting the projected target behind the drawn
+//       marker, the server side lag the state tracker must prevent).
+//       Exit 1 on spikes > 2.5x, a drawn step back or a target
+//       re-anchor behind by more than 50 u.
 //
 // Mobius semantics reproduced (verified in the server sources):
 // - game ticks are 100 ms; a creature advances speed * ticks per tick
@@ -69,7 +77,16 @@ const HARNESS = {
     // inter tick rendering) plus one tick of phase slack.
     maxErrFactor: 0.25,
     maxErrAbsolute: 12,
-    maxSpikeRatio: 2.5
+    maxSpikeRatio: 2.5,
+    // The drawn marker must never travel backwards along its walk
+    // segment by more than sub pixel noise.
+    maxBackUnits: 0.5,
+    // A re-anchor of the same destination that puts the projected
+    // target farther back than this means the position sample lagged
+    // the movement by a large fraction of a second (the state bug).
+    maxTargetBackUnits: 50,
+    // The map renders a discontinuity as a teleport (map.js).
+    teleportUnits: 400
 };
 
 // deterministic pseudo random numbers so runs are comparable
@@ -312,18 +329,24 @@ class EventDriver {
 // Metrics collects the frame by frame comparison of the drawn position
 // against the simulated server truth. The spike ratio compares the frame
 // displacement with the unit speed over the ACTUAL frame interval, so
-// sparse frame execution does not fake spikes.
+// sparse frame execution does not fake spikes. The back metric projects
+// the frame displacement on the forward axis of the current movement
+// segment: a negative projection is the marker stepping backwards along
+// the walk line, the artifact the player sees as a jump back.
 class Metrics {
     constructor() {
         this.maxErr = 0;
         this.maxSpike = 0;
+        this.maxBack = 0;
+        this.backFrames = 0;
         this.errAtArrival = null;
         this.last = null;
         this.lastTime = 0;
+        this.lastSig = null;
         this.frames = 0;
     }
 
-    observe(drawn, truth, speed, timeMs, atArrival) {
+    observe(drawn, truth, speed, timeMs, atArrival, segment) {
         if (!drawn) {
             return;
         }
@@ -331,17 +354,34 @@ class Metrics {
         if (err > this.maxErr) {
             this.maxErr = err;
         }
-        if (this.last && timeMs > this.lastTime) {
-            const delta = Math.hypot(drawn.x - this.last.x,
-                drawn.y - this.last.y);
+        const sig = segment ? segment.sig : null;
+        if (this.last && timeMs > this.lastTime && sig !== null
+            && sig === this.lastSig) {
+            const stepX = drawn.x - this.last.x;
+            const stepY = drawn.y - this.last.y;
+            const delta = Math.hypot(stepX, stepY);
             const dtS = (timeMs - this.lastTime) / 1000;
             const frameSpeed = speed * dtS;
             if (frameSpeed > 0.01) {
                 this.maxSpike = Math.max(this.maxSpike, delta / frameSpeed);
             }
+            const len = Math.hypot(segment.dx, segment.dy);
+            if (len > 1) {
+                const rel = ((this.last.x - segment.ax) * segment.dx
+                    + (this.last.y - segment.ay) * segment.dy) / len;
+                if (rel >= 0 && rel <= len) {
+                    const along = (stepX * segment.dx + stepY * segment.dy)
+                        / len;
+                    if (along < -1e-6) {
+                        this.backFrames++;
+                        this.maxBack = Math.max(this.maxBack, -along);
+                    }
+                }
+            }
         }
         this.last = { x: drawn.x, y: drawn.y };
         this.lastTime = timeMs;
+        this.lastSig = sig;
         this.frames++;
         if (atArrival) {
             this.errAtArrival = err;
@@ -478,7 +518,7 @@ class Scenario {
                 const atArrival = this.arrivalFlag;
                 this.arrivalFlag = false;
                 this.metrics.observe(after, this.truthPos(), this.opts.speed,
-                    this.clock.nowMs, atArrival);
+                    this.clock.nowMs, atArrival, this.segment());
                 this.logCounter++;
                 if (this.frameLog && this.logCounter % 10 === 0) {
                     const step = Math.hypot(after.x - (before
@@ -530,8 +570,40 @@ class Scenario {
         return this.isSelf ? this.selfMoving : this.state.obj.moving;
     }
 
+    // segment returns the forward axis of the movement segment the
+    // map is rendering right now, plus a signature that changes when a
+    // new movement packet re-anchors it. The back metric only compares
+    // frames of one signature, so a legitimate turn to a new
+    // destination is not counted as a backwards step.
+    segment() {
+        const v = this.isSelf ? {
+            x: this.selfX, y: this.selfY,
+            destX: this.selfDestX, destY: this.selfDestY,
+            moveAtMs: this.selfMoveAtMs, moving: this.selfMoving,
+            speed: this.selfSpeed
+        } : this.state.obj;
+        if (!v.moving || !(v.speed > 0)) {
+            return null;
+        }
+
+        return {
+            ax: v.x, ay: v.y,
+            dx: v.destX - v.x, dy: v.destY - v.y,
+            sig: v.x + "," + v.y + "," + v.destX + "," + v.destY + ","
+                + v.moveAtMs
+        };
+    }
+
     applySelfPacket(packet, nowMs) {
         this.selfSpeed = this.opts.speed;
+        if (packet.type === "PositionOnly") {
+            // The state bug shape: the anchor moves but the movement
+            // state does not, so the projection overruns the server.
+            this.selfX = packet.x;
+            this.selfY = packet.y;
+
+            return;
+        }
         if (packet.type === "MoveToPawn") {
             const dx = packet.x - packet.targetX;
             const dy = packet.y - packet.targetY;
@@ -627,6 +699,14 @@ class Scenario {
             }
             this.deliverSnapshot(this.driver.time + 2);
             this.scheduleTicks(this.driver.time + 1, this.driver.time + 1000);
+            if (this.opts.laggy) {
+                // A mob chasing the player broadcasts MoveToPawn with
+                // the player position sampled mid tick once per second.
+                // The sample carries no movement state of the player.
+                this.driver.at(this.driver.time + 400, (t) => {
+                    this.applyLaggyPosition(t);
+                });
+            }
             this.driver.run(this.driver.time + 1000,
                 (bound) => this.pumpFrames(bound));
             if (Math.hypot(targetX - this.sim.x, targetY - this.sim.y)
@@ -638,6 +718,17 @@ class Scenario {
         this.applyPacket(stop, this.driver.time + 1);
         this.driver.run(this.driver.time + 1500,
             (bound) => this.pumpFrames(bound));
+    }
+
+    // applyLaggyPosition feeds a position-only self sample at the current
+    // server truth: the anchor moves, the destination and moveAt stay.
+    applyLaggyPosition(at) {
+        if (!this.isSelf) {
+            return;
+        }
+        this.selfX = this.sim.x;
+        this.selfY = this.sim.y;
+        this.deliverSnapshot(at + 1);
     }
 
     // runPickupHops mimics the loot phase: many short straight hops with
@@ -680,10 +771,12 @@ class Scenario {
 
     evaluate() {
         const failures = [];
+        const errFactor = this.opts.maxErrFactor || HARNESS.maxErrFactor;
         const maxErr = Math.max(HARNESS.maxErrAbsolute,
-            HARNESS.maxErrFactor * this.opts.speed);
+            errFactor * this.opts.speed);
         const errOk = this.metrics.maxErr <= maxErr;
         const spikeOk = this.metrics.maxSpike <= HARNESS.maxSpikeRatio;
+        const backOk = this.metrics.maxBack <= HARNESS.maxBackUnits;
         const arrivalOk = this.metrics.errAtArrival === null
             || this.metrics.errAtArrival <= maxErr;
         if (!errOk) {
@@ -693,6 +786,11 @@ class Scenario {
         if (!spikeOk) {
             failures.push("max spike " + this.metrics.maxSpike.toFixed(2)
                 + "x > " + HARNESS.maxSpikeRatio + "x");
+        }
+        if (!backOk) {
+            failures.push("drawn back " + this.metrics.maxBack.toFixed(1)
+                + "u > " + HARNESS.maxBackUnits + "u in "
+                + this.metrics.backFrames + " frames");
         }
         if (!arrivalOk) {
             failures.push("arrival error "
@@ -707,6 +805,7 @@ class Scenario {
             + " err@arrival=" + (this.metrics.errAtArrival === null
                 ? "n/a" : this.metrics.errAtArrival.toFixed(1) + "u")
             + " maxSpike=" + this.metrics.maxSpike.toFixed(2) + "x"
+            + " maxBack=" + this.metrics.maxBack.toFixed(1) + "u"
             + " frames=" + this.metrics.frames
             + (passed ? "" : "  <- " + failures.join("; ")));
 
@@ -740,6 +839,13 @@ function scenarios() {
             speed: 165, collision: 9,
             startX: 45000, startY: 50000, chase: true,
             chaseDistance: 700, pawnOffset: 40, seed: 41
+        }),
+        new Scenario("played character chase, laggy samples", {
+            kind: "player", objectId: 100, templateId: 0,
+            speed: 165, collision: 9,
+            startX: 45000, startY: 50000, chase: true, laggy: true,
+            chaseDistance: 700, pawnOffset: 40, seed: 43,
+            maxErrFactor: 0.6
         }),
         new Scenario("pickup hops", {
             kind: "player", objectId: 100, templateId: 0,
@@ -838,7 +944,12 @@ async function record(seconds, outfile, url, bot) {
 }
 
 // replay feeds a recording through the real map at 60 fps and reports
-// the frame log plus speed spikes of every moving unit.
+// the drawn marker stepping backwards along its walk segment
+// (DRAWN-BACK), a target projection that retreats when a late position
+// sample re-anchors the move (TARGET-BACK, the server side lag the
+// state tracker has to prevent) and the frame speed spikes. A real
+// teleport (the position jumps farther than the map teleport radius)
+// is not a movement transition and is skipped by the back checks.
 async function replay(file) {
     const data = JSON.parse(fs.readFileSync(file, "utf8"));
     const samples = data.samples;
@@ -856,13 +967,74 @@ async function replay(file) {
     let maxSpike = 0;
     let spikeCount = 0;
     let frames = 0;
+    let drawnBackMax = 0;
+    let drawnBackFrames = 0;
+    let targetBackMax = 0;
+    let targetBackCount = 0;
     const lastPos = new Map();
+    const lastSig = new Map();
+    const lastView = new Map();
+
+    const viewOf = (snap, key) => {
+        if (!snap) {
+            return null;
+        }
+        if (key === "self") {
+            return snap.character || null;
+        }
+
+        return (snap.objects || []).find((o) => String(o.objectId)
+            === String(key)) || null;
+    };
+    const signature = (view) => view.x + "," + view.y + "," + view.destX
+        + "," + view.destY + "," + view.moveAtMs;
+
     console.log("replaying " + samples.length + " snapshots, "
         + Math.round((to - from) / 1000) + "s");
     for (let t = from; t <= to; t += HARNESS.frameMs) {
         clock.nowMs = t;
         while (sampleIndex < samples.length && samples[sampleIndex].t <= t) {
-            MapView.update(samples[sampleIndex].snap);
+            const snap = samples[sampleIndex].snap;
+            const before = MapView.lastSnap;
+            const nowBefore = clock.nowMs + MapView.clockOffsetMs;
+            const keys = new Set(["self"]);
+            for (const o of snap.objects || []) {
+                keys.add(String(o.objectId));
+            }
+            for (const key of keys) {
+                const prev = viewOf(before, key);
+                const next = viewOf(snap, key);
+                if (!prev || !next || !prev.moving || !next.moving
+                    || !(next.speed > 0)) {
+                    continue;
+                }
+                if (prev.destX !== next.destX || prev.destY !== next.destY) {
+                    continue;
+                }
+                const jump = Math.hypot(next.x - prev.x, next.y - prev.y);
+                if (jump > HARNESS.teleportUnits) {
+                    continue;
+                }
+                const tp = MapView.projectTickwise(prev, key, nowBefore);
+                const tn = MapView.projectTickwise(next, key, nowBefore);
+                const ddx = tn.x - tp.x;
+                const ddy = tn.y - tp.y;
+                const fx = next.destX - next.x;
+                const fy = next.destY - next.y;
+                const flen = Math.hypot(fx, fy);
+                if (flen <= 1) {
+                    continue;
+                }
+                const along = (ddx * fx + ddy * fy) / flen;
+                if (along < -HARNESS.maxBackUnits) {
+                    targetBackCount++;
+                    targetBackMax = Math.max(targetBackMax, -along);
+                    console.log("TARGET-BACK t=" + Math.round(t) + " unit "
+                        + key + " target retreated " + (-along).toFixed(1)
+                        + "u (position jump " + jump.toFixed(0) + "u)");
+                }
+            }
+            MapView.update(snap);
             sampleIndex++;
         }
         // drain the frame callbacks that are due
@@ -886,6 +1058,7 @@ async function replay(file) {
         for (const { key, view, speed } of views) {
             if (!view || !view.moving || !(speed > 0)) {
                 lastPos.delete(key);
+                lastSig.delete(key);
 
                 continue;
             }
@@ -893,12 +1066,17 @@ async function replay(file) {
             if (!rt) {
                 continue;
             }
+            const sig = signature(view);
             const prev = lastPos.get(key);
+            const prevSig = lastSig.get(key);
             lastPos.set(key, { x: rt.drawX, y: rt.drawY });
+            lastSig.set(key, sig);
             if (!prev) {
                 continue;
             }
-            const delta = Math.hypot(rt.drawX - prev.x, rt.drawY - prev.y);
+            const stepX = rt.drawX - prev.x;
+            const stepY = rt.drawY - prev.y;
+            const delta = Math.hypot(stepX, stepY);
             const perFrame = speed * HARNESS.frameMs / 1000;
             const ratio = perFrame > 0.01 ? delta / perFrame : 0;
             if (ratio > maxSpike) {
@@ -910,19 +1088,59 @@ async function replay(file) {
                     + " moved " + delta.toFixed(1) + "u in one frame ("
                     + ratio.toFixed(2) + "x of " + speed + " u/s)");
             }
+            if (prevSig === sig && delta > 0.01) {
+                const fx = view.destX - view.x;
+                const fy = view.destY - view.y;
+                const flen = Math.hypot(fx, fy);
+                // Outside the anchor-destination span the marker is
+                // catching up after a retarget, not walking the line.
+                const relX = rt.drawX - view.x;
+                const relY = rt.drawY - view.y;
+                const rel = flen > 1 ? (relX * fx + relY * fy) / flen : -1;
+                if (flen > 1 && rel >= 0 && rel <= flen) {
+                    const along = (stepX * fx + stepY * fy) / flen;
+                    if (along < -HARNESS.maxBackUnits) {
+                        drawnBackFrames++;
+                        drawnBackMax = Math.max(drawnBackMax, -along);
+                        console.log("DRAWN-BACK t=" + Math.round(t)
+                            + " unit " + key + " stepped back "
+                            + (-along).toFixed(2) + "u of "
+                            + delta.toFixed(2) + "u (speed frame "
+                            + perFrame.toFixed(2) + "u)");
+                    }
+                }
+            }
+            const prevView = lastView.get(key);
+            lastView.set(key, view);
             if (verbose && frames % 10 === 0) {
                 console.log("t=" + Math.round(t) + " unit " + key
                     + " drawn=" + Math.round(rt.drawX) + ","
                     + Math.round(rt.drawY)
                     + " seg=" + (view.destX - view.x).toFixed(0) + ","
                     + (view.destY - view.y).toFixed(0)
-                    + " frameU=" + delta.toFixed(2));
+                    + " frameU=" + delta.toFixed(2)
+                    + (prevView && prevView.moveAtMs !== view.moveAtMs
+                        ? " reanchor" : ""));
             }
         }
     }
     console.log("frames=" + frames + " maxSpike=" + maxSpike.toFixed(2)
         + "x spikes>" + HARNESS.maxSpikeRatio + "x: " + spikeCount);
-    process.exitCode = maxSpike > HARNESS.maxSpikeRatio ? 1 : 0;
+    console.log("drawnBackMax=" + drawnBackMax.toFixed(1)
+        + "u frames=" + drawnBackFrames
+        + " targetBackMax=" + targetBackMax.toFixed(1)
+        + "u count=" + targetBackCount);
+    const drawnOk = drawnBackMax <= HARNESS.maxBackUnits;
+    const targetOk = targetBackMax <= HARNESS.maxTargetBackUnits;
+    if (!drawnOk) {
+        console.log("FAIL: drawn marker stepped back along the walk line");
+    }
+    if (!targetOk) {
+        console.log("FAIL: a late position sample re-anchored the move "
+            + "behind the projected target");
+    }
+    process.exitCode = maxSpike <= HARNESS.maxSpikeRatio
+        && drawnOk && targetOk ? 0 : 1;
 }
 
 function main() {

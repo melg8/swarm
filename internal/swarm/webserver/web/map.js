@@ -758,17 +758,46 @@ const MapView = {
       rt.settled = true;
     } else {
       const chase = Math.max(60, rt.lastV * chaseFactor) * dt;
-      if (dist <= chase) {
-        rt.drawX = target.x;
-        rt.drawY = target.y;
-        rt.settled = true;
-      } else {
-        rt.drawX += dx / dist * chase;
-        rt.drawY += dy / dist * chase;
-        rt.settled = false;
-      }
+      const step = Math.min(chase, dist);
+      let stepX = dist > 0 ? dx / dist * step : 0;
+      let stepY = dist > 0 ? dy / dist * step : 0;
+      const guard = this.monotoneStep(view, rt, stepX, stepY);
+      stepX = guard.x;
+      stepY = guard.y;
+      rt.drawX += stepX;
+      rt.drawY += stepY;
+      rt.settled = Math.hypot(target.x - rt.drawX,
+        target.y - rt.drawY) <= 0.5;
     }
     rt.drawHeading = turnHeading(rt.drawHeading, view.heading, turning);
+  },
+
+  // monotoneStep keeps the drawn marker from moving away from its
+  // current destination. A packet position may lag the projection (a
+  // late read, a refused move, a blocked server tick), and correcting
+  // that lag radially reads as a step back; dropping the outward part
+  // of the chase step still corrects the line and lets the projection
+  // catch up. A real retarget installs a new destination, so the
+  // distance to it is measured from scratch.
+  monotoneStep(view, rt, stepX, stepY) {
+    if (!view.moving || !(view.speed > 0)) {
+      return { x: stepX, y: stepY };
+    }
+    const remX = view.destX - rt.drawX;
+    const remY = view.destY - rt.drawY;
+    const rem = Math.hypot(remX, remY);
+    if (rem <= 1) {
+      return { x: 0, y: 0 };
+    }
+    const inward = (stepX * remX + stepY * remY) / rem;
+    if (inward >= 0) {
+      return { x: stepX, y: stepY };
+    }
+
+    return {
+      x: stepX - remX / rem * inward,
+      y: stepY - remY / rem * inward
+    };
   },
 
   // projectTickwise reproduces the server movement recurrence exactly:

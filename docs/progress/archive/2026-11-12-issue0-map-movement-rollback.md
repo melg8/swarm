@@ -1,4 +1,4 @@
-# The web map marker jumping back (status: in progress)
+# The web map marker jumping back (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner report: the character
 marker on the web map periodically jumps back during a hunt).
@@ -62,3 +62,32 @@ victim, the standing sample that must not gain a stamp).
 In progress: the state re-anchor is in place and tested. Next: the
 `map.js` monotone guard, the harness back-step gate, and the live
 recording after both fixes.
+
+### 2026-11-12 - the monotone guard and the harness gate
+
+`map.js advanceRuntime` now passes the chase step through `monotoneStep`:
+the outward radial component (away from the current destination) is
+dropped, the tangential part stays, so a packet that lands behind the
+projection never drags the marker back; a real retarget installs a new
+destination and is measured from scratch, a real teleport still renders
+instantly. The movement harness grew an eighth scenario (a mob chase
+that feeds position-only samples with a stale `moveAt`), a per scenario
+`maxBack` metric (threshold 0.5 u) and a replay report of `DRAWN-BACK`
+(marker against its walk line) and `TARGET-BACK` (a projected target
+retreat over 50 u). The gate was proven red on the old renderer: rec2
+replays with 27 drawn-back frames up to 3.7 u and the laggy scenario
+fails at 3.7 u, while the guarded map is 0.
+
+### 2026-11-12 - the live proof on the deployed stack
+
+Rebuilt the bot from the fixed tree, hunted 180 s on the Windows stack
+and recorded 375 snapshots (`runs/rec5.json`). The replay: drawn-back
+0.0 u in 0 frames, target retreat 22.9 u worst (pre-fix combat 93 u and
+166 u), frame spikes 0 over 2.5x. The gate exits 0, all twelve web
+harnesses and the state/webserver test packages pass.
+
+## Status
+
+Complete: the tracker re-anchors self position samples, the map marker
+never travels away from its destination, the harness gate covers both,
+and the live hunt recording shows no rollback.

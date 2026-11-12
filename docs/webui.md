@@ -350,6 +350,20 @@ character is interpolated the same way from its own movement
 broadcasts (Player.broadcastPacket sends every broadcast except
 CharInfo to the acting player itself).
 
+Two rules keep the marker from stepping back. A position sample of the
+played character that carries no movement state of its own (a UserInfo
+refresh, the target fields of a mob MoveToPawn chase, an Attack hit)
+re-anchors the move in the tracker: `applySelfPositionSampleLocked`
+adopts the sample place and restarts the movement stamp (`MoveAt`) at
+the sample arrival, so the projection replays the remaining segment
+from the true point instead of adding the already covered distance and
+snapping back on the next broadcast. The drawn position additionally
+never travels away from its current destination: `monotoneStep` drops
+the outward part of a chase step, keeps the tangential part and lets
+the projection catch up, while a real retarget installs a new
+destination measured from scratch. A real teleport still renders
+instantly (the over-400-unit discontinuity check).
+
 Heading semantics (Mobius `LocationUtil.calculateHeadingFrom`):
 `atan2(dy, dx) * 65535 / 2pi`, 0 faces east, the angle grows clockwise
 because world y points south. The server announces arrival with a zero
@@ -1433,15 +1447,19 @@ plumbing closes that gap:
 ## Reproduction harnesses (all exit 1 while their bug is present)
 
 - `tools/repro_movement.js` (`task repro:movement`) for the movement
-  interpolation: the simulation mode replays seven patterns (random
-  walk, long run, character walk, chase, pickup hops, retarget
-  approach, npc chase) against a faithful server simulation (100 ms
-  ticks, the exact recurrence, the 1 s broadcast throttle) and measures
-  per frame position error against the simulated truth (threshold 0.25x
-  speed in world units) and frame speed spikes (threshold 2.5x);
-  `--record <seconds> [file] [url] [bot]` captures the live SSE stream
-  and `--replay file [--frames]` replays it at 60 fps, printing the
-  drawn position of every moving unit per frame and failing on spikes.
+  interpolation: the simulation mode replays eight patterns (random
+  walk, long run, character walk, chase, laggy chase samples, pickup
+  hops, retarget approach, npc chase) against a faithful server
+  simulation (100 ms ticks, the exact recurrence, the 1 s broadcast
+  throttle) and measures per frame position error against the simulated
+  truth (threshold 0.25x speed in world units), frame speed spikes
+  (threshold 2.5x) and the largest backwards step of the drawn marker
+  along its walk line (threshold 0.5 u); `--record <seconds>
+  [file] [url] [bot]` captures the live SSE stream and `--replay file
+  [--frames]` replays it at 60 fps, printing the drawn position of every
+  moving unit per frame and failing on spikes, DRAWN-BACK steps and
+  TARGET-BACK re-anchors (a projected target retreat over 50 u, the
+  state lag the tracker prevents).
 - `tools/repro_map_render.js` (`task repro:map`) for the target links,
   unit markers, the static free camera, the grab semantics of map
   panning, the walk plan pastel flow (the dark casing, the palette,
