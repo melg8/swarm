@@ -46,12 +46,14 @@ merchant behind a counter or on a floor layer the geodata does not
 model is reached through the deck ring within the interaction
 distance, the water deck below the shop never satisfies the radius).
 
-The A* step rules mirror the Mobius movement validation: upward steps
-are gated at `DefaultMaxPassableHeight` (40, the Mobius
-HEIGHT_INCREASE_LIMIT), drops of any height are walkable, and layers
-below the C1 water surface (waterLevel -3780, the maxZ of the water
-zones) cost `waterCostMultiplier` (3x) per step so bridges and shores
-beat swimming whenever they exist. The line of sight raster keeps the
+The A* step rules mirror the Mobius movement validation: the height
+difference of a step is gated at `DefaultMaxPassableHeight` (40, the
+Mobius HEIGHT_INCREASE_LIMIT) in both directions - the server accepts
+any downward step, a plan does not (the terrace edges of the stacked
+decks). Layers below the C1 water surface (`WaterLevel` -3780, the maxZ
+of the water zones) cost `waterCostMultiplier` (2.3, the measured
+115/50 run/swim ratio of the HumanFighter) per step, so bridges and
+shores beat swimming whenever they exist. The line of sight raster keeps the
 strict symmetric height rule, so the smoothing never collapses a
 detour into a straight drop. The smoothing is also water aware
 (`segmentDry`): a segment between two dry points must stay above the water
@@ -61,6 +63,15 @@ rule the smoothed path would ford the very bays the cost aware search
 paid to route around (the 2026-09-10 elven lake regression,
 `TestSmoothedLegsStayDry`). Segments that start or end in the water are
 exempt: they belong to the swim escape below.
+
+The A* also routes around the recovery bans (`AvoidArea`, the hunt
+recovery's memory of ground the live server refused although the pack
+models it open): a banned cell is impassable to the expansions, the
+direct line and the smoothing. The ban holding the search start keeps an
+escape ring of `avoidEscapeRadius` (256 units) whose cells cost
+`avoidEscapeMultiplier` (6x) instead of walls - a sealed start would
+otherwise answer no route at all, while a goal sealed behind the ban
+still answers not found.
 
 The engine answers one water query besides the searches:
 `OverWater(x, y, refZ)` tells whether the walkable surface under a

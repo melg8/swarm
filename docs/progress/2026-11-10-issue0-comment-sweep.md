@@ -176,13 +176,30 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance tests,
   `task lint:new`.
 
+### 2026-11-12 - pathfind/search.go keeps the cost model only
+
+- 26 blocks compress: the water constants, the avoid ban and the step
+  rules keep the numbers (the -3780 water surface, the 2.3 swim price,
+  the 6x escape price, the 256 unit escape ring, the 40 unit
+  HEIGHT_INCREASE_LIMIT, the 8..24 unit ramps, the 7x7 ring, the
+  symmetric wall check, the reverse wall and the anti corner cut) and
+  the round stories drop. The two stacked `wallsOpen` doc blocks merge
+  into one.
+- The doc loses two stale facts: `docs/pathfinding.md` read "drops of
+  any height are walkable" (the plan gates the drop at 40 too) and
+  `waterCostMultiplier` 3x (the code prices 115/50 = 2.3). The same
+  paragraph now carries the avoid ban and the escape ring.
+- Verified: `task fmt`, `go build ./...`, the pathfind tests,
+  `task lint:new`. The tree share reads 13.7 percent, 546 blocks,
+  1,267 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
 compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `shopping.go`, `cell_policy.go`, `user.go`, `quest_trip.go`,
-`town_walk.go` (twice) and `loop_state.go`. Next: `town_stuck.go`
-(46.4 percent comment share), `acceptance/archer_fleet.go`,
-`pathfind/search.go`, `pathfind/navmesh/hierarchy.go`,
-`state/scans.go`; the share and the block count are re-measured at
-the end.
+`town_walk.go` (twice), `loop_state.go`, `town_stuck.go`,
+`acceptance/archer_fleet.go` and `pathfind/search.go`. Next:
+`pathfind/navmesh/hierarchy.go` (298 lines), `state/scans.go` (284),
+`hunt/zones.go` (280), `hunt/town.go` (272); the share and the block
+count are re-measured at the end.

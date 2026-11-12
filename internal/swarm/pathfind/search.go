@@ -22,53 +22,29 @@ const (
     impassableScore = float32(math.MaxFloat32 / 2)
 )
 
-// Water plane constants of the C1 world. The water zones of the
-// Mobius data sit with their surface at -3780 (the maxZ of the
-// water.xml cuboids); the geodata layers below it are the lake and
-// sea beds. The server lets characters walk (swim) over them, so
-// the search must too - but at a cost, so land routes win whenever
-// they exist (the elven village town trips crossed the whole lake
-// under the floating island before this cost existed).
+// WaterLevel is the water surface of the C1 world (the maxZ of the
+// Mobius water.xml cuboids); the layers below it are the lake and sea
+// beds the server lets characters swim over.
 const (
-    // WaterLevel is the water surface height; layers below it count
-    // as underwater.
     WaterLevel = int16(-3780)
-    // waterCostMultiplier scales the step cost of every move landing
-    // on an underwater cell: the measured run/swim speed ratio of the
-    // C1 server (the player templates carry the run speeds 115..125
-    // against the swim 50 of every class, the HumanFighter the bots
-    // walk prices the swim at 115/50 = 2.3) - swimming burns the
-    // breath meter on top.
+    // waterCostMultiplier prices an underwater step at the run/swim
+    // speed ratio of the C1 server (115/50 for the HumanFighter the bots
+    // walk; the swim of every class is 50).
     waterCostMultiplier = float32(2.3)
-    // avoidEscapeMultiplier scales the step cost of every move landing
-    // on an escape cell of the avoid area that holds the search
-    // start: the walker stands inside its own ban (the widening of
-    // the frozen corridor recovery grows the patch past the standing
-    // cell), and the only honest route out crosses it. Expensive, so
-    // the search leaves at the nearest edge and never prefers the
-    // banned ground - but never impassable, or the start is sealed in
-    // and every later search answers no route (the 2026-09-14 08:42
-    // dump: the widened corridor ban swallowed the crept standing
-    // cell, the dry search explored one cell and the trips fell back
-    // to the ban-less route forever).
+    // avoidEscapeMultiplier prices an escape cell of the ban that holds
+    // the search start: expensive enough to leave by the nearest edge,
+    // never impassable (a sealed start answers no route at all).
     avoidEscapeMultiplier = float32(6)
-    // avoidEscapeRadius bounds the escape cells of the ban that holds
-    // the search start: only the cells within this radius of the
-    // standing cell stay plannable, the rest of the own ban keeps its
-    // wall. The neighborhood of the standing cell is the ground the
-    // character itself arrived through, so planning out of it is
-    // honest - but a route that threads DEEP into the own ban toward
-    // a goal sealed behind it must still answer not found (the
-    // trainer hall aisle contract: the sealed goal falls back to the
-    // next recovery rung instead of re-planning the frozen corridor).
+    // avoidEscapeRadius bounds that escape ring: a route threading
+    // deeper into the own ban toward a goal sealed behind it still
+    // answers not found (the sealed goal falls back to the next rung).
     avoidEscapeRadius = 256.0
 )
 
 // nodeKey identifies one search node: the cell plus the height of the
-// layer it was reached with. Multilayer cells produce one node per
-// walkable floor, so a cell first touched from the water does not seal
-// its bridge deck layer away from the search (a single layer per cell
-// resolved on first touch did exactly that on the Elven village bridge).
+// layer it was reached with. A multilayer cell carries one node per
+// walkable floor, so a cell first touched from the water never seals
+// its bridge deck layer (docs/pathfinding.md).
 type nodeKey struct {
     p Point
     h int16
@@ -106,25 +82,15 @@ type search struct {
     // this 3D distance of targetWorld. Zero keeps the plain cell
     // arrival semantics (any layer of the target cell).
     approachRadius float64
-    // avoid holds the world patches this search must route around
-    // (the frozen-cell ban of the hunt loop recovery): a step onto a
-    // banned cell costs impassable, so the A* detours around the
-    // patch, and neither the direct line shortcut nor the smoothing
-    // may collapse a segment across it. The ban is the planner's own
-    // memory of ground the live server refused to walk although the
-    // geodata pack modeled it as open (the 2026-09-12 trainer hall
-    // aisle freeze: the plan entered through the west aisle column,
-    // the server walled it, the deterministic re-plan reproduced the
-    // identical route and the character stood frozen through the
-    // whole re-path budget).
+    // avoid holds the world patches this search must route around (the
+    // hunt recovery's ban): a step onto a banned cell is impassable, and
+    // neither the direct line nor the smoothing may cross it. The ban is
+    // the planner's memory of ground the live server refused to walk
+    // though the pack models it open.
     avoid []AvoidArea
-    // escapeIdx is the index of the avoid area that contains the
-    // search start (-1 when the start sits on no ban): its cells
-    // within avoidEscapeRadius of the start cost avoidEscapeMultiplier
-    // instead of impassable, so a walker that stands inside its own
-    // ban can always plan its way out of it (the documented intent of
-    // the start exemption - the widening of a ban makes the
-    // deep-interior start the common case, not the edge case).
+    // escapeIdx is the index of the avoid area holding the search start
+    // (-1 when the start sits on no ban): its cells within
+    // avoidEscapeRadius stay plannable at avoidEscapeMultiplier.
     escapeIdx int
     // startWorld is the world position of the search start: the
     // escape ring of the own ban measures against it.
@@ -240,16 +206,10 @@ func (s *search) nextSeq() uint64 {
 
 // run executes the whole search and fills the result statistics. The
 // target cell resolves its intended layer against the target z, like
-// the server's own pathfinder does (PathFinding.findPath resolves
-// getHeight(tx, ty, tz)): a coordinate with several floors picks the
-// floor the destination names, not the floor the start stands on.
-// The search answers the straight line of sight raster directly only
-// when the line is a dry minimum-rate walk (directOrAstar below);
-// every other route comes from the cost aware A*. With a positive
-// approachRadius the search succeeds on the first node within that
-// 3D distance of the end point (the merchant interaction distance
-// of the town trips); with zero it succeeds on the first arrival on
-// the target cell at any layer (the original behavior).
+// the server pathfinder does (getHeight(tx, ty, tz)): a coordinate with
+// several floors picks the floor the destination names. A positive
+// approachRadius ends the search on the first node within that 3D
+// distance, zero on the first arrival on the target cell.
 func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
     began := time.Now()
     from, err := s.nodeAtWorld(start)
@@ -327,11 +287,9 @@ func (s *search) astar(from *node) []*node {
             }
             step := current.g + s.costTo(current, next, ring)
             if step >= impassableScore {
-                // A wall hit: the cell is not walkable from here.
-                // The original library inserted it into the open set
-                // with an astronomic cost instead, which let a sealed
-                // target produce a wall crossing path; unreachable
-                // targets must report not found.
+                // A wall hit: unreachable targets report not found, never
+                // a wall crossing path (the original opened it at an
+                // astronomical cost).
                 continue
             }
             if existing, inOpen := s.openSet[next.key]; inOpen {
@@ -355,24 +313,13 @@ func (s *search) astar(from *node) []*node {
     return nil
 }
 
-// directOrAstar answers the straight raster line between the start
-// and the target when it is a clean dry walk, and runs the full cost
-// aware A* otherwise. It returns the raw node path together with its
-// smoothed form. The old line of sight short circuit answered ANY
-// walkable straight line - including one that fords a lake bed - and
-// so bypassed the water cost entirely: the synthetic channel route
-// swam straight across while the bridge, cheaper by the water
-// penalty, sat unplanned. A dry line of sight is the safe case to
-// keep answering directly: it walks the minimum step rate the grid
-// allows, so no detour beats it by more than the wall proximity
-// noise, and skipping the search keeps the flat field walks (the
-// region crossing concurrent routes) instant instead of flooding
-// the A* ellipse and the quadratic smoothing cascade over them (the
-// accepted direct line is its own smoothing: the two endpoints). A
-// line that steps into water, hits a wall or a terrace boundary, or
-// ends short of the target (missing geodata truncated the raster)
-// defers to the A*, which weighs the swim against the bridge detour
-// and the walls against the detour itself.
+// directOrAstar answers the straight raster line between the start and
+// the target when it is a clean dry walk, and runs the full cost aware
+// A* otherwise (it returns the raw node path and its smoothed form). A
+// dry line walks the minimum step rate the grid allows, so no detour
+// beats it: the direct answer is its own smoothing (the two endpoints).
+// A line that steps into water, hits a wall or a terrace boundary, or
+// ends short of the target defers to the A*.
 func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
     direct := s.straightPath(from, to)
     if len(direct) > 0 && direct[len(direct)-1].coords == to.coords &&
@@ -389,10 +336,9 @@ func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
     return raw, s.smoothPath(raw)
 }
 
-// directLineDry reports whether every step of a raster line is
-// walkable at the plain step rate and lands on dry ground: the water
-// penalty is the one cost dimension that can make a walkable
-// straight line clearly worse than a detour.
+// directLineDry reports whether every step of a raster line is walkable
+// at the plain step rate and lands on dry ground: water is the one cost
+// a detour can beat.
 func (s *search) directLineDry(direct []*node) bool {
     for i := 0; i+1 < len(direct); i++ {
         if !s.canStep(direct[i], direct[i+1]) {
@@ -420,17 +366,11 @@ func (s *search) dryLine(from, to *node) bool {
 }
 
 // segmentDry reports whether the smoothing may replace the walk between
-// two nodes with a straight segment: a segment between two dry points must
-// stay above the water surface. The string pulling itself is water
-// blind - it only asks the line of sight - and the line of sight
-// happily crosses a lake bed whose shores step within the passable
-// height, so without this rule the smoothed path fords bays the cost
-// aware search priced out and hands the walker water crossing segments
-// the plan never priced (the elven village lake sent the town trips
-// swimming). A segment that starts or ends in the water is exempt: it
-// belongs to a crossing the search itself priced (or the swim escape
-// of a character that already stands in a lake), and the water is the
-// only surface such a walk can use.
+// two nodes with a straight segment: a segment between two dry points
+// must stay above the water surface, since the sight line happily
+// crosses a lake bed the cost aware search paid to route around. A
+// segment that starts or ends in the water is exempt - it belongs to a
+// crossing the search itself priced.
 func (s *search) segmentDry(from, to *node) bool {
     if from.layer.Height < WaterLevel || to.layer.Height < WaterLevel {
         return true
@@ -439,19 +379,12 @@ func (s *search) segmentDry(from, to *node) bool {
     return s.dryLine(from, to)
 }
 
-// nodeReached reports whether a popped node satisfies the goal of
-// the search: an approach run accepts the first node within the 3D
-// approach radius of the target point, a plain run accepts the first
-// arrival on the target cell whatever layer the walk came on. The
-// approach run also accepts the target cell arrival itself: a cell
-// center sits up to half a diagonal away from a point inside the
-// cell, so a radius under that gap never satisfies the ball on any
-// node - not even on the target cell the point belongs to - and the
-// search would flood the whole walkable component looking for a node
-// that does not exist (the tight npc search radius of the town
-// trips). The arrival keeps the plain run's any-layer semantics: the
-// caller validates the landed deck against the destination (the
-// foreign deck refusals of the town planners).
+// nodeReached reports whether a popped node satisfies the goal: an
+// approach run accepts the first node within the 3D approach radius or
+// the target cell itself (a cell center sits up to half a diagonal away
+// from any point inside it, so a tighter radius would flood the whole
+// component). A plain run accepts the target cell on any layer; the
+// caller validates the landed deck against the destination.
 func (s *search) nodeReached(current *node) bool {
     if s.approachRadius > 0 {
         world := nodeWorld(current)
@@ -485,10 +418,10 @@ func (s *search) reconstruct(target *node) []*node {
     return path
 }
 
-// costTo returns the movement cost between neighbouring cells, with the
-// wall proximity multiplier of the original (the more walled cells in the
-// 7x7 ring, the more the step costs, pulling the path away from)
-// and the water penalty of the destination.
+// costTo returns the movement cost between neighbouring cells: the step
+// score, the water penalty of the destination and the wall proximity
+// multiplier of the 7x7 ring (the more walled cells, the dearer the
+// step).
 func (s *search) costTo(current, next *node, ring []*node) float32 {
     if !s.canStep(current, next) {
         return impassableScore
@@ -506,11 +439,8 @@ func (s *search) costTo(current, next *node, ring []*node) float32 {
         cost = diagonalScore
     }
     if next.layer.Height < WaterLevel {
-        // The step lands underwater: swimming costs several land
-        // steps (the run/swim speed ratio), so bridges and shores
-        // beat water crossings unless the water cut is the genuinely
-        // faster walk - the plan may swim, the slowdown priced (the
-        // 2026-09-19 round retired the walled form of the water).
+        // The step lands underwater: the swim price keeps bridges and
+        // shores ahead unless the water cut is the genuinely faster walk.
         cost *= waterCostMultiplier
     }
     if escape {
@@ -542,23 +472,15 @@ func (s *search) obstacleMultiplier(ring []*node) float32 {
     return float32(len(ring)) / float32(obstacles)
 }
 
-// canStep mirrors the walkable surface rule of one cell step: the
-// walls of the source cell must be open for the step direction, the
-// walls of the target cell must be open for the reverse direction and
-// the height difference must stay within the passable limit in BOTH
-// directions (the Mobius HEIGHT_INCREASE_LIMIT of 40 gates the climb;
-// the drop uses the same bound). The Mobius movement validation
-// accepts any downward step, but a planned walk must stay on the
-// walkable surfaces: the world stacks terraces over each other (the
-// lake bed under the floating elven city deck) and the only walkable
-// connections between them are the gradual ramps - the bridges and
-// the shores, every ramp cell measured at 8..24 units of the real
-// geodata. A step that drops hundreds of units is a terrace boundary
-// (a deck edge behind a railing the geodata does not model, a cliff):
-// planning it sends the walker over the railing the server never
-// lets it cross or into a fall. The line of sight raster and the
-// smoothing share the same strict symmetric form so no segment of the
-// smoothed path ever leaves the surface either.
+// canStep mirrors the walkable surface rule of one step: the walls of
+// the source cell open for the direction, the walls of the target cell
+// open in reverse, and the height difference within the Mobius
+// HEIGHT_INCREASE_LIMIT of 40 in both directions. The server accepts
+// any downward step, but a planned walk must stay on the walkable
+// surfaces: the world stacks terraces (the lake bed under the floating
+// city deck) whose only connections are the 8..24 unit ramps. A drop
+// of hundreds of units is a terrace edge or a cliff, and the sight
+// raster and the smoothing share the strict symmetric form.
 func (s *search) canStep(from, to *node) bool {
     if !s.wallsOpen(from, to) {
         return false
@@ -568,37 +490,14 @@ func (s *search) canStep(from, to *node) bool {
         s.maxPassableHeight
 }
 
-// wallsOpen reports whether the walls of both the source and the
-// target node allow the step between them. The source cell's wall in
-// the step direction must be open (the character can leave the cell)
-// AND the target cell's wall in the reverse direction must be open
-// (the character can enter the cell). The reverse check mirrors the
-// Mobius MoveToLocation handler: isCompletelyBlocked rejects any
-// target cell whose walls are all closed, and the movement validation
-// checks the target cell's wall in the approach direction. Without
-// the reverse check the search planned steps onto cells the server
-// refused to enter - the character stood still, the stuck timer fired
-// and the deterministic re-path planned the identical route (the
-// 2026-09-11 town walk stuck loop of the elven village teacher plaza
-// trips).
-// wallsOpen reports whether the walls of the source node allow the
-// step to the adjacent node. The cardinal directions check the source
-// layer's own wall; a diagonal step additionally needs BOTH flanking
-// cells to allow the crossing - the anti corner cut rule every server
-// movement channel applies (GeoEngine.checkNearestNsweAntiCornerCut of
-// the click validation and the NodeBuffer diagonal expansion of the
-// server pathfinder agree on it: the SW step needs (x, y+1) open to
-// the west and (x-1, y) open to the south). A route that cuts a
-// walled corner plans a walk the server refuses wholesale: its click
-// validation walks the Bresenham line of the click, refuses the first
-// corner cut and collapses the destination back onto the walker cell -
-// the character freezes in place re-clicking the same waypoint (the
-// village plaza edge of the 2026-09-10 town walk stuck report: the
-// smoothed plan climbed the plaza wall through the corner the terrace
-// deck had walled off, every click came back ActionFailed and the
-// distance collapsed to zero).
-//
-// The 8 directional wall checks mirror the server anti corner cut.
+// wallsOpen reports whether the walls of the source node allow the step
+// to the adjacent node: the cardinal directions check the source
+// layer's own wall, the reverse direction checks the target cell (the
+// MoveToLocation isCompletelyBlocked rule), and a diagonal step needs
+// BOTH flanking cells open - the anti corner cut rule every server
+// movement channel applies (docs/pathfinding.md). A route that cuts a
+// walled corner plans a walk the server refuses wholesale: the click
+// collapses onto the walker cell and freezes the character in place.
 //
 //nolint:cyclop
 func (s *search) wallsOpen(from, to *node) bool {
@@ -614,12 +513,8 @@ func (s *search) wallsOpen(from, to *node) bool {
     if from.coords.X > to.coords.X && !from.layer.IsWestOpen() {
         return false
     }
-    // The target cell's wall in the reverse direction must also be
-    // open: a step onto a cell whose reverse wall is closed is a step
-    // the server refuses (the isCompletelyBlocked check of
-    // MoveToLocation rejects any target whose walls are all closed,
-    // and a target whose reverse wall alone is closed blocks the
-    // movement validation the same way).
+    // The target cell's reverse wall must be open too: MoveToLocation
+    // rejects a cell whose walls are all closed from the approach side.
     if from.coords.Y > to.coords.Y && !to.layer.IsSouthOpen() {
         return false
     }
@@ -639,14 +534,11 @@ func (s *search) wallsOpen(from, to *node) bool {
     return true
 }
 
-// diagonalFlanksOpen mirrors the anti corner cut of the server for a
-// diagonal step: the two orthogonal cells the step cuts across must
-// each allow the crossing direction, their layers resolved against the
-// source height - the running z the server line validation carries.
-// The SW step (x-1, y+1) needs the vertical flank (x, y+1) open to the
-// west and the horizontal flank (x-1, y) open to the south; the other
-// diagonals rotate the same pair. A flank cell without geodata counts
-// as open: the server reads no wall from a region it has no data for.
+// diagonalFlanksOpen mirrors the anti corner cut of a diagonal step: the
+// two orthogonal cells the step cuts across must allow the crossing,
+// their layers resolved against the source height (the running z of the
+// server line validation). The SW step needs (x, y+1) open to the west
+// and (x-1, y) open to the south; a flank without geodata counts open.
 func (s *search) diagonalFlanksOpen(from, to *node) bool {
     south := to.coords.Y > from.coords.Y
     east := to.coords.X > from.coords.X
@@ -674,13 +566,9 @@ func (s *search) diagonalFlanksOpen(from, to *node) bool {
     return true
 }
 
-// canMoveTo reports whether the straight walk from one cell to an
-// adjacent one stays on the walkable surface: the walls of the source
-// cell open for the direction and the symmetric height difference
-// within the passable limit - the same terrace rule canStep applies
-// to the search expansions. The line of sight raster and the
-// smoothing use this strict form: a segment they verify must stay on one
-// walkable surface, never drop off it.
+// canMoveTo reports whether the straight walk between two adjacent cells
+// stays on the walkable surface: the strict symmetric canStep rule the
+// sight raster and the smoothing verify every segment with.
 func (s *search) canMoveTo(from, to *node) bool {
     return s.canStep(from, to)
 }
@@ -699,10 +587,10 @@ func (s *search) heuristic(current *node, target Point) float32 {
     return commonScore * float32(dx+dy)
 }
 
-// neighbors returns the existing cell nodes around a node: radius 1 is
-// the 8 step neighbourhood, radius 3 the 7x7 ring for the wall
-// proximity. Cells without geodata are skipped. The scratch buffer is
-// reused between expansions to keep the hot loop allocation free.
+// neighbors returns the existing nodes around a center: radius 1 is the
+// 8 step neighbourhood, radius 3 the 7x7 ring of the wall proximity; a
+// cell without geodata is skipped. The scratch buffers keep the hot loop
+// allocation free.
 func (s *search) neighbors(center *node, radius int) []*node {
     scratch := s.neighborScratch[:0]
     if radius > 1 {
@@ -744,17 +632,11 @@ func (s *search) lineOfSight(from, to *node) bool {
     return s.serverSegmentVerified(from, to)
 }
 
-// serverSegmentVerified answers whether the game server's click
-// validation walks the straight line between two nodes: the smoothing
-// may only collapse turns into segments the follower can click. The
-// server rasterizes the click with its Bresenham iterator whose
-// diagonal double steps pass the anti corner cut rule, while the t/k
-// supercover raster of straightPath decomposes the same line into
-// cardinal steps and never cuts the diagonals - a segment verified by the
-// supercover alone can still be refused wholesale by the server (the
-// click collapses onto the walker, every re-click comes back
-// ActionFailed and the character freezes - the village plaza corner
-// of the 2026-09-10 town walk stuck report).
+// serverSegmentVerified answers whether the server click validation
+// walks the straight line between two nodes: its Bresenham raster cuts
+// the diagonals the t/k supercover of straightPath decomposes into
+// cardinal steps, so a supercover-legal segment can still be refused.
+// The smoothing may only collapse turns into segments a click survives.
 func (s *search) serverSegmentVerified(from, to *node) bool {
     fromX, fromY, fromZ := nodeClickWorld(from)
     toX, toY, toZ := nodeClickWorld(to)
@@ -772,10 +654,9 @@ func nodeClickWorld(node *node) (int32, int32, int32) {
 }
 
 // straightPath walks the supercover line between two nodes in cell
-// coordinates: the t/k test advances x and y so corners are not cut and
-// every shared edge crossing lands on a real cell. It is a verbatim port
-// of the original GetStraightPath, including the start height driving
-// the layer selection of the rastered cells.
+// coordinates: the t/k test advances x and y so every shared edge
+// crossing lands on a real cell (the GetStraightPath port), the start
+// height driving the layer selection.
 func (s *search) straightPath(from, to *node) []*node {
     xS, yS := from.coords.X, from.coords.Y
     xE, yE := to.coords.X, to.coords.Y
@@ -807,15 +688,10 @@ func (s *search) straightPath(from, to *node) []*node {
 }
 
 // smoothPath pulls the raw path straight: it keeps the last node that
-// still sees the candidate ahead and commits a turning point whenever
-// the line of sight breaks. The anchor stays on the committed point, so
-// every segment between two waypoints was verified with a line of sight -
-// the original jumped the anchor one node past the commit, which left
-// the segment between two waypoints unchecked and let the smoothed path cut
-// wall corners near gaps. Every segment between two dry points must also
-// stay dry (segmentDry): the cost aware search may have walked around a
-// lake while the sight lines across its bed stay open, and collapsing
-// them back would reintroduce the swim the search paid to avoid.
+// still sees the candidate ahead and commits a turning point where the
+// sight, the dry or the ban test breaks. The anchor stays on the
+// committed point, so every kept segment was verified - the original
+// jumped it one node past the commit and cut wall corners near gaps.
 func (s *search) smoothPath(path []*node) []*node {
     if len(path) == 0 {
         return nil
@@ -855,14 +731,10 @@ func (s *search) cellAvoided(p Point) bool {
     return false
 }
 
-// cellAvoidedEscape splits the avoid answer of cellAvoided: the cell
-// is avoided, and when it belongs to (only) the avoid area that holds
-// the search start AND sits within avoidEscapeRadius of the start it
-// is an escape cell - passable at the heavy avoidEscapeMultiplier
-// instead of impassable. A cell inside any OTHER area stays a wall
-// even when the escape area overlaps it: the route out of the own ban
-// must not thread a foreign ban to escape, and the own ban beyond the
-// start neighborhood keeps its wall too (the sealed goal contract).
+// cellAvoidedEscape splits the avoid answer of cellAvoided: a cell of
+// the area holding the search start within avoidEscapeRadius is an
+// escape (passable at the escape price), while a cell of any other area
+// and the own ban beyond the start neighborhood stay walls.
 func (s *search) cellAvoidedEscape(p Point) (escape bool, avoided bool) {
     if len(s.avoid) == 0 {
         return false, false
@@ -902,10 +774,9 @@ func (s *search) startAvoidIndex(from *node) int {
     return -1
 }
 
-// segmentAllowed reports whether the straight segment between two nodes stays
-// outside every avoid area: the direct line shortcut and the smoothing
-// may only collapse segments the ban does not cross, otherwise the shortcut
-// hands the walker back the very corridor the re-plan meant to detour.
+// segmentAllowed reports whether the straight segment between two nodes
+// stays outside every avoid area: the direct line and the smoothing may
+// only collapse segments the ban does not cross.
 func (s *search) segmentAllowed(from, to *node) bool {
     if len(s.avoid) == 0 {
         return true
