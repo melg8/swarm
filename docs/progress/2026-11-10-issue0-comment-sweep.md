@@ -106,6 +106,15 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, the hunt tests, `task lint:new`. The tree
   share reads 14.3 percent, 647 blocks, 1,380 history markers.
 
+### 2026-11-12 - cell_policy.go keeps the economy rules only
+
+- The 22 line section header compresses to eight and points at
+  `docs/hunting_cells.md`; the 32 function and constant blocks keep
+  the rule (the ripeness clock, the starved cooldown, the unfenced
+  emptiness read, the global regression contest) and drop the crowd
+  and dump stories.
+- Verified: `task fmt`, the hunt tests, `task lint:new`.
+
 ## Status
 
 The tool, the rule and the renames are in. The kite header and the
