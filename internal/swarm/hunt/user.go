@@ -558,6 +558,11 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
             selfZ, result.Waypoints[0].Z)
     }
     l.userMoveAt = time.Time{}
+    // The flow scan shares the skip bookkeeping with the town walk:
+    // a manual plan must not inherit the dead-cell verdict of the
+    // walk that ran before it.
+    l.skipArmed = false
+    l.skipX, l.skipY = 0, 0
     l.userRefusalVariants = 0
     l.cursorEscapes = 0
     l.cursorEscape = cursorEscapeState{} //nolint:exhaustruct_v5 // zero reset
@@ -681,14 +686,19 @@ func (l *Loop) beginUserCursorKeyEscape(
 }
 
 // followUserWaypoints walks the planned segments of a long manual move:
-// every waypoint gets a ground click walk, segments longer than the server
-// move limit split into straight intermediate points (the smoothing
-// keeps the line of sight of every segment), and a waypoint the character
-// already passed ON THE ROUTE skips ahead (the projection pass test of
-// the town walker - a character beside the route keeps targeting the
-// waypoint it missed). The walk ends when the last waypoint is
-// reached or the manual deadline passes; a segment that stalls (the server
-// stopped the character short) re-issues at the walk request period.
+// the click target spans the farthest waypoints the server transport
+// delivers inside the aim window (see flowAdvance), so the character
+// crosses the dense plan points without an arrival stop; segments
+// longer than the server move limit split into straight intermediate
+// points (the smoothing keeps the line of sight of every segment),
+// and a waypoint the character already passed ON THE ROUTE skips
+// ahead (the projection pass test of the town walker - a character
+// beside the route keeps targeting the waypoint it missed). The walk
+// ends when the last waypoint is reached or the manual deadline
+// passes; a segment that stalls (the server stopped the character
+// short) re-issues at the walk request period. The running move is
+// re-aimed every period too: the server replaces the destination
+// without stopping the character, only a reached target stops it.
 //
 //nolint:cyclop,funlen // the follower ladder is one linear decision train
 func (l *Loop) followUserWaypoints(
@@ -741,10 +751,6 @@ func (l *Loop) followUserWaypoints(
 
         return
     }
-    if l.tracker.SelfWalking() && !l.userRedirect {
-        // The current segment is running: do not restart the server path.
-        return
-    }
     if !l.userMoveAt.IsZero() && now.Sub(l.userMoveAt) < walkRequestPeriod {
         return
     }
@@ -771,20 +777,30 @@ func (l *Loop) followUserWaypoints(
             return
         }
     }
+    // The goal span of the manual click: the farthest route waypoint
+    // the server delivers inside the aim window (see flowAdvance), so
+    // the walk crosses the dense plan points without an arrival stop.
+    l.userWpIndex = l.flowAdvance(l.userWaypoints, l.userWpIndex,
+        l.userFrameOffset, selfX, selfY, selfZ)
+    l.clickUserWaypoint(now, selfX, selfY, selfZ)
+}
+
+// clickUserWaypoint sends the ground click toward the current manual
+// waypoint: the click z rides the server frame transport of the
+// manual plan (see click_frame.go), and a segment longer than the
+// server move limit splits into a straight intermediate point - the
+// smoothing verified the whole segment, the server only gets the
+// short piece it accepts.
+func (l *Loop) clickUserWaypoint(
+    now time.Time, selfX int32, selfY int32, selfZ int32,
+) {
     wp := l.userWaypoints[l.userWpIndex]
     dx := wp.X - float64(selfX)
     dy := wp.Y - float64(selfY)
     dist := math.Hypot(dx, dy)
-    // The click z rides the server frame transport of the manual
-    // plan (see click_frame.go): the mesh height plus the measured
-    // vintage shift - the raw mesh z names the wrong layer wherever
-    // the packs disagree about a surface's absolute height.
     wpZ := anchorZToServerFrame(wp.Z, l.userFrameOffset)
     moveX, moveY, moveZ := wp.X, wp.Y, wpZ
     if dist > maxMoveDistance {
-        // Split the segment into a straight intermediate point: the
-        // smoothing verified the whole segment, the server only
-        // gets the short piece it accepts.
         scale := maxMoveDistance / dist
         moveX = float64(selfX) + dx*scale
         moveY = float64(selfY) + dy*scale

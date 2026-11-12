@@ -125,9 +125,12 @@ func TestWalkClickRidesTheServerFrameTransport(t *testing.T) {
 
     loop.tick()
 
-    require.Equal(t, [][3]int32{{46100, 51100, -2650}}, game.walks,
-        "the click z rides the measured shift into the server frame "+
-            "(-3050 mesh + 400 shift), never the raw mesh z")
+    // The flow span reaches the second bend of the route: the click
+    // rides the anchored z of that far waypoint (-3100 mesh + 400
+    // shift), never the raw mesh z.
+    require.Equal(t, [][3]int32{{46200, 51200, -2700}}, game.walks,
+        "the click z rides the measured shift into the server frame, "+
+            "never the raw mesh z")
 }
 
 // TestWalkClickLongSegmentSplitsInTheServerFrame pins the far split of

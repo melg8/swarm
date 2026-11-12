@@ -499,6 +499,10 @@ type Loop struct {
     // rides the raw mesh z.
     segmentFrameOffset float64
     moveAt             time.Time
+    // flowScanAt paces the corner pre-click scans: at most one scan
+    // per flowPreClickGap whatever its answer, so a route point no
+    // far target serves cannot turn the ring into a per tick probe.
+    flowScanAt time.Time
     // questWalkAt paces the quest trip walk requests (the flood
     // protector mute of the 2026-09-12 class transfer run).
     questWalkAt time.Time
@@ -1225,6 +1229,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         segmentStart:        pathfind.Vec3{X: 0, Y: 0, Z: 0},
         segmentFrameOffset:  0,
         moveAt:              time.Time{},
+        flowScanAt:          time.Time{},
         moveStartAt:         time.Time{},
         moveStartX:          0,
         moveStartY:          0,

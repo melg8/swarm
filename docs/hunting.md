@@ -1466,12 +1466,33 @@ The short form:
   within the 150 unit trip arrival radius; a waypoint the character
   already passed ON the route skips ahead through the projection pass
   test, while a character beside the route keeps targeting the
-  waypoint it missed). Every skip is gated on the walkable line: the
-  straight line from the actual standing cell to the successor
-  waypoint must pass the geodata line of sight, else the waypoint
-  stays the target until walking onto it re-opens the line - the
-  server (the deployment runs PathFinding = 0) validates every click
-  as a straight line and cancels a move whose first step hits a
+  waypoint it missed). The click target spans the route, not one
+  point: the follower aims the farthest waypoint the server click
+  transport delivers inside the aim window (the run speed times two
+  click periods, floored at 300 units for the pre UserInfo clicks and
+  capped at the 1000 unit move limit), so the next request re-aims
+  before the character reaches the target - the server replaces the
+  destination of a running move without stopping the creature, only a
+  reached destination stops it, and the old one-point aim turned
+  every dense plan point into an arrival stop. A corner pre-click
+  re-aims within 80 units of the current town waypoint while the
+  character still walks, paced at half a request period (the 50 unit
+  intermediate arrival radius leaves that ring); the manual walk of
+  the web UI and `-move` re-aims the same way every request period
+  instead of standing down while the move runs. The far click must
+  stay on the drawn route: every skipped waypoint projects inside the
+  click chord within the 100 unit corridor and within 100 units of
+  the chord height, so a switchback, a priced water dip or a ramp the
+  plan walks around is never cut. The scan runs only at the click and
+  pre-click moments, and the pre-click scan is paced like its click
+  (at most one per half request period), never per tick; the
+  dead-cell skip verdict short-circuits it, so a dead transport still
+  reaches the stuck recovery. Every skip is gated on the walkable
+  line: the straight line from the actual standing cell to the
+  successor waypoint must pass the geodata line of sight, else the
+  waypoint stays the target until walking onto it re-opens the line -
+  the server (the deployment runs PathFinding = 0) validates every
+  click as a straight line and cancels a move whose first step hits a
   closed wall at the character's own position, and the 2026-09-11
   teacher walk stuck exactly that way (the follower skipped the 16
   unit ramp steps of the trainer plaza approach inside the 50 unit

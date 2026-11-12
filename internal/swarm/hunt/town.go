@@ -140,6 +140,36 @@ const (
     // cursor is pinned on it (no clear successor line), and the
     // pinned click then extends past it along the plan polyline.
     minWalkClick = 50.0
+    // flowAimFloor is the lower bound of the continuous follower's
+    // click span: the run speed of a fresh character walks this far
+    // in two request periods, so the target is never reached before
+    // the next click re-aims farther.
+    flowAimFloor = 300.0
+    // flowAimPeriods is the number of walk request periods the click
+    // span covers: two periods keep a full period of head room for
+    // the next click to re-aim before the character reaches the
+    // target and the server stops it.
+    flowAimPeriods = 2.0
+    // flowProbeMax bounds the click validation probes of one flow
+    // scan: the scan runs at the click cadence (once per request
+    // period plus the corner pre-click), never per tick.
+    flowProbeMax = 8
+    // flowCornerLead is the distance to the current click target at
+    // which the pre-click fires: the character is about to arrive and
+    // the server would stop it, so a farther validated target
+    // replaces the destination mid-walk. About one third of a
+    // request period of walking, so the pre-click still lands while
+    // the move runs.
+    flowCornerLead = 80.0
+    // flowPreClickGap bounds the pre-click cadence: at most one
+    // pre-click per half request period, so a tight corridor cannot
+    // turn the follower into a click storm.
+    flowPreClickGap = walkRequestPeriod / 2
+    // flowLayerTolerance bounds the vertical deviation of a skipped
+    // route point from the click chord: a deeper dip is a priced
+    // water crossing or a ramp the plan walks through on purpose,
+    // and the straight click must not cut it.
+    flowLayerTolerance = 100.0
     // frozenRepathLimit bounds the consecutive stuck re-paths that
     // start from the same cell without a single cell of movement in
     // between: the re-path re-plans from the standing position, so
@@ -2222,9 +2252,23 @@ func (l *Loop) followWaypoints(
     if l.wpIndex >= len(l.waypoints) {
         return true
     }
+    // The corner pre-click replaces the destination just before the
+    // character reaches the current one (see flowPreClick): the
+    // server keeps the move running instead of stopping the character
+    // on the arrival of a dense route point.
+    if l.flowPreClick(selfX, selfY, selfZ, now) {
+        return false
+    }
     if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
         return false
     }
+    // The goal span of the click: the farthest route waypoint the
+    // server delivers inside the aim window (see flowAdvance). The
+    // click never targets a point the character reaches before the
+    // next request re-aims farther, so the walk crosses the dense
+    // plan points without an arrival stop.
+    l.wpIndex = l.flowAdvance(l.waypoints, l.wpIndex,
+        l.segmentFrameOffset, selfX, selfY, selfZ)
     l.clickWaypoint(selfX, selfY, selfZ, now)
 
     return false
@@ -2839,12 +2883,24 @@ func (l *Loop) clickEscapeHop(
 func (l *Loop) segmentAdvanceClear(
     selfX, selfY, selfZ int32, next int,
 ) bool {
-    if next >= len(l.waypoints) || l.navigator == nil {
+    return l.routeAdvanceClear(l.waypoints, next,
+        l.segmentFrameOffset, selfX, selfY, selfZ)
+}
+
+// routeAdvanceClear is the segmentAdvanceClear gate over a caller
+// supplied route and frame offset: the manual walk plan carries its
+// own waypoints and z transport, so the continuous flow scan of both
+// followers answers through one click transport semantics.
+func (l *Loop) routeAdvanceClear(
+    waypoints []pathfind.Vec3, next int, frameOffset float64,
+    selfX, selfY, selfZ int32,
+) bool {
+    if next < 0 || next >= len(waypoints) || l.navigator == nil {
         return true
     }
-    wp := l.waypoints[next]
+    wp := waypoints[next]
     targetX, targetY := wp.X, wp.Y
-    targetZ := anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
+    targetZ := anchorZToServerFrame(wp.Z, frameOffset)
     dx := targetX - float64(selfX)
     dy := targetY - float64(selfY)
     if dist := math.Hypot(dx, dy); dist > maxMoveDistance {
