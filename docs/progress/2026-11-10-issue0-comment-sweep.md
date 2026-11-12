@@ -506,6 +506,22 @@ corner probe is a length, not a leg at all.
   comment lines), no block above 8 lines; the tree share reads 12.9
   percent.
 
+### 2026-11-12 - hunt/loop_avoid.go moves the steering facts to the doc
+
+- 31 blocks compress: the on-sight trigger and the effective aggro
+  range, the `avoidClearance` 150 and `avoidScanRange` 1600 windows,
+  the `avoidArriveExempt` 500 destination exemption, the tangent
+  steering and the inside-the-circle side-step, the skipped waypoint of
+  the ping-pong (the 338 of 600 units case), the `combatAvoidWarning`
+  150, `combatAvoidStep` 300, the 30/60 degree lane fan, the 2 s
+  window, the 4 s pace, the 1 s scan and the 15 s hold log. A new
+  `## The transit aggro steering` section of `docs/hunting.md` carries
+  the moved facts (the exempt threats, the terrain contract, the
+  observed incidents) in the same commit.
+- Verified: `task fmt`, `go build ./...`, the hunt tests, `task
+  lint:new`. `loop_avoid.go` fell from 41.4 to 29.5 percent (114
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -521,8 +537,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/loop_params.go`, `acceptance/archer_kite.go`, `hunt/user.go`,
 `hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go`,
 `hunt/learning.go` and `hunt/town_cursor_escape.go`,
-`pathfind/navmesh/query.go` and `pathfind/navmesh/hierarchy.go` (a
-second pass). Next: a fresh `task comment:audit --top 10` pick (the
-`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
-their fragments are active); the share and the block count are
-re-measured at the end.
+`pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go` and
+`hunt/loop_avoid.go` (second passes). Next: a fresh
+`task comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/loop_state.go` entries stay untouched while their fragments are
+active); the share and the block count are re-measured at the end.

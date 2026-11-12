@@ -271,6 +271,62 @@ would have paid for.
   farm spot of the previous square (the returns aim at the new center
   until a fresh spot is remembered inside it).
 
+## The transit aggro steering (hunt/loop_avoid.go)
+
+The Mobius `AttackableAI` attacks a player on sight when the 3D distance
+drops inside the mob's effective aggro range with a line of sight (the xml
+`aggroRange` clamped at `MaxAggroRange` 450 for the `Monster` type, see
+the live facts below), so a transit walk - a town trip in either
+direction, a zone return, an inter-ground walk - that passes an idle
+aggressive camp collects a chaser, the train that later forces the pile up
+run and the emergency relogin. The steering deflects one issued segment at
+a time (`steerClearOfAggro`): the endpoint moves onto the tangent ray of
+the first threat circle (the effective aggro range plus the
+`avoidClearance` 150 margin) on the side the segment leans to, and the
+walk follower re-issues the request every period from the live position,
+so the chained tangents arc around the camp while the waypoint plan stays
+untouched. A character already inside the margin circle side-steps
+straight out (no tangent exists from inside, and the perpendicular keeps
+the radius constant). The endangerment check is 3D like the server trigger
+and the tangent is planar; a threat already holding a target belongs to
+the flee machinery, the current fight target drops out through its id, and
+the mobs within `avoidArriveExempt` 500 of the walk destination stay
+exempt - the ground the walk enters carries its own mobs and the engage
+phase answers them. Segments under `avoidMinSegment` 100 never steer, the
+scan bounds at `avoidScanRange` 1600, and the detour log line paces at
+`avoidLogPeriod` 5 s.
+
+A waypoint inside the trigger circle of an idle aggressive mob is skipped
+instead of clicked (`segmentTargetThreatened`): no tangent can land there,
+so the receding horizon would re-issue from alternating tangent endpoints
+and the character would ping-pong without net progress - the observed
+delevel walk burned an hour around one idle Kaboo Orc Fighter whose
+waypoint sat 338 units inside the 600 unit margin circle. The check takes
+the waypoint itself, not the clipped click target: the clip parks the
+click next to the character, and a camp between the character and the
+horizon would condemn every far waypoint of the direction (the mass skip
+of the 2026-09-20 town walk).
+
+A running fight steps clear of an impending add (`avoidImpendingAdd`): an
+idle aggressive mob inside its trigger band plus `combatAvoidWarning` 150
+around a fighting character is about to join, and a short
+`combatAvoidStep` 300 sidestep away from the deepest-band threat opens the
+distance before the trigger fires - backing off a second opponent beats
+the two-attacker pile up logout. The step owns the shared movement window
+`combatAvoidStepPeriod` 2 s (a forced attack request interrupts a running
+walk server-side, so the engage holds its re-requests until the step ends
+and the swings resume after), the steps pace at `combatAvoidPeriod` 4 s,
+and the threat scan runs at `combatAvoidScanPeriod` 1 s over
+`combatAvoidScanRange` 800. A straight away lane walled by the terrain,
+water or the leash tries the flanking lanes at 30 and 60 degrees each side
+(`combatAvoidFanStep`) through the terrain contract the kite retreat lanes
+run (`combatAvoidLane`); when every lane is walled the fight holds the
+ground and logs it once per `combatAvoidHoldLogPeriod` 15 s (a refused
+click freezes the character and burns the avoid window). The leash
+outranks the add - a step that would leave the hunting square is skipped -
+and the mobs on another deck never enter the scan (the 3D trigger cannot
+fire across the gap).
+
 ## The spawn protection settle and the pile up policy (2026-09-21)
 
 The verified server facts (H-005 in AGENTS.md, the Mobius sources):

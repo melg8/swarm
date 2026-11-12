@@ -4,28 +4,10 @@
 
 package hunt
 
-// The aggro-aware movement layer of the hunt loop: the transit walks
-// (the town trips both ways, the zone returns, the inter-ground walks
-// of the spot economy) steer clear of the aggressive mobs camped on
-// their lines. The Mobius AttackableAI attacks a player on sight when
-// the 3D distance drops inside the mob's effective aggro range (the
-// xml value clamped at the server wide MaxAggroRange, 450 for the
-// Monster type on this deployment) and a line of sight exists, so a
-// walk that passes an
-// idle aggressive mob closer than that collects a chaser - the train
-// that later forces the pile up run and the emergency relogin. The
-// steering deflects one walk segment at a time around such camps: the segment
-// direction rides the tangent of the threat circle (the effective
-// aggro range plus the clearance margin), so the issued segment never
-// enters the trigger distance; the walk follower re-issues its
-// requests every period from the live position, and the chained
-// tangent segments arc the route around the camp while the underlying
-// waypoint plan stays untouched. A character already inside the
-// margin circle side-steps straight out first (the tangent does not
-// exist from inside). Mobs that stand at the destination itself are
-// exempt: the last stretch of a walk INTO a hunting ground
-// deliberately meets its mobs, and the engage phase answers whatever
-// the entry radius offers.
+// The aggro-aware movement layer: the transit walks deflect around aggressive
+// mobs and a running fight steps clear of an impending add before it triggers.
+// The server attacks on sight inside the effective aggro range with a line of
+// sight (docs/hunting.md, the transit aggro steering section).
 
 import (
     "math"
@@ -36,48 +18,31 @@ import (
 
 // The steering constants of the aggro-aware movement.
 const (
-    // avoidClearance is the margin the steering keeps between the
-    // walk line and an aggressive mob beyond its effective aggro
-    // range: the projected positions lag the real server positions by
-    // up to a broadcast interval and the mob may drift while the segment
-    // walks, so the raw trigger radius alone would graze the circle.
+    // avoidClearance is the margin the steering keeps between the walk line
+    // and an aggressive mob beyond its effective aggro range: the projected
+    // positions lag the broadcast and the mob drifts while the segment walks.
     avoidClearance = 150.0
     // avoidMinSegment suppresses the steering on segments too short to bend
     // anywhere (a stop request, an arrival shuffle).
     avoidMinSegment = 100.0
-    // avoidScanRange bounds the threat scan around the character: the
-    // segments issue at most maxMoveDistance ahead, and only mobs within that
-    // segment plus their trigger circle plus the clearance can endanger
-    // the line.
+    // avoidScanRange bounds the threat scan: the issued segment plus the
+    // trigger circle plus the clearance (at most maxMoveDistance ahead).
     avoidScanRange = 1600.0
-    // avoidArriveExempt drops the steering for the mobs standing at
-    // the destination of the walk itself: the ground the walk
-    // deliberately enters carries its own mobs (a hunting spot, the
-    // merchant square), and passing within their aggro range on
-    // arrival is the point of the walk - the engage phase answers
-    // whatever the entry radius offers.
+    // avoidArriveExempt exempts the mobs standing at the destination of the
+    // walk itself: the ground the walk deliberately enters carries its own
+    // mobs, and the engage phase answers whatever the entry radius offers.
     avoidArriveExempt = 500.0
-    // avoidLogPeriod paces the detour diagnostic: a busy corridor
-    // bends every segment, the log names the corridor once per period.
+    // avoidLogPeriod paces the detour diagnostic: a busy corridor bends every
+    // segment, the log names the corridor once per period.
     avoidLogPeriod = 5 * time.Second
 )
 
-// steerClearOfAggro deflects one walk segment around the aggressive mobs
-// camped on its line: the segment end moves onto the tangent ray of the
-// first threat circle the straight line would enter - the on-sight
-// trigger distance (the effective aggro range plus the clearance
-// margin) - on the side the original segment leaned to. The receding
-// horizon does the rest: the walk follower re-issues its request
-// every period from the live position, and every re-issue re-spawns
-// the tangent, so the chained segments arc the route around the camp
-// without touching the waypoint plan. The endangerment check is 3D
-// like the server's own trigger (a mob on another deck never blocks
-// a ground line), the tangent itself is planar (the walk cannot steer
-// vertically anyway). Threats already holding a target never steer
-// (the scan skips them: a chaser belongs to the flee machinery),
-// threats at the destination are exempt (the walk wants to meet
-// them), and the current fight target drops out through its id.
-// Reports the adjusted endpoint and whether a deflection happened.
+// steerClearOfAggro deflects one walk segment around the aggressive mobs camped
+// on its line: the endpoint moves onto the tangent ray of the first threat
+// circle (the effective aggro range plus the clearance) on the side the segment
+// leans to. The follower re-issues the request every period from the live
+// position, so the chained tangents arc the route around the camp without
+// touching the waypoint plan. Reports the adjusted endpoint.
 func (l *Loop) steerClearOfAggro(
     fromX int32, fromY int32, fromZ int32,
     toX int32, toY int32, toZ int32,
@@ -95,8 +60,8 @@ func (l *Loop) steerClearOfAggro(
         return toX, toY, false
     }
     // The first threat the straight segment would wake: the smallest
-    // along-line parameter among the endangered mobs (the deepest
-    // penetration breaks the tie - the mob the line grazes hardest).
+    // along-line parameter among the endangered mobs (the deepest penetration
+    // breaks the tie - the mob the line grazes hardest).
     first := -1
     firstT := 1.0
     firstPen := 0.0
@@ -104,13 +69,13 @@ func (l *Loop) steerClearOfAggro(
         threat := &l.avoidScratch[i]
         if math.Hypot(threat.X-float64(destX), threat.Y-float64(destY)) <=
             avoidArriveExempt {
-            // The mob stands at the destination of the whole walk: the
-            // ground the walk deliberately enters.
+            // The mob stands at the destination: the walk enters it
+            // deliberately.
             continue
         }
-        // The closest point of the segment to the threat and its 3D
-        // clearance, mirroring the server's own isInsideRadius3D
-        // trigger (a mob on another deck never blocks a ground line).
+        // The closest point of the segment to the threat and its 3D clearance,
+        // mirroring the server isInsideRadius3D trigger (a mob on another deck
+        // never blocks a ground line).
         relX, relY := threat.X-float64(fromX), threat.Y-float64(fromY)
         t := (relX*segmentX + relY*segmentY) / (segmentLen * segmentLen)
         if t < 0 {
@@ -153,23 +118,13 @@ func (l *Loop) steerClearOfAggro(
     return endXI, endYI, true
 }
 
-// segmentTargetThreatened reports whether the waypoint the walk aims
-// at sits inside the trigger circle of an idle aggressive mob that
-// does not stand at the walk destination. No steering arc can land
-// there: every tangent ray only grazes the circle, so the receding
-// horizon re-issues the segment from alternating tangent endpoints and
-// flips its side at every hop - the character ping-pongs between two
-// points without a unit of net progress (the observed delevel walk
-// burned an hour exactly so around one idle Kaboo Orc Fighter, its
-// waypoint 338 units inside the 600 unit margin circle). The caller
-// skips such a waypoint instead of clicking into the circle; a mob at
-// the walk destination stays exempt exactly like in the steering (the
-// ground the walk deliberately enters carries its own mobs). The
-// caller passes the waypoint itself, not the clipped click target it
-// issues: the clip parks the click next to the character, and a camp
-// between the character and the horizon would condemn every far
-// waypoint along the direction while the waypoints stay far outside
-// the circle (the mass skip of the 2026-09-20 town walk).
+// segmentTargetThreatened reports whether the waypoint the walk aims at sits
+// inside the trigger circle of an idle aggressive mob that does not stand at
+// the destination. No tangent lands there: every ray only grazes the circle, so
+// the receding horizon would re-issue from alternating endpoints and the
+// character would ping-pong without net progress (the delevel walk burned an
+// hour around one idle Kaboo Orc Fighter). The waypoint itself is passed, not
+// the clipped click: a camp in between would condemn every far waypoint.
 func (l *Loop) segmentTargetThreatened(
     toX int32, toY int32, destX int32, destY int32,
 ) bool {
@@ -190,15 +145,12 @@ func (l *Loop) segmentTargetThreatened(
     return false
 }
 
-// tangentClearDirection resolves the deflected segment direction around
-// one threat circle: the tangent ray from the position to the circle
-// of the needed radius, on the side the original segment direction leans
-// to (the shorter arc around the camp). A position already inside
-// the circle has no tangent - the direction becomes the pure
-// side-step perpendicular to the threat axis there (the walk leaves
-// the margin circle straight before any tangent ride, and the
-// side-step never closes a unit of the distance: the perpendicular
-// keeps the radius constant while the segment lasts).
+// tangentClearDirection resolves the deflected segment direction around one
+// threat circle: the tangent ray from the position to the circle of the needed
+// radius, on the side the original direction leans to (the shorter arc around
+// the camp). A position already inside the circle has no tangent - the
+// direction becomes the pure side-step perpendicular to the threat axis there,
+// which keeps the radius constant while the segment lasts.
 func tangentClearDirection(
     fromX, fromY, threatX, threatY float64,
     segmentUX, segmentUY float64,
@@ -207,15 +159,14 @@ func tangentClearDirection(
     towardX, towardY := threatX-fromX, threatY-fromY
     sp := math.Hypot(towardX, towardY)
     if sp < 1 {
-        // The threat sits on the position itself: any perpendicular
-        // leaves it behind; right of the segment wins by convention.
+        // The threat sits on the position itself: any perpendicular leaves it
+        // behind; right of the segment wins by convention.
         return segmentUY, -segmentUX
     }
     towardX, towardY = towardX/sp, towardY/sp
     if sp <= needed {
-        // Inside the margin circle: the side-step perpendicular to
-        // the threat axis, on the side the segment leans to (the arc the
-        // route would take anyway), straight out of the circle.
+        // Inside the margin circle: the side-step perpendicular to the threat
+        // axis, on the side the segment leans to.
         side := towardX*segmentUY - towardY*segmentUX
         if side >= 0 {
             return -towardY, towardX
@@ -223,10 +174,10 @@ func tangentClearDirection(
 
         return towardY, -towardX
     }
-    // The tangent half-angle: the angle between the threat axis and
-    // the grazing ray (sin of it is the needed radius over the
-    // distance). The deflected direction is the threat axis rotated
-    // by it, toward the side the original segment leans to.
+    // The tangent half-angle: the angle between the threat axis and the
+    // grazing ray (its sine is the needed radius over the distance). The
+    // deflected direction is the threat axis rotated by it, toward the side
+    // the original segment leans to.
     beta := math.Asin(math.Min(1, needed/sp))
     s := 1.0
     if towardX*segmentUY-towardY*segmentUX < 0 {
@@ -239,73 +190,50 @@ func tangentClearDirection(
 
 // The constants of the impending-add step of a running fight.
 const (
-    // combatAvoidWarning is the trigger margin of the impending-add
-    // scan: an idle aggressive mob closer than its effective aggro
-    // range plus this margin to a FIGHTING character is about to join
-    // the fight - the step opens the distance before the on-sight
-    // trigger fires.
+    // combatAvoidWarning is the trigger margin of the impending-add scan: an
+    // idle aggressive mob closer than its effective aggro range plus this
+    // margin to a fighting character is about to join the fight.
     combatAvoidWarning = 150.0
-    // combatAvoidStep is the reposition length away from the impending
-    // add: short - the melee target follows the stepping character,
-    // and the swings resume through the forced attack re-request once
-    // the step window ends.
+    // combatAvoidStep is the reposition length away from the impending add:
+    // short, because the melee target follows the stepping character.
     combatAvoidStep = 300.0
-    // combatAvoidFanStep and combatAvoidFanSteps shape the sidestep
-    // fan: a straight lane a wall, the water or the leash edge walls
-    // off tries the flanking lanes (30 and 60 degrees each side)
-    // before the step stands down - the same terrain contract the
-    // kite retreat lanes run (see kiteTerrainLane).
+    // combatAvoidFanStep and combatAvoidFanSteps shape the sidestep fan: a
+    // walled straight lane tries the flanking lanes each side before the step
+    // stands down (the terrain contract of the kite retreat lanes).
     combatAvoidFanStep  = math.Pi / 6
     combatAvoidFanSteps = 2
-    // combatAvoidHoldLogPeriod paces the walled-pocket diagnostic:
-    // a fight boxed in by the terrain holds the ground instead of
-    // clicking into a wall, one line per period keeps it readable.
+    // combatAvoidHoldLogPeriod paces the walled-pocket diagnostic.
     combatAvoidHoldLogPeriod = 15 * time.Second
-    // combatAvoidStepPeriod is the movement window the step owns: a
-    // forced attack request interrupts a running walk server-side, so
-    // the engage holds its re-requests until the step finished.
+    // combatAvoidStepPeriod is the movement window the step owns: a forced
+    // attack request interrupts a running walk server-side, so the engage
+    // holds its re-requests until the step finished.
     combatAvoidStepPeriod = 2 * time.Second
-    // combatAvoidPeriod paces the steps themselves: the walk costs the
-    // fight a second of swings, the period trades them evenly against
-    // the growing add.
+    // combatAvoidPeriod paces the steps themselves: the walk costs the fight
+    // a second of swings, the period trades them evenly against the add.
     combatAvoidPeriod = 4 * time.Second
-    // combatAvoidScanPeriod paces the threat scan of the running
-    // fight: the engage ticks four times a second, the pass over the
-    // hot records runs at the target search cadence.
+    // combatAvoidScanPeriod paces the threat scan of the running fight at the
+    // target search cadence (the engage ticks four times a second).
     combatAvoidScanPeriod = 1 * time.Second
-    // combatAvoidScanRange bounds the impending-add scan: the warning
-    // band reaches the aggro range plus the margin, nothing farther
-    // can matter yet.
+    // combatAvoidScanRange bounds the impending-add scan: nothing farther than
+    // the aggro range plus the margin can matter yet.
     combatAvoidScanRange = 800.0
 )
 
-// avoidImpendingAdd steps a fighting character away from an
-// aggressive mob that is about to join the fight: the mob stands idle
-// inside its on-sight trigger band (the effective aggro range plus
-// the warning margin) around the character, has not triggered yet,
-// and is not the current target. The step is short and straight away
-// from the deepest-band threat - the melee target follows the
-// stepping character, the forced attack re-request of the engage
-// resumes the swings once the step window ends, and the distance to
-// the impending add opened before its trigger fired: slightly backing
-// off a potential second opponent beats the pile up run and the
-// emergency relogin of the real one (two attackers). A step that
-// would leave the hunting square is skipped - the leash outranks the
-// add - and so are the mobs on another deck (the server's own 3D
-// trigger cannot fire across the gap). Reports whether the tick
-// issued the step (the caller skips the chase logic then - the walk
-// owns the movement).
+// avoidImpendingAdd steps a fighting character away from an aggressive mob that
+// is about to join the fight: the mob stands idle inside its on-sight trigger
+// band (the effective aggro range plus the warning margin), has not triggered
+// yet, and is not the current target. The step is short and straight away from
+// the deepest-band threat: backing off a potential second opponent beats the
+// pile up run and the emergency relogin. A step that would leave the hunting
+// square or cross a deck is skipped. Reports whether the tick issued the step.
 func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     if now.Before(l.combatAvoidUntil) {
-        // Another fighting step owns the movement window (a kite
-        // walk, the deferred retreat of the live shot cycle - see
-        // kite.go, or an earlier add step): one movement owner per
-        // fight step, the shared combatAvoidUntil contract. An add
-        // click inside a bow windup would defer to the disable end
-        // (the server saves the intention) and its window overwrite
-        // would reopen the re-request gate onto the running kite
-        // walk - the premature forced attack stops the walk for a
-        // bow the server still holds disabled.
+        // Another fighting step owns the movement window (a kite walk, the
+        // deferred retreat of the live shot cycle, an earlier add step): one
+        // movement owner per fight step, the shared combatAvoidUntil contract.
+        // An add click inside a bow windup would defer to the disable end and
+        // its window overwrite would reopen the re-request gate onto the
+        // running kite walk.
         return false
     }
     if !l.combatAvoidScanAt.IsZero() &&
@@ -326,8 +254,8 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     if !ok {
         return false
     }
-    // The deepest band penetration wins: the mob closest to its
-    // on-sight trigger steps first.
+    // The deepest band penetration wins: the mob closest to its on-sight
+    // trigger steps first.
     worst := l.avoidDeepestThreat(selfX, selfY, selfZ)
     if worst < 0 {
         return false
@@ -339,13 +267,10 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     if dist < 1 {
         return false
     }
-    // The sidestep fans: the straight away lane first, then the
-    // flanking lanes each side - a wall, the water or the leash edge
-    // straight behind does not box the fight in while a step along
-    // the obstacle stays open (the 14:03:16 dump clicked the walled
-    // straight lane and froze, the add stayed on top of the
-    // character). Every candidate runs the same terrain contract the
-    // kite retreat lanes use (see combatAvoidLane).
+    // The sidestep fans: the straight away lane first, then the flanking lanes
+    // each side, so a wall, the water or the leash edge straight behind does
+    // not box the fight in. Every candidate runs the terrain contract the kite
+    // retreat lanes use (combatAvoidLane).
     if stepX, stepY, ok := l.combatAvoidFanStep(
         selfX, selfY, selfZ, dx/dist, dy/dist); ok {
         l.combatAvoidAt = now
@@ -358,11 +283,10 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
 
         return true
     }
-    // Every lane is walled, over water or outside the leash: the
-    // fight holds the ground instead of clicking into the obstacle
-    // (the refused click freezes the character and burns the avoid
-    // window). The hold paces itself like a step, so the scan does
-    // not re-run the full fan on every engage tick.
+    // Every lane is walled, over water or outside the leash: the fight holds
+    // the ground instead of clicking into the obstacle (the refused click
+    // freezes the character and burns the avoid window). The hold paces itself
+    // like a step, so the scan does not re-run the full fan on every tick.
     l.combatAvoidAt = now
     if l.combatAvoidHoldAt.IsZero() ||
         now.Sub(l.combatAvoidHoldAt) >= combatAvoidHoldLogPeriod {
@@ -375,10 +299,9 @@ func (l *Loop) avoidImpendingAdd(now time.Time) bool {
     return false
 }
 
-// combatAvoidFanStep walks the sidestep fan around the away ray: the
-// straight lane first, then the flanking lanes each side at
-// combatAvoidFanStep. Reports the first candidate that passes the
-// terrain contract (see combatAvoidLane) and whether one exists.
+// combatAvoidFanStep walks the sidestep fan around the away ray: the straight
+// lane first, then the flanking lanes each side at combatAvoidFanStep. Reports
+// the first candidate that passes the terrain contract (combatAvoidLane).
 func (l *Loop) combatAvoidFanStep(
     selfX, selfY, selfZ int32, dirX, dirY float64,
 ) (int32, int32, bool) {
@@ -401,13 +324,12 @@ func (l *Loop) combatAvoidFanStep(
     return 0, 0, false
 }
 
-// combatAvoidLane resolves one sidestep candidate through the terrain
-// contract of the running fight: the leash first (a step that would
-// leave the hunting square is skipped - the leash outranks the add),
-// then the degenerate length, the geodata wall and the water. The
-// gates mirror the kite retreat lanes (kiteTerrainLane); without a
-// navigator (the no-geodata runtime, the plain unit scenes) the leash
-// alone fences the step.
+// combatAvoidLane resolves one sidestep candidate through the terrain contract
+// of the running fight: the leash first (a step that would leave the hunting
+// square is skipped - the leash outranks the add), then the degenerate length,
+// the geodata wall and the water. The gates mirror the kite retreat lanes
+// (kiteTerrainLane); without a navigator (the no-geodata runtime, the plain
+// unit scenes) the leash alone fences the step.
 func (l *Loop) combatAvoidLane(
     selfX, selfY, selfZ int32, dirX, dirY float64,
 ) (int32, int32, bool) {
@@ -428,8 +350,8 @@ func (l *Loop) combatAvoidLane(
         X: float64(stepX), Y: float64(stepY), Z: float64(selfZ)}
     if sight, err := l.navigator.LineOfSight(from, to); err != nil ||
         !sight {
-        // A wall (or an unreadable geodata) behind: the click would
-        // freeze on the server correction - the next lane serves.
+        // A wall (or an unreadable geodata) behind: the click would freeze on
+        // the server correction - the next lane serves.
         return 0, 0, false
     }
     if l.navigator.OverWater(float64(stepX), float64(stepY),
@@ -441,10 +363,9 @@ func (l *Loop) combatAvoidLane(
     return stepX, stepY, true
 }
 
-// avoidDeepestThreat picks the scanned add with the deepest band
-// penetration on the character's deck: the mob closest to its
-// on-sight trigger steps first (-1 when every scan sits on another
-// deck).
+// avoidDeepestThreat picks the scanned add with the deepest band penetration on
+// the character's deck: the mob closest to its on-sight trigger steps first (-1
+// when every scan sits on another deck).
 func (l *Loop) avoidDeepestThreat(selfX, selfY, selfZ int32) int {
     worst := -1
     worstPen := 0.0
