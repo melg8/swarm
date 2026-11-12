@@ -1816,37 +1816,51 @@ The short form:
 ## The city shopping errand (hunt/city_shopping.go)
 
 A live bot that already owns a weapon and whose wallet covers the
-missing top no-grade kit runs the city errand on its own. The errand
-blocks the tick between the deleveling and the town trips: it owns
-every move and transaction from the village walk to the return home,
-then the ordinary hunt resumes from the spot the errand ended on. The
-trigger (`cityShoppingWanted`) fires when a navigator exists, no town
-trip runs, the 10 minute retry cooldown expired, the character hunts
-the elven lands (`zoneRegion` empty or `elven`), its gear profile is
-the melee fighter, it owns any weapon (worn or bagged,
-`cityShoppingArmed`), the missing kit cost is positive and the wallet
-covers it.
+missing top no-grade kit runs the city errand on its own; when the
+wallet also covers the top no-grade bow, the same trip carries it
+behind the kit. The errand blocks the tick between the deleveling and
+the town trips: it owns every move and transaction from the village
+walk to the return home, then the ordinary hunt resumes from the spot
+the errand ended on. The trigger (`cityShoppingWanted`) fires when a
+navigator exists, no town trip runs, the 10 minute retry cooldown
+expired, the character hunts the elven lands (`zoneRegion` empty or
+`elven`), its gear profile is the melee fighter, it owns any weapon
+(worn or bagged, `cityShoppingArmed`) and the plan cost is positive
+and covered (`cityShoppingPlan`): the missing kit pieces, plus the bow
+when the wallet covers the whole plan beside a tool weaker than the
+Composition Bow (`cityShoppingBowUpgrade` reads `gear.OwnedBow`). A
+kit-complete character with the bow money runs the errand for the bow
+alone.
 
 - The route: the walk to Mirabel (7146, 46926 51511 -2976) of the
   Elven Village, the gatekeeper list "The Town of Gludio" (arrive
   -12694 122776 -3114), Sydnia (7321, list 3032100) for the Falchion
   68, Simplon (7253, list 3025300) for the Bronze Breastplate 26,
   Bronze Gaiters 34, Hard Leather Helmet 1148, Bracer 51, Boots 39
-  and Bone Shield 625, then Bella (7256, -12736 122816 -3114) back
-  to the Elven Village and the walk to the start spot. The teleports
-  are free below `MaxFreeTeleportLevel` 40 and cost 9 200 adena
-  above.
+  and Bone Shield 625, Sydnia again for the Composition Bow 273 (the
+  same weapon list, the last stop so the rest of the kit is in the
+  bag first), then Bella (7256, -12736 122816 -3114) back to the
+  Elven Village and the walk to the start spot. The teleports are free
+  below `MaxFreeTeleportLevel` 40 and cost 9 200 adena above.
 - The Gludio 20 percent buy tax prices the kit at 455 760 adena
-  (292 800 for the weapon and 162 960 for the armor): the wallet
-  gate prices every missing piece, so a bot that already carries
-  some of the pieces pays only for the rest.
+  (292 800 for the weapon and 162 960 for the armor) and the bow at
+  another 292 800 (the whole plan 748 560): the wallet gate prices
+  every missing piece, so a bot that already carries some of the
+  pieces pays only for the rest. The bow never delays the kit - a
+  wallet that stops at the kit cost leaves the tool for a later
+  errand once the saved adena reaches it.
 - The plan is fixed, not the ordinary planner's: the stop list buys
-  exactly the top no-grade set, one buylist per merchant (one buy
-  transaction), through the same `tickStopShopping` pipeline the
-  town trips use. Each purchase names the worn village piece of its
-  slot (`SellFirst`), the stop sells it before the replacement lands
-  (`stepReplacementSales`), and the errand dresses the bought kit
-  once both stops are done.
+  exactly the top no-grade set (the pieces the bag still misses; an
+  owned line drops out and an empty stop costs no walk), one buylist
+  per merchant (one buy transaction), through the same
+  `tickStopShopping` pipeline the town trips use. Each kit purchase
+  names the worn village piece of its slot (`SellFirst`), the stop
+  sells it before the replacement lands (`stepReplacementSales`), and
+  the errand dresses the bought kit once all stops are done. The bow
+  purchase carries no `SellFirst`: the two hand slot it would take
+  belongs to the Falchion and the shield the melee dress keeps
+  wearing, so the bow rides home bagged for the lure (`EquipBaggedGear`
+  never wears it under the melee profile).
 - A fight holds the start: a pending loot (`phaseLoot`) or an
   incoming hit (`SelfUnderAttack`) keeps the errand off the tick, and
   a merely held engage target drops first (`dropAttackTarget`), so
@@ -1866,16 +1880,18 @@ covers it.
   ends inside the budget; the next ordinary tick hunts from wherever
   it stopped.
 - The acceptance scenario `city-shopping` rides this production gate
-  (no seam): it sets a level 15 character with 500 000 adena and the
+  (no seam): it sets a level 15 character with 800 000 adena and the
   village dress on the Kaboo ground and verifies the Gludio arrival,
-  the purchases, the sales of the replaced village pieces, the worn
-  kit, the walk home and the resumed farm.
+  the purchases (the Falchion, the armor set and the Composition Bow),
+  the sales of the replaced village pieces, the worn kit, the walk
+  home and the resumed farm.
 
 Pinned by `internal/swarm/hunt/city_shopping_test.go` (the stock and
-the list ids, the prices, the frozen purchase lines, the sell first
-wiring, the start gate matrix with the region and profile fences, the
-combat hold, the errand status hand-off) and the `city-shopping`
-acceptance scenario (`internal/swarm/acceptance/city_shopping.go`).
+the list ids, the prices, the frozen purchase lines, the bow gate and
+its no-displacement line, the plan route order, the sell first wiring,
+the start gate matrix with the region and profile fences, the combat
+hold, the errand status hand-off) and the `city-shopping` acceptance
+scenario (`internal/swarm/acceptance/city_shopping.go`).
 
 ## Deleveling (internal/swarm/hunt/delevel.go)
 

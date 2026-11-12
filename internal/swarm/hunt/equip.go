@@ -61,6 +61,13 @@ type equipManager struct {
     keepsCache   map[int32]bool
     keepsVersion uint64
     keepsScanned bool
+    // bowAttack caches the best owned bow attack and bowAttackVersion
+    // the tracker inventory version it was scanned at: the city
+    // shopping gate asks the bow question on every tick (see
+    // city_shopping.go), so the bag copy scan runs per mutation.
+    bowAttack        int32
+    bowAttackVersion uint64
+    bowAttackScanned bool
 }
 
 // equipActionPeriod spaces the item flows that keep a fixed window:
@@ -93,6 +100,9 @@ func newEquipManager(profile gear.Profile) *equipManager {
         keepsCache:         nil,
         keepsVersion:       0,
         keepsScanned:       false,
+        bowAttack:          0,
+        bowAttackVersion:   0,
+        bowAttackScanned:   false,
     }
 }
 
@@ -180,6 +190,26 @@ func (l *Loop) equipment() gear.Equipment {
     return gear.NewEquipment(
         l.tracker.InventoryItems(),
         l.tracker.PaperdollSlotObjectIDs())
+}
+
+// ownedBowAttack resolves the best owned bow attack through the
+// version cache of the gear manager: the city shopping gate asks the
+// question on every tick, while the answer only moves with an
+// inventory mutation (the scan copies the bag).
+func (l *Loop) ownedBowAttack() int32 {
+    manager := l.equip
+    if manager == nil {
+        return gear.OwnedBow(l.equipment())
+    }
+    version := l.tracker.InventoryVersion()
+    if manager.bowAttackScanned && version == manager.bowAttackVersion {
+        return manager.bowAttack
+    }
+    manager.bowAttack = gear.OwnedBow(l.equipment())
+    manager.bowAttackVersion = version
+    manager.bowAttackScanned = true
+
+    return manager.bowAttack
 }
 
 // maybeArmQuiver equips the arrow stack of the archer onto the

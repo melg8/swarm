@@ -82,10 +82,11 @@ func IsArcher(profile Profile) bool {
     return ok
 }
 
-// ownedBow scans the inventory for the best bow the character owns
+// OwnedBow scans the inventory for the best bow the character owns
 // (equipped or bagged) and reports its attack stat. A character
-// without any bow answers zero.
-func ownedBow(equipment Equipment) int32 {
+// without any bow answers zero. The luring bow upgrade and the city
+// shopping errand price their bow step against it.
+func OwnedBow(equipment Equipment) int32 {
     var best int32
     for _, item := range equipment.Items {
         stats, ok := npcdata.ItemGearStats(item.ItemID)
@@ -278,7 +279,7 @@ func (w *planWalk) bowPhase() {
 // planBowUpgrade emits the best affordable bow strictly stronger than
 // the owned one: one bow per trip.
 func (w *planWalk) planBowUpgrade() {
-    owned := ownedBow(w.equipment)
+    owned := OwnedBow(w.equipment)
     // The bows this walk already planned count as owned: the tail
     // walk continues the phases past the wallet and must not
     // re-purchase the rung the affordable walk just bought.

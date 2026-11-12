@@ -20,11 +20,21 @@ import (
 // upgrades: the armed gate reads a bagged or worn weapon.
 const vendorVillageSword = int32(2)
 
+// cityShopAllStops returns the kit stops plus the bow stop: the
+// static stock facts of the errand, independent of a bot's plan.
+func cityShopAllStops() []cityShopStop {
+    stops := make([]cityShopStop, 0, len(cityShoppingStops)+1)
+    stops = append(stops, cityShoppingStops...)
+    stops = append(stops, cityShopBowStop)
+
+    return stops
+}
+
 // TestCityShopStockMatchesTheNamedLists pins the live stock facts of
 // the errand: every purchase rides the buylist of its merchant, so
 // the buy request cannot drift from the generated shop data.
 func TestCityShopStockMatchesTheNamedLists(t *testing.T) {
-    for _, stop := range cityShoppingStops {
+    for _, stop := range cityShopAllStops() {
         lists := npcdata.BuyListsOfNPC(stop.merchant.TemplateID)
         require.Contains(t, lists, stop.listID,
             "%s must sell list %d", stop.merchant.Name, stop.listID)
@@ -51,9 +61,10 @@ func TestCityShoppingKitOrder(t *testing.T) {
     }, CityShoppingKit())
 }
 
-// TestCityShopPrice pins the Gludio counter prices of the kit: the
+// TestCityShopPrice pins the Gludio counter prices of the plan: the
 // reference price plus the 20 percent castle tax. The full kit costs
-// 455 760 adena, the budget the errand gate checks.
+// 455 760 adena and the bow another 292 800, the 748 560 adena budget
+// of the whole errand plan.
 func TestCityShopPrice(t *testing.T) {
     cases := []struct {
         itemID int32
@@ -66,6 +77,7 @@ func TestCityShopPrice(t *testing.T) {
         {cityShopGlovesID, 14760},
         {cityShopFeetID, 14760},
         {cityShopShieldID, 15480},
+        {cityShopBowID, 292800},
     }
     total := int64(0)
     for _, testCase := range cases {
@@ -73,8 +85,8 @@ func TestCityShopPrice(t *testing.T) {
             "the price of %s", npcdata.ItemName(testCase.itemID))
         total += testCase.want
     }
-    require.Equal(t, int64(455760), total,
-        "the full kit must stay under the 500 000 adena budget")
+    require.Equal(t, int64(748560), total,
+        "the kit plus the bow must stay under the 800 000 adena wallet")
 }
 
 // TestCityShopBuysShape pins the frozen purchase lines of one stop:
@@ -82,7 +94,7 @@ func TestCityShopPrice(t *testing.T) {
 // unit per line at the Gludio price.
 func TestCityShopBuysShape(t *testing.T) {
     loop, _, _, _ := newTripLoop()
-    for _, stop := range cityShoppingStops {
+    for _, stop := range cityShopAllStops() {
         buys := loop.cityShopBuys(stop)
         require.Len(t, buys, len(stop.itemIDs))
         for index, purchase := range buys {
@@ -149,6 +161,13 @@ func TestCityShopBuysCarryTheDisplacedKit(t *testing.T) {
     require.Equal(t,
         [][]int32{{101}, {102}, {103}, {104}, {105}, {106}},
         displaced, "every armor slot sells its own village piece")
+
+    bowBuys := loop.cityShopBuys(cityShopBowStop)
+    require.Len(t, bowBuys, 1)
+    require.Empty(t, bowBuys[0].SellFirst,
+        "the luring bow keeps the melee dress on")
+    require.Zero(t, bowBuys[0].SellCredit,
+        "the luring bow credits no sale")
 }
 
 // TestCityShopTradeSellsBeforeTheBuy pins the stop wiring: the worn
@@ -258,6 +277,21 @@ func TestCityShoppingWantedGate(t *testing.T) {
     for _, itemID := range CityShoppingKit() {
         kitCost += cityShopPrice(itemID)
     }
+    bowCost := cityShopPrice(cityShopBowID)
+    withKit := func(extra ...state.InventoryItem) []state.InventoryItem {
+        bag := make([]state.InventoryItem, 0, 1+len(ownedKit)+len(extra))
+        bag = append(bag, villageSword)
+        bag = append(bag, ownedKit...)
+        bag = append(bag, extra...)
+
+        return bag
+    }
+    compositionBow := state.InventoryItem{
+        ObjectID: 200, ItemID: cityShopBowID, Count: 1,
+    }
+    strengthenedBow := state.InventoryItem{
+        ObjectID: 201, ItemID: 274, Count: 1,
+    }
     cases := []struct {
         name  string
         adena int32
@@ -311,10 +345,36 @@ func TestCityShoppingWantedGate(t *testing.T) {
             bag:   []state.InventoryItem{villageSword}, want: true,
         },
         {
+            name:  "one adena short of the bow still runs the kit",
+            adena: int32(kitCost + bowCost - 1),
+            bag:   []state.InventoryItem{villageSword}, want: true,
+        },
+        {
+            name:  "the kit plus bow wallet runs the whole plan",
+            adena: int32(kitCost + bowCost),
+            bag:   []state.InventoryItem{villageSword}, want: true,
+        },
+        {
             name:  "the owned kit ends the errand",
-            adena: 0, bag: append([]state.InventoryItem{
-                villageSword,
-            }, ownedKit...), want: false,
+            adena: 0, bag: withKit(), want: false,
+        },
+        {
+            name:  "the owned kit with the bow wallet runs the bow errand",
+            adena: int32(bowCost), bag: withKit(), want: true,
+        },
+        {
+            name:  "the owned kit one adena short of the bow holds",
+            adena: int32(bowCost - 1), bag: withKit(), want: false,
+        },
+        {
+            name:  "the owned kit and bow ends the errand",
+            adena: cityShoppingWallet, bag: withKit(compositionBow),
+            want: false,
+        },
+        {
+            name:  "a stronger owned bow keeps the errand off",
+            adena: cityShoppingWallet, bag: withKit(strengthenedBow),
+            want: false,
         },
         {
             name:  "the retry cooldown holds the start",
@@ -356,6 +416,90 @@ func TestCityShoppingWantedGate(t *testing.T) {
                 loop.cityShoppingWanted())
         })
     }
+}
+
+// TestCityShoppingPlanCost pins the plan resolution: the kit cost
+// always drives the errand, and the bow joins the cost only when the
+// wallet covers the whole plan beside the owned tool.
+func TestCityShoppingPlanCost(t *testing.T) {
+    kitCost := int64(0)
+    for _, itemID := range CityShoppingKit() {
+        kitCost += cityShopPrice(itemID)
+    }
+    bowCost := cityShopPrice(cityShopBowID)
+    villageSword := state.InventoryItem{
+        ObjectID: 2, ItemID: vendorVillageSword, Count: 1,
+    }
+    ownedKit := make([]state.InventoryItem, 0, 8)
+    ownedKit = append(ownedKit, villageSword)
+    for index, itemID := range CityShoppingKit() {
+        ownedKit = append(ownedKit, state.InventoryItem{
+            ObjectID: int32(100 + index), ItemID: itemID, Count: 1,
+        })
+    }
+
+    cost, withBow := cityShoppingTestLoop(cityShoppingWallet,
+        []state.InventoryItem{villageSword}).cityShoppingPlan()
+    require.Equal(t, kitCost+bowCost, cost)
+    require.True(t, withBow, "the wallet covers the kit and the bow")
+
+    cost, withBow = cityShoppingTestLoop(int32(kitCost),
+        []state.InventoryItem{villageSword}).cityShoppingPlan()
+    require.Equal(t, kitCost, cost)
+    require.False(t, withBow, "the kit only wallet leaves the bow")
+
+    cost, withBow = cityShoppingTestLoop(int32(bowCost),
+        ownedKit).cityShoppingPlan()
+    require.Equal(t, bowCost, cost)
+    require.True(t, withBow, "the owned kit plans the bow alone")
+}
+
+// TestCityShoppingPlanStops pins the frozen route: the kit stops in
+// purchase order, the bow stop last, the owned lines dropped and no
+// walk to a merchant left with an empty list.
+func TestCityShoppingPlanStops(t *testing.T) {
+    loop := cityShoppingTestLoop(cityShoppingWallet, nil)
+    stops := loop.cityShoppingPlanStops(false)
+    require.Len(t, stops, 2)
+    require.Equal(t, []int32{cityShopWeaponID}, stops[0].itemIDs)
+    require.Equal(t, cityShoppingArmorStop.itemIDs, stops[1].itemIDs)
+
+    stops = loop.cityShoppingPlanStops(true)
+    require.Len(t, stops, 3)
+    require.Equal(t, []int32{cityShopBowID}, stops[2].itemIDs,
+        "the bow rides the last stop of the route")
+    require.Equal(t, cityShoppingWeaponStop.merchant, stops[2].merchant)
+    require.Equal(t, cityShoppingWeaponStop.listID, stops[2].listID)
+
+    owned := make([]state.InventoryItem, 0, 7)
+    for index, itemID := range CityShoppingKit() {
+        owned = append(owned, state.InventoryItem{
+            ObjectID: int32(100 + index), ItemID: itemID, Count: 1,
+        })
+    }
+    stops = cityShoppingTestLoop(cityShoppingWallet,
+        owned).cityShoppingPlanStops(true)
+    require.Len(t, stops, 1, "an owned kit leaves the bow walk alone")
+    require.Equal(t, []int32{cityShopBowID}, stops[0].itemIDs)
+}
+
+// TestOwnedBowAttackFollowsTheBag pins the version cache of the errand
+// bow scan: a repeated ask answers from the cache, an inventory
+// mutation refreshes it.
+func TestOwnedBowAttackFollowsTheBag(t *testing.T) {
+    loop := cityShoppingTestLoop(cityShoppingWallet,
+        []state.InventoryItem{{
+            ObjectID: 9, ItemID: 272, Count: 1,
+        }})
+    require.Equal(t, int32(49), loop.ownedBowAttack())
+    require.Equal(t, int32(49), loop.ownedBowAttack(),
+        "the cached answer survives the second ask")
+
+    loop.tracker.ApplyInventoryUpdate([]state.InventoryItem{{
+        ObjectID: 10, ItemID: cityShopBowID, Count: 1, Change: 1,
+    }})
+    require.Equal(t, int32(64), loop.ownedBowAttack(),
+        "an inventory mutation refreshes the scan")
 }
 
 // TestCityShoppingWornWeaponArms pins the paperdoll half of the
@@ -486,9 +630,9 @@ func TestMaybeCityShoppingHoldsTheFight(t *testing.T) {
     }
 }
 
-// cityShoppingWallet is the wallet of the scenario: the full Gludio
-// kit price leaves 44 240 adena behind.
-const cityShoppingWallet = int32(500000)
+// cityShoppingWallet is the wallet of the scenario: the full plan of
+// the kit and the bow (748 560 adena) leaves 51 440 adena behind.
+const cityShoppingWallet = int32(800000)
 
 // TestStartCityShoppingPublishesTheErrandStatus pins the fail fast
 // hand-off of the errand: the tracker status carries the start and

@@ -20,20 +20,22 @@ import (
 // dress and has saved enough adena walks to the Elven Village
 // gatekeeper, teleports to Gludio, sells the village weapon and armor
 // the trip replaces, buys the top no-grade weapon and armor set at
-// the town shops, rides back to the Elven Village and resumes the
-// hunt on its own ground. The live bots run it whenever the wallet
-// covers the missing kit; the ordinary town trip keeps the rest of
-// the shopping. The policy and the gates: docs/hunting.md.
+// the town shops, carries the top no-grade bow when the wallet covers
+// it, rides back to the Elven Village and resumes the hunt on its own
+// ground. The live bots run it whenever the wallet covers the missing
+// kit; the ordinary town trip keeps the rest of the shopping. The
+// policy and the gates: docs/hunting.md.
 //
 // The route and the stock are live Mobius C1 facts: Mirabel of the
 // Elven Village teleports to Gludio (the only direct link, 9 200
 // adena - free below MaxFreeTeleportLevel 40), Bella of Gludio
 // teleports back to the Elven Village, Sydnia (30321, display 7321)
-// sells the Falchion 68 on list 3032100 and Simplon (30253, display
-// 7253) sells the whole no-grade armor set, the shield and the boots
-// on list 3025300. The 20 percent Gludio buy tax (the
-// MerchantPriceConfig of the castle) prices the kit at 455 760 adena:
-// 292 800 for the weapon and 162 960 for the armor.
+// sells the Falchion 68 and the Composition Bow 273 on list 3032100
+// and Simplon (30253, display 7253) sells the whole no-grade armor
+// set, the shield and the boots on list 3025300. The 20 percent
+// Gludio buy tax (the MerchantPriceConfig of the castle) prices the
+// kit at 455 760 adena (292 800 for the weapon and 162 960 for the
+// armor) and the bow at another 292 800.
 
 // CityShoppingErrand is the name the errand publishes in the tracker
 // errand status: the acceptance watch compares against it to tell the
@@ -56,6 +58,10 @@ const (
     cityShopFeetID = int32(39)
     // cityShopShieldID is the Bone Shield of Simplon.
     cityShopShieldID = int32(625)
+    // cityShopBowID is the Composition Bow of Sydnia: the top
+    // no-grade bow (64 pAtk, no crystal grade). The errand carries it
+    // beside the melee dress once the wallet covers the whole plan.
+    cityShopBowID = int32(273)
 )
 
 // cityShopTaxPercent is the Gludio buy tax markup of the merchant
@@ -135,45 +141,65 @@ type cityShopStop struct {
     itemIDs  []int32
 }
 
-// cityShoppingStops is the fixed purchase plan of the errand, the
+// cityShoppingWeaponStop is the Sydnia stop: the melee weapon
+// milestone the errand runs first, so the old weapon sells and the
+// Falchion lands before any armor walk.
+var cityShoppingWeaponStop = cityShopStop{
+    merchant: townNpc{
+        TemplateID: 7321,
+        Name:       "Sydnia",
+        X:          -15238,
+        Y:          123282,
+        Z:          -3107,
+    },
+    listID:  3032100,
+    itemIDs: []int32{cityShopWeaponID},
+}
+
+// cityShoppingArmorStop is the Simplon stop: the whole no-grade armor
+// set and the shield in one buy transaction of list 3025300.
+var cityShoppingArmorStop = cityShopStop{
+    merchant: townNpc{
+        TemplateID: 7253,
+        Name:       "Simplon",
+        X:          -15132,
+        Y:          123282,
+        Z:          -3107,
+    },
+    listID: 3025300,
+    itemIDs: []int32{
+        cityShopChestID,
+        cityShopLegsID,
+        cityShopHeadID,
+        cityShopGlovesID,
+        cityShopFeetID,
+        cityShopShieldID,
+    },
+}
+
+// cityShoppingStops is the fixed melee kit plan of the errand, the
 // weapon first. The planner of the ordinary town trip is not used:
 // it scores by value per adena and would pick D-grade pieces or
 // jewels, while the errand buys exactly the top no-grade set.
 var cityShoppingStops = []cityShopStop{
-    {
-        merchant: townNpc{
-            TemplateID: 7321,
-            Name:       "Sydnia",
-            X:          -15238,
-            Y:          123282,
-            Z:          -3107,
-        },
-        listID:  3032100,
-        itemIDs: []int32{cityShopWeaponID},
-    },
-    {
-        merchant: townNpc{
-            TemplateID: 7253,
-            Name:       "Simplon",
-            X:          -15132,
-            Y:          123282,
-            Z:          -3107,
-        },
-        listID: 3025300,
-        itemIDs: []int32{
-            cityShopChestID,
-            cityShopLegsID,
-            cityShopHeadID,
-            cityShopGlovesID,
-            cityShopFeetID,
-            cityShopShieldID,
-        },
-    },
+    cityShoppingWeaponStop,
+    cityShoppingArmorStop,
 }
 
-// CityShoppingKit returns the item ids of the top no-grade kit in
-// purchase order (the weapon first): the acceptance scenario verifies
-// the bought and worn set against it.
+// cityShopBowStop is the bow visit of the errand: the same Sydnia
+// counter and weapon list as the melee weapon, walked after the kit
+// stops so the other kit pieces are in the bag first. The purchase
+// keeps the melee dress on (the two hand tool would drop the
+// Falchion and the shield), so the stop displaces nothing.
+var cityShopBowStop = cityShopStop{
+    merchant: cityShoppingWeaponStop.merchant,
+    listID:   cityShoppingWeaponStop.listID,
+    itemIDs:  []int32{cityShopBowID},
+}
+
+// CityShoppingKit returns the item ids of the top no-grade melee kit
+// in purchase order (the weapon first): the acceptance scenario
+// verifies the bought and worn set against it.
 func CityShoppingKit() []int32 {
     kit := make([]int32, 0, 7)
     for _, stop := range cityShoppingStops {
@@ -181,6 +207,13 @@ func CityShoppingKit() []int32 {
     }
 
     return kit
+}
+
+// CityShoppingBowID returns the top no-grade bow the errand buys
+// behind the kit when the wallet covers it: the acceptance scenario
+// verifies the bagged tool against it.
+func CityShoppingBowID() int32 {
+    return cityShopBowID
 }
 
 // cityShoppingProfileAccepts reports whether the gear profile fights
@@ -222,6 +255,67 @@ func (l *Loop) cityShoppingMissingCost() int64 {
     return cost
 }
 
+// cityShoppingBowUpgrade reports whether the bow joins the errand: the
+// melee lurer climbs from a tool weaker than the Composition Bow, so a
+// character that already owns the bow (or a stronger one) never buys a
+// second copy.
+func (l *Loop) cityShoppingBowUpgrade() bool {
+    stats, ok := npcdata.ItemGearStats(cityShopBowID)
+    if !ok {
+        return false
+    }
+
+    return l.ownedBowAttack() < stats.PAtk
+}
+
+// cityShoppingPlan resolves what one errand would buy now: the Gludio
+// cost of the kit pieces the character still misses, plus the bow when
+// the wallet covers the whole plan beside it. An unaffordable plan
+// answers zero, so the gate reads a single number.
+func (l *Loop) cityShoppingPlan() (int64, bool) {
+    cost := l.cityShoppingMissingCost()
+    adena := int64(l.tracker.InventoryStats().Adena)
+    if adena < cost {
+        return 0, false
+    }
+    bowCost := cityShopPrice(cityShopBowID)
+    if adena >= cost+bowCost && l.cityShoppingBowUpgrade() {
+        return cost + bowCost, true
+    }
+
+    return cost, false
+}
+
+// cityShoppingPlanStops builds the merchant route of one errand: the
+// kit stops carry only the pieces the inventory still misses (an owned
+// line would be dropped at buy time, and an empty stop costs a walk),
+// and the bow stop rides last when the plan covers it.
+func (l *Loop) cityShoppingPlanStops(withBow bool) []cityShopStop {
+    stops := make([]cityShopStop, 0, len(cityShoppingStops)+1)
+    for _, stop := range cityShoppingStops {
+        items := make([]int32, 0, len(stop.itemIDs))
+        for _, itemID := range stop.itemIDs {
+            if l.tracker.InventoryHasItem(itemID) {
+                continue
+            }
+            items = append(items, itemID)
+        }
+        if len(items) == 0 {
+            continue
+        }
+        stops = append(stops, cityShopStop{
+            merchant: stop.merchant,
+            listID:   stop.listID,
+            itemIDs:  items,
+        })
+    }
+    if withBow {
+        stops = append(stops, cityShopBowStop)
+    }
+
+    return stops
+}
+
 // cityShoppingArmed reports whether the character already owns a
 // village weapon: the errand upgrades a dressed character, a
 // bare-handed one keeps the ordinary weapon run.
@@ -241,8 +335,8 @@ func (l *Loop) cityShoppingArmed() bool {
 
 // cityShoppingWanted reports whether the errand may start now: the
 // character hunts the elven lands with a melee profile, owns a
-// village weapon, the top kit is still missing and the wallet covers
-// it, and no trip or cooldown holds the session.
+// village weapon, some piece of the plan is still missing and the
+// wallet covers it, and no trip or cooldown holds the session.
 func (l *Loop) cityShoppingWanted() bool {
     if l.navigator == nil || l.tripActive() {
         return false
@@ -260,11 +354,8 @@ func (l *Loop) cityShoppingWanted() bool {
         time.Since(l.cityShoppingTriedAt) < cityShopCooldown {
         return false
     }
-    cost := l.cityShoppingMissingCost()
+    cost, _ := l.cityShoppingPlan()
     if cost <= 0 {
-        return false
-    }
-    if int64(l.tracker.InventoryStats().Adena) < cost {
         return false
     }
     // The armed scan copies the bag, so it runs last: the steady
@@ -316,12 +407,17 @@ func (l *Loop) startCityShopping(ctx context.Context) {
     l.clearServerSelection()
     l.target = 0
     l.lootID = 0
+    cost, withBow := l.cityShoppingPlan()
+    stops := l.cityShoppingPlanStops(withBow)
     l.logf("Hunt: city shop: the %d adena wallet covers the %d adena "+
-        "top grade kit, walking to Gludio",
-        l.tracker.InventoryStats().Adena,
-        l.cityShoppingMissingCost())
+        "plan, walking to Gludio with %d stops",
+        l.tracker.InventoryStats().Adena, cost, len(stops))
+    if withBow {
+        l.logf("Hunt: city shop: the plan carries the %s",
+            npcdata.ItemName(cityShopBowID))
+    }
     driveCtx, cancel := context.WithTimeout(ctx, cityShopBudget)
-    err := l.driveCityShopping(driveCtx)
+    err := l.driveCityShopping(driveCtx, stops)
     cancel()
     if errors.Is(err, context.DeadlineExceeded) {
         err = fmt.Errorf("the errand ran past its %s budget",
@@ -351,10 +447,12 @@ func (l *Loop) startCityShopping(ctx context.Context) {
 }
 
 // driveCityShopping is the blocking flow: the dress of the bagged
-// village kit, the ride to Gludio, the two merchant stops, the dress
-// of the new kit, the ride home and the walk back to the spot the
-// errand started on.
-func (l *Loop) driveCityShopping(ctx context.Context) error {
+// village kit, the ride to Gludio, the frozen merchant stops, the
+// dress of the new kit, the ride home and the walk back to the spot
+// the errand started on.
+func (l *Loop) driveCityShopping(
+    ctx context.Context, stops []cityShopStop,
+) error {
     if err := ctx.Err(); err != nil {
         return fmt.Errorf("cancelled: %w", err)
     }
@@ -378,7 +476,7 @@ func (l *Loop) driveCityShopping(ctx context.Context) error {
     if err := l.driveCityShopTransfer(ctx, cityShoppingOutbound); err != nil {
         return fmt.Errorf("the ride to Gludio: %w", err)
     }
-    for _, stop := range cityShoppingStops {
+    for _, stop := range stops {
         if err := l.cityShopAt(ctx, stop); err != nil {
             return err
         }
@@ -521,7 +619,7 @@ func (l *Loop) cityShopBuys(stop cityShopStop) []gear.Purchase {
     equipment := l.equipment()
     buys := make([]gear.Purchase, 0, len(stop.itemIDs))
     for _, itemID := range stop.itemIDs {
-        credit, sellFirst := gear.DisplacedByItem(equipment, itemID)
+        credit, sellFirst := cityShopDisplaced(equipment, itemID)
         buys = append(buys, gear.Purchase{
             ItemID:             itemID,
             ListID:             stop.listID,
@@ -529,7 +627,7 @@ func (l *Loop) cityShopBuys(stop cityShopStop) []gear.Purchase {
             Count:              1,
             OwnedStack:         0,
             Price:              cityShopPrice(itemID),
-            Reason:             "the top grade kit of the city shop",
+            Reason:             cityShopBuyReason(itemID),
             SellFirst:          sellFirst,
             SellCredit:         credit,
             Gain:               0,
@@ -539,6 +637,30 @@ func (l *Loop) cityShopBuys(stop cityShopStop) []gear.Purchase {
     }
 
     return buys
+}
+
+// cityShopBuyReason names the plan line of one purchase in the trip
+// log.
+func cityShopBuyReason(itemID int32) string {
+    if itemID == cityShopBowID {
+        return "the luring bow of the city shop"
+    }
+
+    return "the top grade kit of the city shop"
+}
+
+// cityShopDisplaced prices the equipped pieces one stop purchase
+// replaces. The bow displaces nothing: the two hand slot it would take
+// belongs to the Falchion and the shield the hunt keeps wearing, and
+// the errand carries the bow as the bagged tool of the melee dress.
+func cityShopDisplaced(
+    equipment gear.Equipment, itemID int32,
+) (int64, []int32) {
+    if itemID == cityShopBowID {
+        return 0, nil
+    }
+
+    return gear.DisplacedByItem(equipment, itemID)
 }
 
 // walkCityShopHome walks the character back to the spot the errand
