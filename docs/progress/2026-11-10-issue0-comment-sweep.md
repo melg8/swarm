@@ -276,6 +276,19 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.4 percent, 508 blocks,
   1,236 history markers.
 
+### 2026-11-12 - hunt/delevel.go keeps the server rules only
+
+- 28 blocks compress: the package header drops from 35 lines to 14, and
+  the constants keep the numbers (the trigger difference 7, the target
+  gap 5, the Lucky level 9, the guide cubic floor 16, the 60 unit melee
+  range, the 3 free deaths, the 30 minute free cooldown, the 20 s fight
+  stage, the 5 minute abort backoff growing 5x, the 60 minute timeout,
+  the 1100 bow range) with the detail left to `docs/hunting.md`.
+- The stale phase-debt note (a pointer to a process document) goes.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.4 percent, 499 blocks,
+  1,228 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -285,7 +298,8 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `acceptance/archer_fleet.go`, `pathfind/search.go`,
 `pathfind/navmesh/hierarchy.go`, `state/scans.go`, `hunt/zones.go` and
 `hunt/town.go`, `hunt/kite.go` and `hunt/cell_policy.go` (both second
-passes). Next: `hunt/loop_state.go` (268 comment lines, 46.7 percent),
-`hunt/delevel.go` (259, 42.9 percent), `hunt/quest_trip.go` (253) and
-`hunt/shopping.go` (249); the share and the block count are re-measured
-at the end.
+passes), `hunt/delevel.go` and the `hunt/loop_state.go` field registry
+(the share of a struct file stays high by nature). Next:
+`hunt/quest_trip.go` (253 comment lines), `hunt/shopping.go` (249),
+`hunt/quest_chains.go` (246, 45.6 percent); the share and the block count
+are re-measured at the end.
