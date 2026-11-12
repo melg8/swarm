@@ -2091,7 +2091,7 @@ guard revenge + NPC kill penalty server patch was reverted - see the
 server integrity rules in AGENTS.md).
 
 - **Appearing fix confirmed working**: after adding the 0x30 reply to
-  the self TeleportToLocation (connection/game.go applyTeleport), the
+  the self TeleportToLocation (connection/game_apply.go applyTeleport), the
   death -> village revive -> walk cycle worked: consecutive provoke ->
   die -> revive -> walk-to-guard cycles.
 - **The aggressive default is TRUE**: the Mobius `NpcTemplate`

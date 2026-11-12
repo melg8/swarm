@@ -31,9 +31,10 @@ for the opposite direction.
    a `*_bench_test.go` reporting allocs - packet parsing is a hot path
    for hundreds of connections.
 3. **Dispatch**: one entry in the connection handler table
-   (`internal/swarm/connection/game.go`) and a mechanical `applyXxx`
-   method that copies the parsed fields into `state.Bot` through its
-   public Apply API. Unknown ids keep landing in the unknown-packet log.
+   (`internal/swarm/connection/game_dispatch.go`) and a mechanical
+   `applyXxx` method that copies the parsed fields into `state.Bot`
+   through its public Apply API. Unknown ids keep landing in the
+   unknown-packet log.
 4. **Document**: an entry in `docs/protocol_description.md` with the
    byte layout and the link to the Mobius Java class.
 
