@@ -13,24 +13,22 @@ import (
 )
 
 // The cell policy: the decision core of the hexagon cell hunting. The
-// hunter holds ONE hexagon, reads the emptiness of the KNOWNLIST
-// through the level window, predicts the respawns of its kills and
-// chooses between waiting, drifting to the predicted respawn and
-// rotating to a neighbor ring. The respawn ripeness paces the
-// rotation; the far relocation fires only when the level window
-// empties the whole neighborhood. The partition and its economy:
-// docs/hunting_cells.md.
+// hunter holds one hexagon, reads the knownlist emptiness through the
+// level window, predicts the respawns of its kills and chooses between
+// waiting, drifting to the predicted respawn and rotating to a neighbor
+// ring. The ripeness paces the rotation, and the far relocation fires
+// only when the level window empties the whole neighborhood; the
+// partition and its economy: docs/hunting_cells.md.
 
 // The decision constants of the cell policy.
 const (
-    // cellWaitPatience is the respawn window worth waiting out at
-    // the ground: the elven respawn runs 15-20 s per mob, so a
-    // predicted respawn within this window beats every walk (the
-    // walk to a neighbor costs the same time).
+    // cellWaitPatience is the respawn window worth waiting out: the
+    // elven respawn runs 15-20 s per mob, so a prediction inside this
+    // window beats every walk.
     cellWaitPatience = 20 * time.Second
-    // cellNoDataPatience bounds the wait of a cell with NO respawn
-    // predictions (a fresh session, kills of other hunters): the
-    // window gets two chances before the economy takes over.
+    // cellNoDataPatience bounds the wait of a cell with no respawn
+    // predictions (a fresh session, kills of other hunters): two
+    // respawn windows before the economy takes over.
     cellNoDataPatience = 40 * time.Second
     // cellExhaustedPatience is the emptiness duration that marks a
     // cell as starved: nothing pickable for a full minute means the
@@ -43,10 +41,8 @@ const (
     // may be left early, but not instantly (the emptiness reading
     // needs the patrol to settle first).
     cellExhaustedMinStay = 90 * time.Second
-    // cellSwitchMargin is the hysteresis of the voluntary switch:
-    // the alternative must score 25 percent above the current
-    // ground, so the hunter never ping-pongs between comparable
-    // cells.
+    // cellSwitchMargin is the hysteresis of the voluntary switch: the
+    // alternative must score 25 percent above the current ground.
     cellSwitchMargin = 1.25
     // cellStarveCooldown holds a starved ground out of the contest:
     // the sweep moves forward instead of walking back into it.
@@ -126,10 +122,9 @@ type cellHunter struct {
     // kills is the respawn overlay: the recent kill records with
     // their predicted respawn times.
     kills []killRecord
-    // mapKills is the persistent kill log the web map draws (the
-    // fleet wide death statistics): every kill appends and nothing
-    // expires by time - the respawn predictions above keep their own
-    // short lifecycle, the map marks outlive them (issue #6).
+    // mapKills is the persistent kill log the web map draws (the fleet
+    // wide death statistics): every kill appends, nothing expires by
+    // time.
     mapKills []state.KillMarkView
     // lastAdena and adenaKnown baseline the income attribution,
     // lastAccumAt paces the active time accumulation.
@@ -370,11 +365,9 @@ func (h *cellHunter) groundOf(x int32, y int32) int {
 }
 
 // followGround moves the held hexagon onto the ground the character
-// actually fights on: the fight target position drives the switch
-// while a fight runs, the character position otherwise. The switch
-// respects the level window, the starvation cooldown and the pacing
-// floor, and every departure starts the ripeness clock of the left
-// ground.
+// actually fights on (the target position while a fight runs, the
+// character position otherwise), within the level window, the starvation
+// cooldown and the pacing floor.
 func (h *cellHunter) followGround(l *Loop, now time.Time) {
     if h.pin != "" {
         // The ground lock (see SetCellPin): the held cell never
@@ -420,10 +413,9 @@ func (h *cellHunter) followGround(l *Loop, now time.Time) {
         "following the ground", h.cells[ground].Name, left)
 }
 
-// standingGround resolves the hunting cell the character stands on
-// after a fresh login: the exact grid assignment inside the level
-// window; a character that logs in between the cells falls through
-// to the scored pick.
+// standingGround resolves the hunting cell the character stands on after
+// a fresh login: the exact grid assignment inside the level window (a
+// login between the cells falls through to the scored pick).
 func (h *cellHunter) standingGround(x int32, y int32) (int, bool) {
     ground := h.groundOf(x, y)
     if ground < 0 {
@@ -461,10 +453,9 @@ func (h *cellHunter) windowFloor() int32 {
     return floor
 }
 
-// markCleared starts the ripeness clock of a ground the hunter
-// leaves empty: the respawn window refills it, the picker holds off
-// until then. The expired entries of the map leave on the way (the
-// registry holds hundreds of cells, the map must not grow forever).
+// markCleared starts the ripeness clock of a ground the hunter leaves
+// empty: the picker holds off until the respawn window refills it. The
+// expired entries leave on the way (the map must not grow forever).
 func (h *cellHunter) markCleared(cellID string, now time.Time) {
     if h.clearedAt == nil {
         h.clearedAt = make(map[string]time.Time)
@@ -505,10 +496,9 @@ func respawnDuration(seconds int32) time.Duration {
     return time.Duration(seconds) * time.Second
 }
 
-// markStarved starts the anomaly cooldown of a ground the hunter
-// leaves empty even though it should have ripened: the sweep never
-// walks straight back into it. The expired entries of the map leave
-// on the way.
+// markStarved starts the anomaly cooldown of a ground the hunter leaves
+// empty even though it should have ripened: the sweep never walks
+// straight back into it. The expired entries leave on the way.
 func (h *cellHunter) markStarved(cellID string, now time.Time) {
     if h.starvedUntil == nil {
         h.starvedUntil = make(map[string]time.Time)
@@ -552,10 +542,9 @@ func (h *cellHunter) pickGlobal(exclude int, now time.Time) (int, float64) {
         }
     }
     if best < 0 && exclude < 0 {
-        // The level window holds no ground at all (or every ground
-        // of the window cools down from a starvation): the closest
-        // mob level distance wins - a character above or below every
-        // window still hunts something.
+        // The level window holds no ground (or every ground cools down
+        // from a starvation): the closest mob level distance wins - a
+        // character above or below every window still hunts something.
         return h.pickClosestLevel(now), 0
     }
 
@@ -653,10 +642,10 @@ func (h *cellHunter) ringCells(ring int) []int32 {
     return outer
 }
 
-// ringEligible reports whether the neighbor ring of the held cell
-// holds any level-eligible ground at all (the ripeness plays no
-// role): an eligible but unripe ring means the neighborhood refills
-// on its own clock and the hunter WAITS instead of relocating far.
+// ringEligible reports whether the neighbor ring holds any level
+// eligible ground at all (the ripeness plays no role): an eligible but
+// unripe ring refills on its own clock, so the hunter waits instead of
+// relocating far.
 func (h *cellHunter) ringEligible(now time.Time) bool {
     if h.picked < 0 {
         return false
@@ -733,9 +722,8 @@ func (h *cellHunter) foldVisit(index int) {
 }
 
 // cellNoteKill records a kill of the overlay: the corpse position
-// predicts where the mob returns and the species respawn window
-// bounds WHEN. The kill attributes to the hexagon the CORPSE lies
-// on.
+// predicts where the mob returns and the species respawn window bounds
+// when. The kill attributes to the hexagon the corpse lies on.
 func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
     h := l.cell
     if h == nil || h.picked < 0 {
@@ -797,9 +785,9 @@ func (l *Loop) cellNoteKill(objectID int32, now time.Time) {
 }
 
 // deathRegression reports whether the cell carries a fresh death
-// regression recorded by the tracker (the per-cell heat itself dies
-// with the session's loop instance). The age is returned for the
-// caller's log; a lapsed record reopens the ground.
+// regression recorded by the tracker (the per-cell heat dies with the
+// loop instance); a lapsed record reopens the ground. The age feeds the
+// caller's log.
 func (l *Loop) deathRegression(
     cellID string, now time.Time,
 ) (time.Duration, bool) {
@@ -816,8 +804,7 @@ func (l *Loop) deathRegression(
 }
 
 // cellNoteDeath counts a hunting death against the current cell: the
-// death heat rises and the regression re-pick fires right away, in a
-// global contest.
+// heat rises and the regression re-pick fires right away.
 func (l *Loop) cellNoteDeath(now time.Time) {
     h := l.cell
     if h == nil || h.picked < 0 {
@@ -879,16 +866,15 @@ func (h *cellHunter) accumulate(l *Loop, now time.Time) {
 }
 
 // waitOrRotate is the economy between the fights: a pickable mob
-// visible ANYWHERE in the knownlist wins, a predicted respawn within
-// the patience window beats every walk, and only an empty knownlist
-// lets the economy wait or rotate. Only a healthy standing engage
-// phase reads the emptiness; the reading runs UNFENCED.
+// anywhere in the knownlist wins, a predicted respawn inside the
+// patience window beats every walk, and only an empty knownlist lets the
+// economy wait or rotate. The reading runs unfenced and only in a
+// healthy standing engage phase.
 func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
     if h.pin != "" {
-        // The ground lock (see SetCellPin): the rotation economy
-        // stands down - the pinned cell is held through its empty
-        // stretches (the respawn refills it) and the starve switch
-        // never fires.
+        // The ground lock (SetCellPin): the rotation economy stands
+        // down - the pinned cell is held through its empty stretches and
+        // the starve switch never fires.
         return
     }
     if l.phase != phaseEngage || l.tripActive() ||
@@ -918,8 +904,8 @@ func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
     eta, predX, predY, pending := h.earliestPendingRespawn(cell.ID, now)
     if pending && eta <= cellWaitPatience {
         // The respawn comes back before any walk could reach an
-        // equivalent ground: hold the ground, drift toward the
-        // predicted corpse position (one paced segment).
+        // equivalent ground: hold and drift toward the predicted corpse
+        // position (one paced segment).
         h.waitWalk(l, predX, predY, selfX, selfY, selfZ, now)
 
         return
@@ -932,10 +918,10 @@ func (h *cellHunter) waitOrRotate(l *Loop, now time.Time) {
     h.evaluateRotation(l, &cell, now, waited, pending, eta)
 }
 
-// waitWalk drifts the waiting hunter toward a predicted respawn
-// position: one paced short segment (the per second target search of the
-// engage picks up any mob the segment comes past), suppressed while the
-// character already stands on the respawn point.
+// waitWalk drifts the waiting hunter toward a predicted respawn position:
+// one paced short segment (the engage target search picks up any mob the
+// segment comes past), suppressed while the character already stands on
+// the point.
 func (h *cellHunter) waitWalk(
     l *Loop, x int32, y int32,
     selfX int32, selfY int32, selfZ int32, now time.Time,
@@ -977,10 +963,9 @@ func (h *cellHunter) evaluateRotation(
         return
     }
     if best < 0 {
-        // The local sweep found nothing: either the neighborhood is
-        // all unripe (the wait continues - it ripens within the
-        // window) or the level window left the ground (the far
-        // relocation).
+        // The local sweep found nothing: either the neighborhood is all
+        // unripe (the wait continues) or the level window left the
+        // ground (the far relocation).
         if !starved || h.ringEligible(now) {
             return
         }
@@ -1000,9 +985,8 @@ func (h *cellHunter) evaluateRotation(
     // paces itself on the respawn refill.
     h.markCleared(cell.ID, now)
     if starved {
-        // The left ground keeps its starvation cooldown too: the
-        // next starved sweep moves forward past it instead of
-        // walking straight back into the empty ground.
+        // The left ground keeps its starvation cooldown too: the next
+        // starved sweep moves past it instead of walking straight back.
         h.markStarved(cell.ID, now)
     }
     h.apply(l, best, now)
@@ -1104,9 +1088,9 @@ func (h *cellHunter) pruneKills(now time.Time) {
     h.kills = kept
 }
 
-// recordMapKill appends one kill to the persistent map log and holds
-// the count cap: the marks never expire by time, the oldest ones drop
-// only when the log outgrows cellMapKillCap (issue #6).
+// recordMapKill appends one kill to the persistent map log and holds the
+// count cap: the marks never expire by time, only the oldest drop past
+// cellMapKillCap.
 func (h *cellHunter) recordMapKill(mark state.KillMarkView) {
     h.mapKills = append(h.mapKills, mark)
     if len(h.mapKills) > cellMapKillCap {
@@ -1114,10 +1098,9 @@ func (h *cellHunter) recordMapKill(mark state.KillMarkView) {
     }
 }
 
-// earliestPendingRespawn resolves the earliest UNEXPIRED prediction
-// of a cell: the kill records whose respawn still lies in the
-// future. The ETA, the predicted position, and whether any
-// prediction exists at all.
+// earliestPendingRespawn resolves the earliest unexpired prediction of a
+// cell (a kill record whose respawn still lies in the future): the ETA,
+// the predicted position and whether any prediction exists at all.
 func (h *cellHunter) earliestPendingRespawn(
     cellID string, now time.Time,
 ) (time.Duration, int32, int32, bool) {

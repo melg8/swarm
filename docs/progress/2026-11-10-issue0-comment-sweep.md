@@ -264,6 +264,18 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.4 percent, 509 blocks,
   1,244 history markers.
 
+### 2026-11-12 - hunt/cell_policy.go second pass keeps the economy only
+
+- 22 blocks compress: the economy keeps the numbers (the 20 s cell wait
+  patience, the 40 s no-data patience, the 60 s starvation, the 5 minute
+  minimum stay and starve cooldown, the 90 s exhausted stay, the 1.25
+  switch margin, the 15 minute death regression, the 8 level floor
+  slack, the 500 unit drift floor, the 96 and 400 kill log caps) and the
+  issue ids drop.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.4 percent, 508 blocks,
+  1,236 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -272,8 +284,8 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `town_walk.go` (twice), `loop_state.go`, `town_stuck.go`,
 `acceptance/archer_fleet.go`, `pathfind/search.go`,
 `pathfind/navmesh/hierarchy.go`, `state/scans.go`, `hunt/zones.go` and
-`hunt/town.go` and the second pass of `hunt/kite.go`. Next:
-`hunt/cell_policy.go` (288 comment lines, the second pass),
-`hunt/loop_state.go` (268, 46.7 percent), `hunt/delevel.go` (259, 42.9
-percent), `hunt/quest_trip.go` (253) and `hunt/shopping.go` (249); the
-share and the block count are re-measured at the end.
+`hunt/town.go`, `hunt/kite.go` and `hunt/cell_policy.go` (both second
+passes). Next: `hunt/loop_state.go` (268 comment lines, 46.7 percent),
+`hunt/delevel.go` (259, 42.9 percent), `hunt/quest_trip.go` (253) and
+`hunt/shopping.go` (249); the share and the block count are re-measured
+at the end.
