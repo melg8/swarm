@@ -1,4 +1,4 @@
-# P05: one packet dispatch table (status: in progress)
+# P05: one packet dispatch table (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner instruction: continue
 the refactor after the file split rounds).
@@ -56,5 +56,14 @@ named handlers for the two log-only ids. The mechanical check against
 
 ## Status
 
-The table lands; the constant deduplication stays open as the next
-P05 slice.
+Complete: the table lands on `main` as `1e12eada`; the constant
+deduplication stays open as the next P05 slice.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole test
+suite, `fmt:check`). The live run on the Windows stack: the binary
+carries the `-ldflags` identity of `1e12eada`, `-login
+127.0.0.3:2106 -hunt -web ""`, 65 s in world, then Ctrl+Break - the
+character killed and looted, the `Received packet id 0x0b` line proves
+the unknown-id route, `Leaving the game world with test1` / `Bot
+finished`, exit code 0.
