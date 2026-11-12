@@ -522,6 +522,21 @@ corner probe is a length, not a leg at all.
   lint:new`. `loop_avoid.go` fell from 41.4 to 29.5 percent (114
   comment lines), no block above 8 lines.
 
+### 2026-11-12 - hunt/stagnation.go moves the watch facts to the doc
+
+- 15 blocks compress: the `20` minute experience window and the `10`
+  minute position window with their calibration (the 2.2 min weapon
+  round, the 14m54s readiness round, the hour long frozen cell), the
+  `15` minute rebuild cooldown, the event fan out (logger, journal,
+  action note), the soft reset contents and the hard reset cure, the
+  delevel exemption, the offline and manual baseline reset, the
+  experience-first ordering and the 2026-09-14 dump it answers. A new
+  `## The stagnation watch` section of `docs/hunting.md` carries the
+  moved facts in the same commit.
+- Verified: `task fmt`, `go build ./...`, the hunt tests, `task
+  lint:new`. `stagnation.go` fell from 47.6 to 28.8 percent (57
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -537,8 +552,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/loop_params.go`, `acceptance/archer_kite.go`, `hunt/user.go`,
 `hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go`,
 `hunt/learning.go` and `hunt/town_cursor_escape.go`,
-`pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go` and
-`hunt/loop_avoid.go` (second passes). Next: a fresh
-`task comment:audit --top 10` pick (the `proxy/game.go` and
+`pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
+`hunt/loop_avoid.go` and `hunt/stagnation.go` (second passes). Next: a
+fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
 `hunt/loop_state.go` entries stay untouched while their fragments are
 active); the share and the block count are re-measured at the end.

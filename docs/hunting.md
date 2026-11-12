@@ -153,6 +153,44 @@ would have paid for.
   refresh-while-farming, manual/offline quiet, the tick path
   coverage, the event feed surface, the diagnostics wiring).
 
+## The stagnation watch (hunt/stagnation.go)
+
+The M1 soak proof requires that a silently stuck bot becomes a loud line and
+then recovers itself, so the loop watches two values: the experience
+(`stagnationXPWindow`, 20 min) and the exact position
+(`stagnationPositionWindow`, 10 min). The windows are calibrated against the
+measured honest flows of the elven autonomy: the longest healthy experience
+stall is the full town trip round (2.2 min for the weapon run, 14m54s for
+the whole farm readiness round with every stop landed), and the longest
+honest stand on one cell is a rest or a paced lesson stop (minutes). A
+frozen walk (one village cell for over an hour) or a dead engage blows
+straight past both.
+
+An event logs one line per window with the current loop phase (the console,
+the web UI event feed and the state dump all mirror the loop logger), lands
+in the tracker action note and in the session journal (`Stall`), and
+re-arms only its own window, so a frozen character logs its stall every
+window instead of every 250 ms tick. The baselines reset on the offline
+gaps (a supervisor relogin is not a livelock) and on the manual only
+sessions (an interactive character may stand still).
+
+The escalation rides the same watch: the first position stall clears the
+frozen loop state in place (the soft reset - the target skip for the frozen
+object, the engage timers, the blind recovery, the pending loot, the panic
+and flee episodes, a mid-freeze town trip and the return budget all restart
+from the live world state, and a sitting character stands up), while a
+stall that survives it or a full experience window rebuilds the session
+through the emergency logout (the hard reset - the known cure of the stale
+selection, the refused collapsed walk clicks and the frozen engage stance),
+paced by `stagnationHardCooldown` (15 min) so a livelocked loop retries one
+rebuild per window instead of thrashing reconnects. The delevel phase is
+exempt from both (its deaths refresh the experience, its own timeout bounds
+it). The experience check runs first and its hard recovery arms
+`logoutDone`; the position check must not run after it, or the soft reset
+would run on the dying session (the 2026-09-14 03:55 dump: the position
+branch logged "clearing the loop state" while the emergency logout was
+already unwinding, and the relogin inherited none of the cleanup).
+
 ## Combat safety (hunt/loop_safety.go + the constrained target search of state)
 
 - The engage never initiates on mobs above the character level + 2 or
