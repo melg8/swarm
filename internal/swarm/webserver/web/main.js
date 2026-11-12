@@ -18,6 +18,10 @@ const galleryScripts = {
   "test-path-v3": "pathflow.js",
 };
 
+// statsBoot is the in-flight first load of the statistics tab script;
+// a failed load resets it so a later visit retries.
+let statsBoot = null;
+
 window.addEventListener("DOMContentLoaded", async () => {
   initBuildWatch();
   initTheme();
@@ -35,7 +39,9 @@ window.addEventListener("DOMContentLoaded", async () => {
   if (config && config.mode === "pathfind") {
     document.body.classList.add("mode-pathfind");
     MapView.init();
-    PathfindUI.init(config);
+    loadScript("pathfind.js")
+      .then(() => PathfindUI.init(config))
+      .catch((err) => console.error("pathfind UI boot failed:", err));
 
     return;
   }
@@ -92,7 +98,6 @@ window.addEventListener("DOMContentLoaded", async () => {
   initPathfindLinkButton();
   initAcceptance();
   initSidebarTabs();
-  StatsTab.init();
   MapView.init();
   refreshBots();
   refreshAcceptance();
@@ -109,12 +114,36 @@ window.addEventListener("DOMContentLoaded", async () => {
 // its init once the script executed. The galleries keep the classic
 // form their vm harnesses evaluate, so no ES module import.
 function bootGallery(mode, boot) {
-  const src = galleryScripts[mode];
-  const element = document.createElement("script");
-  element.src = src;
-  element.onload = () => boot();
-  element.onerror = () => console.error("gallery boot failed:", src);
-  document.head.appendChild(element);
+  loadScript(galleryScripts[mode])
+    .then(boot)
+    .catch((err) => console.error("gallery boot failed:", err));
+}
+
+// loadScript injects one classic script and resolves after it ran.
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const element = document.createElement("script");
+    element.src = src;
+    element.onload = () => resolve();
+    element.onerror = () => reject(new Error("script load failed: " + src));
+    document.head.appendChild(element);
+  });
+}
+
+// ensureStats loads the statistics tab on its first visit: the fleet
+// charts, tables and history stay off the map-only page. A failed
+// script load clears the cache so a later visit retries; a loaded
+// script is never injected twice (its top level const would collide).
+function ensureStats() {
+  if (!statsBoot) {
+    statsBoot = loadScript("stats.js").then(() => {
+      StatsTab.init();
+    }, (err) => {
+      statsBoot = null;
+      throw err;
+    });
+  }
+  return statsBoot;
 }
 
 // Tab switching.
@@ -132,9 +161,15 @@ function initTabs() {
         MapView.refreshColors();
         MapView.resize();
       }
-      // The statistics tab polls only while it is visible.
+      // The statistics tab polls only while it is visible, and its
+      // script loads on the first visit.
+      const statsActive = name === "stats";
       if (typeof StatsTab !== "undefined") {
-        StatsTab.setActive(name === "stats");
+        StatsTab.setActive(statsActive);
+      } else if (statsActive) {
+        ensureStats()
+          .then(() => StatsTab.setActive(tab.classList.contains("active")))
+          .catch((err) => console.error("stats tab boot failed:", err));
       }
     });
   }

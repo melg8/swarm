@@ -10,13 +10,15 @@ keep it that way (embedded via go:embed). Watch out: top level `const`
 declarations are not `window` properties, so cross script references
 must use the bare binding name.
 
-The five design galleries (`fight.js`, `fighttest.js`, `pathtest.js`,
-`pathcurve.js`, `pathflow.js` - about 270 KB together) are dev-only:
-`main.js` injects the script of the active gallery mode as a classic
-`<script>` element and boots it after it executed, so the regular bot
-page downloads none of them. The galleries stay classic scripts (no
-`export`) because the twelve `tools/repro_*.js` harnesses evaluate
-them with `vm.runInContext`.
+The dev-only scripts load on demand: `main.js` injects the script of
+the active gallery mode as a classic `<script>` element and boots it
+after it executed, so the regular bot page downloads none of the five
+galleries (`fight.js`, `fighttest.js`, `pathtest.js`, `pathcurve.js`,
+`pathflow.js` - about 270 KB together). The statistics tab script
+(`stats.js`) loads on the first visit of the Stats tab and the
+pathfind UI (`pathfind.js`) only in the pathfind mode. The injected
+scripts stay classic (no `export`) because the twelve
+`tools/repro_*.js` harnesses evaluate them with `vm.runInContext`.
 
 ## The launch modes
 
@@ -1169,7 +1171,9 @@ fight, how they behave, how often they die and rejoin the game - the
 fleet wide picture and the per bot picture side by side, with the
 long term history a 24/7 run needs (the rings hold the last day at
 full 15 second resolution, older data ages into coarser steps
-through the half-on-full compaction).
+through the half-on-full compaction). The script loads on the first
+visit of the tab (`main.js` injects it), so the map-only page does
+not pay for the charts.
 
 The fleet overview renders:
 
