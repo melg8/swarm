@@ -251,6 +251,19 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.5 percent, 509 blocks,
   1,250 history markers.
 
+### 2026-11-12 - hunt/kite.go second pass trims the constant prose
+
+- 29 blocks compress: the constants and the ladder keep the numbers (the
+  250 unit retreat radius, the 400 step, the 800 train scan, the 0.3
+  encirclement share, the 700 ms shot window, the 250 ms re-click, the
+  1200 ms probe, the 250 ms refusal window, the 1350 ms bow retry lead,
+  the 1500 reuse delay, the 1 s and 5 s window clamps, the 500000/pAtkSpd
+  formula) and the round references drop (the owner round markers, issue
+  id).
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.4 percent, 509 blocks,
+  1,244 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -259,7 +272,8 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `town_walk.go` (twice), `loop_state.go`, `town_stuck.go`,
 `acceptance/archer_fleet.go`, `pathfind/search.go`,
 `pathfind/navmesh/hierarchy.go`, `state/scans.go`, `hunt/zones.go` and
-`hunt/town.go`. Next: `hunt/kite.go` (371 comment lines, the second
-pass), `hunt/cell_policy.go` (288, the second pass), `hunt/loop_state.go`
-(268), `hunt/delevel.go` (259) and `hunt/quest_trip.go` (253); the share
-and the block count are re-measured at the end.
+`hunt/town.go` and the second pass of `hunt/kite.go`. Next:
+`hunt/cell_policy.go` (288 comment lines, the second pass),
+`hunt/loop_state.go` (268, 46.7 percent), `hunt/delevel.go` (259, 42.9
+percent), `hunt/quest_trip.go` (253) and `hunt/shopping.go` (249); the
+share and the block count are re-measured at the end.

@@ -21,24 +21,21 @@ import (
 // The kiting constants of the archer fight.
 const (
     // kiteRetreatRadius arms the step: a hostile closer than this is
-    // about to reach melee (the swing range sits near 150, a chaser
-    // runs 120+ units per second).
+    // about to reach melee (the swing range sits near 150).
     kiteRetreatRadius = 250.0
     // kiteStep is the retreat length of one walk, sized so a completed
     // walk lands back inside the optimal band.
     kiteStep = 400.0
     // kiteStepWindow is the movement window one step owns: a forced
-    // attack request interrupts a running walk server-side, so the
-    // engage holds its re-requests until the window closes.
+    // attack request interrupts a running walk server-side.
     kiteStepWindow = 2 * time.Second
     // kiteReengageDelay holds the first forced attack re-request after
     // the walk. Zero today - the window end IS the re-engage.
     kiteReengageDelay time.Duration = 0
     // kiteStepPeriod paces the steps and the cornered hold re-probes.
     kiteStepPeriod = 3 * time.Second
-    // kiteStreakLimit is the diagnostic threshold of an unwinnable
-    // race: a chaser at least as fast never falls behind, the counter
-    // names it, and the retreat keeps running.
+    // kiteStreakLimit is the diagnostic threshold of an unwinnable race:
+    // a chaser at least as fast never falls behind.
     kiteStreakLimit = 8
     // kiteTrainScanRange bounds the chaser scan of the retreat
     // direction: a farther member cannot reach the character inside a
@@ -54,9 +51,8 @@ const (
     // kiteHalfPlaneSlack lets a lane run perpendicular to the away-ray
     // but never fold back toward the train.
     kiteHalfPlaneSlack = -0.05
-    // kiteRoamRadius fences the retreat around the fight anchor (the
-    // target position at the first retreat resolution): three bow
-    // engage radii, location-general, no zone table.
+    // kiteRoamRadius fences the retreat around the fight anchor: three
+    // bow engage radii, location-general, no zone table.
     kiteRoamRadius = 3 * userBowEngageRadius
     // kiteMinStep is the shortest step the ring budget may leave; the
     // lane gate refuses even that when it is walled.
@@ -64,14 +60,12 @@ const (
     // kiteHoldLogPeriod paces the cornered hold diagnostic line.
     kiteHoldLogPeriod = 15 * time.Second
     // kiteShotWindow is the freshness window of the character's own
-    // Attack broadcast, the server commit of the shot. It keeps the
-    // broadcast catchable for at least two ticks at the quarter-second
-    // loop cadence while bounding the schedule to its own shot.
+    // Attack broadcast, the server commit of the shot: at least two ticks
+    // at the quarter-second loop cadence, its own shot only.
     kiteShotWindow = 700 * time.Millisecond
     // kiteReclickPeriod paces the re-click ladder of the retreat walk
-    // while the character still stands on the issue cell. It sits
-    // under the server's once-per-second movement broadcast gate, so a
-    // re-click re-aims the same endpoint and is never wasted.
+    // while the character still stands on the issue cell: under the once
+    // per second movement broadcast gate, the re-click is never wasted.
     kiteReclickPeriod = 250 * time.Millisecond
     // kiteReclickLimit bounds the re-clicks of one walk (the initial
     // click plus this many re-issues): the packet budget of a dead
@@ -85,50 +79,43 @@ const (
     // kite click: a genuine refusal answers within the round trip, a
     // wider window would latch healthy endpoints dead.
     kiteRefusalAnswerWindow = 250 * time.Millisecond
-    // kiteBowRetryLead is the look-back band of the bow retry: an
-    // attack refused during the disable schedules its re-try a second
-    // ahead (Creature.canUseRangeWeapon) and its ActionFailed lands
-    // with no client request inside the tight answer window.
+    // kiteBowRetryLead is the look-back band of the bow retry: an attack
+    // refused during the disable answers ActionFailed a second later
+    // (Creature.canUseRangeWeapon), outside the tight answer window.
     kiteBowRetryLead = 1350 * time.Millisecond
     // kiteBowReuseDelay is the reuse delay of the bow family the fleet
     // shoots (the C1 item data: the Short Bow and the D-grade bows
     // carry 1500); it feeds the bow disable formula of kiteWalkWindow.
     kiteBowReuseDelay = 1500.0
-    // kiteWalkWindowFloor and kiteWalkWindowMax clamp the bow-aware
-    // walk window: the formula reads the live pAtkSpd, and a broken
-    // broadcast must never collapse or explode the window. Outside the
-    // band the shipped kiteStepWindow applies.
+    // kiteWalkWindowFloor and kiteWalkWindowMax clamp the bow-aware walk
+    // window: a broken pAtkSpd broadcast must never collapse or explode
+    // it, and outside the band the shipped kiteStepWindow applies.
     kiteWalkWindowFloor = 1 * time.Second
     kiteWalkWindowMax   = 5 * time.Second
     // kiteGaugeMaxAge bounds how long a RED SetupGauge still counts as
     // the bow cycle of the shot in flight: the server sends one on
     // every commit, so an older gauge belongs to a fight that ended.
     kiteGaugeMaxAge = 10 * time.Second
-    // kiteWindupLead is the safety lead the deferred retreat click
-    // adds past the windup end: the accepted move window opens at the
-    // (timeAtk+reuse)/2 boundary, and the lead must clear it despite
+    // kiteWindupLead clears the (timeAtk+reuse)/2 move boundary despite
     // the quarter-second loop cadence and the broadcast lag.
     kiteWindupLead = 150 * time.Millisecond
     // kiteRingLeashShare caps the straight step as a share of the roam
     // radius: the ring keeps the whole fight band inside the 1500 unit
     // audit drift leash from the anchor.
     kiteRingLeashShare = 0.72
-    // kiteArrivalEpsilon is the arrival radius of the re-click ladder:
-    // a stand inside it completes the step, a stand beyond it re-arms
-    // the episode (the server cell granularity and a partial route
-    // never leave the character exactly on the clicked cell).
+    // kiteArrivalEpsilon is the arrival radius of the re-click ladder: a
+    // stand inside it completes the step, beyond it re-arms the episode
+    // (the cell granularity never lands the character exactly).
     kiteArrivalEpsilon = 100.0
 )
 
-// KiteParams is the tunable block of the kite fight: the four knobs
-// the launch config carries per bot spec (launch_config.go), plus the
-// enable gate. Every other kite constant stays a package constant -
-// only these four are tuned between measurement runs.
+// KiteParams is the tunable block of the kite fight: the four knobs the
+// launch config carries per bot spec (launch_config.go) plus the enable
+// gate; every other kite constant stays a package constant.
 type KiteParams struct {
     // Enabled gates the kite layer whole: false turns every bow fight
-    // into the standing archer the baseline measures (the mob closes,
-    // the archer stands and shoots - the melee fallback rate of the
-    // baseline comes from exactly this).
+    // into the standing archer (the mob closes, the archer stands and
+    // shoots - the melee fallback rate of the baseline).
     Enabled bool
     // RetreatRadius is the trigger distance of the kite step and the
     // inner edge of the optimal band (kiteRetreatRadius is the
@@ -177,9 +164,9 @@ func (l *Loop) SetKiteParams(p KiteParams) {
 }
 
 // closedDistance bounds how close a chaser may stand now from its last
-// movement broadcast (one to two second cadence): the result is never
-// above the true gap, so the floor decisions may only underestimate
-// the distance.
+// movement broadcast (one to two second cadence): the result never
+// exceeds the true gap, so the floor decisions may only underestimate
+// it.
 func closedDistance(
     dist float64, age time.Duration, speed float64,
 ) float64 {
@@ -244,9 +231,9 @@ func (l *Loop) kiteThreat(
 // triple, the movement window and the cornered hold pacing.
 
 func (l *Loop) kiteLayerGates(now time.Time) bool {
-    // The params gate comes first: a kite-disabled profile (the
-    // standing-archer baseline of issue #29) never arms the layer,
-    // whatever the bow and the fight report.
+    // The params gate comes first: a kite-disabled profile (the standing
+    // archer baseline) never arms the layer, whatever the bow and the
+    // fight report.
     if !l.kite.Enabled || !l.bowEquipped() || l.target == 0 {
         return false
     }
@@ -350,10 +337,9 @@ func (l *Loop) kiteFlightHolds(now time.Time) bool {
     return false
 }
 
-// kiteFleeBusy reports whether the flight's own movement state owns
-// the tick: a live walk window (the re-click ladder keeps it) or a
-// movement hold another step armed. A lapsed window stands down and
-// reports free, so the next step issues on this very tick.
+// kiteFleeBusy reports whether the flight's own movement state owns the
+// tick: a live walk window (the re-click ladder keeps it) or a movement
+// hold another step armed. A lapsed window reports free.
 func (l *Loop) kiteFleeBusy(now time.Time) bool {
     if !l.kiteWalkUntil.IsZero() {
         if now.After(l.kiteWalkUntil) {
@@ -368,10 +354,9 @@ func (l *Loop) kiteFleeBusy(now time.Time) bool {
     return now.Before(l.combatAvoidUntil)
 }
 
-// kiteFleeHeld reports whether the last flight step found no lane:
-// the hold paces the re-probe at the kite period and keeps the ticks
-// in between. Only the targetless hold (kiteHeldFor == 0) belongs to
-// the flight; a hold of a live target names its own fight.
+// kiteFleeHeld reports whether the last flight step found no lane: the
+// hold paces the re-probe at the kite period. Only the targetless hold
+// (kiteHeldFor == 0) belongs to the flight.
 func (l *Loop) kiteFleeHeld(now time.Time) bool {
     return l.kiteHeldFor == 0 && !l.kiteHeldAt.IsZero() &&
         now.Sub(l.kiteHeldAt) < l.kite.StepPeriod
@@ -439,9 +424,9 @@ func (l *Loop) kiteFleeThreat(now time.Time) bool {
     }
     dirX, dirY, encircled := l.kiteTrainDirection(selfX, selfY, selfZ)
     if dirX == 0 && dirY == 0 {
-        // No away bearing at all: the chaser stands ON the character
+        // No away bearing: the chaser stands ON the character
         // (kiteContactAway) or its position has not broadcast yet.
-        // Standing in contact is death, so the ring rays answer.
+        // Contact is death, so the ring rays answer.
         var contact bool
         dirX, dirY, contact = l.kiteContactAway(selfX, selfY, selfZ)
         if !contact {
@@ -459,9 +444,8 @@ func (l *Loop) kiteFleeThreat(now time.Time) bool {
     breakout := false
     if !found {
         // The away side is a dead end: break out through the back
-        // half-plane - the open ground the character came from - THROUGH
-        // the chaser's bearing, instead of handing the tick to the
-        // zone-clamped fan.
+        // half-plane - the open ground the character came from - through
+        // the chaser's bearing rather than the zone-clamped fan.
         stepX, stepY, found = l.kiteRetreatLane(
             selfX, selfY, selfZ, -dirX, -dirY, -dirX, -dirY,
             escapeWalkDistance)
@@ -540,11 +524,10 @@ func (l *Loop) kiteStepAdmitted(now time.Time) bool {
     return true
 }
 
-// kiteFromTarget steps away from the hostile that armed the step,
-// buying the weapon range back: the direction is the straight
-// away-ray of the whole train, the only lane. An encircled or walled
-// lane holds the ground and keeps shooting. The timing follows the
-// live shot cycle.
+// kiteFromTarget steps away from the hostile that armed the step to buy
+// the weapon range back: the straight away-ray of the whole train, the
+// only lane. An encircled or walled lane holds the ground and keeps
+// shooting, and the timing follows the live shot cycle.
 func (l *Loop) kiteFromTarget(now time.Time) bool {
     if !l.kiteStepAdmitted(now) {
         return false
@@ -580,8 +563,7 @@ func (l *Loop) kiteFromTarget(now time.Time) bool {
         until = now.Add(l.kiteWalkWindow(now) + l.kite.ReengageDelay)
     }
     if !l.kiteResolveAndClick(now, until, selfX, selfY, selfZ) {
-        // The encircled or cornered hold answered (see
-        // kiteResolveAndClick): the hold ground rule owns the cycle.
+        // The encircled or cornered hold answered: it owns the cycle.
         return false
     }
     l.kiteStreak++
@@ -615,12 +597,11 @@ func (l *Loop) kiteThreatBeyondThePursue(
     return true
 }
 
-// kiteFromShot arms the shot-paced retreat: the character's own
-// Attack broadcast is the server commit of the shot, but the server
-// forbids movement through the windup (it saves the click and replays
-// it at the disable end, where the re-shot cancels it). The broadcast
-// therefore arms the deferred retreat: the click waits the windup end
-// plus the safety lead. The lane resolves at the click moment.
+// kiteFromShot arms the shot-paced retreat: the character's own Attack
+// broadcast is the server commit of the shot, and the server forbids
+// movement through the windup (it replays the saved click at the disable
+// end, where the re-shot cancels it). The click waits the windup end
+// plus the safety lead; the lane resolves at the click moment.
 func (l *Loop) kiteFromShot(now time.Time) bool {
     if !l.kiteLayerGates(now) {
         return false
@@ -693,11 +674,10 @@ func (l *Loop) kiteStraightStep(step float64, selfX, selfY int32) float64 {
     return step
 }
 
-// kiteResolveAndClick resolves the retreat lane against the live
-// train and terrain and issues the click through the ladder seam: an
-// encircled train or a blocked lane holds the ground, a walkable lane
-// clicks with the caller's window. One resolution serves the deferred
-// click, the catch and the proximity step.
+// kiteResolveAndClick resolves the retreat lane against the live train
+// and terrain and issues the click through the ladder seam: an encircled
+// train or a blocked lane holds the ground, a walkable lane clicks with
+// the caller's window. One resolution serves every trigger.
 func (l *Loop) kiteResolveAndClick(
     now, until time.Time, selfX, selfY, selfZ int32,
 ) bool {
@@ -874,8 +854,8 @@ func (l *Loop) kiteIssueWalk(
     l.kiteWalkBaseX, l.kiteWalkBaseY = selfX, selfY
     l.kiteWalkIssuedAt = now
     // The window is the caller's phase-aware moment; the walk is
-    // deliberately NOT stretched past it, because waiting for a
-    // regained distance is the treadmill the acceptance run measured.
+    // deliberately not stretched past it - waiting for a regained
+    // distance is the treadmill the acceptance run measured.
     l.kiteWalkUntil = until
     l.combatAvoidUntil = until
     l.kiteReclickAt = now
@@ -941,10 +921,9 @@ func (l *Loop) kiteClickRefused() bool {
     }
     failedAt := l.tracker.LastActionFailed()
 
-    // The failure may carry the SAME coarse clock stamp as the click
-    // (the Windows timer granularity - the live server answers inside
-    // the same millisecond), so the correlation starts at the click
-    // moment inclusive instead of strictly after it.
+    // The failure may carry the same coarse clock stamp as the click
+    // (the Windows timer granularity), so the correlation starts at the
+    // click moment inclusive.
     if failedAt.Sub(l.kiteReclickAt) > kiteRefusalAnswerWindow {
         return false
     }
@@ -956,10 +935,9 @@ func (l *Loop) kiteClickRefused() bool {
         return false
     }
 
-    // The bow retry chain: an attack request the server bounced
-    // through the bow disable answers ActionFailed about a second
-    // later (Creature.canUseRangeWeapon schedules the retry), far
-    // outside the tight window of the click.
+    // The bow retry chain: an attack bounced through the bow disable
+    // answers ActionFailed about a second later (Creature.canUseRangeWeapon
+    // schedules the retry), far outside the tight window of the click.
     return !l.tracker.OtherRequestBetween(
         failedAt.Add(-kiteBowRetryLead), l.kiteReclickAt)
 }
@@ -974,9 +952,8 @@ func (l *Loop) kiteReclickWalk(now time.Time) bool {
         return false
     }
     if now.After(l.kiteWalkUntil) {
-        // The disable end: the walk stands down and the forced
-        // attack re-request owns the tick. That request IS the next
-        // shot - the owner contract of the 2026-11-09 round - even
+        // The disable end: the walk stands down and the forced attack
+        // re-request owns the tick. That request IS the next shot even
         // when the chaser stands in melee after the reload.
         l.kiteWalkClear()
 
@@ -1002,8 +979,8 @@ func (l *Loop) kiteReclickWalk(now time.Time) bool {
         return false
     }
     if selfX != l.kiteWalkBaseX || selfY != l.kiteWalkBaseY {
-        // A fresh standing episode: the ladder re-bases onto the
-        // current cell and keeps pushing the SAME endpoint.
+        // A fresh standing episode: the ladder re-bases onto the current
+        // cell and keeps pushing the same endpoint.
         l.kiteWalkBaseX, l.kiteWalkBaseY = selfX, selfY
         l.kiteReclicks = 0
         l.kiteWalkIssuedAt = now
@@ -1044,9 +1021,8 @@ func (l *Loop) kiteReclickVerdict(
 ) bool {
     if refused && !l.kiteWalkDead {
         // The evidence verdict: the server answered the click with
-        // ActionFailed inside the round trip. The probe line lands once
-        // per walk; the age gate separates a late AI retry answer from
-        // the movement broadcast.
+        // ActionFailed inside the round trip, and the probe line lands
+        // once per walk.
         l.kiteWalkDead = true
         l.logger.Printf("Hunt: the kite walk click on target %d "+
             "was refused by the server (standing on %d %d), "+
@@ -1069,10 +1045,9 @@ func (l *Loop) kiteReclickVerdict(
         // gate: the re-click keeps hitting the endpoint.
         return true
     }
-    // The straight design has no second lane to rotate onto (the
-    // owner rule of the 2026-11-09 round): the dead endpoint stands
-    // the ladder down and the hold ground answer keeps the bow
-    // shooting. The next shot cycle re-arms the retreat fresh.
+    // The straight design has no second lane to rotate onto: the dead
+    // endpoint stands the ladder down and the hold ground answer keeps
+    // the bow shooting. The next shot cycle re-arms the retreat fresh.
     l.kiteWalkClear()
     l.kiteHoldGround(now, false)
 
