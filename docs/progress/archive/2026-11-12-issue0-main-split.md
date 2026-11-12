@@ -1,4 +1,4 @@
-# The launcher split: one file per operator mode (status: in progress)
+# The launcher split: one file per operator mode (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner instruction: continue
 the refactor after the loop, town, walker and state rounds).
@@ -53,7 +53,9 @@ script (the AST range lister plus a verbatim copy, scratch) is next.
 
 ## Status
 
-Inventory done, the move is next.
+Complete: the ten files land on `main` as `a34c3c3b` (the
+split) and `3a951c4b` (the doc paths), `task verify` green and the
+live run clean.
 
 ### 2026-11-12 - the move
 The split script (the AST range lister plus a verbatim copy, scratch,
@@ -89,3 +91,12 @@ Verified: `go build ./...`, `go vet ./cmd/swarm/...`,
 `go test ./cmd/swarm/... -count=1` ok in 0.1 s.
 
 Next: `task verify`, the live launch, then the fragment archive.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole test
+suite, `fmt:check`). The live run on the Windows stack: the binary
+carries the `-ldflags` identity of `3a951c4b`, `-login
+127.0.0.3:2106 -hunt -web ""`, 65 s in world, then Ctrl+Break - the
+spawn burst, `Leaving the game world with test1` / `Bot finished`,
+exit code 0. `-h` prints every flag group of the split (config,
+proxy, navmesh, pathfind), so the flag layer moved intact.
