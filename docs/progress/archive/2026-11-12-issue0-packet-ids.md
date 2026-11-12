@@ -1,4 +1,4 @@
-# P05 follow-up: the packet packages own the opcodes (status: in progress)
+# P05 follow-up: the packet packages own the opcodes (status: complete)
 
 Started 2026-11-12, branch main, issue0 (the constant deduplication
 slice of the P05 prompt, continued after the dispatch table round).
@@ -59,4 +59,14 @@ Verified: `go build ./...`, `go vet` on `connection` and `packets`,
 and `./internal/swarm/connection/...` green (10.5 s), the old-to-new id
 comparison reports 0 mismatches over the 41 pairs.
 
-Next: `task verify`, the live run, then the fragment archive.
+Complete: the slice lands on `main` as `912326c2`; `task verify`
+green and the live run clean.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole test
+suite, `fmt:check`). The live run on the Windows stack: the binary
+carries the `-ldflags` identity of `912326c2`, `-login
+127.0.0.3:2106 -hunt -web ""`, 65 s in world, then Ctrl+Break - the
+dispatch table answered the spawn burst, the kill and the loot, the
+unknown id 0x0b kept its log line, `Leaving the game world with test1`
+/ `Bot finished`, exit code 0.
