@@ -7,15 +7,11 @@ package navmesh
 import "math"
 
 // The hierarchical route query (docs/navmesh.md, the hierarchy
-// section): the HNA* query model over the cluster graph. The coarse
-// search runs the A* over the abstract nodes (the cluster blocks) and
-// answers with the chain of portal edges it crossed; the refinement
-// then searches the real mesh hop by hop through the chain - every
-// hop is one ordinary corridor search from the previous portal
-// midpoint to the next portal polygon, budgeted and cached (the
-// HNA* intra-edge cache; the cached corridor of a portal pair serves
-// every future route through it). A failed hop bans its exit edge
-// and the coarse search replans, at most a few attempts; a route the
+// section): the coarse A* over the cluster blocks answers the chain of
+// portal edges it crossed, and the refinement searches the real mesh
+// hop by hop through it (one corridor search per portal pair, cached by
+// the HNA* intra-edge cache). A failed hop bans its exit edge and the
+// coarse search replans, at most maxCoarseAttempts times; a route the
 // hierarchy cannot finish answers the partial corridor up to the
 // failure - the flat search semantics stay the contract.
 
@@ -32,31 +28,19 @@ const maxHopperNodes = 32768
 // maxCoarseAttempts bounds the ban and replan cycles of one query.
 const maxCoarseAttempts = 3
 
-// gatedCoarsePops bounds the component gated guide attempt: the gate
-// keeps the chain honest where the sampling serves it, and the cap
-// hands the pathological pairs (the sparse cluster crossings the
-// component chain strands) to the gate free retry fast.
+// gatedCoarsePops bounds the component gated guide attempt: the cap
+// hands the pathological pairs to the gate free retry fast.
 const gatedCoarsePops = 4096
 
-// The coarse guide prices the cluster edges by the same swim model
-// the refinement runs (the zone aware water multiplier of the edge
-// destination area, see hierQuery.waterMultiplier): the chain must
-// follow the cheap ground - the uniform distance guide locked the
-// corridor to the shortest distance chain and the priced refinement
-// could not escape it (the through town walk the ban answer beat by
-// a quarter, the bay crossings the shore detour undercuts). The
-// plain dist3 heuristic stays admissible - every multiplier costs at
-// least the land rate, so the honest chain cost only exceeds the
-// straight line - the priced guide explores the cluster frontier
-// wider (the underpriced water heuristic cannot prune the land side
-// as hard), the maxCoarseNodes bound carries that.
+// The coarse guide prices the cluster edges by the same swim model the
+// refinement runs (hierQuery.waterMultiplier), so the chain follows the
+// cheap ground. The plain dist3 heuristic stays admissible - every
+// multiplier costs at least the land rate - and the priced guide
+// explores the cluster frontier wider, which maxCoarseNodes carries.
 
 // maxConfinedNodes bounds the corridor confined fallback search: the
-// allowed set keeps the exploration inside the coarse chain clusters,
-// so the bound only guards the pathological mazes. The whole map town
-// segments thread half a million real polygons through their chain - the
-// bound rides at a million expansions (the node memory is the flat
-// search's, the pooled state carries it).
+// allowed set keeps it inside the chain clusters, and the million
+// expansions cover the half million polygon town segments.
 const maxConfinedNodes = 1 << 20
 
 // hopCacheCapacity bounds the cached refinement corridors (the
@@ -64,12 +48,9 @@ const maxConfinedNodes = 1 << 20
 const hopCacheCapacity = 4096
 
 // coarseNode is one node of the cluster level search: the (cluster,
-// entering crossing) pair. The entry component (the link component of
-// the crossing target polygon) resolves when the node pops - the
-// eager neighbour abstract build the relaxation would force is the
-// whole frontier cost the lazy resolution avoids (the search builds
-// the abstracts of the clusters it actually settles, not of every
-// cluster the frontier touches).
+// entering crossing) pair. The entry component resolves when the node
+// pops, so the abstracts build only for the clusters the search
+// settles, not for every cluster the frontier touches.
 type coarseNode struct {
     key       clusterKey
     entryPoly uint32
@@ -213,11 +194,8 @@ type coarseResult struct {
     // gaveUp reports the gated guide budget stop (the gate free
     // retry takes over).
     gaveUp bool
-    // estimate is the geometric length of the chain walk (the start,
-    // the portal midpoints and the end in sequence): the honest
-    // refinement stays near it, the chain the straight line portal
-    // pricing lied about refines far past it (the flat contest asks
-    // for the exact search then).
+    // estimate is the geometric chain walk (start, portal midpoints,
+    // end): the refinement stays near it, a lying chain refines past it.
     estimate float64
 }
 
@@ -238,11 +216,9 @@ type hierQuery struct {
     zones *zoneIndex
 }
 
-// waterMultiplier prices one coarse guide edge landing at pos: the
-// zone aware swim rate the filter arms - the zoned water crossings
-// pay the run/swim ratio, the un-zoned river beds walk at the plain
-// land rate, the ground always does (the same model the fine search
-// prices the corridor with, see polyCost).
+// waterMultiplier prices one coarse guide edge landing at pos: the zoned
+// crossings pay the filter run/swim ratio, the un-zoned river beds and
+// the ground walk at the plain land rate (the model polyCost follows).
 func (q *hierQuery) waterMultiplier(at Pos) float64 {
     if q.zones == nil {
         return q.filter.WaterCost
@@ -254,14 +230,10 @@ func (q *hierQuery) waterMultiplier(at Pos) float64 {
     return 1
 }
 
-// hierWorthy reports whether the route goes through the hierarchy:
-// the avoid bans wall polygons at the mesh granularity the coarse
-// graph cannot see, so those queries stay flat. The cross tile
-// queries go hierarchical first (a flat search over a multi tile
-// corridor only caps into the partial answer); the same tile queries
-// stay flat and the budget cap escalates them (RouteApproach) - the
-// within tile measurements answer the flat search faster and with
-// the shorter corridors when the target fits the budget.
+// hierWorthy reports whether the route goes through the hierarchy: the
+// avoid bans wall polygons at a granularity the coarse graph cannot see,
+// so those queries stay flat, and the same tile queries stay flat too
+// (the budget cap escalates them, RouteApproach).
 func hierWorthy(startRef, endRef PolyRef, _, _ Pos,
     filter Filter,
 ) bool {
@@ -275,10 +247,8 @@ func hierWorthy(startRef, endRef PolyRef, _, _ Pos,
 }
 
 // routeHierarchical runs the hierarchical query: the coarse chain and
-// the hop refinement, stitched into the ordinary route answer. The
-// answer is nil when the hierarchy declines (an abstract graph could
-// not build, or not even the first hop produced a corridor) - the
-// caller falls back to the flat search.
+// the hop refinement stitched into the ordinary route answer, nil when
+// the hierarchy declines and the caller falls back to the flat search.
 //
 //nolint:funlen // the hierarchical route walks the phases in order
 func (m *Mesh) routeHierarchical(
@@ -291,11 +261,9 @@ func (m *Mesh) routeHierarchical(
         return nil
     }
 
-    // The line corridor prefetch: the coarse search loads the
-    // region cluster graphs lazily per settled node; the regions
-    // the straight segment crosses are the common frontier, the
-    // parallel sidecar load serves them from the cache (the cap
-    // bounds the half world diagonals; the RAM bound stays the
+    // The line corridor prefetch: the coarse search loads the cluster
+    // graphs lazily per settled node, and the regions the straight
+    // segment crosses are the common frontier (the RAM bound stays the
     // abstract LRU).
     m.PrefetchAbstracts(lineRegionKeys(startPos, endPos))
 
@@ -339,9 +307,8 @@ func (m *Mesh) routeHierarchical(
             break
         }
         if len(chain.edges) == 0 {
-            // The cluster level found nothing at all: the flat search
-            // holds the honest answer for this start (an isolated
-            // surface the abstract graph also cannot leave).
+            // The cluster level found nothing: the flat search holds
+            // the honest answer for this isolated surface.
             return nil
         }
         if m.refineChain(&query, chain, route) {
@@ -351,11 +318,9 @@ func (m *Mesh) routeHierarchical(
         // different portal chain.
     }
     if gaveUp {
-        // The gated guide stranded (the sparse cluster crossings the
-        // component chain needs): the gate free chain samples the
-        // crossings plain and the refinement verifies them on the
-        // real mesh - the hop failures ban the fake crossings and the
-        // confined fallback threads the chain clusters.
+        // The gated guide stranded: the gate free chain samples the
+        // crossings plain, the refinement verifies them on the real
+        // mesh and the confined fallback threads the chain clusters.
         clear(query.bans)
         for range maxCoarseAttempts {
             chain = m.coarseChain(&query, endRef, endPos, false)
@@ -369,11 +334,9 @@ func (m *Mesh) routeHierarchical(
         }
     }
 
-    // The attempts are exhausted: the representative crossings of a
-    // cluster pair need not be co-reachable at the polygon level (the
-    // dedupe keeps one crossing per class). The confined search
-    // threads the real mesh through the chain clusters instead,
-    // choosing the crossings that actually connect.
+    // The attempts are exhausted and the representative crossings of a
+    // cluster pair need not be co-reachable at the polygon level: the
+    // confined search threads the real mesh through the chain clusters.
     if route.Corridor == nil && m.confinedRoute(&query, chain.clusters,
         route) {
         return route
@@ -389,12 +352,10 @@ func (m *Mesh) routeHierarchical(
 }
 
 // coarseChain runs the cluster level A* and returns the portal edge
-// chain from the start cluster toward the goal cluster (the best
-// partial chain when the goal is unreachable). The gated pass caps
-// the exploration (the component sampling of the sparse cluster
-// pairs strands the honest search into a whole map flood - the gate
-// free retry chains the crossings and the confined refinement
-// restores the connectivity on the real mesh).
+// chain from the start cluster toward the goal (the best partial chain
+// when the goal is unreachable). The gated pass caps the exploration;
+// the gate free retry chains the crossings and the refinement verifies
+// them on the real mesh.
 //
 //nolint:cyclop,gocognit,funlen // the edge and gate checks read side by side
 func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
@@ -420,10 +381,8 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
     if goalAbstract == nil {
         return result
     }
-    // The search states carry the component the crossing stood on:
-    // the start stands on the start polygon's component (resolved
-    // here, the start abstract is built), the crossing entries
-    // resolve at pop time through the node tile abstract.
+    // The search states carry the link component of the crossing: the
+    // start resolves here, the crossing entries at pop time.
     startComp := uint32(0)
     if startIdx := PolyOf(q.startRef); startIdx >= 0 &&
         int(startIdx) < len(startAbstract.comps) {
@@ -463,11 +422,9 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
 
         if gated {
             if node.entryComp == 0 {
-                // The lazy entry resolution: the crossing target
-                // poly's link component lives in the node tile
-                // abstract - the same build the expansion needs, so
-                // the settle order pays the decode once per searched
-                // tile.
+                // The lazy entry resolution: the crossing poly's link
+                // component lives in the node tile abstract, whose
+                // decode the expansion pays once per searched tile.
                 abstract := m.abstractOf(RegionKey{Col: node.key.Col,
                     Row: node.key.Row})
                 if abstract != nil && int(node.entryPoly) <
@@ -476,16 +433,9 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
                 }
             }
             // The settled component merge: another crossing into this
-            // cluster already expanded the same component. The merge
-            // keeps the best settled g, not the first pop: the
-            // crossings of one cluster carry different entry
-            // heuristics and the f order pops the far entry first -
-            // the first pop need not hold the cheapest g (the harbor
-            // query answered through the expensive entry while the
-            // cheap one stood beside it unexpanded, the walk plan
-            // carried the hook in). A strictly cheaper entry re-arms
-            // the component and expands again, the costlier one
-            // skips as duplicated work.
+            // cluster already expanded the component. A strictly cheaper
+            // entry re-arms it (the f order may pop the far entry
+            // first), the costlier one skips as duplicated work.
             compKey := coarseCompKey{key: node.key, comp: node.entryComp}
             if best, ok := q.coarse.settled[compKey]; ok &&
                 node.g >= best {
@@ -531,10 +481,9 @@ func (m *Mesh) coarseChain(q *hierQuery, endRef PolyRef,
     return result
 }
 
-// expandCoarse relaxes the coarse edges of one settled cluster node.
-// The gated pass verifies the cluster connectivity through the link
-// components; the gate free pass chains the sampled crossings and
-// lets the refinement hops verify them on the real mesh.
+// expandCoarse relaxes the coarse edges of one settled cluster node: the
+// gated pass verifies the link components, the gate free pass chains the
+// sampled crossings the refinement verifies.
 //
 //nolint:funlen // the edge branches read side by side
 func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
@@ -557,10 +506,8 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
             continue
         }
         if edge.srcComp != node.entryComp {
-            // The component gate: the crossing the search stands on
-            // and this crossing live in different link components of
-            // the cluster - no polygon path connects them, chaining
-            // the edge would fake the connectivity.
+            // The component gate: the two crossings live in different
+            // link components, so no polygon path connects them.
             continue
         }
         // The node identity rides the crossing (the component gate
@@ -580,12 +527,9 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
         if seen {
             known := &q.coarse.nodes[existing]
             if known.closed {
-                // The re-armed component expansion is the second
-                // improvement source beside the ordinary edge
-                // relaxations: the closed state re-opens when the new
-                // g is strictly cheaper (the label correcting the
-                // merged g race asks for), the equal or costlier one
-                // stays folded.
+                // The re-armed component expansion: a closed state
+                // re-opens when the new g is strictly cheaper (the label
+                // correcting the merged g race asks for), else it folds.
                 if known.g <= g {
                     continue
                 }
@@ -634,11 +578,10 @@ func (m *Mesh) expandCoarse(q *hierQuery, idx int32, endPos Pos,
     }
 }
 
-// edgeEntryPoly names the polygon index (within the target cluster's
-// tile) whose link component the crossing enters through: the
-// external edges (they carry the neighbour region key) name the
-// neighbour polygon of the source tile's link record, the internal
-// ones carry the full target reference.
+// edgeEntryPoly names the polygon (within the target cluster's tile)
+// whose link component the crossing enters through: an external edge
+// names the neighbour polygon of the source tile's link record, an
+// internal one carries the full target reference.
 func edgeEntryPoly(edge *abstractEdge) uint32 {
     if edge.extCol != 0 || edge.extRow != 0 {
         return edge.extPoly
@@ -696,12 +639,10 @@ type clusterBitmap = [clustersPerSide][clustersPerSide]bool
 //
 //nolint:gocognit // the confined set walk branches per region boundary case
 func newConfinedSet(clusters []clusterKey) *confinedSet {
-    // The one cluster dilation: the coarse chain samples the cluster
-    // crossings - the honest corridor between them leaves the chain's
-    // own cluster blocks where the sampled crossings sit a block off
-    // the real path (the bay detours the geodata holes force). The
-    // dilation keeps the confinement meaningful (the goal direction)
-    // while the neighbourhood absorbs the sampling slack.
+    // The one cluster dilation: the sampled crossings sit a block off the
+    // real path (the bay detours the geodata holes force), and the
+    // neighbourhood absorbs that slack while the confinement keeps the
+    // goal direction.
     set := &confinedSet{regions: make(map[RegionKey]*clusterBitmap)}
     add := func(col, row int16, cx, cy int32) {
         if cx < 0 || cx >= clustersPerSide || cy < 0 ||
@@ -770,11 +711,9 @@ func (cs *confinedSet) allows(key RegionKey, p *Poly) bool {
     return false
 }
 
-// confinedRoute runs the fallback search: one fine A* over the mesh
-// with the expansion confined to the coarse chain clusters. The
-// coarse level already answered the connectivity question; the
-// confined search threads the real polygons through the chain,
-// choosing the crossings the representative hops failed to pair.
+// confinedRoute runs the fallback search: one fine A* with the expansion
+// confined to the coarse chain clusters, choosing the crossings the
+// representative hops failed to pair.
 func (m *Mesh) confinedRoute(q *hierQuery, clusters []clusterKey,
     route *Route,
 ) bool {
@@ -871,19 +810,15 @@ func chainRegionKeys(chain coarseResult, bound int) []RegionKey {
     return keys
 }
 
-// refineChain walks the coarse edge chain and fills the route with
-// the stitched refinement corridors. The answer reports whether the
-// route is finished (found or the final partial); a false answer
-// bans the failed hop exit and asks for the replan.
+// refineChain walks the coarse edge chain and fills the route with the
+// stitched refinement corridors; false asks for the replan.
 //
 //nolint:cyclop // the refinement walks the chain branch by branch
 func (m *Mesh) refineChain(q *hierQuery, chain coarseResult,
     route *Route,
 ) bool {
-    // The chain region prefetch: the first regions of the walk
-    // decode in parallel before the hops start (the LRU bound is
-    // the window the walk keeps live; the further regions ride
-    // the rolling look ahead below).
+    // The chain region prefetch: the first regions decode in parallel
+    // before the hops start, the rest ride the rolling look ahead.
     m.PrefetchTiles(chainRegionKeys(chain, maxPrefetchWorkers))
     corridor := make([]PolyRef, 0, 64+len(chain.edges)*8)
     currentRef := q.startRef
@@ -965,11 +900,9 @@ type hopSegment struct {
 }
 
 // hopCorridor answers one portal to portal corridor: the cached
-// intra-edge answer when the pair ran before (the HNA* intra-edge
-// cache), a fresh budgeted search otherwise. Only the interior hops
-// cache - the pair of their entry and exit edges pins the exact
-// start and goal polygons and midpoints of the segment; the first
-// and the last segments search from the real positions.
+// intra-edge answer when the pair ran before (the HNA* cache), a fresh
+// budgeted search otherwise. Only the interior hops cache - their entry
+// and exit edges pin the exact start and goal polygons and midpoints.
 func (m *Mesh) hopCorridor(q *hierQuery, fromRef PolyRef, fromPos Pos,
     entry, exit abstractEdgeRef, toRef PolyRef, toPos Pos,
     cacheable, last bool,
@@ -998,14 +931,10 @@ func (m *Mesh) hopCorridor(q *hierQuery, fromRef PolyRef, fromPos Pos,
     return segment
 }
 
-// runHop searches one hop on the mesh: the ordinary corridor search
-// with the hop budget (the approach radius rides on the last hop
-// only - the portal goals are exact). A search that hit the node
-// budget retries with the quadrupled budget before the caller bans
-// the edge: the component gate already verified the polygon path
-// exists, the capped search just never saw the goal side (the intra
-// tile hops of the dense regions wander past the flat bound), so
-// the retry converges where the replan would repeat the same cap.
+// runHop searches one hop on the mesh with the hop budget (the approach
+// radius rides on the last hop only - the portal goals are exact). A
+// capped search retries with the quadrupled budget before the caller bans
+// the edge: the component gate already verified the polygon path exists.
 func (m *Mesh) runHop(q *hierQuery, fromRef PolyRef, fromPos Pos,
     toRef PolyRef, toPos Pos, last bool,
 ) *hopSegment {
@@ -1032,10 +961,8 @@ func (m *Mesh) runHop(q *hierQuery, fromRef PolyRef, fromPos Pos,
                 partial:  result.partial,
             }
         }
-        // The progress guard: a capped search that never left the
-        // start side names a crossing the mesh does not serve - the
-        // bigger budget would repeat the same flood (the hop fails,
-        // the caller bans the edge and replans instead).
+        // The progress guard: a capped search that never left the start
+        // side names a crossing the mesh does not serve.
         if dist3(fromPos, result.end) < 0.25*dist3(fromPos, toPos) {
             return &hopSegment{
                 corridor: result.corridor,
@@ -1061,10 +988,8 @@ func (m *Mesh) hierEdge(ref abstractEdgeRef) (*abstractEdge, bool) {
     return &abstract.edges[ref.Index], true
 }
 
-// resolveEdgeTarget resolves the crossing target polygon of an
-// external edge: the source tile decodes on demand, the missing
-// neighbour answers the null reference (the hop then fails and the
-// edge bans).
+// resolveEdgeTarget resolves the crossing target polygon of an external
+// edge: the missing neighbour answers the null reference.
 func (m *Mesh) resolveEdgeTarget(ref abstractEdgeRef,
     edge *abstractEdge,
 ) PolyRef {
@@ -1121,12 +1046,9 @@ func (m *Mesh) storeHop(key hopKey, corridor []PolyRef) {
     m.hopOrder = append(m.hopOrder, key)
 }
 
-// chainEstimate sums the geometric walk of the chain: the start, the
-// portal midpoints and the end in sequence. The refinement funnels
-// through the corridor the chain names, so its honest answer stays
-// near this sum; the portals straight line pricing cannot see the
-// terrain detours inside the clusters and underprices the lying
-// chains (the river valley crossing the shore walk beats).
+// chainEstimate sums the geometric walk of the chain (start, portal
+// midpoints, end): the refinement funnels through the corridor the chain
+// names, so its honest answer stays near this sum.
 func chainEstimate(m *Mesh, q *hierQuery, edges []abstractEdgeRef) float64 {
     prev := q.startPos
     sum := 0.0
@@ -1153,17 +1075,11 @@ func routeLengthOf(route *Route) float64 {
     return sum
 }
 
-// contestFlat hands the refined answer to the exact competitors when
-// the refinement outran its own chain estimate: the chain the portal
-// straight lines underpriced threaded the expensive ground and the
-// budgeted flat search answers the honest optimum within its node
-// budget. The capped flat search hands the contest to the confined
-// search over the chain clusters (the same set the refinement
-// threads, priced by the same filter, free to pick the crossings the
-// representative hops missed). A competitor serves only when it
-// reached and prices cheaper under the filter model - the capped,
-// unreachable or costlier search keeps the hierarchical answer (the
-// hierarchy exists for the corridors the flat budget cannot finish).
+// contestFlat hands the refined answer to the exact competitors when the
+// refinement outran its own chain estimate: the budgeted flat search
+// answers the honest optimum, and a capped flat search hands the contest
+// to the confined search over the chain clusters. A competitor serves
+// only when it reached and prices cheaper under the filter model.
 func (m *Mesh) contestFlat(q *hierQuery, chain coarseResult,
     route *Route,
 ) *Route {
@@ -1193,10 +1109,8 @@ func (m *Mesh) contestFlat(q *hierQuery, chain coarseResult,
 
         return route
     }
-    // The exact budget cannot finish the corridor: the confined
-    // search threads the chain clusters with the full polygon
-    // freedom (the zone aware pricing included) and answers the set
-    // optimum when its budget holds.
+    // The exact budget cannot finish the corridor: the confined search
+    // threads the chain clusters with the full polygon freedom.
     confined := &Route{
         Found:        false,
         Partial:      false,
@@ -1221,10 +1135,9 @@ func (m *Mesh) contestFlat(q *hierQuery, chain coarseResult,
 
 // corridorCostOf prices the corridor under the search filter: every
 // polygon pays its polyCost weighted by the share of the center walk
-// (the centers of the corridor chain sum to the path length, the
-// boundary polygons carry the half weights). The relative answer
-// ranks two corridors of one query honestly; the absolute number is
-// the approximation the funnel waypoints refine.
+// (the boundary polygons carry the half weights). The relative answer
+// ranks two corridors of one query honestly; the absolute number is the
+// approximation the funnel waypoints refine.
 func corridorCostOf(m *Mesh, corridor []PolyRef, q *hierQuery) float64 {
     if len(corridor) == 0 {
         return math.MaxFloat64

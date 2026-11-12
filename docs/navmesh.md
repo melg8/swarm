@@ -281,11 +281,13 @@ mesh hop by hop through it (the hop corridors cache - the HNA*
 intra-edge answers), and the confined fallback threads the chain
 clusters on the real mesh when the sampled crossings strand.
 
-- **The coarse guide** prices the edges uniformly (no water
-  multiplier): the guide only points the direction and the uniform
-  price keeps the plain dist3 heuristic consistent - the swim
-  priced guide flooded half the map (the honest water route costs
-  3x the straight line and the plain A* cannot prune the land wave).
+- **The coarse guide** prices the edges by the same zone aware swim
+  model the refinement runs (`hierQuery.waterMultiplier`): a crossing
+  whose destination area is water pays the filter water cost, the
+  un-zoned river beds and the ground walk at the land rate. The plain
+  dist3 heuristic stays admissible (every multiplier costs at least
+  the land rate); the priced guide explores the cluster frontier wider
+  and `maxCoarseNodes` carries it.
 - **The component gate**: the first (gated) attempt verifies the
   cluster connectivity through the per tile link components (the
   union find of abstract.go) - the chain cannot fake a passage

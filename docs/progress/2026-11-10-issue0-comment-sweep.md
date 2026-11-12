@@ -193,13 +193,30 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.7 percent, 546 blocks,
   1,267 history markers.
 
+### 2026-11-12 - pathfind/navmesh/hierarchy.go keeps the phase rules only
+
+- 33 blocks compress: the header, the bounded budgets, the coarse guide
+  pricing and the fallback ladder keep the numbers (65536 coarse nodes,
+  32768 hop nodes, 3 coarse attempts, the 4096 pop gate cap, the 1M
+  confined nodes, the 4096 hop cache, the 24 region line prefetch, the
+  4x budget retry, the quarter distance progress guard) and the round
+  evidence drops.
+- The doc loses a stale design note: `docs/navmesh.md` still described
+  the uniform coarse guide, while the code prices the water edges since
+  the zone aware swim model landed; the bullet now matches
+  `hierQuery.waterMultiplier`.
+- Verified: `task fmt`, `go build ./...`, the navmesh tests,
+  `task lint:new`. The tree share reads 13.6 percent, 540 blocks,
+  1,267 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
 compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `shopping.go`, `cell_policy.go`, `user.go`, `quest_trip.go`,
 `town_walk.go` (twice), `loop_state.go`, `town_stuck.go`,
-`acceptance/archer_fleet.go` and `pathfind/search.go`. Next:
-`pathfind/navmesh/hierarchy.go` (298 lines), `state/scans.go` (284),
-`hunt/zones.go` (280), `hunt/town.go` (272); the share and the block
-count are re-measured at the end.
+`acceptance/archer_fleet.go`, `pathfind/search.go` and
+`pathfind/navmesh/hierarchy.go`. Next: `state/scans.go` (284 comment
+lines), `hunt/zones.go` (280), `hunt/town.go` (272), then the second
+pass over `hunt/kite.go` and `hunt/cell_policy.go`; the share and the
+block count are re-measured at the end.
