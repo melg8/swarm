@@ -1,4 +1,4 @@
-# The state bot split: files by responsibility (status: in progress)
+# The state bot split: files by responsibility (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner instruction: continue
 the refactor after the hunt loop, town and walker rounds).
@@ -54,7 +54,8 @@ grouping above; next the range assignment and the move.
 
 ## Status
 
-Inventory done, the split script is next.
+Complete: the ten files land on `main` as `6d382a90`, `task
+verify` green and the live run clean.
 
 ### 2026-11-12 - the move
 The split script (the AST lister for the declaration ranges plus a
@@ -89,3 +90,12 @@ Verified: `go build ./...`, `go vet ./internal/swarm/state/...`,
 `task fmt:check` exit 0.
 
 Next: `task verify`, the live run, then the fragment archive.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole test
+suite, `fmt:check`). The live run on the Windows stack: the binary
+carries the `-ldflags` identity of `6d382a90`, `-login
+127.0.0.3:2106 -hunt -web ""`, 65 s in world, then Ctrl+Break
+through the console process group helper - the tracker fed the login
+and the spawn burst, the socket closed with `Leaving the game world
+with test1` / `Bot finished`, exit code 0, no panic.
