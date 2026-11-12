@@ -129,7 +129,7 @@ func (b *Bot) NoteHuntTick(d time.Duration) {
     b.metrics.tickCount++
     b.metrics.tickEMA += time.Duration(
         tickEmaWeight * float64(d-b.metrics.tickEMA))
-    now := time.Now()
+    now := b.now()
     if b.metrics.tickMaxAt.IsZero() ||
         now.Sub(b.metrics.tickMaxAt) > tickMaxWindow {
         b.metrics.tickMax = d

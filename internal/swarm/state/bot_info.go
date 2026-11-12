@@ -6,7 +6,6 @@ package state
 
 import (
     "strconv"
-    "time"
 
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
@@ -81,7 +80,7 @@ func (b *Bot) Info() BotInfo {
         CurMP:         b.char.CurMP,
         MaxMP:         b.char.MaxMP,
         ExpPercent:    ExpPercent(b.char.Level, int64(b.char.Exp)),
-        InCombat:      b.char.inCombat(time.Now()),
+        InCombat:      b.char.inCombat(b.now()),
         Sitting:       b.char.Sitting,
     }
 }

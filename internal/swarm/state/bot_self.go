@@ -48,7 +48,7 @@ func (b *Bot) SelfEngaged(targetID int32) bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
 
-    return b.char.FightingTargetID == targetID && b.char.inCombat(time.Now())
+    return b.char.FightingTargetID == targetID && b.char.inCombat(b.now())
 }
 
 // SelfFighting reports whether the character is actually swinging at or
@@ -62,7 +62,7 @@ func (b *Bot) SelfFighting(targetID int32) bool {
     defer b.mu.RUnlock()
 
     return b.char.FightingTargetID == targetID &&
-        b.char.fightingFresh(time.Now())
+        b.char.fightingFresh(b.now())
 }
 
 // SelfEngagedBy reports whether the given target is still a live
@@ -80,7 +80,7 @@ func (b *Bot) SelfEngagedBy(targetID int32) bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
     if b.char.FightingTargetID == targetID &&
-        b.char.fightingFresh(time.Now()) {
+        b.char.fightingFresh(b.now()) {
         return true
     }
     obj, _ := b.objectLocked(targetID)
@@ -164,7 +164,7 @@ func (b *Bot) SelfWalking() bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
 
-    return b.char.Moving && time.Since(b.char.MoveAt) <= walkingFreshWindow
+    return b.char.Moving && b.now().Sub(b.char.MoveAt) <= walkingFreshWindow
 }
 
 // SelfPosition returns the last observed placement of the played
@@ -192,7 +192,7 @@ func (b *Bot) SelfProjectedPosition() (float64, float64, float64, bool) {
     if b.selfID == 0 {
         return 0, 0, 0, false
     }
-    x, y, z := b.char.projectedPosition(time.Now())
+    x, y, z := b.char.projectedPosition(b.now())
 
     return x, y, z, true
 }
@@ -338,7 +338,7 @@ func (b *Bot) SelfUnderAttack() bool {
     defer b.mu.RUnlock()
     last := b.char.LastHitAt
 
-    return !last.IsZero() && time.Since(last) < underAttackWindow
+    return !last.IsZero() && b.now().Sub(last) < underAttackWindow
 }
 
 // SelfLandedHit returns the target of the last blow of the played

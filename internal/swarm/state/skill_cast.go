@@ -60,7 +60,7 @@ func (b *Bot) ApplySkillCast(cast SkillCast) {
     if cast.CasterID != b.selfID {
         return
     }
-    now := time.Now()
+    now := b.now()
     if b.skillCasts == nil {
         b.skillCasts = make(map[int32]skillCastWindow, 8)
     }

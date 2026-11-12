@@ -102,7 +102,7 @@ func (b *Bot) ApplySay(s Say) {
     b.mu.Lock()
     defer b.mu.Unlock()
     b.chat.record(chatKindForChannel(s.Channel), s.Text, s.From,
-        time.Now())
+        b.now())
     b.touch()
 }
 
@@ -140,7 +140,7 @@ func (b *Bot) ApplySystemMessage(m SystemMessage) {
     b.mu.Lock()
     defer b.mu.Unlock()
     if m.ID == systemMessageCannotSeeTarget {
-        b.char.CannotSeeTargetAt = time.Now()
+        b.char.CannotSeeTargetAt = b.now()
     }
     b.recordChatLocked("system",
         formatChatText(npcdata.SystemMessageText(m.ID), m.Params))
@@ -153,7 +153,7 @@ func (b *Bot) ApplySystemMessage(m SystemMessage) {
 func (b *Bot) ApplySocialAction(a SocialAction) {
     b.mu.Lock()
     defer b.mu.Unlock()
-    now := time.Now()
+    now := b.now()
     if a.ObjectID == b.selfID {
         b.char.SocialUntil = now.Add(socialWindow)
     } else if _, cold := b.objectLocked(a.ObjectID); cold != nil {
@@ -175,7 +175,7 @@ func (b *Bot) ApplySocialAction(a SocialAction) {
 // recordChatLocked appends one line to the chat ring buffer. The caller
 // must hold the state write lock.
 func (b *Bot) recordChatLocked(kind string, text string) {
-    b.chat.record(kind, text, "", time.Now())
+    b.chat.record(kind, text, "", b.now())
     b.touch()
 }
 

@@ -357,7 +357,7 @@ func (b *Bot) SelfSnapshot() CharacterSnapshot {
 
     adena, slots := b.inventoryTotalsLocked()
 
-    return b.characterSnapshotLocked(time.Now(), adena, slots)
+    return b.characterSnapshotLocked(b.now(), adena, slots)
 }
 
 // Snapshot returns a deep copy of the current state for serialization.
@@ -366,7 +366,7 @@ func (b *Bot) SelfSnapshot() CharacterSnapshot {
 func (b *Bot) Snapshot() Snapshot { //nolint:funlen
     b.mu.RLock()
     defer b.mu.RUnlock()
-    now := time.Now()
+    now := b.now()
 
     snap := Snapshot{
         ID:     b.id,
@@ -446,7 +446,7 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
         ActionFailedAt: b.actionFailedAt,
         Diagnostics:    Diagnostics{}, //nolint:exhaustruct_v5 // filled below
     }
-    if b.walkPlan != nil && time.Since(b.walkPlanAt) <= walkPlanTTL {
+    if b.walkPlan != nil && b.now().Sub(b.walkPlanAt) <= walkPlanTTL {
         snap.WalkPath = make([]WalkPoint, len(b.walkPlan.Points))
         copy(snap.WalkPath, b.walkPlan.Points)
         snap.WalkOrigin = b.walkPlan.Origin

@@ -255,7 +255,7 @@ func (b *Bot) SetHuntDiagnostics(d HuntDiagnostics) {
     b.mu.Lock()
     defer b.mu.Unlock()
     b.hunt = d
-    b.huntPublishedAt = time.Now()
+    b.huntPublishedAt = b.now()
 }
 
 // NoteAction records a hunt loop decision: the message lands in the
@@ -267,7 +267,7 @@ func (b *Bot) NoteAction(message string) {
     b.mu.Lock()
     defer b.mu.Unlock()
     b.huntLastAction = message
-    b.huntLastActionAt = time.Now()
+    b.huntLastActionAt = b.now()
     b.recordLocked(message)
 }
 
@@ -283,7 +283,7 @@ func (b *Bot) NoteLastAction(message string) {
     b.mu.Lock()
     defer b.mu.Unlock()
     b.huntLastAction = message
-    b.huntLastActionAt = time.Now()
+    b.huntLastActionAt = b.now()
 }
 
 // SetHuntErrand publishes the status of the blocking hunt errand in

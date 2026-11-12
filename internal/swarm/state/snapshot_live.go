@@ -30,7 +30,7 @@ func (b *Bot) AppendSnapshotJSON(dst []byte) []byte {
     b.mu.RLock()
     defer b.mu.RUnlock()
 
-    return b.appendSnapshotJSONLocked(dst, time.Now())
+    return b.appendSnapshotJSONLocked(dst, b.now())
 }
 
 // appendSnapshotJSONLocked is the direct live state walk of the
@@ -200,7 +200,7 @@ func (b *Bot) appendLiveChatJSON(dst []byte) []byte {
 // array plus the origin, the current target index, the final
 // destination and the search contract. The caller must hold a lock.
 func (b *Bot) appendLiveWalkPathJSON(dst []byte) []byte {
-    if b.walkPlan != nil && time.Since(b.walkPlanAt) <= walkPlanTTL {
+    if b.walkPlan != nil && b.now().Sub(b.walkPlanAt) <= walkPlanTTL {
         return appendWalkPlanFieldsJSON(dst, b.walkPlan.Points,
             b.walkPlan.Origin, b.walkPlan.Index, b.walkPlan.Dest,
             b.walkPlan.Search)

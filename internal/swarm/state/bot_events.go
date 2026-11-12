@@ -13,7 +13,7 @@ func (b *Bot) CountPacket() {
     b.mu.Lock()
     defer b.mu.Unlock()
     b.packets++
-    b.packetWindow.note(time.Now().Unix())
+    b.packetWindow.note(b.now().Unix())
 }
 
 // RecordEvent appends a message to the rolling event log.
@@ -154,7 +154,7 @@ func (b *Bot) charObjectID() int32 {
 // touch bumps the version and the update timestamp.
 func (b *Bot) touch() {
     b.version++
-    b.updated = time.Now()
+    b.updated = b.now()
 }
 
 // clearCharMovement resets the self movement tracking. The caller must
@@ -164,7 +164,7 @@ func (b *Bot) clearCharMovement() {
     b.char.DestX = b.char.X
     b.char.DestY = b.char.Y
     b.char.DestZ = b.char.Z
-    b.char.MoveAt = time.Now()
+    b.char.MoveAt = b.now()
 }
 
 // applySelfPositionSampleLocked adopts a position sample of the played
@@ -216,7 +216,7 @@ func (b *Bot) clearSelfTargetLocked(reason string) {
 // write lock; the sink contract forbids any re-entry into the tracker
 // (see SetEventSink).
 func (b *Bot) recordLocked(message string) {
-    at := time.Now()
+    at := b.now()
     b.log.record(message, at)
     if b.eventSink != nil {
         b.eventSink(at, message)
@@ -226,5 +226,5 @@ func (b *Bot) recordLocked(message string) {
 // recordCombatEventLocked appends one combat animation beat (see
 // combatFeed.record). The caller must hold the state write lock.
 func (b *Bot) recordCombatEventLocked(e CombatEvent) {
-    b.combat.record(e, time.Now())
+    b.combat.record(e, b.now())
 }

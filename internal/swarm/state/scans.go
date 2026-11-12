@@ -10,7 +10,6 @@ import (
     "math"
     "slices"
     "sync"
-    "time"
 
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
@@ -81,7 +80,7 @@ func (b *Bot) NearestAttacker() (AttackTarget, bool) {
     found := false
     selfX := float64(b.char.X)
     selfY := float64(b.char.Y)
-    nowNano := time.Now().UnixNano()
+    nowNano := b.now().UnixNano()
     for i := range b.world.hot {
         obj := &b.world.hot[i]
         if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
@@ -214,7 +213,7 @@ func (b *Bot) ZoneHasAttackableBelow(zone ZoneArea, maxLevel int32) bool {
     }
     b.mu.RLock()
     defer b.mu.RUnlock()
-    nowNano := time.Now().UnixNano()
+    nowNano := b.now().UnixNano()
     for i := range b.world.hot {
         obj := &b.world.hot[i]
         if obj.Kind != kindNPC || !obj.Attackable || obj.Dead {
@@ -307,7 +306,7 @@ func (b *Bot) AppendAggroThreats(
     defer b.mu.RUnlock()
     selfX := float64(b.char.X)
     selfY := float64(b.char.Y)
-    nowNano := time.Now().UnixNano()
+    nowNano := b.now().UnixNano()
     for i := range b.world.hot {
         obj := &b.world.hot[i]
         if obj.Kind != kindNPC || !obj.Attackable || obj.Dead ||
@@ -380,7 +379,7 @@ func (b *Bot) NearestBlockedTargetsWindowed(
     defer b.mu.RUnlock()
     selfX := float64(b.char.X)
     selfY := float64(b.char.Y)
-    nowNano := time.Now().UnixNano()
+    nowNano := b.now().UnixNano()
     scanPtr := npcScanPool.Get().(*[]npcScan)
     scans := (*scanPtr)[:0]
     defer func() {
@@ -556,7 +555,7 @@ func (b *Bot) nearestAttackable(
     found := false
     selfX := float64(b.char.X)
     selfY := float64(b.char.Y)
-    nowNano := time.Now().UnixNano()
+    nowNano := b.now().UnixNano()
     for i := range b.world.hot {
         obj := &b.world.hot[i]
         if obj.Kind != kindNPC || !obj.Attackable || obj.Dead {
@@ -618,7 +617,7 @@ func (b *Bot) nearestAttackableSocial(
     found := false
     selfX := float64(b.char.X)
     selfY := float64(b.char.Y)
-    nowNano := time.Now().UnixNano()
+    nowNano := b.now().UnixNano()
     // The flat scan records come from a pool: the search runs under
     // the read lock (concurrent readers), so a per bot scratch would
     // race - the pool hands every caller its own array and the fleet

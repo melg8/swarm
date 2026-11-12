@@ -67,7 +67,7 @@ func (b *Bot) ApplyUserInfo(info UserInfo) {
     b.char.Level = info.Level
     b.char.Race = info.Race
     b.char.ClassID = info.ClassID
-    b.applySelfPositionSampleLocked(info.X, info.Y, info.Z, time.Now())
+    b.applySelfPositionSampleLocked(info.X, info.Y, info.Z, b.now())
     b.char.STR = info.STR
     b.char.DEX = info.DEX
     b.char.CON = info.CON
@@ -118,7 +118,7 @@ func (b *Bot) ApplyPlacement(p Placement) {
         obj.DestY = p.Y
         obj.DestZ = p.Z
     }
-    nowNano := time.Now().UnixNano()
+    nowNano := b.now().UnixNano()
     obj.MoveAt = nowNano
     cold.UpdatedAt = nowNano
     b.touch()
@@ -147,7 +147,7 @@ func (b *Bot) ApplyMovement(m Movement) {
             b.char.DestX = m.DestX
             b.char.DestY = m.DestY
             b.char.DestZ = m.DestZ
-            b.char.MoveAt = time.Now()
+            b.char.MoveAt = b.now()
         }
         b.touch()
 
@@ -167,7 +167,7 @@ func (b *Bot) ApplyMovement(m Movement) {
     obj.DestY = m.DestY
     obj.DestZ = m.DestZ
     obj.Moving = !arrived
-    nowNano := time.Now().UnixNano()
+    nowNano := b.now().UnixNano()
     obj.MoveAt = nowNano
     cold.UpdatedAt = nowNano
     b.touch()
@@ -185,7 +185,7 @@ func (b *Bot) ApplyMovement(m Movement) {
 func (b *Bot) ApplyPawnMovement(m PawnMovement) {
     b.mu.Lock()
     defer b.mu.Unlock()
-    now := time.Now()
+    now := b.now()
     destX, destY := pawnDestination(m)
     if m.ObjectID == b.selfID {
         b.applySelfPawnMovementLocked(m, destX, destY, now)
@@ -271,7 +271,7 @@ func pawnDestination(m PawnMovement) (int32, int32) {
 // (see Creature.doAttack). When the played character is the target, the
 // trailing target location doubles as a position update of it.
 func (b *Bot) ApplyAttack(a Attack) {
-    b.ApplyAttackAt(a, time.Now())
+    b.ApplyAttackAt(a, b.now())
 }
 
 // ApplyShotGauge records a bow shot cycle announced by the RED
@@ -281,7 +281,7 @@ func (b *Bot) ApplyAttack(a Attack) {
 // of any other color are ignored by the parser gate (IsBowCycle),
 // so the caller passes only bow cycles.
 func (b *Bot) ApplyShotGauge(cycle time.Duration) {
-    b.ApplyShotGaugeAt(cycle, time.Now())
+    b.ApplyShotGaugeAt(cycle, b.now())
 }
 
 // ApplyShotGaugeAt is the timestamped twin of ApplyShotGauge: the
@@ -457,7 +457,7 @@ func (b *Bot) critHintLocked(victimID int32, now time.Time) bool {
 func (b *Bot) ApplyAutoAttackStart(objectID int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
-    now := time.Now()
+    now := b.now()
     if objectID == b.selfID {
         b.char.AutoAttacking = true
         b.char.CombatUntil = now.Add(combatWindow)
@@ -490,7 +490,7 @@ func (b *Bot) ApplyAutoAttackStop(objectID int32) {
         return
     }
     obj.AutoAttacking = false
-    cold.UpdatedAt = time.Now().UnixNano()
+    cold.UpdatedAt = b.now().UnixNano()
     b.touch()
 }
 
@@ -527,7 +527,7 @@ func (b *Bot) ApplyNpcInfo(info NpcInfo) {
     obj.Dead = info.Dead
     cold.Name = resolveNpcName(info.Name, info.TemplateID)
     cold.Title = info.Title
-    now := time.Now()
+    now := b.now()
     if info.InCombat {
         b.markObjectCombatLocked(obj, cold, now)
     }
@@ -558,7 +558,7 @@ func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
     obj.DestX = info.X
     obj.DestY = info.Y
     obj.DestZ = info.Z
-    now := time.Now()
+    now := b.now()
     if info.InCombat {
         b.markObjectCombatLocked(obj, cold, now)
     }
@@ -579,7 +579,7 @@ func (b *Bot) ApplyItemInfo(info ItemInfo) {
     obj.X = info.X
     obj.Y = info.Y
     obj.Z = info.Z
-    cold.UpdatedAt = time.Now().UnixNano()
+    cold.UpdatedAt = b.now().UnixNano()
     b.touch()
     b.recordLocked("item dropped: " + itemName(cold.Name, info.TemplateID))
 }
@@ -623,7 +623,7 @@ const (
 func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
     b.mu.Lock()
     defer b.mu.Unlock()
-    now := time.Now()
+    now := b.now()
     if objectID == b.charObjectID() {
         b.applySelfStatusLocked(attrs, now)
 

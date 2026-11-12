@@ -82,7 +82,7 @@ func (b *Bot) SetPhase(phase string) {
         return
     }
     b.phase = phase
-    b.phaseAt = time.Now()
+    b.phaseAt = b.now()
     b.touch()
 }
 
@@ -215,7 +215,7 @@ func zoneViewsEqual(a, b []ZoneView) bool {
 func (b *Bot) SetLoginCooldown(pause time.Duration) {
     b.mu.Lock()
     defer b.mu.Unlock()
-    b.loginCooldownUntil = time.Now().Add(pause)
+    b.loginCooldownUntil = b.now().Add(pause)
     b.touch()
 }
 
@@ -259,7 +259,7 @@ func (b *Bot) NoteDangerSpot(x int32, y int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
     b.dangerSpots = append(b.dangerSpots,
-        DangerSpot{X: x, Y: y, At: time.Now()})
+        DangerSpot{X: x, Y: y, At: b.now()})
     if len(b.dangerSpots) > dangerSpotCap {
         b.dangerSpots = append(b.dangerSpots[:0], b.dangerSpots[1:]...)
     }
@@ -272,7 +272,7 @@ func (b *Bot) NoteDangerSpot(x int32, y int32) {
 func (b *Bot) DangerSpots(window time.Duration) []DangerSpot {
     b.mu.RLock()
     defer b.mu.RUnlock()
-    cutoff := time.Now().Add(-window)
+    cutoff := b.now().Add(-window)
     spots := make([]DangerSpot, 0, len(b.dangerSpots))
     for _, spot := range b.dangerSpots {
         if spot.At.After(cutoff) {
@@ -294,7 +294,7 @@ func (b *Bot) SetDeathRegression(cellID string) {
     b.mu.Lock()
     defer b.mu.Unlock()
     b.deathCell = cellID
-    b.deathCellAt = time.Now()
+    b.deathCellAt = b.now()
     b.touch()
 }
 
@@ -344,7 +344,7 @@ func (b *Bot) ResetSession() {
     defer b.mu.Unlock()
     b.drainCommands()
     b.metrics.sessions++
-    b.sessionAt = time.Now()
+    b.sessionAt = b.now()
     b.selfID = 0
     b.char = newCharacterState()
     b.world = newObjectStore()

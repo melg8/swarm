@@ -69,7 +69,7 @@ func (b *Bot) SetBuffs(buffs []BuffEntry) {
     defer b.mu.Unlock()
     elapsed := int32(0)
     if !b.buffsAt.IsZero() {
-        elapsed = buffLeftCapped(int32(time.Since(b.buffsAt).Seconds()))
+        elapsed = buffLeftCapped(int32(b.now().Sub(b.buffsAt).Seconds()))
     }
     entries := make(map[int32]buffRecord, len(buffs))
     for _, buff := range buffs {
@@ -106,7 +106,7 @@ func (b *Bot) SetBuffs(buffs []BuffEntry) {
         }
     }
     b.buffs = entries
-    b.buffsAt = time.Now()
+    b.buffsAt = b.now()
     b.touch()
 }
 

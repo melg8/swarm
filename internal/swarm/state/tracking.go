@@ -6,7 +6,6 @@ package state
 
 import (
     "strconv"
-    "time"
 
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
@@ -64,7 +63,7 @@ func (b *Bot) ApplyWaitType(w WaitType) {
             return
         }
         cold.Sitting = w.Sitting
-        cold.UpdatedAt = time.Now().UnixNano()
+        cold.UpdatedAt = b.now().UnixNano()
         b.touch()
 
         return
@@ -116,7 +115,7 @@ func (b *Bot) applyRotation(r Rotation, stop bool) {
         obj.DestY = obj.Y
         obj.DestZ = obj.Z
     }
-    cold.UpdatedAt = time.Now().UnixNano()
+    cold.UpdatedAt = b.now().UnixNano()
     b.touch()
 }
 
@@ -223,7 +222,7 @@ func (b *Bot) ApplyTeleport(t Teleport) {
     obj.DestX = t.X
     obj.DestY = t.Y
     obj.DestZ = t.Z
-    cold.UpdatedAt = time.Now().UnixNano()
+    cold.UpdatedAt = b.now().UnixNano()
     b.touch()
 }
 
@@ -239,7 +238,7 @@ func (b *Bot) ApplySpawnItem(info ItemInfo) {
     obj.X = info.X
     obj.Y = info.Y
     obj.Z = info.Z
-    cold.UpdatedAt = time.Now().UnixNano()
+    cold.UpdatedAt = b.now().UnixNano()
     b.touch()
     b.recordLocked("item appeared: " + itemName(cold.Name, info.TemplateID))
 }

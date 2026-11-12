@@ -457,7 +457,7 @@ func (b *Bot) NearestGroundItemExcluding(
     best := LootItem{}
     bestDist := maxDistance
     found := false
-    now := time.Now()
+    now := b.now()
     selfX := float64(b.char.X)
     selfY := float64(b.char.Y)
     for i := range b.world.hot {

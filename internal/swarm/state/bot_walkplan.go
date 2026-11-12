@@ -93,7 +93,7 @@ func (b *Bot) SetWalkPlan(plan WalkPlan) {
 
         return
     }
-    now := time.Now()
+    now := b.now()
     if b.walkPlan != nil && walkPlansEqual(*b.walkPlan, plan) {
         b.walkPlanAt = now
 
@@ -162,7 +162,7 @@ func (b *Bot) rememberWalkPlanLocked(plan *WalkPlan) {
     record.Points = make([]WalkPoint, len(plan.Points))
     copy(record.Points, plan.Points)
     b.lastWalkPlan = &record
-    b.lastWalkPlanAt = time.Now()
+    b.lastWalkPlanAt = b.now()
     b.lastWalkStart = b.walkPlanStart
     b.lastWalkWpAt = make([]time.Time, len(b.walkWpAt))
     copy(b.lastWalkWpAt, b.walkWpAt)

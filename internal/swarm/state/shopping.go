@@ -82,7 +82,7 @@ func (b *Bot) SetShoppingPlan(view ShoppingPlanView) {
         return
     }
     if shoppingPlanEqual(b.shopping, view) {
-        b.shoppingAt = time.Now()
+        b.shoppingAt = b.now()
 
         return
     }
@@ -94,7 +94,7 @@ func (b *Bot) SetShoppingPlan(view ShoppingPlanView) {
         Total:   view.Total,
         Trip:    view.Trip,
     }
-    b.shoppingAt = time.Now()
+    b.shoppingAt = b.now()
     b.touch()
 }
 
