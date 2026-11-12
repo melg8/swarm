@@ -88,7 +88,25 @@ build ./...`, `go vet ./...`, `task fmt:check`, `go test
 ./internal/swarm/hunt/... -count=1` (97.6 s), `golangci-lint run
 ./internal/swarm/hunt/...` (0 issues).
 
+### 2026-11-12 - hunt: split the tick context into steps
+`tickContext` dropped its `//nolint:cyclop,funlen,gocognit` and became
+a nine line chain of named steps: `publishTickState` (the defer: phase
+banner, shopping widget, diagnostics heartbeat, stagnation watch),
+`tickDeathOrSafety` (the death restart, the critical health logout, the
+armed pile up run, then `tickPileUp`), `tickCommandPhase` (the user
+command drain, the delevel and manual phases, the manual only idle
+hold), `tickErrands` (the auto equipment, the first cell pick, the
+deleveling, the shopping trips) and `tickHunt` (the inventory cleanup,
+the zone switch, the engage or loot step). The gate order and the
+return semantics stay exactly as before: every helper reports `bool`
+"the tick was consumed" and the only shared input is the single
+`time.Now()` of the pile up step. Several 10-20 line comment blocks
+that retold the moved code were compressed to their load-bearing fact.
+Verified: `go build ./...`, `task fmt` + `task fmt:check`,
+`go test ./internal/swarm/hunt/... -count=1` (97.6 s),
+`golangci-lint run ./internal/swarm/hunt/...` (0 issues).
+
 ## Status
 
-Commits 1 and 2 done. Next: the `tickContext` split (commit 3), then
-the `engage` split (commit 4), full verify and E2E.
+Commits 1-3 done. Next: the `engage` split (commit 4), full verify and
+E2E.

@@ -87,184 +87,150 @@ func (l *Loop) tick() {
     l.tickContext(context.Background())
 }
 
-// tickContext advances the hunt state machine by one decision. The phase
-// transitions fall through, so a kill switches into looting and the
-// first pickup happens on the same tick.
-// Pre-consolidation phase debt; the hunt loop cleanup is planned
-// (docs/quality_review_and_agent_prompts.md P07).
-//
-//nolint:cyclop,funlen,gocognit // the phase debt waits for the planned split
+// tickContext advances the hunt state machine by one decision. The
+// phase transitions fall through, so a kill switches into looting and
+// the first pickup happens on the same tick.
 func (l *Loop) tickContext(ctx context.Context) {
-    // Publish the hunt loop phase to the bot tracker so the web UI
-    // can show the human readable activity banner. SetPhase is a
-    // no-op when the phase has not changed, so the per tick call
-    // never churns the event stream. Runs on every return path
-    // through the defer. The closure captures l.phase by reference
-    // so the value at return time is published (a plain defer call
-    // evaluates its arguments at registration time). The shopping
-    // view of the web UI widget rides the same defer: every tick
-    // republishes the queue (SetShoppingPlan no-ops on an identical
-    // view) so the widget never shows a stale plan whatever phase
-    // the tick ended in. The same defer publishes the loop internals
-    // for the diagnostics section of the state dump
-    // (SetHuntDiagnostics stamps the heartbeat the encoders age
-    // without a version bump). The stagnation watch rides the same
-    // defer so it observes every tick whatever path the state
-    // machine took (see stagnation.go).
-    defer func() {
-        now := time.Now()
-        l.tracker.SetPhase(string(l.phase))
-        l.publishShoppingView()
-        l.tracker.SetHuntDiagnostics(l.diagnostics(now))
-        l.observeStagnation(now)
-    }()
-    if l.tracker.SelfDead() {
-        l.recoverFromDeath()
-
+    defer l.publishTickState()
+    if l.tickDeathOrSafety() {
         return
-    }
-    // The emergency logout: critical health with the blows still
-    // landing ends the session at once (one hit from death, the
-    // run has nothing left to protect), while a social pile up -
-    // several mobs already hold the character as their target -
-    // starts the pile up run instead: the logout waits until the
-    // character opened the escape distance from the aggro point.
-    // The deleveling wants the deaths, a manual only session
-    // never decides on its own, and a request already sent stays
-    // one shot while the session unwinds. The armed run keeps
-    // driving the logout even after the pack thins out on the
-    // way: the escape distance, not the live mob count, ends it.
-    // The winnable pile up is the exception: a healthy character
-    // whose attackers sit inside the engage ceiling tanks the pack
-    // down instead of throwing the fight away - the old unconditional
-    // run, relogin and immediate walk home restarted the same aggro
-    // cycle on the same spot (see pileUpWinnable).
-    if !l.logoutDone && l.autonomous && l.phase != phaseDelevel {
-        if l.tracker.SelfHealthPercent() < panicLogoutHealthPercent &&
-            l.tracker.SelfUnderAttack() {
-            l.emergencyLogout()
-
-            return
-        }
-        if !l.panicAt.IsZero() {
-            l.panicPileUpRun(time.Now())
-
-            return
-        }
-        if l.tracker.SelfAttackerCount() >= panicLogoutAttackers &&
-            !l.pileUpWinnable() && !l.settleHolding() {
-            if l.kiteOwnsRetreat() && l.kiteFlightWanted() &&
-                !l.kiteKillWindow() {
-                // The standing kite turned unwinnable: the shot
-                // cycle spends half of every reload inside the
-                // melee range, so the pack grinds the health down
-                // while the character waits for the bow. The
-                // straight flight is the survival answer - the
-                // fight is dropped and the away-ray opens the
-                // ground (see dropFightForFlight). A target inside
-                // the kill window is finished first: the flight
-                // would throw the kill away and the pack trade of
-                // two arrows is its price.
-                l.dropFightForFlight(time.Now())
-
-                return
-            }
-            if !l.kiteOwnsRetreat() && !l.kiteFlightOwnsEscape() {
-                l.panicPileUpRun(time.Now())
-
-                return
-            }
-        }
     }
     if l.logoutDone {
         return
     }
-    // The manual commands of the web UI arrive asynchronously on the
-    // bot tracker: drain them before the phase dispatch so a command
-    // can interrupt the current phase.
+    if l.tickCommandPhase() {
+        return
+    }
+    if l.tickErrands(ctx) {
+        return
+    }
+    l.tickHunt()
+}
+
+// publishTickState mirrors the tick result into the tracker: the phase
+// banner, the shopping widget queue, the diagnostics heartbeat and the
+// stagnation watch. The defer reads l.phase at return time, so every
+// path of the tick publishes the phase it ended in.
+func (l *Loop) publishTickState() {
+    now := time.Now()
+    l.tracker.SetPhase(string(l.phase))
+    l.publishShoppingView()
+    l.tracker.SetHuntDiagnostics(l.diagnostics(now))
+    l.observeStagnation(now)
+}
+
+// tickDeathOrSafety answers the death and the defensive layer: the
+// village restart of a dead character, the critical health logout, the
+// armed pile up run and the fresh social pile up. It reports true when
+// the tick was consumed.
+func (l *Loop) tickDeathOrSafety() bool {
+    if l.tracker.SelfDead() {
+        l.recoverFromDeath()
+
+        return true
+    }
+    if l.logoutDone || !l.autonomous || l.phase == phaseDelevel {
+        return false
+    }
+    if l.tracker.SelfHealthPercent() < panicLogoutHealthPercent &&
+        l.tracker.SelfUnderAttack() {
+        l.emergencyLogout()
+
+        return true
+    }
+    if !l.panicAt.IsZero() {
+        l.panicPileUpRun(time.Now())
+
+        return true
+    }
+
+    return l.tickPileUp(time.Now())
+}
+
+// tickPileUp answers a social pile up: several mobs already hold the
+// character as their target. A healthy character whose attackers sit
+// inside the engage ceiling tanks the pack down, everything else starts
+// the pile up run; a standing kite that turned unwinnable drops the
+// fight for the straight flight. It reports true when the tick was
+// consumed.
+func (l *Loop) tickPileUp(now time.Time) bool {
+    if l.tracker.SelfAttackerCount() < panicLogoutAttackers ||
+        l.pileUpWinnable() || l.settleHolding() {
+        return false
+    }
+    if l.kiteOwnsRetreat() && l.kiteFlightWanted() &&
+        !l.kiteKillWindow() {
+        l.dropFightForFlight(now)
+
+        return true
+    }
+    if !l.kiteOwnsRetreat() && !l.kiteFlightOwnsEscape() {
+        l.panicPileUpRun(now)
+
+        return true
+    }
+
+    return false
+}
+
+// tickCommandPhase drains the queued web UI commands and runs the
+// phases they own: the deleveling, the manual command and the idle hold
+// of a manual only session. It reports true when the tick was consumed.
+func (l *Loop) tickCommandPhase() bool {
     l.consumeUserCommands()
     if l.phase == phaseDelevel {
         l.tickDelevel()
         l.publishWalkPlan()
 
-        return
+        return true
     }
     if l.phase == phaseUser {
         l.tickUser()
-        // The walk plan view follows the manual phase: the plan
-        // publishes while a manual move runs, anything else clears
-        // it (ClearWalkPlan is a no-op without a plan).
         l.publishWalkPlan()
 
-        return
+        return true
     }
     if !l.autonomous {
-        // A manual only session never hunts on its own: the loop
-        // waits in the idle phase for the next web command.
         l.tracker.ClearWalkPlan()
         l.phase = phaseIdle
 
-        return
+        return true
     }
-    // The auto equipment runs in every phase of the hunt: the paperdoll
-    // stays current while a town trip buys its gear and while the loot
-    // drops arrive, so the combat stats never lag behind the inventory.
-    // The class profile pick runs before it: a mystic class scores the
-    // caster gear from its very first equip decision.
+
+    return false
+}
+
+// tickErrands runs the autonomous errands ahead of the hunt: the auto
+// equipment, the first cell pick, the deleveling and the shopping
+// trips. The deleveling outranks the trips (its deaths are the point of
+// the phase), and a running trip owns every move until it returns. It
+// reports true when the tick was consumed.
+func (l *Loop) tickErrands(ctx context.Context) bool {
     l.maybePickGearProfile()
     l.maybeEquipGear()
-    // The archer quiver follows the auto equipment: the bow the
-    // planner placed shoots only with the arrows worn, and the ammo
-    // is invisible to the planner (it scores zero - a consumable, not
-    // gear), so the arming is the loop's own step right behind it.
     l.maybeArmQuiver()
-    // The replaced starter kit follows the equips: the unsellable,
-    // undroppable Squire's pieces leave the bag through the destroy
-    // request as soon as their replacement is worn.
     l.maybeDestroyReplacedStarters()
-    // The first cell pick serves every gate below it: the delevel
-    // trigger reads the held ground's median (a nil leash reads an
-    // empty live zone), the trip zone gate reads the patrol square.
-    // A fresh session picks the cell before the delevel check runs,
-    // so the outleveled spawn spot starts the guard walk on the very
-    // first tick instead of losing the race to the engage (the 2026-
-    // 09-20 delevel acceptance report: the mobs of the spot pulled
-    // the farming first while the cell pick lagged a tick). The
-    // rotation economy keeps its own place between the fights.
     if l.cell != nil && l.cell.picked < 0 {
         l.cellEvaluate(time.Now())
     }
-    // The deleveling outranks the town trips and the hunt: the guard
-    // deaths are the point of the phase - a shopping detour of a
-    // character that plans to die buys nothing, and the mobs of the
-    // outleveled spot pay no drops worth the walk delay (the level
-    // gap collapsed them). The check runs ahead of the trip start,
-    // so a full bag or a shopping plan never walks the character to
-    // the shops instead of the guards (the 2026-09-20 report: the
-    // fresh level 15 wallet shopped while the ground waited for the
-    // deleveling).
     if l.delevelWanted() {
         l.startDelevel()
         l.tickDelevel()
         l.publishWalkPlan()
 
-        return
+        return true
     }
-    // The city shopping errand blocks the whole tick: it owns every
-    // move and transaction from the village walk to the return home
-    // (see city_shopping.go).
     if l.maybeCityShopping(ctx) {
-        return
+        return true
     }
-    if l.handleTownTrip() {
-        return
-    }
-    // The non walking hunt phases clear the walk plan view: the
-    // engage and loot phases have no planned path to draw.
+
+    return l.handleTownTrip()
+}
+
+// tickHunt runs the hunt itself: the inventory cleanup, the zone switch
+// and the engage or loot step of the current phase.
+func (l *Loop) tickHunt() {
     l.tracker.ClearWalkPlan()
-    // The destroy cleanup runs outside the trips: everything the
-    // merchant refuses is still better sold at the next shop than
-    // destroyed on the way.
     l.cleanupInventory()
     l.maybeSwitchZone()
     if l.phase == phaseEngage {
