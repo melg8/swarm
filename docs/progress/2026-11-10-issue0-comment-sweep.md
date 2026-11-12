@@ -322,6 +322,22 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.3 percent, 497 blocks,
   1,223 history markers; `quest_trip.go` reads 20.0 percent.
 
+### 2026-11-12 - hunt/loop_safety.go keeps the rules, drops the dumps
+
+- 22 blocks compress: the flight keeps its rules (one paced segment per
+  call, the ordered straight/45/90 lane fan clamped into the hunting
+  square, the no-lane and no-progress guards, the fifteen second logout
+  combat window, the run anchor distance, the health gate and the pick
+  ceiling) and the round dumps drop (the run-31 868 unit sample, the
+  run-24 99 percent reset, the 14:02/14:03 dumps collapse into the one
+  kept number: a level 10 Kaboo Orc Fighter held ~19 units through 21 s,
+  the level 7 archer ran 100 -> 59 percent in sixteen seconds, 85
+  logouts on one ground).
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.3 percent, 492 blocks,
+  1,219 history markers; `loop_safety.go` fell from 35.2 to
+  25.8 percent (152 comment lines).
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -333,8 +349,8 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `hunt/town.go`, `hunt/kite.go` and `hunt/cell_policy.go` (both second
 passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
-`hunt/quest_trip.go`. Next: `hunt/shopping.go` (249 comment lines),
-`hunt/loop_params.go` (240, 78.2 percent - a params registry, trim the
-prose not the facts), `acceptance/archer_kite.go` (240, 28.3 percent) and
-`hunt/loop_safety.go` (238, 35.2 percent); the share and the block count
-are re-measured at the end.
+`hunt/quest_trip.go` and `hunt/loop_safety.go`. Next:
+`hunt/shopping.go` (249 comment lines), `hunt/loop_params.go` (240, 78.2
+percent - a params registry, trim the prose not the facts),
+`acceptance/archer_kite.go` (240, 28.3 percent) and `hunt/user.go` (232,
+21.7 percent); the share and the block count are re-measured at the end.

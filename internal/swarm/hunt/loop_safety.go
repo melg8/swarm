@@ -15,14 +15,10 @@ import (
 )
 
 // dropAttackTarget drops the held fight and the server side target
-// selection with it: the travel tasks of the loop (the walk to town,
-// the route change of a zone or ground rotation) own the target
-// register - a loop target the selection keeps would resurrect on the
-// next engage tick (the re-adopt reads the server view of the
-// selection, and the server never unselects on its own), so the drop
-// sends the clear self click whenever a selection exists. The mob
-// itself stays untouched - no skip entry, the next pick may fight it
-// again when the travel is over.
+// selection with it: the travel tasks own the target register, and a
+// selection the loop left behind would resurrect as the next engage pick
+// (the server never unselects on its own), so the drop sends the clear
+// self click. The mob itself stays untouched - no skip entry.
 func (l *Loop) dropAttackTarget(reason string) {
     if l.target == 0 && l.tracker.SelfTargetID() == 0 {
         return
@@ -54,57 +50,38 @@ func (l *Loop) fleeFromTarget(targetID int32, now time.Time) {
     }
     l.targetSkip[targetID] = now.Add(fleeSkipDelay)
     // The dropped fight leaves no selection behind: the self click
-    // replaces the server side target with the own object, and the
-    // answered MyTargetSelected zeroes the fight target of the
-    // tracker (see ApplySelfTarget). A flight is not a fight - the
-    // stale selection made the run-31 acceptance sample the
-    // abandoned mob at 868 units and fail the bow band.
+    // replaces the server side target with the own object, and a stale
+    // selection would hand the abandoned mob to the next engage.
     l.clearServerSelection()
     l.fleeFromThreat(now)
 }
 
-// fleeFromThreat walks the character away from the nearest living
-// threat (the chasing mob of a fled fight, an aggressive pull it
-// never selected): one paced segment per call along the ordered
-// escape lane fan (see escapeWalkDestination), never toward the
-// threat and never through the zone center the mob may hold. A
-// sitting character stands up first - the server refuses move
-// requests while it sits. Two guards end a dead escape instead of
-// running it forever: no open lane at all (the cornered or walled
-// pocket) and a window that moved less than escapeNoProgressDistance
-// (the silent H-006 click drop, a walk pinned against the terrain).
-// Both reset the aggro through the emergency logout - the user rule
-// "relog when the fight cannot be won". The bow-wielding character
-// answers with the straight kite flight instead (kiteFleeThreat):
-// the fan is clamped to the hunting zone box and logs kites out of
-// their own ground (the run-3 acceptance dump), so it only serves
-// the scenes the flight refuses (a melee weapon, a bow attacker, a
-// walled straight lane).
+// fleeFromThreat walks the character away from the nearest living threat
+// (the chasing mob of a fled fight, an aggressive pull): one paced segment
+// per call along the ordered escape lane fan (escapeWalkDestination), never
+// toward the threat and never through the zone center the mob may hold. A
+// sitting character stands up first. Two guards end a dead escape instead
+// of running it forever: no open lane at all and a window that moved less
+// than escapeNoProgressDistance; both reset the aggro through the
+// emergency logout. The bow character answers with the straight kite
+// flight (kiteFleeThreat), the fan serving only the scenes it refuses.
 func (l *Loop) fleeFromThreat(now time.Time) {
     if !l.fleeAt.IsZero() && now.Sub(l.fleeAt) < selectPeriod {
         return
     }
     l.fleeAt = now
     if l.kiteFleeThreat(now) {
-        // The archer flight owns the defensive flee (see
-        // kiteFleeThreat): the straight away-ray of the train, the
-        // full escape segment, its own window and the re-click
-        // ladder. The fan below stays the fallback of a genuinely
-        // walled lane - it is clamped to the hunting zone box, and
-        // the run-3 acceptance measured the logout it produces on a
-        // kite fight that drifted across the cell boundaries.
+        // The archer flight owns the defensive flee (kiteFleeThreat): the
+        // straight away-ray of the train, the full escape segment, its own
+        // window and the re-click ladder. The fan below only serves a
+        // genuinely walled lane - it is clamped to the hunting zone box.
         return
     }
     if l.kiteLayerArmed() {
-        // The bow character never falls back to the zone-clamped
-        // melee fan. A flight that refused the tick (a bow attacker
-        // on the nearest bearing, a chaser on another deck, a
-        // bearing not broadcast yet) is answered by the hunt's
-        // standing trade on the next tick, while a walled lane holds
-        // the flight (see kiteFleeThreat); the fan's no-lane and
-        // no-progress guards would only log the session out - the
-        // 2026-11-10 run-24 dump reset the aggro at 99 percent
-        // health 30 s into a healthy flight.
+        // The bow character never falls back to the zone-clamped melee
+        // fan: a refused flight tick is answered by the standing trade on
+        // the next tick, while the fan's guards would only log the session
+        // out at full health.
         return
     }
     if l.fleeSince.IsZero() {
@@ -112,10 +89,8 @@ func (l *Loop) fleeFromThreat(now time.Time) {
         l.noteFleeGap(now)
     }
     if now.Sub(l.fleeSince) >= fleeLogoutAfter {
-        // The escape never shook the chase: the mobs keep the
-        // character running forever, the session ends and the
-        // login cooldown resets the aggro while the character
-        // regenerates sitting.
+        // The escape never shook the chase: the session ends and the login
+        // cooldown resets the aggro while the character regenerates.
         l.logf("Hunt: fleeing for %.0fs without shaking "+
             "the chase, resetting the aggro via logout",
             now.Sub(l.fleeSince).Seconds())
@@ -135,11 +110,9 @@ func (l *Loop) fleeFromThreat(now time.Time) {
         return
     }
     if gap, held := l.escapeNotOpening(now); held {
-        // The character travels, but the chaser travels with it:
-        // the gap never widens, so the run would burn the whole
-        // budget for nothing (the 14:03:09 dump: a level 10 Kaboo
-        // Orc Fighter held ~19 units through 21 s of fleeing).
-        // Reset the aggro now.
+        // The character travels, but the chaser travels with it: a level 10
+        // Kaboo Orc Fighter held ~19 units through 21 s of fleeing. Reset
+        // the aggro now.
         l.logf("Hunt: the chaser keeps pace at %.0f units after "+
             "%.0fs of fleeing, resetting the aggro via logout",
             gap, fleeGapWindow.Seconds())
@@ -153,10 +126,9 @@ func (l *Loop) fleeFromThreat(now time.Time) {
     moveX, moveY, moveZ, ok := l.escapeWalkDestination()
     if !ok {
         if _, _, hasThreat := l.threatPosition(); hasThreat {
-            // Every ordered lane is clamped to nothing or folds
-            // toward the threat: a cornered character with the
-            // chase still on it. The walk would not open distance,
-            // the relog resets the aggro instead.
+            // Every ordered lane is clamped to nothing or folds toward the
+            // threat: a cornered character with the chase still on it. The
+            // relog resets the aggro instead.
             l.logf("Hunt: no escape lane opens from the chase, " +
                 "resetting the aggro via logout")
             l.emergencyLogout()
@@ -174,16 +146,13 @@ func (l *Loop) fleeFromThreat(now time.Time) {
 }
 
 // escapeWalkDestination plans one escape segment away from the nearest
-// threat as an ORDERED lane fan: the straight away ray first, then the
-// 45 and 90 degree lanes each side of it. Every candidate is clamped
-// along its own ray into the hunting square, so an escape that would
-// leave the ground stops on the safe inner margin instead of turning
-// toward the zone center - the old center fallback ran the character
-// back through the chasing mob whenever the straight away point left
-// the square, the reported 180 degree flips. No candidate points into
-// the far side of the away hemisphere, so the run always opens
-// distance; the first lane with a usable length wins, which keeps the
-// direction stable between ticks while the geometry does.
+// threat as an ordered lane fan: the straight away ray first, then the 45
+// and 90 degree lanes each side. Every candidate is clamped along its own
+// ray into the hunting square, so an escape that would leave the ground
+// stops on the safe inner margin instead of turning toward the zone
+// center. No candidate points into the far side of the away hemisphere, so
+// the run always opens distance; the first lane with a usable length wins,
+// which keeps the direction stable between ticks.
 func (l *Loop) escapeWalkDestination() (int32, int32, int32, bool) {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
@@ -269,13 +238,10 @@ func escapeSlabExit(origin, dir, lo, hi float64) float64 {
 
 // escapeStalled reports whether the escape stopped moving: less than
 // escapeNoProgressDistance covered since the anchor inside
-// escapeNoProgressWindow. It only measures episodes that issued a
-// walk (escapeWalkAt), so the stand-up settle of a sitting character
-// never reads as a stall; it re-anchors every accepted window, so a
-// long run keeps measuring rolling progress, while a walk transport
-// that silently drops the clicks (H-006) or a run pinned against the
-// terrain names itself inside one window. The caller logs the session
-// out; clearEscapeAnchor ends the observation with the flee episode.
+// escapeNoProgressWindow. It only measures episodes that issued a walk, so
+// the stand-up settle never reads as a stall, and it re-anchors every
+// accepted window, so a long run keeps measuring rolling progress while a
+// silently dropped click names itself inside one window.
 func (l *Loop) escapeStalled(now time.Time) bool {
     if l.escapeWalkAt.IsZero() || l.escapeAnchorAt.IsZero() {
         return false
@@ -298,10 +264,9 @@ func (l *Loop) escapeStalled(now time.Time) bool {
     return false
 }
 
-// noteFleeGap anchors the closure-rate watchdog of the escape: the
-// moment the episode opened and the distance to its threat then. A
-// chase with no threat to measure (a bare under-attack window) arms
-// nothing - the stalled watch and the flee budget own that case.
+// noteFleeGap anchors the closure-rate watchdog of the escape: the moment
+// the episode opened and the distance to its threat then. A chase with no
+// threat to measure (a bare under-attack window) arms nothing.
 func (l *Loop) noteFleeGap(now time.Time) {
     l.fleeGapAt = now
     l.fleeGap = 0
@@ -316,15 +281,11 @@ func (l *Loop) noteFleeGap(now time.Time) {
     l.fleeGap = math.Hypot(float64(x-threatX), float64(y-threatY))
 }
 
-// escapeNotOpening reports whether the chase held its distance through
-// the current probe window: the window lapsed and the threat is still
-// no farther than fleeGapOpen past the anchor gap, so the chaser runs
-// at the character's speed and the escape cannot shake it. The gap is
-// re-measured every call; a window that did widen the gap (a mob
-// turning home, a slower chaser, the character breaking the line of
-// sight) re-anchors the probe and keeps the escape running. Reports
-// the measured gap and the verdict; no live threat means the escape
-// has nothing to measure and the flee code's other branches own it.
+// escapeNotOpening reports whether the chase held its distance through the
+// current probe window: the window lapsed and the threat is still no
+// farther than fleeGapOpen past the anchor gap, so the chaser runs at the
+// character's speed. A window that did widen the gap re-anchors the probe
+// and keeps the escape running; no live threat arms nothing.
 func (l *Loop) escapeNotOpening(now time.Time) (float64, bool) {
     if l.fleeGapAt.IsZero() {
         return 0, false
@@ -352,9 +313,8 @@ func (l *Loop) escapeNotOpening(now time.Time) (float64, bool) {
 }
 
 // noteEscapeWalk starts the no-progress window of an issued escape
-// segment: the first walk of the episode anchors the window at the
-// spot it was issued from, later walks leave the running window
-// alone (its own anchor measures the progress).
+// segment: the first walk of the episode anchors it, later walks leave the
+// running window alone.
 func (l *Loop) noteEscapeWalk(now time.Time) {
     l.escapeWalkAt = now
     if !l.escapeAnchorAt.IsZero() {
@@ -379,17 +339,11 @@ func (l *Loop) clearEscapeAnchor() {
     l.fleeGap = 0
 }
 
-// threatPosition returns the position of the mob the escape runs
-// from: the living target while one is engaged, the nearest attacker
-// around otherwise (the mob whose blows land or whose chase steps
-// toward the character carry it as the target). A mob that merely
-// stands nearby is not a threat: the old last resort to the nearest
-// living attackable npc armed the escape against a passive bystander
-// the moment a finished fight left its fresh SelfUnderAttack window -
-// the hurt character ran several hundred units away from the kill
-// spot (sometimes out of the zone) before it sat down to rest. With
-// no mob holding the character as its target the escape has nothing
-// to run from and the rest happens where the fight ended.
+// threatPosition returns the position of the mob the escape runs from: the
+// living target while one is engaged, the nearest attacker around
+// otherwise. A mob that merely stands nearby is not a threat - the old
+// nearest attackable fallback ran the hurt character away from the kill
+// spot the moment a finished fight left its SelfUnderAttack window open.
 func (l *Loop) threatPosition() (int32, int32, bool) {
     if l.target != 0 && l.tracker.ObjectAlive(l.target) {
         if x, y, _, ok := l.tracker.ObjectPosition(l.target); ok {
@@ -403,22 +357,15 @@ func (l *Loop) threatPosition() (int32, int32, bool) {
     return 0, 0, false
 }
 
-// panicPileUpRun answers the social pile up (two or more mobs
-// hold the character as their target) with a run instead of the
-// instant logout. The first call anchors the aggro point - the
-// spot the pack piled up on - and drops the current fight (the
-// walk away must not re-engage it), every later call walks one
-// paced escape segment away from the threats. The logout fires only
-// once the run opened panicRunDistance units between the character
-// and the anchor: the chasing pack stays behind, the mobs drop the
-// target and walk home while the character is offline, and the
-// short relogin lands outside their aggro range instead of on top
-// of the same pack. A run that cannot open the distance within the
-// shared flee budget (a cornered or blocked escape) still logs out
-// wherever it got to - the session must not run forever. So does a
-// run whose pack dissolved on the way (no mob holds the target
-// anymore, nothing attackable stands near): nothing is left to
-// run from, the spot is as safe as the run gets.
+// panicPileUpRun answers the social pile up (two or more mobs hold the
+// character as their target) with a run instead of the instant logout. The
+// first call anchors the aggro point and drops the current fight, every
+// later call walks one paced escape segment away from the threats. The
+// logout fires once the run opened panicRunDistance units between the
+// character and the anchor: the chasing pack stays behind and the short
+// relogin lands outside its aggro range. A run that cannot open the
+// distance within the flee budget still logs out wherever it got to, and so
+// does a run whose pack dissolved on the way.
 func (l *Loop) panicPileUpRun(now time.Time) {
     if l.panicAt.IsZero() {
         x, y, _, ok := l.tracker.SelfPosition()
@@ -464,12 +411,9 @@ func (l *Loop) panicPileUpRun(now time.Time) {
     moveX, moveY, moveZ, ok := l.escapeWalkDestination()
     if !ok {
         if _, _, hasThreat := l.threatPosition(); hasThreat {
-            // A chaser still holds the character while every
-            // ordered lane is clamped to nothing or walled: the
-            // cornered pile up (the 14:02:41 dump logged out at
-            // 0 units). The old line claimed the pack dissolved
-            // and hid the real reason from the dump - the logout
-            // is the cornered answer, the log must say so.
+            // A chaser still holds the character while every ordered lane
+            // is walled: the cornered pile up, and the logout is the
+            // answer.
             l.logger.Printf("Hunt: no escape lane opens from the "+
                 "pile up at %.0f units, logging out",
                 l.panicAnchorDistance())
@@ -477,11 +421,9 @@ func (l *Loop) panicPileUpRun(now time.Time) {
 
             return
         }
-        // No mob holds the target anymore and nothing
-        // attackable stands within the escape range: the
-        // pack dissolved, the chase is over wherever the
-        // run got to. Log out now instead of idling out the
-        // budget - the relogin spot is already clear.
+        // No mob holds the target and nothing attackable stands within the
+        // escape range: the pack dissolved, log out now instead of idling
+        // out the budget.
         l.logger.Printf("Hunt: the pile up run shook the chase "+
             "at %.0f units, logging out", l.panicAnchorDistance())
         l.emergencyLogout()
@@ -493,10 +435,9 @@ func (l *Loop) panicPileUpRun(now time.Time) {
     }
 }
 
-// dropPileUpFight drops the fight the pack joined: the dropped
-// target lands on the long skip list (the run must not re-engage
-// it) and the pending engage bookkeeping clears - the same handoff
-// fleeFromTarget makes.
+// dropPileUpFight drops the fight the pack joined: the dropped target
+// lands on the long skip list and the pending engage bookkeeping clears -
+// the same handoff fleeFromTarget makes.
 func (l *Loop) dropPileUpFight(now time.Time) {
     if l.target == 0 {
         return
@@ -523,20 +464,14 @@ func (l *Loop) panicAnchorDistance() float64 {
     return math.Hypot(float64(x-l.panicX), float64(y-l.panicY))
 }
 
-// emergencyLogout saves a character with no way out: the health
-// is critical, the blows keep landing and the escape could not
-// shake the chase, or the pile up run opened its escape distance
-// (or lapsed its budget) away from the pack. One last escape segment
-// keeps the character moving through the combat window the server
-// holds an offline character in the world (fifteen seconds), then
-// the session logs out and the supervisor reconnects after the
-// armed login cooldown - the aggro resets on the disappearance,
-// the mobs walk home, and the character regenerates sitting. The
-// logout also counts against the zone it fires in: a ground that
-// keeps piling mobs on the character is as hostile as one that keeps
-// killing it, and without the count the relogin loop can burn hours
-// (the observed run: 85 emergency logouts on the same spider ground,
-// every session a fresh loop instance with a zeroed regression).
+// emergencyLogout saves a character with no way out: the health is
+// critical, the blows keep landing and the escape could not shake the
+// chase, or the pile up run opened its distance away from the pack. One
+// last escape segment keeps the character moving through the fifteen second
+// combat window the server holds an offline character in the world, then
+// the session logs out and the login cooldown resets the aggro. The logout
+// also counts against the zone it fires in (85 logouts on one ground in an
+// observed run).
 func (l *Loop) emergencyLogout() {
     reason := fmt.Sprintf("HP %.0f%% under attack",
         l.tracker.SelfHealthPercent())
@@ -547,13 +482,11 @@ func (l *Loop) emergencyLogout() {
     l.emergencyLogoutWithReason(reason)
 }
 
-// emergencyLogoutWithReason is the shared body of the emergency
-// logout: the reason line names what drove the session out, the
-// escape segment keeps the character moving through the logout combat
-// window and the login cooldown paces the supervisor reconnect.
-// The stagnation recovery calls it with its own honest reason (a
-// livelocked loop is as good a reason to rebuild the session as a
-// death risk - see stagnation.go).
+// emergencyLogoutWithReason is the shared body of the emergency logout:
+// the reason line names what drove the session out, the escape segment
+// keeps the character moving through the logout combat window and the
+// login cooldown paces the supervisor reconnect. The stagnation recovery
+// calls it with its own honest reason (stagnation.go).
 func (l *Loop) emergencyLogoutWithReason(reason string) {
     l.logoutDone = true
     l.logf("Hunt: %s, emergency logout for %s",
@@ -587,22 +520,15 @@ func (l *Loop) targetSkipped(objectID int32, now time.Time) bool {
     return ok && now.Before(until)
 }
 
-// attackerEngageable reports whether the character may answer the
-// attacker by fighting it: the mob level sits inside the engage
-// ceiling and the character is healthy enough to press a fight - the
-// winnable half of the aggro answer. The ceiling is the general pick
-// ceiling (the character level plus the slack) for every profile:
-// the 2026-11-10 run-28 acceptance dump measured the bow archer
-// against a level 10 Kaboo Orc Fighter (three levels up, 163 HP) -
-// roughly half of the arrows missed and the Fighter pair dealt 13-16
-// per swing, taking the level 7 archer from 100 to 59 percent of its
-// health in sixteen seconds while the target lost a third of its
-// bar. The widened kite ceiling never bought that race; it only
-// delayed the flight that answers it. An unresolved template (level
-// 0 or unknown) passes like every level filter of the target search;
-// an attacker above the ceiling never becomes winnable and the
-// defense flow answers instead (the straight kite flight, the escape
-// walk and, when the chase holds, the logout).
+// attackerEngageable reports whether the character may answer the attacker
+// by fighting it: the mob level sits inside the engage ceiling and the
+// character is healthy enough to press a fight. The ceiling is the general
+// pick ceiling (the character level plus the slack) for every profile - the
+// widened kite ceiling only delayed the flight that answers the attacker,
+// and a measured race of a level 7 archer against a level 10 Kaboo Orc
+// Fighter took it from 100 to 59 percent of its health in sixteen seconds.
+// An unresolved template passes like every level filter of the target
+// search.
 func (l *Loop) attackerEngageable(objectID int32) bool {
     if l.tracker.SelfHealthPercent() < reengageHealthPercent {
         return false
@@ -616,29 +542,17 @@ func (l *Loop) attackerEngageable(objectID int32) bool {
     return maxLevel <= 0 || level <= maxLevel
 }
 
-// pileUpWinnable reports whether a social pile up answers with a
-// fight instead of the panic run: the character is healthy enough to
-// press the fight, every attacker sits inside the engage level
-// ceiling and the pack is small enough to tank. The tank answers the
-// reported two mob softlock - the old unconditional panic run,
-// relogin and immediate walk home restarted the same aggro cycle
-// with full aggro on both mobs, while a healthy character that tanks
-// the pair down (one mob dies, the loot runs, the aggro answer picks
-// the survivor) keeps the experience and the drops. The health gate
-// makes the verdict dynamic: the fight that goes bad re-arms the
-// panic run on the next tick, the kill that thins the pack to one
-// attacker hands the answer to the ordinary aggro flow.
-//
-// The ceiling is the general pick ceiling (the character level plus
-// the slack) for every profile: the archer kite fights the pack from
-// the same bow rhythm it fights a single mob with, and the 2026-11-10
-// run-28 acceptance dump measured the race it cannot buy - two level
-// 10 Kaboo Orc Fighters kept the level 7 archer in melee and took
-// 100 -> 59 percent of its health in sixteen seconds while the
-// target lost a third of its bar. A pack with an attacker above the
-// ceiling is unwinnable whatever the weapon is, so the gate converts
-// it into the straight flight (see dropFightForFlight); a target
-// inside the kill window is still finished first.
+// pileUpWinnable reports whether a social pile up answers with a fight
+// instead of the panic run: the character is healthy enough to press the
+// fight, every attacker sits inside the engage level ceiling and the pack
+// is small enough to tank. The tank answers the two mob softlock - the old
+// unconditional panic run restarted the same aggro cycle with full aggro on
+// both mobs. The health gate makes the verdict dynamic: a fight that goes
+// bad re-arms the panic run, and the kill that thins the pack to one
+// attacker hands the answer to the ordinary aggro flow. A pack with an
+// attacker above the ceiling converts into the straight flight
+// (dropFightForFlight); a target inside the kill window is finished
+// first.
 func (l *Loop) pileUpWinnable() bool {
     if l.tracker.SelfHealthPercent() < reengageHealthPercent {
         return false
