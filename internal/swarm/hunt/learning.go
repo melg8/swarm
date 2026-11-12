@@ -4,16 +4,13 @@
 
 package hunt
 
-// The skill learning of the town trips: when the learning queue holds
-// enough affordable lessons, the trip walks to the village teacher of
-// the class (Ellenia teaches the elven fighters, Greenis the elven
-// mystics - the teachers are class specific, a warrior never learns
-// at the mage master), buys the spellbooks the lessons demand from
-// the town merchant first and then learns one lesson per request at
-// the teacher. The teacher interaction is the plain client click on
-// the npc (Action 0x04): the NpcClick handler of the server selects
-// the teacher AND remembers it as the last folk the character talked
-// to - exactly what RequestAcquireSkill resolves its trainer through.
+// The skill learning of the town trips: when the queue holds enough affordable
+// lessons, the trip walks to the village teacher of the class (Ellenia the
+// elven fighters, Greenis the elven mystics - a warrior never learns at the
+// mage master), buys the demanded spellbooks from the town merchant and learns
+// one lesson per request. The teacher interaction is the plain client click on
+// the npc (Action 0x04): the NpcClick handler selects the teacher and remembers
+// it as the last folk, which RequestAcquireSkill resolves its trainer through.
 
 import (
     "math"
@@ -25,46 +22,35 @@ import (
 
 // Timing and threshold constants of the skill learning.
 const (
-    // learnTripMinSp is the minimum total SP of the affordable and
-    // unlocked lessons that justifies a walk to the teacher: below it
-    // the trip would spend minutes of hunting on a handful of lessons.
+    // learnTripMinSp is the minimum total SP of the affordable and unlocked
+    // lessons that justifies a walk to the teacher: below it the trip would
+    // spend minutes of hunting on a handful of lessons.
     learnTripMinSp = 300
-    // learnPlanPeriod bounds the learning queue re-reads of the trip
-    // trigger: the queue view allocates, the trigger runs every tick.
+    // learnPlanPeriod bounds the learning queue re-reads of the trip trigger:
+    // the queue view allocates and the trigger runs every tick.
     learnPlanPeriod = 2 * time.Second
-    // learnPause is the minimum spacing of two RequestAcquireSkill
-    // packets. The server side knows no flood protector on the packet
-    // (the mobius handler checks only the trainer distance, the level,
-    // the SP and the spellbook - no FloodProtector call, no rate
-    // limit), so the maximum allowed learn speed is one request per
-    // SkillList answer: the confirm round trip IS the pacing signal
-    // (see tickTeacherLessons). The floor only keeps two sends out of
-    // one decision tick - it matches the loop cadence, the server
-    // never refuses a lesson by pace.
+    // learnPause is the minimum spacing of two RequestAcquireSkill packets. The
+    // server knows no flood protector on the packet (the handler checks only
+    // the trainer distance, the level, the SP and the spellbook), so the
+    // confirm round trip is the real pacing; the floor only keeps two sends
+    // out of one decision tick.
     learnPause = 250 * time.Millisecond
-    // learnConfirmWait bounds the wait for the SkillList bump that
-    // confirms a learned lesson.
+    // learnConfirmWait bounds the SkillList bump wait that confirms a lesson.
     learnConfirmWait = 5 * time.Second
-    // learnRetries bounds the re-requests of one lesson before it is
-    // skipped: a refusal (the level not reached, the SP short, the
-    // book missing) answers silently.
+    // learnRetries bounds the re-requests of one lesson before it is skipped:
+    // a refusal (the level, the SP, the book) answers silently.
     learnRetries = 3
     // teacherWaitTimeout bounds the wait for the teacher NpcInfo
     // before the stop gives the lessons up.
     teacherWaitTimeout = 45 * time.Second
-    // teacherApproachWindow bounds the whole close approach of the
-    // teach stop: the ring walk clicks the npc approach point until
-    // the character stands right by the teacher (from the building
-    // entrance through the hall to the training npc), and the window
-    // leaves room for a server routed walk plus a few position
-    // broadcasts before the fallback (the talk from wherever within
-    // the interaction distance, or the skip) answers.
+    // teacherApproachWindow bounds the whole close approach of the teach stop:
+    // the ring walk clicks the approach point until the character stands by the
+    // teacher; past it the talk fires from the current spot or the stop skips.
     teacherApproachWindow = 45 * time.Second
 )
 
-// lessonTarget is one lesson the teacher stop plans to learn: the
-// skill, the level being learned, its SP cost and the spellbook it
-// consumes (0 - none).
+// lessonTarget is one lesson the teacher stop plans to learn: the skill, the
+// level being learned, its SP cost and the spellbook it consumes (0 - none).
 type lessonTarget struct {
     skillID int32
     level   int32
@@ -72,10 +58,9 @@ type lessonTarget struct {
     book    int32
 }
 
-// townTeachers are the skill teachers of the deployment village per
-// class: the class specific masters the learning trip walks to (the
-// generated teacher dictionary joined with the village spawns). The
-// display ids carry the 1000000 wire offset like the merchants.
+// townTeachers are the skill teachers of the deployment village per class: the
+// class specific masters the learning trip walks to (the generated teacher
+// dictionary joined with the village spawns); the ids carry the wire offset.
 var townTeachers = teacherCatalog()
 
 // teacherCatalog resolves the village teachers of every known class
@@ -136,12 +121,10 @@ func (l *Loop) teacherTemplates() []int32 {
     }
 }
 
-// refreshLearnPlan re-reads the learning queue view of the tracker
-// when the plan period elapsed OR the skills revision moved (every
-// learned lesson rebuilds the queue - a stale cache would re-request
-// the learned lesson). The cached queue drives the trip trigger (the
-// affordable prefix) and the teacher stop (the lesson walk) - both
-// read it every tick, the view allocates.
+// refreshLearnPlan re-reads the learning queue view of the tracker when the
+// plan period elapsed or the skills revision moved (every learned lesson
+// rebuilds the queue). The cached queue drives the trip trigger (the affordable
+// prefix) and the teacher stop (the lesson walk), both read every tick.
 func (l *Loop) refreshLearnPlan() {
     now := l.now()
     revision := l.tracker.SkillsRevision()
@@ -158,29 +141,19 @@ func (l *Loop) refreshLearnPlan() {
     l.learnPlanRevision = revision
 }
 
-// learnableLessons walks the cached learning queue and collects the
-// lessons the character may learn right now: the unlock level
-// reached, the SP affordable and the demanded spellbook owned (or
-// not needed). The walk stops at the first lesson the wallet cannot
-// pay - the queue is priority ordered, the lessons behind it wait
-// for the SP whatever their own budget says. The SP spent subtracts
-// lesson by lesson, so a full prefix answers.
+// learnableLessons collects the lessons the character may learn right now: the
+// unlock level reached, the SP affordable and the demanded spellbook owned. The
+// SP spent subtracts lesson by lesson, so a full affordable prefix answers.
 func (l *Loop) learnableLessons() []lessonTarget {
     return l.walkLearnPrefix(true)
 }
 
-// walkLearnPrefix walks the affordable and unlocked lessons of the
-// cached learning queue in its priority order. A lesson above the
-// character level is skipped - it cannot be learned this trip, so it
-// reserves no SP and the unlocked lessons behind it stay reachable
-// (the attack lessons of the next level window never fence out the
-// defense lesson of the current one); the walk breaks at the first
-// unlocked lesson the wallet cannot pay - the priority order spends
-// the SP on the head lessons first and the tail waits for it. The
-// book lessons join when their spellbook is owned (ownBook true -
-// the teacher walk; the trigger and the book planning walk the
-// prefix without the gate so a lesson that waits for its spellbook
-// counts its SP and demands its purchase).
+// walkLearnPrefix walks the affordable and unlocked lessons of the queue in its
+// priority order. A lesson above the character level is skipped - it reserves
+// no SP, so the unlocked lessons behind it stay reachable; the walk breaks at
+// the first unlocked lesson the wallet cannot pay. The book lessons join when
+// their spellbook is owned (ownBook - the teacher walk; the trigger and the
+// book planning count them without the gate so their SP and purchase demand).
 func (l *Loop) walkLearnPrefix(ownBook bool) []lessonTarget {
     if len(l.learnPlanCache) == 0 {
         return nil
@@ -213,11 +186,10 @@ func (l *Loop) walkLearnPrefix(ownBook bool) []lessonTarget {
     return lessons
 }
 
-// learnTripWanted reports whether the learning queue justifies a
-// town trip on its own: enough SP worth of lessons unlocked and
-// affordable (a lesson that waits for its spellbook counts - the
-// trip buys the book). The trigger runs on the cached queue,
-// refreshed per period.
+// learnTripWanted reports whether the learning queue justifies a town trip on
+// its own: enough SP worth of unlocked and affordable lessons (a lesson that
+// waits for its spellbook counts - the trip buys the book). The trigger runs on
+// the cached queue, refreshed per period.
 func (l *Loop) learnTripWanted() bool {
     l.refreshLearnPlan()
     if len(l.learnPlanCache) == 0 {
@@ -227,16 +199,11 @@ func (l *Loop) learnTripWanted() bool {
     return spTotal(l.walkLearnPrefix(false)) >= learnTripMinSp
 }
 
-// planLearnStops appends the learning stops of the running trip: the
-// spellbook purchases of the learnable lessons from the town merchant
-// that sells them and the teacher stop of the class master. The stops
-// close the trip BEHIND the gear stops (the sell phase calls this
-// after planShoppingStops): the books merge into the gear stop of
-// their merchant when they match (the jewel trader Creamees sells both
-// the basic jewels and the spellbooks - one visit buys them all), the
-// teacher walk follows, so one town visit buys the weapon, the armor,
-// the jewels, the books and teaches the lessons. The fresh adena of
-// the junk sales funds the books.
+// planLearnStops appends the learning stops behind the gear stops (the sell
+// phase calls it after planShoppingStops): the spellbook purchases of the
+// learnable lessons from the merchant that sells them (merged into an existing
+// gear stop of the same merchant, Creamees sells both jewels and books) and the
+// teacher stop of the class master. The junk sales fund the books.
 func (l *Loop) planLearnStops() {
     l.refreshLearnPlan()
     lessons := l.walkLearnPrefix(false)
@@ -255,9 +222,8 @@ func (l *Loop) planLearnStops() {
         merchant, found := merchantByTemplate(books[0].MerchantTemplateID)
         if found {
             if stop := l.merchantStop(merchant.TemplateID); stop != nil {
-                // The gear stop of the book merchant absorbs the books:
-                // the jewels and the spellbooks of the same trader leave
-                // in one visit.
+                // The gear stop of the book merchant absorbs the books: the
+                // jewels and the spellbooks of the same trader leave together.
                 stop.buys = append(stop.buys, books...)
                 l.logger.Printf("Hunt: learn: buying %d spellbooks from %s"+
                     " with the gear stop", len(books), merchant.Name)
@@ -289,9 +255,8 @@ func (l *Loop) planLearnStops() {
         spTotal(lessons))
 }
 
-// merchantStop resolves the trip stop of the merchant when the trip
-// carries one, so a later stop planning merges its buys into it
-// instead of walking to the same npc twice.
+// merchantStop resolves the trip stop of the merchant when the trip carries
+// one, so a later stop planning merges its buys instead of walking twice.
 func (l *Loop) merchantStop(templateID int32) *tripStop {
     for index := range l.tripStops {
         if l.tripStops[index].merchant.TemplateID == templateID {
@@ -312,12 +277,10 @@ func spTotal(lessons []lessonTarget) int64 {
     return total
 }
 
-// bookPurchases plans the spellbook purchases of the lessons: every
-// distinct demanded book the character does not carry yet (the
-// inventory check runs through the has callback - the state accessor
-// keeps the function pure for the tests), priced through the buylist
-// product the town merchants sell. The returned purchases are plain
-// gear purchases - the buy stop machinery executes them unchanged.
+// bookPurchases plans the spellbook purchases of the lessons: every distinct
+// demanded book the character does not carry yet, priced through the buylist
+// product the town merchants sell (the has callback keeps the function pure).
+// The returned purchases are plain gear purchases the buy stop executes.
 func bookPurchases(
     lessons []lessonTarget, has func(itemID int32) bool,
 ) []gear.Purchase {
@@ -342,13 +305,10 @@ func bookPurchases(
     return purchases
 }
 
-// bookPurchase resolves one spellbook purchase through the town shop
-// catalogs: the elven village catalog first (the near stop of the
-// 1-19 band lessons), the Dion catalog as the fallback (Sonia sells
-// every spellbook of the first profession band - the village list
-// carries only Charm and Poison Recovery, so the Cure Bleeding book
-// of the level 24 lessons routes through the Dion stop; the price
-// carries the selling town's tax).
+// bookPurchase resolves one spellbook purchase through the town shop catalogs:
+// the elven village catalog first (the near stop of the 1-19 band lessons), the
+// Dion catalog as the fallback (Sonia sells the whole first profession band,
+// the village list only Charm and Poison Recovery). The price carries the tax.
 func bookPurchase(itemID int32) (gear.Purchase, bool) {
     for _, catalog := range []gear.Catalog{townShopCatalog, dionShopCatalog} {
         for _, shop := range catalog.Shops {
@@ -377,9 +337,8 @@ func bookPurchase(itemID int32) (gear.Purchase, bool) {
     return gear.Purchase{}, false //nolint:exhaustruct_v5 // not-found
 }
 
-// shopTaxPercent reads the buy tax of a catalog shop back as whole
-// percent for the integer price math (the catalog builders carry the
-// exact 15 and 20 percent rates).
+// shopTaxPercent reads the buy tax of a catalog shop back as whole percent for
+// the integer price math (the catalog builders carry the exact rates).
 func shopTaxPercent(shop gear.Shop) int32 {
     return int32(math.Round(float64(shop.TaxRate) * 100))
 }
@@ -393,13 +352,10 @@ func (l *Loop) teachStop() bool {
     return len(l.tripStops) > 0 && l.tripStops[0].teach
 }
 
-// handleTeacher approaches the teacher npc and clicks it like the
-// official client talks to an npc: the click selects the teacher and
-// the server remembers it as the last folk - the RequestAcquireSkill
-// lesson requests resolve their trainer through it. It reports false
-// while the character still walks toward the teacher or waits for
-// one to appear, true when the teaching may start (the click went
-// out or the teacher never showed up and the stop skips).
+// handleTeacher approaches the teacher npc and clicks it like the official
+// client: the click selects the teacher and the server remembers it as the last
+// folk, which RequestAcquireSkill resolves its trainer through. It reports
+// false while the character still walks, true when the teaching may start.
 func (l *Loop) handleTeacher(now time.Time) bool {
     if l.teacherID < 0 {
         return true
@@ -430,32 +386,13 @@ func (l *Loop) handleTeacher(now time.Time) bool {
     return true
 }
 
-// approachTeacher walks the character right up to the teacher npc and
-// reports when the lesson requests may fire. The walk targets the npc
-// approach point - the converging offset ring of npcApproachPoint at
-// npcApproachOffset units from the teacher - and the talk click fires
-// once the character stands on the ring (the 2026-09-12 user rule: the
-// character must walk from the building entrance right up to the
-// training npc, not talk to it through the wall from wherever the
-// geodata segment happened to end).
-//
-// The approach walk clicks the ground at the npc approach point, not
-// at the teacher's exact cell: the server's getValidLocation walks a
-// Bresenham line that can "step over" onto a roof layer when the
-// click targets an interior cell (the 2026-09-11 roof teleport
-// report: the bot clicked Cobendell's spawn point inside the trainer
-// hall, the line crossed the south wall and the height-step fallback
-// resolved the target onto the roof). The offset keeps the click
-// line on the walkable approach, within the interaction distance.
-//
-// The teacherWalkUntil window bounds the whole close approach and
-// answers its two dead ends: a ring the server routing refuses to
-// walk (the talk then fires from wherever the character stands, as
-// long as the 3D distance fits the server INTERACTION_DISTANCE of
-// 250 - the 2026-09-11 05:45 dump: the bot stood at dist 244 with a
-// z gap of 40, the talk gate waited for 200 forever), and a teacher
-// on a deck the ring cannot reach (the stop skips, the trip
-// continues).
+// approachTeacher walks the character right up to the teacher npc and reports
+// when the lesson requests may fire: the npc approach point ring before the
+// talk click, never the teacher's exact cell (the Bresenham line of the server
+// can step over onto a roof layer there). The teacherWalkUntil window bounds
+// the walk and answers its two dead ends: a ring the server routing refuses
+// (the talk fires from wherever the character stands inside the 250 unit
+// INTERACTION_DISTANCE) and a teacher on another deck (the stop skips).
 func (l *Loop) approachTeacher(now time.Time) bool {
     x, y, z, ok := l.tracker.ObjectPosition(l.teacherID)
     if !ok {
@@ -468,29 +405,22 @@ func (l *Loop) approachTeacher(now time.Time) bool {
         float64(x-selfX), float64(y-selfY))
     dz := float64(z - selfZ)
     dist3D := math.Sqrt(dist2D*dist2D + dz*dz)
-    // The window arms once per teach stop and bounds the whole close
-    // approach (the ring walk and the deck wait alike).
+    // The window arms once per teach stop and bounds the whole approach.
     if l.teacherWalkUntil.IsZero() {
         l.teacherWalkUntil = now.Add(teacherApproachWindow)
     }
-    // The close ring: the character stands right by the teacher - the
-    // small z gap of the trainer hall floor stays inside the server
-    // interaction gate, so the talk click lands from the ring.
+    // The close ring: the character stands right by the teacher, so the
+    // talk click lands from the ring.
     if dist2D <= npcApproachOffset+hopCoincideDist {
         if dist3D <= npcInteractionDist {
             l.clickTeacher(now)
 
             return true
         }
-        // The teacher stands on another deck and no ring walk closes
-        // the z gap: the paced talk clicks keep firing while the
-        // window runs (the offset clicks cannot help - clicking the
-        // teacher's exact cell teleported the bot onto the roof, the
-        // 2026-09-11 report) and the attack analog pull of the
-        // already selected teacher hands the close walk to the
-        // server - the straight line the pack cannot walk. The
-        // expiry path below talks from wherever the character stands
-        // or skips.
+        // The teacher stands on another deck and no ring walk closes the z
+        // gap: the paced talk clicks keep firing while the window runs, and
+        // the attack analog pull of the already selected teacher hands the
+        // close walk to the server. The expiry path talks or skips.
         if l.teacherDeckUntil.IsZero() {
             l.teacherDeckUntil = now.Add(merchantDeckWindow)
             l.logger.Printf("Hunt: learn: the teacher stands on "+
@@ -502,12 +432,10 @@ func (l *Loop) approachTeacher(now time.Time) bool {
         return false
     }
     if now.After(l.teacherWalkUntil) {
-        // The window burned without reaching the ring: the talk fires
-        // from wherever the character stands when the 3D distance fits
-        // the server interaction gate (the 2026-09-11 05:45 rule: the
-        // z gap kept the character at dist3D 244 forever, the talk gate
-        // must not wait for the ring it cannot close), everything else
-        // skips the lessons - the trip continues either way.
+        // The window burned without reaching the ring: the talk fires from
+        // wherever the character stands when the 3D distance fits the server
+        // interaction gate (a z gap must not hold the gate forever), else the
+        // lessons are skipped and the trip continues.
         if dist3D <= npcInteractionDist {
             l.clickTeacher(now)
 
@@ -519,11 +447,9 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 
         return true
     }
-    // The ring walk: click the npc approach point until the character
-    // stands on the ring right by the teacher. The point converges
-    // with the character (npcApproachPoint offsets toward the walker),
-    // so the chained clicks close the last stretch of the approach -
-    // through the building entrance and up to the training npc.
+    // The ring walk: click the npc approach point until the character stands
+    // on the ring. The point converges with the character, so the chained
+    // clicks close the last stretch through the entrance to the npc.
     ax, ay, az := npcApproachPoint(x, y, z, selfX, selfY)
     approachDist2D := math.Hypot(
         float64(ax-selfX), float64(ay-selfY))
@@ -535,12 +461,9 @@ func (l *Loop) approachTeacher(now time.Time) bool {
 }
 
 // clickTeacher sends the paced talk click that selects the teacher and
-// refreshes the server's last-folk memory (the RequestAcquireSkill
-// lesson requests resolve their trainer through it). When the teacher
-// is already the selected target the click is the attack analog pull:
-// the second plain click takes the interact branch and the server
-// walks the character to the teacher along the straight line, so the
-// talk distance is met however the deck geometry sits between them.
+// refreshes the server last-folk memory. When the teacher is already the
+// selected target the click is the attack analog pull: the second plain click
+// takes the interact branch and the server walks the character straight in.
 func (l *Loop) clickTeacher(now time.Time) {
     if now.Sub(l.teacherPick) >= selectPeriod {
         l.teacherPick = now
@@ -556,20 +479,13 @@ func (l *Loop) clickTeacher(now time.Time) {
     }
 }
 
-// tickTeacherLessons learns the queued lessons one request at a time
-// at the maximum speed the server allows: the next request fires the
-// moment the previous lesson's SkillList answer lands (the confirm
-// consumes the head and the same tick walks straight into the next
-// send - the confirm round trip is the only real rate limit, the
-// server knows no flood protector on RequestAcquireSkill). A lesson
-// that never confirms is re-requested up to the retry budget and
-// then skipped (the refusals answer silently). A send held back by
-// the pacing pause arms nothing - the request retries on a later
-// tick instead of burning the confirm window on a packet that never
-// went out. The lesson list re-reads the live queue every call - the
-// SP drop of each learned lesson drops the tail behind it out of the
-// budget. It reports true when nothing learnable is left and the
-// stop may advance.
+// tickTeacherLessons learns the queued lessons one request at a time: the next
+// request fires the moment the previous lesson's SkillList answer lands, the
+// confirm round trip being the only real rate limit. A lesson that never
+// confirms is re-requested up to the retry budget and then skipped. A send held
+// back by the pacing arms nothing, so the confirm window never burns on a
+// packet that never went out. The lesson list re-reads the live queue every
+// call and reports true when nothing learnable is left and the stop advances.
 func (l *Loop) tickTeacherLessons(now time.Time) bool {
     l.refreshLearnPlan()
     lessons := l.learnableLessons()
@@ -588,9 +504,8 @@ func (l *Loop) tickTeacherLessons(now time.Time) bool {
         return false
     }
     if l.tracker.SkillsRevision() != l.learnRevision {
-        // The SkillList answer of the learned lesson: the queue head
-        // moved, the next request fires right away (the recursion
-        // walks into the fresh head within this same tick).
+        // The SkillList answer of the learned lesson: the queue head moved,
+        // so the next request fires within this same tick.
         l.logger.Printf("Hunt: learn: learned %s level %d for %d sp",
             skillDisplayName(l.learnRequested.skillID),
             l.learnRequested.level, l.learnRequested.sp)
@@ -617,8 +532,7 @@ func (l *Loop) tickTeacherLessons(now time.Time) bool {
         " of %d)", skillDisplayName(l.learnRequested.skillID),
         l.learnRequested.level, l.learnRetries+1, learnRetries)
     if !l.sendLearnRequest(*l.learnRequested) {
-        // The pacing pause holds the re-request: the retry budget
-        // only counts requests that actually went out.
+        // The pacing pause holds the re-request: only real sends count.
         return false
     }
     l.learnRetries++
@@ -627,11 +541,9 @@ func (l *Loop) tickTeacherLessons(now time.Time) bool {
     return false
 }
 
-// sendLearnRequest sends one paced lesson request and reports
-// whether the request actually went out: the pacing pause holds the
-// send back and a transport error reports the same way - the caller
-// retries on a later tick and the confirm machinery stays unarmed
-// until a packet is on the wire.
+// sendLearnRequest sends one paced lesson request and reports whether it went
+// out: the pacing pause and a transport error both report false, so the caller
+// retries on a later tick and the confirm machinery stays unarmed.
 func (l *Loop) sendLearnRequest(lesson lessonTarget) bool {
     if !l.learnAt.IsZero() && l.now().Sub(l.learnAt) < learnPause {
         return false
@@ -646,8 +558,7 @@ func (l *Loop) sendLearnRequest(lesson lessonTarget) bool {
     return true
 }
 
-// skillDisplayName resolves the display name of a skill id for the
-// logs (the generated dictionary).
+// skillDisplayName resolves the display name of a skill id for the logs.
 func skillDisplayName(skillID int32) string {
     if info, ok := npcdata.SkillInfoOf(skillID); ok {
         return info.Name
@@ -656,9 +567,8 @@ func skillDisplayName(skillID int32) string {
     return "skill"
 }
 
-// resetLearnState drops the teacher stop state: a fresh trip
-// re-finds its teacher, an aborted trip leaves no half-learned
-// lesson behind.
+// resetLearnState drops the teacher stop state: a fresh trip re-finds its
+// teacher, an aborted trip leaves no half-learned lesson behind.
 func (l *Loop) resetLearnState() {
     l.teacherID = 0
     l.teacherPick = time.Time{}

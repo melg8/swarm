@@ -443,6 +443,20 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `cell_policy.go` fell from 23.7 to 20.5 percent
   (225 comment lines); the tree share reads 13.1 percent.
 
+### 2026-11-12 - hunt/learning.go keeps the request pacing
+
+- 34 blocks compress: the 300 SP trip floor and the 2 s plan re-read,
+  the 250 ms send spacing (the server knows no flood protector on
+  `RequestAcquireSkill`, the SkillList confirm is the rate limit),
+  the 5 s confirm wait and the 3 retry budget, the 45 s teacher wait
+  and approach windows, the `INTERACTION_DISTANCE` of 250 and the
+  roof-layer Bresenham hazard of the exact-cell click, the 15-20
+  percent shop tax. The approach narrative (the roof report, the z gap
+  dump) drops; docs/hunting.md already carries the ring and the skip.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. `learning.go` fell from 32.4 to 22.0 percent (128
+  comment lines).
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -456,7 +470,8 @@ passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`, `hunt/shopping.go`,
 `hunt/loop_params.go`, `acceptance/archer_kite.go`, `hunt/user.go`,
-`hunt/loop_movement.go`, `hunt/kite.go` and `hunt/cell_policy.go`. Next: a
-fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
-`hunt/loop_state.go` entries stay untouched while their fragments are
-active); the share and the block count are re-measured at the end.
+`hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go` and
+`hunt/learning.go`. Next: a fresh `task comment:audit --top 10` pick
+(the `proxy/game.go` and `hunt/loop_state.go` entries stay untouched
+while their fragments are active); the share and the block count are
+re-measured at the end.
