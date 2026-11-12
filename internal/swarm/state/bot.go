@@ -2010,9 +2010,7 @@ func (b *Bot) ApplyUserInfo(info UserInfo) {
     b.char.Level = info.Level
     b.char.Race = info.Race
     b.char.ClassID = info.ClassID
-    b.char.X = info.X
-    b.char.Y = info.Y
-    b.char.Z = info.Z
+    b.applySelfPositionSampleLocked(info.X, info.Y, info.Z, time.Now())
     b.char.STR = info.STR
     b.char.DEX = info.DEX
     b.char.CON = info.CON
@@ -2139,9 +2137,7 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
         return
     }
     if m.TargetID == b.selfID {
-        b.char.X = m.TargetX
-        b.char.Y = m.TargetY
-        b.char.Z = m.TargetZ
+        b.applySelfPositionSampleLocked(m.TargetX, m.TargetY, m.TargetZ, now)
         b.char.CombatUntil = now.Add(combatWindow)
         b.char.LastHitAt = now
         b.touch()
@@ -2258,10 +2254,7 @@ func (b *Bot) ApplyAttackAt(a Attack, at time.Time) {
     facing := HeadingFromDelta(a.TargetX-a.X, a.TargetY-a.Y)
     hasFacing := a.TargetX != a.X || a.TargetY != a.Y
     if a.AttackerID == b.selfID {
-        b.char.X = a.X
-        b.char.Y = a.Y
-        b.char.Z = a.Z
-        b.clearCharMovement()
+        b.applySelfPositionSampleLocked(a.X, a.Y, a.Z, now)
         if hasFacing {
             b.char.Heading = facing
         }
@@ -2291,9 +2284,8 @@ func (b *Bot) ApplyAttackAt(a Attack, at time.Time) {
     b.noteSwingsLocked(a)
     for i := range a.TargetCount {
         if a.TargetIDs[i] == b.selfID {
-            b.char.X = a.TargetX
-            b.char.Y = a.TargetY
-            b.char.Z = a.TargetZ
+            b.applySelfPositionSampleLocked(
+                a.TargetX, a.TargetY, a.TargetZ, now)
             b.char.CombatUntil = now.Add(combatWindow)
             b.char.LastHitAt = now
             b.touch()
@@ -2809,6 +2801,27 @@ func (b *Bot) clearCharMovement() {
     b.char.DestY = b.char.Y
     b.char.DestZ = b.char.Z
     b.char.MoveAt = time.Now()
+}
+
+// applySelfPositionSampleLocked adopts a position sample of the played
+// character that carries no movement state of its own: a UserInfo
+// refresh, the target position of a pawn chase, an attack hit. The
+// sample is the server position at packet build time, so a moving
+// character is re-anchored to the sample arrival: the client
+// projection keeps the destination and replays the ticks from the
+// fresh point, exactly like a movement broadcast of the sampled
+// packet would. Leaving the old anchor in place made the projection
+// run ahead by the avenue already covered and snap back on the next
+// broadcast. The caller must hold the write lock.
+func (b *Bot) applySelfPositionSampleLocked(
+    x int32, y int32, z int32, now time.Time,
+) {
+    b.char.X = x
+    b.char.Y = y
+    b.char.Z = z
+    if b.char.Moving && now.After(b.char.MoveAt) {
+        b.char.MoveAt = now
+    }
 }
 
 // clearSelfTargetLocked drops the target of the character and records
