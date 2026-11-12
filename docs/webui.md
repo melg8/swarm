@@ -250,9 +250,10 @@ colors from the same variables).
   value. The effective on-sight flag of `AttackableAI` is true only
   for a monster class template (`Monster`, `RaidBoss`, `GrandBoss`)
   with a true `isAggressive` flag (the default when the xml omits it)
-  and a positive effective range: guards and friendly mobs attack only
-  players with karma and folk never attack, so a town npc draws no
-  threat circle. The map draws the on-sight radius of every living
+  and a positive effective range: guards answer a player with karma
+  (and hunt aggressive monsters), friendly mobs answer only a player
+  with karma, and folk never attack, so a town npc draws no threat
+  circle. The map draws the on-sight radius of every living
   attackable aggressive mob as a dashed circle around its drawn
   position (2 px stroke at 0.85 alpha plus a faint zone fill; amber
   idle, red once it fights; the `aggro` toolbar checkbox hides the
