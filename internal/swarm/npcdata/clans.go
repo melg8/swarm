@@ -37,11 +37,11 @@ var npcClanMasks = buildNpcClanMasks()
 // the mask for the social pull check of the target search without
 // any string work.
 func NPCClanMask(templateID int32) uint64 {
-    if templateID <= npcTemplateOffset {
+    if templateID <= NPCDisplayOffset {
         return 0
     }
 
-    return npcClanMasks[templateID-npcTemplateOffset]
+    return npcClanMasks[templateID-NPCDisplayOffset]
 }
 
 // buildNpcClanSets splits the joined clan strings of the generated

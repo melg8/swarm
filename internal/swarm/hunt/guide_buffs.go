@@ -25,6 +25,8 @@ package hunt
 import (
     "math"
     "time"
+
+    "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
 // The support magic constants: the wire template of the guide npc,
@@ -110,8 +112,8 @@ var guideBuffSlots = map[int32]string{
 }
 
 // guideWireTemplates are the packet template ids of the Newbie Guide
-// (the display id offset of the wire, see npcDisplayOffset).
-var guideWireTemplates = []int32{guideTemplateID + npcDisplayOffset}
+// (the display id offset of the wire, see npcdata.NPCDisplayOffset).
+var guideWireTemplates = []int32{guideTemplateID + npcdata.NPCDisplayOffset}
 
 // guideStopNpc is the Newbie Guide of the elven village the guide
 // stop walks to (the spawn position of the Mobius spawn data).

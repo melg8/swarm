@@ -8,6 +8,7 @@ import (
     "testing"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -95,7 +96,7 @@ func TestReproFarmReadinessShopRound(t *testing.T) {
     } {
         bot.ApplyNpcInfo(state.NpcInfo{
             ObjectID:   npc.objectID,
-            TemplateID: npc.template + npcDisplayOffset,
+            TemplateID: npc.template + npcdata.NPCDisplayOffset,
             X:          npc.x, Y: npc.y, Z: npc.z,
             Name: npc.name,
         })

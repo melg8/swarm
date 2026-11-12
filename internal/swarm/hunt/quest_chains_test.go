@@ -31,7 +31,7 @@ func TestQuestNpcIdsResolveToNames(t *testing.T) {
         "Rains":   rainsNPC(),
     }
     for wantName, npc := range stations {
-        got := npcdata.NPCName(npc.TemplateID + npcDisplayOffset)
+        got := npcdata.NPCName(npc.TemplateID + npcdata.NPCDisplayOffset)
         require.Equal(t, wantName, got,
             "the %s station display id resolves through npcdata",
             wantName)
@@ -55,7 +55,7 @@ func TestQuestKillMobsResolveToNames(t *testing.T) {
         5031: "Ol Mahum Sentry",
     }
     for id, want := range expected {
-        require.Equal(t, want, npcdata.NPCName(id+npcDisplayOffset),
+        require.Equal(t, want, npcdata.NPCName(id+npcdata.NPCDisplayOffset),
             "the kill mob %d resolves through npcdata", id)
     }
 }

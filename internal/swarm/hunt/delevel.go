@@ -43,6 +43,7 @@ import (
     "math"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
@@ -151,7 +152,7 @@ var delevelGuards = []townNpc{
 func delevelGuardTemplates() []int32 {
     templates := make([]int32, 0, len(delevelGuards))
     for _, guard := range delevelGuards {
-        templates = append(templates, guard.TemplateID+npcDisplayOffset)
+        templates = append(templates, guard.TemplateID+npcdata.NPCDisplayOffset)
     }
 
     return templates

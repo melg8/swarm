@@ -20,7 +20,7 @@ import (
 func spawnMerchantNPC(bot *state.Bot, npc townNpc, objectID int32) {
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID:   objectID,
-        TemplateID: npc.TemplateID + npcDisplayOffset,
+        TemplateID: npc.TemplateID + npcdata.NPCDisplayOffset,
         X:          npc.X,
         Y:          npc.Y,
         Z:          npc.Z,

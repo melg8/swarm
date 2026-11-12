@@ -57,4 +57,18 @@ Measured 2026-11-12 before the change:
 
 ## Status
 
-The bench cleanup lands; the offset unification is next.
+Both slices land; the full gate and the live run are next.
+
+### 2026-11-12 - the offset unification
+`npcdata.NPCDisplayOffset` is the single definition: the package's own
+resolvers, the hunt trip planning (the merchant, quest and guide
+template lists of `delevel.go`, `guide_buffs.go`, `learning.go`,
+`quest_chains.go`, `quest_trip.go`, `shopping.go`,
+`town_merchants.go`) and the state name resolution of `bot_info.go`
+read it. The two duplicate declarations and the stale
+`npcTemplateOffset` name are gone.
+
+Verified: `go build ./...`, `go vet` on the four touched packages,
+`golangci-lint run` 0 issues on them, `go test` of `npcdata` (0.4 s),
+`state` (1.2 s) and `hunt` (97 s) green, the three `InitPacket`
+benchmarks run.

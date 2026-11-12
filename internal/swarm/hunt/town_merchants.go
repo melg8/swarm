@@ -7,12 +7,9 @@ package hunt
 import (
     "math"
 
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/pathfind"
 )
-
-// npcDisplayOffset mirrors the display id offset the Mobius server adds
-// to the npc id of every NpcInfo packet (AbstractNpcInfo writeImpl).
-const npcDisplayOffset = 1000000
 
 // townNpc is a town npc the trip machinery navigates to: a shop
 // merchant of the sell trips or a guard of the deleveling.
@@ -171,7 +168,8 @@ func (l *Loop) merchantTemplates() []int32 {
 func townMerchantTemplates(merchants []townNpc) []int32 {
     templates := make([]int32, 0, len(merchants))
     for _, merchant := range merchants {
-        templates = append(templates, merchant.TemplateID+npcDisplayOffset)
+        templates = append(templates,
+            merchant.TemplateID+npcdata.NPCDisplayOffset)
     }
 
     return templates

@@ -9,28 +9,28 @@
 // the bot resolves the names itself.
 package npcdata
 
-// npcTemplateOffset is added to the display id inside NpcInfo packets.
-const npcTemplateOffset = 1000000
+// NPCDisplayOffset is added to the npc display id inside NpcInfo packets.
+const NPCDisplayOffset = 1000000
 
 // NPCName resolves the name of an npc by the raw NpcInfo template id
 // (display id + 1000000). It returns an empty string when the template is
 // unknown.
 func NPCName(templateID int32) string {
-    if templateID <= npcTemplateOffset {
+    if templateID <= NPCDisplayOffset {
         return ""
     }
 
-    return npcNames[templateID-npcTemplateOffset]
+    return npcNames[templateID-NPCDisplayOffset]
 }
 
 // NPCLevel resolves the level of an npc by the raw NpcInfo template id.
 // It returns zero when the template is unknown.
 func NPCLevel(templateID int32) int32 {
-    if templateID <= npcTemplateOffset {
+    if templateID <= NPCDisplayOffset {
         return 0
     }
 
-    return npcLevels[templateID-npcTemplateOffset]
+    return npcLevels[templateID-NPCDisplayOffset]
 }
 
 // NPCAggroRange resolves the effective aggro range the server builds
@@ -42,11 +42,11 @@ func NPCLevel(templateID int32) int32 {
 // sight. It returns zero when the template is unknown or carries no
 // range.
 func NPCAggroRange(templateID int32) int32 {
-    if templateID <= npcTemplateOffset {
+    if templateID <= NPCDisplayOffset {
         return 0
     }
 
-    return npcAggroRanges[templateID-npcTemplateOffset]
+    return npcAggroRanges[templateID-NPCDisplayOffset]
 }
 
 // NPCIsAggressive resolves the effective on-sight aggression of an npc
@@ -56,11 +56,11 @@ func NPCAggroRange(templateID int32) int32 {
 // friendly mobs answer only players with karma, folk never attack, so
 // they resolve false even when their xml flags suggest otherwise.
 func NPCIsAggressive(templateID int32) bool {
-    if templateID <= npcTemplateOffset {
+    if templateID <= NPCDisplayOffset {
         return false
     }
 
-    return npcAggressives[templateID-npcTemplateOffset]
+    return npcAggressives[templateID-NPCDisplayOffset]
 }
 
 // NPCClanHelpRange resolves the ai clanHelpRange of an npc by the raw
@@ -68,11 +68,11 @@ func NPCIsAggressive(templateID int32) bool {
 // clan mates to help. It returns zero when the template is unknown or
 // the npc hunts alone.
 func NPCClanHelpRange(templateID int32) int32 {
-    if templateID <= npcTemplateOffset {
+    if templateID <= NPCDisplayOffset {
         return 0
     }
 
-    return npcClanHelpRanges[templateID-npcTemplateOffset]
+    return npcClanHelpRanges[templateID-NPCDisplayOffset]
 }
 
 // NPCClans resolves the clan names of an npc by the raw NpcInfo template
@@ -83,11 +83,11 @@ func NPCClanHelpRange(templateID int32) int32 {
 // returned list is the shared pre-split dictionary entry (see clans.go)
 // and must be treated as read-only.
 func NPCClans(templateID int32) []string {
-    if templateID <= npcTemplateOffset {
+    if templateID <= NPCDisplayOffset {
         return nil
     }
 
-    return npcClanSets[templateID-npcTemplateOffset]
+    return npcClanSets[templateID-NPCDisplayOffset]
 }
 
 // NPCWireTemplateID maps the Mobius internal (CT0 xml) template id of

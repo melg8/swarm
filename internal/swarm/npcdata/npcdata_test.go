@@ -13,7 +13,7 @@ import (
 // Known template ids and item ids from the generated dictionaries.
 // The goblin (display id 3) is the first mob of the elven fields
 // hunt ladder; the keltir (display id 532) is the level 1 starter
-// mob. The wire template id adds the npcTemplateOffset (1000000).
+// mob. The wire template id adds the NPCDisplayOffset (1000000).
 const (
     goblinDisplayID    = 3
     goblinTemplateID   = 1000000 + goblinDisplayID

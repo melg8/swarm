@@ -450,7 +450,7 @@ func shoppingEntryView(
         Icon:       npcdata.ItemIcon(purchase.ItemID),
         MerchantID: purchase.MerchantTemplateID,
         Merchant: npcdata.NPCName(
-            purchase.MerchantTemplateID + npcDisplayOffset),
+            purchase.MerchantTemplateID + npcdata.NPCDisplayOffset),
         Type:        itemType,
         WeaponType:  stats.WeaponType,
         ArmorType:   stats.ArmorType,
@@ -826,7 +826,7 @@ func (l *Loop) stopMerchantTemplates() []int32 {
     }
 
     return []int32{
-        l.tripStops[0].merchant.TemplateID + npcDisplayOffset,
+        l.tripStops[0].merchant.TemplateID + npcdata.NPCDisplayOffset,
     }
 }
 

@@ -12,6 +12,7 @@ import (
     "time"
 
     "github.com/melg8/swarm/internal/swarm/gear"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
 )
@@ -153,11 +154,11 @@ const questHealthFloor = 20.0
 // tracker world (the knownlist push of the world entry or the
 // approach walk) and returns its live object. The scan walks the
 // npcdata display id onto the wire template id (the
-// TemplateID+npcDisplayOffset convention of the chain data).
+// TemplateID+npcdata.NPCDisplayOffset convention of the chain data).
 func (l *Loop) FindQuestNpc(
     npc QuestNpc, wait time.Duration,
 ) (state.AttackTarget, error) {
-    templates := []int32{npc.TemplateID + npcDisplayOffset}
+    templates := []int32{npc.TemplateID + npcdata.NPCDisplayOffset}
     deadline := time.Now().Add(wait)
     for {
         found, ok := l.tracker.NearestNpcByTemplates(
@@ -957,7 +958,7 @@ func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
     selfX, selfY, _, _ := l.tracker.SelfPosition()
     templates := make([]int32, 0, len(stage.Kill.Mobs))
     for _, mob := range stage.Kill.Mobs {
-        templates = append(templates, mob+npcDisplayOffset)
+        templates = append(templates, mob+npcdata.NPCDisplayOffset)
     }
     awayX, awayY := selfX, selfY
     if mob, found := l.tracker.NearestNpcByTemplates(
@@ -1018,7 +1019,7 @@ func (l *Loop) farmQuestStage(
     }
     templates := make([]int32, 0, len(kill.Mobs))
     for _, mob := range kill.Mobs {
-        templates = append(templates, mob+npcDisplayOffset)
+        templates = append(templates, mob+npcdata.NPCDisplayOffset)
     }
     deadline := time.Now().Add(questKillStageTimeout)
     for {

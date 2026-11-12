@@ -11,6 +11,7 @@ import (
     "time"
 
     "github.com/melg8/swarm/internal/swarm/gear"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -191,8 +192,8 @@ func TestMerchantSetsFollowTheRegion(t *testing.T) {
     require.Equal(t, int32(7150), merchant.TemplateID,
         "the elven default picks the nearest elven trader")
     templates := loop.merchantTemplates()
-    require.Contains(t, templates, int32(7147)+npcDisplayOffset)
-    require.NotContains(t, templates, int32(7060)+npcDisplayOffset)
+    require.Contains(t, templates, int32(7147)+npcdata.NPCDisplayOffset)
+    require.NotContains(t, templates, int32(7060)+npcdata.NPCDisplayOffset)
 
     loop.zoneRegion = regionDion
     merchant, ok = loop.nearestMerchant(18000, 144500)
@@ -200,8 +201,8 @@ func TestMerchantSetsFollowTheRegion(t *testing.T) {
     require.Equal(t, int32(7060), merchant.TemplateID,
         "the Dion region picks the nearest Dion trader")
     templates = loop.merchantTemplates()
-    require.Contains(t, templates, int32(7060)+npcDisplayOffset)
-    require.NotContains(t, templates, int32(7147)+npcDisplayOffset)
+    require.Contains(t, templates, int32(7060)+npcdata.NPCDisplayOffset)
+    require.NotContains(t, templates, int32(7147)+npcdata.NPCDisplayOffset)
 }
 
 // TestMerchantSelectionFiresTheAttackAnalogPull pins the interaction

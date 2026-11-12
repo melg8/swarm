@@ -11,6 +11,7 @@ import (
     "testing"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
@@ -420,7 +421,7 @@ func TestReproTownTripFromTheUserStuckSpot(t *testing.T) {
     // quarter): the loop selects it like the official client and sells.
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID:   reproUnorenID,
-        TemplateID: 7147 + npcDisplayOffset,
+        TemplateID: 7147 + npcdata.NPCDisplayOffset,
         X:          reproUnorenX, Y: reproUnorenY, Z: reproUnorenZ,
         Name: "Unoren",
     })

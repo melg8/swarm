@@ -9,6 +9,7 @@ import (
     "testing"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
@@ -90,7 +91,7 @@ func armTeachStop(t *testing.T, loop *Loop) {
 func spawnEllenia(bot *state.Bot) {
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID:   elleniaObjectID,
-        TemplateID: 7156 + npcDisplayOffset,
+        TemplateID: 7156 + npcdata.NPCDisplayOffset,
         X:          elleniaX, Y: elleniaY, Z: elleniaZ,
         Name: "Ellenia",
     })

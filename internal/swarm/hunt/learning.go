@@ -132,7 +132,7 @@ func (l *Loop) teacherTemplates() []int32 {
     }
 
     return []int32{
-        l.tripStops[0].merchant.TemplateID + npcDisplayOffset,
+        l.tripStops[0].merchant.TemplateID + npcdata.NPCDisplayOffset,
     }
 }
 

@@ -86,9 +86,6 @@ func (b *Bot) Info() BotInfo {
     }
 }
 
-// npcDisplayOffset mirrors the template id offset of NpcInfo packets.
-const npcDisplayOffset = 1000000
-
 // bowWeaponType is the weapon family of a bow in the item stats
 // dictionary.
 const bowWeaponType = "BOW"
@@ -117,7 +114,7 @@ func resolveNpcName(name string, templateID int32) string {
         return resolved
     }
 
-    return "npc #" + strconv.Itoa(int(templateID-npcDisplayOffset))
+    return "npc #" + strconv.Itoa(int(templateID-npcdata.NPCDisplayOffset))
 }
 
 // itemName formats the item name with the display id fallback.

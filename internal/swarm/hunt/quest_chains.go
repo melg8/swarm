@@ -29,7 +29,7 @@ package hunt
 // QuestNpc is one npc station of a quest chain: the display id of
 // the npcdata space (the world tracker stores the NpcInfo template
 // id as display id plus 1000000, so a scan looks up
-// TemplateID+npcDisplayOffset) and the spawn position of the live
+// TemplateID+npcdata.NPCDisplayOffset) and the spawn position of the live
 // stack (the trip planner walks to it).
 type QuestNpc struct {
     TemplateID int32

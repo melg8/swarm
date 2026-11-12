@@ -16,6 +16,7 @@ import (
     "time"
 
     "github.com/melg8/swarm/internal/swarm/connection"
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -73,8 +74,8 @@ const (
 // tracker template ids carry the display id plus the 1000000
 // offset). Both trainer pages carry the SkillList and Quest links.
 var liveTeacherTemplateIDs = []int32{
-    7155 + npcDisplayOffset, // Ellenia
-    7156 + npcDisplayOffset, // Cobendell
+    7155 + npcdata.NPCDisplayOffset, // Ellenia
+    7156 + npcdata.NPCDisplayOffset, // Cobendell
 }
 
 // TestLiveDialogWalkerRoundTrip verifies the dialog walker against
@@ -234,13 +235,13 @@ func liveDumpNamedNpcs(t *testing.T, tracker *state.Bot) {
     selfX, selfY, _, _ := tracker.SelfPosition()
     for i := range snap.Objects {
         obj := snap.Objects[i]
-        if obj.Name == "" || obj.TemplateID <= npcDisplayOffset {
+        if obj.Name == "" || obj.TemplateID <= npcdata.NPCDisplayOffset {
             continue
         }
         dx := float64(obj.X - selfX)
         dy := float64(obj.Y - selfY)
         t.Logf("npc %s (template %d, object %d) at (%d, %d, %d), "+
-            "dist %.0f", obj.Name, obj.TemplateID-npcDisplayOffset,
+            "dist %.0f", obj.Name, obj.TemplateID-npcdata.NPCDisplayOffset,
             obj.ObjectID, obj.X, obj.Y, obj.Z, math.Hypot(dx, dy))
     }
 }
