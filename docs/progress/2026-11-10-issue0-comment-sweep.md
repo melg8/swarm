@@ -223,6 +223,18 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.6 percent, 529 blocks,
   1,262 history markers.
 
+### 2026-11-12 - hunt/zones.go keeps the ladder numbers only
+
+- 29 blocks compress: the header, the picker and the rotation keep the
+  numbers (the level lead 1, the 30 s re-pick period, the 10 s rotate
+  window, the 40 s empty cooldown, the 3 death limit, the 15-20 s
+  respawn, the 1 hour danger window, the CT0 20471 to the wire 1000471
+  offset) and the round evidence drops. The zone economy facts stay in
+  `docs/hunting.md`.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.5 percent, 522 blocks,
+  1,261 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -230,8 +242,8 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `shopping.go`, `cell_policy.go`, `user.go`, `quest_trip.go`,
 `town_walk.go` (twice), `loop_state.go`, `town_stuck.go`,
 `acceptance/archer_fleet.go`, `pathfind/search.go`,
-`pathfind/navmesh/hierarchy.go` and `state/scans.go`. Next:
-`hunt/zones.go` (280 comment lines), `hunt/town.go` (272), then the
-second pass over `hunt/kite.go`, `hunt/cell_policy.go` and
-`hunt/loop_state.go`; the share and the block count are re-measured at
-the end.
+`pathfind/navmesh/hierarchy.go`, `state/scans.go` and `hunt/zones.go`.
+Next: `hunt/town.go` (272 comment lines), `hunt/kite.go` (371, the
+second pass), `hunt/cell_policy.go` (288, the second pass),
+`hunt/loop_state.go` (268) and `hunt/delevel.go` (259); the share and
+the block count are re-measured at the end.
