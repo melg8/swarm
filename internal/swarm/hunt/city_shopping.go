@@ -358,8 +358,9 @@ func (l *Loop) cityShoppingWanted() bool {
     if cost <= 0 {
         return false
     }
-    // The armed scan copies the bag, so it runs last: the steady
-    // state of a poor or fully dressed bot never reaches it.
+    // The armed scan copies the bag for a bare paperdoll, so it runs
+    // last: the steady state of a poor bot never reaches it, and the
+    // bow question above is answered by the version cache.
     return l.cityShoppingArmed()
 }
 
