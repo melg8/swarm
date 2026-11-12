@@ -356,6 +356,22 @@ corner probe is a length, not a leg at all.
   history markers; `shopping.go` fell from 20.6 to 18.1 percent
   (212 comment lines).
 
+### 2026-11-12 - hunt/loop_params.go keeps the numbers, drops the essays
+
+- 41 constant docs compress: every registry entry keeps its number and
+  its invariant (the 250 ms tick, the 2.5 s StandUpTask window, the
+  1200 tick attack timeout behind the three minute flee skip, the deck
+  gap 400, the 600 unit panic run, the 20 s flee budget, the 8 s gap
+  window and 150 unit open margin, the 600 s spawn protection, the
+  70 percent potion line above the 60 percent re-engage line) and the
+  round dumps, the "reported 180 degree flips", the 2026-09-11 and
+  2026-11-10 narratives drop. Six doc lines are re-wrapped under the
+  80 column gate; the file fell from 78.2 to 70.0 percent (156
+  comment lines), which is the registry floor.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.2 percent, 486 blocks,
+  1,209 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -368,7 +384,6 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`. Next:
-`hunt/loop_params.go` (240, 78.2 percent - a params registry, trim the
-prose not the facts), `acceptance/archer_kite.go` (240, 28.3 percent),
-`hunt/user.go` (232, 21.7 percent) and `hunt/loop_movement.go` (223, 36.6
-percent); the share and the block count are re-measured at the end.
+`acceptance/archer_kite.go` (240, 28.3 percent), `hunt/user.go` (232, 21.7
+percent) and `hunt/loop_movement.go` (223, 36.6 percent); the share and
+the block count are re-measured at the end.
