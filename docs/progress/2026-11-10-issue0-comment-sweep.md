@@ -629,6 +629,21 @@ corner probe is a length, not a leg at all.
   lint:new`. `smooth.go` fell from 30.3 to 14.0 percent (30 comment
   lines), no block above 8 lines.
 
+### 2026-11-12 - gear/burst.go keeps the burst contract only
+
+- 14 blocks compress: the 28 line burst header (the disabled UseItem
+  flood protector, the shared `PacketExecutor` thread pool, the
+  overlapping write sets), the `PlannedEquip` write set, the
+  `BurstUpgrade` prefix contract and its termination bound, the
+  conflict cut, the `expectedWriteSlots` read-ahead, `ServerWriteSlots`
+  and the four displacement cases of `equipWriteSlots`. The
+  `## Auto equipment` section of `docs/hunting.md` already carried the
+  two source facts and gained the four displacement cases in the same
+  commit.
+- Verified: `task fmt`, `go build ./...`, the gear tests, `task
+  lint:new`. `burst.go` fell from 33.4 to 23.5 percent (60 comment
+  lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -647,7 +662,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
 `pathfind/navmesh/pocket.go`, `pathfind/capsule.go`, `hunt/loop_avoid.go`,
 `hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go`,
-`hunt/walk_params.go` and `pathfind/navmesh/smooth.go` (second passes).
-Next: a fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/walk_params.go`, `pathfind/navmesh/smooth.go` and
+`gear/burst.go` (second passes). Next: a fresh
+`task comment:audit --top 10` pick (the `proxy/game.go` and
 `hunt/loop_state.go` entries stay untouched while their fragments are
 active); the share and the block count are re-measured at the end.

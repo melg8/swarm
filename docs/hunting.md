@@ -1357,7 +1357,9 @@ can interleave on the server and cancel each other, while requests on
 independent slots never touch the same state. `BurstUpgrade` plans on
 a simulated copy of the equipment with the server write semantics
 (`equipWriteSlots`: the landing slot plus the pieces the server
-displaces) and returns the maximum independent prefix of the chain -
+displaces - the shield behind a two hand weapon, the legs behind a
+one-piece, the one-piece behind legs, the two hand weapon behind a
+shield) and returns the maximum independent prefix of the chain -
 the whole starting bag on an empty paperdoll dresses in ONE tick, the
 dependent steps ride the next tick after their prerequisite confirmed.
 The per item confirmation gate (`markInventoryAction`,

@@ -10,67 +10,38 @@ import (
 )
 
 // The burst plan of the auto equipment: the acceleration limit of the
-// sequential use item chain on this server build.
-//
-// The two server facts that bound it (both verified against the
-// deployed Mobius C1 source):
-//
-//   - The UseItem flood protector is disabled
-//     (FloodProtectorUseItemInterval = 0, the retail matching config),
-//     so no rate limit sits between the use item requests.
-//   - The packet executor is one shared ThreadPoolExecutor
-//     (commons/network/packet/PacketExecutor.java): every received
-//     packet becomes its own pool task, so two packets of the SAME
-//     client may run concurrently and in either order - the server
-//     gives no same client ordering guarantee.
-//
-// The second fact is what keeps the chain from being a single blind
-// burst: requests that race on one paperdoll slot (the two steps of a
-// pair swap, the follow up equip of a slot a previous request still
-// has to free) can interleave their reads and writes on the server
-// and cancel each other. Requests on independent slots never touch
-// the same server state and are safe to send together.
-//
-// So the limit is: every equip action whose server write set is
-// disjoint from the others goes out in one tick - the whole starting
-// bag dresses in a single burst - while the dependent steps (the
-// second step of a pair swap, the chest refill behind a one-piece
-// drop, the shield slot behind a two hand weapon) wait for the
-// confirmation of their prerequisite and ride the next tick.
+// sequential use item chain. Two source facts bound it - the UseItem flood
+// protector is disabled (FloodProtectorUseItemInterval = 0) and the packet
+// executor is one shared ThreadPoolExecutor, so two packets of the same client
+// may run concurrently and in either order. Requests whose server write sets
+// overlap cancel each other, while disjoint slots are safe to send together:
+// the disjoint actions go out in one tick, the rest waits (docs/hunting.md).
 
-// PlannedEquip is one use item action of the burst plan with the
-// paperdoll slots the server writes when the request applies: the
-// equip write itself plus the slots of the pieces the server
-// displaces with it (the shield behind a two hand weapon, the legs
-// behind a one-piece armor, the replaced occupant of the slot).
+// PlannedEquip is one use item action of the burst plan with the paperdoll
+// slots the server writes when the request applies: the equip write itself plus
+// the slots of the pieces the server displaces with it.
 type PlannedEquip struct {
-    // EquipAction is the use item request (the object id, the
-    // equip or free direction, the improved slot, the score gain
-    // and the log reason).
+    // EquipAction is the use item request (the object id, the equip or free
+    // direction, the improved slot, the score gain and the log reason).
     EquipAction
-    // Slots are the paperdoll slots the server write set of the
-    // request touches.
+    // Slots are the paperdoll slots the write set of the request touches.
     Slots []Slot
 }
 
-// BurstUpgrade plans every use item action the paperdoll still needs
-// and that can go out in one burst: NextUpgrade applied repeatedly to
-// a simulated copy of the equipment, each offered action mirrored
-// with the server write semantics, the chains cut at the steps that
-// would race an earlier request of the same burst (their slot is
-// already written by a collected action) and at the items that are
-// already in flight. The result is the maximum independent prefix of
-// the equip chain - nothing in it can interfere on the server,
-// everything else waits for the confirmations of this burst.
+// BurstUpgrade plans every use item action the paperdoll still needs and that
+// can go out in one burst: NextUpgrade applied repeatedly to a simulated copy
+// of the equipment, the chains cut at the steps that would race an earlier
+// request of the same burst and at the items already in flight. The result is
+// the maximum independent prefix of the equip chain; everything else waits for
+// the confirmations of this burst.
 func BurstUpgrade(profile Profile, equipment Equipment) []PlannedEquip {
     sim := cloneEquipment(equipment)
     locked := make(map[Slot]bool, slotCount)
     flight := make(map[int32]bool, len(equipment.Items))
     planned := make([]PlannedEquip, 0, slotCount)
-    // Every iteration either collects one action (each object id is
-    // collected at most twice - once equipping, once freeing) or
-    // permanently removes one candidate item from the simulation, so
-    // the bound below always terminates the loop.
+    // Every iteration either collects one action (each object id at most
+    // twice - once equipping, once freeing) or permanently removes one
+    // candidate item from the simulation, so the bound always terminates.
     bound := 2*len(equipment.Items) + int(slotCount) + 1
     for range bound {
         action, ok := NextUpgrade(profile, sim)
@@ -78,18 +49,15 @@ func BurstUpgrade(profile Profile, equipment Equipment) []PlannedEquip {
             break
         }
         if flight[action.ObjectID] {
-            // The item already rides this burst: a second request
-            // would toggle the first one's effect back. Drop the
-            // candidate from the simulation so the planner moves on.
+            // The item already rides this burst: a second request would toggle
+            // the first one's effect back, so the candidate drops.
             removeSimItem(&sim, action.ObjectID)
 
             continue
         }
-        // The write set computes purely BEFORE the simulation mutates:
-        // the conflict check needs no rollback clone, the per action
-        // copy of the whole working set was the second allocation
-        // source of the fleet profile (the 40 bot run held it at ten
-        // percent of all allocated bytes).
+        // The write set computes purely BEFORE the simulation mutates, so the
+        // conflict check needs no rollback clone (the per action copy of the
+        // working set was a fleet profile allocation source).
         written := expectedWriteSlots(sim, action)
         conflict := false
         for _, slot := range written {
@@ -100,10 +68,8 @@ func BurstUpgrade(profile Profile, equipment Equipment) []PlannedEquip {
             }
         }
         if conflict {
-            // A collected action of this burst already writes one of
-            // the slots this step needs: the pair swap refill, the
-            // one-piece drop follow up. The step waits for the real
-            // confirmation on the next tick.
+            // A collected action of this burst already writes one of the slots
+            // this step needs: the step waits for the real confirmation.
             flight[action.ObjectID] = true
             removeSimItem(&sim, action.ObjectID)
 
@@ -123,10 +89,10 @@ func BurstUpgrade(profile Profile, equipment Equipment) []PlannedEquip {
     return planned
 }
 
-// expectedWriteSlots computes the paperdoll slots the server write
-// set of the action touches without mutating the working set: the
-// same rules applyExpectedAction lands (see equipWriteSlots), read
-// ahead of time so the burst conflict check needs no rollback copy.
+// expectedWriteSlots computes the paperdoll slots the server write set of the
+// action touches without mutating the working set: the same rules
+// applyExpectedAction lands (see equipWriteSlots), read ahead of time so the
+// burst conflict check needs no rollback copy.
 func expectedWriteSlots(
     equipment Equipment, action EquipAction,
 ) []Slot {
@@ -153,13 +119,12 @@ func expectedWriteSlots(
     return nil
 }
 
-// ServerWriteSlots reports the paperdoll slots the server writes when
-// a use item, drop or destroy request of the inventory item applies:
-// the equip landing plus the displaced pieces for a bagged equippable,
-// the slot itself for a piece that comes off (an unequip toggle, a
-// worn drop or destroy) and nothing for items without gear stats.
-// The manual inventory commands of the hunt loop consult it for their
-// confirmation gate.
+// ServerWriteSlots reports the paperdoll slots the server writes when a use
+// item, drop or destroy request of the inventory item applies: the equip
+// landing plus the displaced pieces for a bagged equippable, the slot itself
+// for a piece that comes off and nothing for items without gear stats. The
+// manual inventory commands of the hunt loop consult it for their confirmation
+// gate.
 func ServerWriteSlots(equipment Equipment, objectID int32) []Slot {
     item, ok := equipment.itemByID(objectID)
     if !ok {
@@ -182,12 +147,10 @@ func ServerWriteSlots(equipment Equipment, objectID int32) []Slot {
     return equipWriteSlots(equipment, stats, slots[0])
 }
 
-// applyExpectedAction mirrors the server effect of one use item
-// request on the working set copy: the equipped flags and the slot
-// table land in the state the tracker will show once the flip arrives
-// (equipWriteSlots owns the write rules). The written slots arrive
-// precomputed by expectedWriteSlots - the burst loop checks the
-// conflict on them before mutating.
+// applyExpectedAction mirrors the server effect of one use item request on the
+// working set copy: the equipped flags and the slot table land in the state the
+// tracker shows once the flip arrives. The written slots arrive precomputed by
+// expectedWriteSlots.
 func applyExpectedAction(
     equipment *Equipment, action EquipAction, written []Slot,
 ) {
@@ -209,12 +172,11 @@ func applyExpectedAction(
     }
 }
 
-// equipWriteSlots computes the slots the server write set of an equip
-// request touches: the landing slot plus the displaced pieces the
-// server removes with it (the shield behind a two hand weapon, the
-// legs behind a one-piece, the one-piece behind legs, the two hand
-// weapon behind a shield). The rules mirror the virtual paperdoll the
-// purchase planner simulates (applyToVirtual).
+// equipWriteSlots computes the slots the server write set of an equip request
+// touches: the landing slot plus the displaced pieces the server removes with
+// it (the shield behind a two hand weapon, the legs behind a one-piece, the
+// one-piece behind legs, the two hand weapon behind a shield). The rules mirror
+// the virtual paperdoll the purchase planner simulates (applyToVirtual).
 func equipWriteSlots(
     equipment Equipment, stats npcdata.GearStats, slot Slot,
 ) []Slot {
@@ -249,8 +211,8 @@ func equipWriteSlots(
     return written
 }
 
-// setWrittenSlots lands the equip write on the working set: the item
-// takes the landing slot, every displaced occupant drops to the bag.
+// setWrittenSlots lands the equip write on the working set: the item takes the
+// landing slot, every displaced occupant drops to the bag.
 func setWrittenSlots(equipment *Equipment, objectID int32, written []Slot) {
     for _, slot := range written {
         occupant := equipment.Slots[slot]
