@@ -399,7 +399,9 @@ strategy is catalog-agnostic, the Dion round only swaps the catalog.
 - `tools/generate_shop_catalogs.sh` - the buylists of every merchant
   keyed by the packet template id (from `data/buylists/*.xml` and
   the CT0 display id table).
-- `internal/swarm/gear/shopping.go` - the phased planner
+- `internal/swarm/gear/shopping.go` (the model and the plan API; the
+  phases, the armor set, the candidates and the simulation live in the
+  `shopping_*.go` siblings) - the phased planner
   (`PlanPurchases`, `PlanPurchaseQueue`: the affordable plan plus
   the wanted tail with the cumulative missing adena), the strategy
   phases (the weapon milestone, the pdef maximizing armor set of

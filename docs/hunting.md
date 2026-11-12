@@ -14,8 +14,9 @@ The four pillars, each detailed in its section below:
 
 - **Auto equipment** (`internal/swarm/gear`, `hunt/equip.go`) wears
   every equippable item the loot and the buys produce.
-- **Shop strategy** (`gear/shopping.go`, `hunt/shopping.go`,
-  `docs/shopping_strategy.md`) plans and executes the purchases.
+- **Shop strategy** (`gear/shopping.go` and its `shopping_*.go`
+  siblings, `hunt/shopping.go`, `docs/shopping_strategy.md`) plans and
+  executes the purchases.
 - **Multi-zone hunting** (`hunt/zones.go`, the generated registry
   `hunt/zones_elven.go`) climbs the mob level ladder of the region.
 - **Hexagon cell hunting** (`hunt/cell*.go`, the generated registry
