@@ -457,6 +457,20 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `learning.go` fell from 32.4 to 22.0 percent (128
   comment lines).
 
+### 2026-11-12 - hunt/town_cursor_escape.go moves the escape facts to the doc
+
+- 30 blocks compress: the keyboard-mode move request (mode 0), the
+  `ValidatePosition` claim stream, the one step per second cadence,
+  the pocket cap and the frame offset of the claimed z, the ground
+  re-anchor at the first owed waypoint, the follow patience and the
+  settle re-baseline. The escape narrative and the two dumps drop, and
+  a new `### The cursor key escape` subsection of `docs/hunting.md`
+  carries the moved facts (the refusing cell, the claims, the follow
+  probe, the heading convention) in the same commit.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. `town_cursor_escape.go` fell from 44.7 to 26.6
+  percent (96 comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -470,8 +484,8 @@ passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`, `hunt/shopping.go`,
 `hunt/loop_params.go`, `acceptance/archer_kite.go`, `hunt/user.go`,
-`hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go` and
-`hunt/learning.go`. Next: a fresh `task comment:audit --top 10` pick
-(the `proxy/game.go` and `hunt/loop_state.go` entries stay untouched
-while their fragments are active); the share and the block count are
-re-measured at the end.
+`hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go`,
+`hunt/learning.go` and `hunt/town_cursor_escape.go`. Next: a fresh
+`task comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/loop_state.go` entries stay untouched while their fragments are
+active); the share and the block count are re-measured at the end.

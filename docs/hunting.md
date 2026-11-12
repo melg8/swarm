@@ -1822,6 +1822,42 @@ The short form:
   TestWorldStandTableJoinsTheSpawnData and
   TestMerchantStandPointResolvesEveryWorldMerchant.
 
+### The cursor key escape (hunt/town_cursor_escape.go)
+
+A live refusal family leaves the routed walk with no click answer at
+all: the server answers no mouse click from such a cell, the official
+client stood frozen there too, and only the ARROW KEYS walked the
+character out (`ValidatePosition.runImpl` syncs the claimed placement
+into the world and broadcasts it). The escape emulates exactly that:
+
+- The arm sends the keyboard-mode move request (`MoveToLocation`
+  movement mode 0), which latches the server cursor key flag; the aim
+  is the ladder's far end (a target on the own cell would answer the
+  `stopMove` refusal first).
+- The claims pace at the official client cadence, one run-speed step
+  per second, and the claimed z rides the segment frame offset into
+  the server frame (a raw pack z would place the character below its
+  own ground and the server correction snaps it back).
+- The steps follow the planned route when the segment holds one, so
+  the ladder bends where the plan bends, and fall back to the straight
+  line toward the aim clamped into the pocket radius without a plan.
+  The route length caps, so one escape stays a pocket recovery.
+- The march starts at the first waypoint the character's ground still
+  owes, never at the plan cursor: the click ladder bets far waypoints
+  (the forward jump, the stuck skip) and a refused bet leaves the
+  cursor ahead of the walked ground.
+- The follow probe watches the position: a drift past the margin
+  re-arms the patience, while an ignoring server burns it and the
+  escape ends for the caller's abort ladder. The settle window lets
+  the broadcasts land, and only the position the character actually
+  reached advances the plan cursor; the ladder aim is never trusted.
+  The stuck window re-baselines from the settle ground.
+- The claimed heading follows the Mobius convention
+  (`LocationUtil.calculateHeadingFrom`, east 0, south 16384), the same
+  one `state.HeadingFromDelta` applies; the cursor key movement probes
+  its obstacle front along it, so a mirrored heading probes behind the
+  character.
+
 ## The city shopping errand (hunt/city_shopping.go)
 
 A live bot that already owns a weapon and whose wallet covers the
