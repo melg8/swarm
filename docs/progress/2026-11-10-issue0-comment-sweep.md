@@ -124,6 +124,16 @@ corner probe is a length, not a leg at all.
   drop. The pre-consolidation debt note leaves `tickUserAttack`.
 - Verified: `task fmt`, the hunt tests, `task lint:new`.
 
+### 2026-11-12 - kite.go keeps the bow timing only
+
+- 42 blocks compress: the 16 line header becomes eight and points at
+  `docs/hunting.md` plus `docs/kite_timing_findings.md`; the function
+  blocks keep the server facts (the 500000/pAtkSpd + reuse formula,
+  the RED gauge outranking it, the 1200 tick attack timeout, the
+  1200 ms silent probe, the 250 ms refusal window) and drop the round
+  ids and the repeated one-lane story.
+- Verified: `task fmt`, the hunt tests, `task lint:new`.
+
 ## Status
 
 The tool, the rule and the renames are in. The kite header and the
