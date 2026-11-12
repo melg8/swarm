@@ -33,7 +33,7 @@ func TestCityShoppingDefinition(t *testing.T) {
         for _, needle := range []string{
             "36000 50229 -3456", "level 15", "800 000 adena",
             "Mirabel", "Gludio", "Sydnia", "Simplon", "Bella",
-            "Composition Bow",
+            "Composition Bow", "Forest Bow",
         } {
             require.Contains(t, def.Description, needle)
         }
@@ -74,6 +74,7 @@ func TestCityShoppingResetShape(t *testing.T) {
     require.Equal(t, int32(level15CP), reset.MaxCP)
     requiresBagItem(t, reset.Items, 2, "Long Sword")
     requiresBagItem(t, reset.Items, 102, "Round Shield")
+    requiresBagItem(t, reset.Items, 272, "Forest Bow")
 }
 
 // requiresBagItem asserts one item of the injected bag.
@@ -308,25 +309,35 @@ func TestCityShoppingWatchLatchesTheStory(t *testing.T) {
 }
 
 // TestCityShoppingWatchSellsTheOldKit pins the sale latch: the old
-// village gear must leave the bag while the errand is open, and the
-// restock trip after the errand cannot turn the check green.
+// village gear and the Forest Bow must leave the bag while the errand
+// is open, and the restock trip after the errand cannot turn the
+// check green.
 func TestCityShoppingWatchSellsTheOldKit(t *testing.T) {
-    newBot := func(oldGear bool) *state.Bot {
+    newBot := func(oldGear bool, oldBow bool) *state.Bot {
         bot := state.NewBot(cityShoppingAccount)
         bot.SetCharacter(cityShoppingAccount, 100, 18,
             cityShoppingGludioX, cityShoppingGludioY, -3114,
             level15HP, level15MP)
         bot.SetOnline(cityShoppingAccount)
-        items := make([]state.InventoryItem, 0, len(cityShoppingSlots)+1)
+        items := make([]state.InventoryItem, 0,
+            len(cityShoppingSlots)+3)
         for index, piece := range cityShoppingSlots {
             items = append(items, state.InventoryItem{
                 ObjectID: int32(3000 + index), ItemID: piece.itemID,
                 Count: 1,
             })
         }
+        items = append(items, state.InventoryItem{
+            ObjectID: 5000, ItemID: hunt.CityShoppingBowID(), Count: 1,
+        })
         if oldGear {
             items = append(items, state.InventoryItem{
                 ObjectID: 4000, ItemID: 2, Count: 1,
+            })
+        }
+        if oldBow {
+            items = append(items, state.InventoryItem{
+                ObjectID: 4001, ItemID: 272, Count: 1,
             })
         }
         bot.ApplyItemList(items)
@@ -348,7 +359,7 @@ func TestCityShoppingWatchSellsTheOldKit(t *testing.T) {
 
     // The old gear left the bag while the errand runs: the check
     // latches.
-    sold := newBot(false)
+    sold := newBot(false, false)
     sold.SetHuntErrand(openErrand)
     watch := &cityShoppingWatch{}
     test := &Test{}
@@ -358,14 +369,26 @@ func TestCityShoppingWatchSellsTheOldKit(t *testing.T) {
     require.Equal(t, checkCityShopSold, test.checks[5].ID)
 
     // A leftover old piece keeps the check open with its count.
-    leftover := newBot(true)
+    leftover := newBot(true, false)
     leftover.SetHuntErrand(openErrand)
     watch = &cityShoppingWatch{}
     test = &Test{}
     test.setChecks(cityShoppingChecks())
     watch.evaluate(leftover, test)
     require.False(t, test.checks[5].Done)
-    require.Contains(t, test.checks[5].Detail, "1 of 7 old pieces")
+    require.Contains(t, test.checks[5].Detail, "1 of 8 old pieces")
+
+    // The owner report: the errand bought the Composition Bow and
+    // left the replaced Forest Bow in the bag - the check stays open.
+    oldBow := newBot(false, true)
+    oldBow.SetHuntErrand(openErrand)
+    watch = &cityShoppingWatch{}
+    test = &Test{}
+    test.setChecks(cityShoppingChecks())
+    watch.evaluate(oldBow, test)
+    require.False(t, test.checks[5].Done,
+        "the carried Forest Bow keeps the sale check open")
+    require.Contains(t, test.checks[5].Detail, "1 of 8 old pieces")
 
     // The restock trip after the errand sells the leftover: the
     // ended errand never turns the check green.

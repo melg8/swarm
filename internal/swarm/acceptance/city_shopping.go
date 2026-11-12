@@ -15,13 +15,14 @@ import (
 )
 
 // The city shopping acceptance scenario: a character that already
-// wears the village dress and has saved 800 000 adena walks to the
-// Elven Village gatekeeper, teleports to Gludio, buys the top
-// no-grade weapon and armor set at the town shops, carries the top
-// no-grade bow beside them, rides back to the Elven Village and
-// resumes the hunt on the start ground. The errand itself lives in
-// hunt/city_shopping.go and starts from the production trigger; the
-// scenario only sets the start state and watches the story.
+// wears the village dress, owns a Forest Bow and has saved 800 000
+// adena walks to the Elven Village gatekeeper, teleports to Gludio,
+// buys the top no-grade weapon and armor set at the town shops,
+// carries the top no-grade bow beside them (selling the Forest Bow it
+// replaces), rides back to the Elven Village and resumes the hunt on
+// the start ground. The errand itself lives in hunt/city_shopping.go
+// and starts from the production trigger; the scenario only sets the
+// start state and watches the story.
 
 // cityShoppingScenarioID is the scenario registry id.
 const cityShoppingScenarioID = "city-shopping"
@@ -94,8 +95,8 @@ const (
     // checkCityShopBow holds once the top no-grade bow is in the bag
     // beside the melee kit.
     checkCityShopBow = "bow"
-    // checkCityShopSold holds once the replaced village gear left the
-    // bag during the errand.
+    // checkCityShopSold holds once the replaced village gear and the
+    // old bow left the bag during the errand.
     checkCityShopSold = "sold"
     // checkCityShopWorn holds once the whole kit fills its paperdoll
     // slots.
@@ -110,8 +111,9 @@ const (
 
 // cityShoppingVillageKit is the village dress in the bag: the level
 // 15 no-grade set the auto equipment puts on, the weapon the errand
-// upgrades and the starter jewels. The two rings ride separate rows
-// so both fingers receive their own object id.
+// upgrades, the Forest Bow the Composition Bow replaces and the
+// starter jewels. The two rings ride separate rows so both fingers
+// receive their own object id.
 var cityShoppingVillageKit = []ResetItem{
     {ItemID: 2, Count: 1},   // Long Sword
     {ItemID: 24, Count: 1},  // Bone Breastplate
@@ -120,6 +122,7 @@ var cityShoppingVillageKit = []ResetItem{
     {ItemID: 50, Count: 1},  // Leather Gloves
     {ItemID: 38, Count: 1},  // Low Boots
     {ItemID: 102, Count: 1}, // Round Shield
+    {ItemID: 272, Count: 1}, // Forest Bow
     {ItemID: 114, Count: 1}, // Earring of Strength
     {ItemID: 115, Count: 1}, // Earring of Wisdom
     {ItemID: 876, Count: 1}, // Ring of Anguish (right finger)
@@ -127,10 +130,12 @@ var cityShoppingVillageKit = []ResetItem{
     {ItemID: 907, Count: 1}, // Necklace of Anguish
 }
 
-// cityShoppingOldGear is the village weapon, armor set and shield the
-// errand replaces and must sell at the Gludio merchants (the starter
-// jewels are kept).
-var cityShoppingOldGear = []int32{2, 24, 31, 44, 50, 38, 102}
+// cityShoppingOldGear is the village weapon, armor set, shield and
+// Forest Bow the errand replaces and must sell at the Gludio
+// merchants (the starter jewels are kept). The bow is the luring tool
+// of the melee dress: the Composition Bow replaces it and the bow
+// stop sells it before the new tool lands.
+var cityShoppingOldGear = []int32{2, 24, 31, 44, 50, 38, 102, 272}
 
 // cityShoppingSlot is one piece of the top kit and the paperdoll
 // slot it must fill: the worn check maps every slot object id back
@@ -204,7 +209,7 @@ func cityShoppingChecks() []Check {
         },
         {
             ID:    checkCityShopSold,
-            Label: "the replaced weapon and armor were sold",
+            Label: "the replaced weapon, armor and bow were sold",
             Done:  false, Detail: "",
         },
         {
@@ -420,10 +425,10 @@ func (w *cityShoppingWatch) evaluateBow(
     test.updateCheck(checkCityShopBow, w.bowSeen, detail)
 }
 
-// evaluateSales latches the sale of the replaced village gear: the
-// old pieces must leave the bag while the errand still runs, because
-// the later restock trip sells the leftovers as junk and would mask
-// the missing sell first step.
+// evaluateSales latches the sale of the replaced gear: the old
+// village pieces and the Forest Bow must leave the bag while the
+// errand still runs, because the later restock trip sells the
+// leftovers as junk and would mask the missing sell first step.
 func (w *cityShoppingWatch) evaluateSales(
     tracker *state.Bot, test *Test,
 ) {
@@ -453,7 +458,7 @@ func (w *cityShoppingWatch) evaluateSales(
         return
     }
     w.soldSeen = true
-    w.soldDetail = "the old village gear left the bag at Gludio"
+    w.soldDetail = "the old gear left the bag at Gludio"
     test.updateCheck(checkCityShopSold, true, w.soldDetail)
 }
 

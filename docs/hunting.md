@@ -1857,10 +1857,14 @@ alone.
   names the worn village piece of its slot (`SellFirst`), the stop
   sells it before the replacement lands (`stepReplacementSales`), and
   the errand dresses the bought kit once all stops are done. The bow
-  purchase carries no `SellFirst`: the two hand slot it would take
-  belongs to the Falchion and the shield the melee dress keeps
-  wearing, so the bow rides home bagged for the lure (`EquipBaggedGear`
-  never wears it under the melee profile).
+  purchase names the weaker owned bows it replaces: the two hand slot
+  it would take belongs to the Falchion and the shield the melee dress
+  keeps wearing, so nothing comes off the paperdoll, but the lure
+  keeps only the strongest bow (see the junk keeps) and the old tool
+  (the Forest Bow 272 behind the Composition Bow 273) sells before the
+  new one lands, at its referencePrice/2 credit. The new bow rides
+  home bagged for the lure (`EquipBaggedGear` never wears it under the
+  melee profile).
 - A fight holds the start: a pending loot (`phaseLoot`) or an
   incoming hit (`SelfUnderAttack`) keeps the errand off the tick, and
   a merely held engage target drops first (`dropAttackTarget`), so
@@ -1880,18 +1884,19 @@ alone.
   ends inside the budget; the next ordinary tick hunts from wherever
   it stopped.
 - The acceptance scenario `city-shopping` rides this production gate
-  (no seam): it sets a level 15 character with 800 000 adena and the
-  village dress on the Kaboo ground and verifies the Gludio arrival,
-  the purchases (the Falchion, the armor set and the Composition Bow),
-  the sales of the replaced village pieces, the worn kit, the walk
-  home and the resumed farm.
+  (no seam): it sets a level 15 character with 800 000 adena, the
+  village dress and a Forest Bow on the Kaboo ground and verifies the
+  Gludio arrival, the purchases (the Falchion, the armor set and the
+  Composition Bow), the sales of the replaced village pieces and of
+  the old bow, the worn kit, the walk home and the resumed farm.
 
 Pinned by `internal/swarm/hunt/city_shopping_test.go` (the stock and
 the list ids, the prices, the frozen purchase lines, the bow gate and
-its no-displacement line, the plan route order, the sell first wiring,
-the start gate matrix with the region and profile fences, the combat
-hold, the errand status hand-off) and the `city-shopping` acceptance
-scenario (`internal/swarm/acceptance/city_shopping.go`).
+its sell first line of the weaker owned bows, the plan route order, the
+sell first wiring, the start gate matrix with the region and profile
+fences, the combat hold, the errand status hand-off) and the
+`city-shopping` acceptance scenario
+(`internal/swarm/acceptance/city_shopping.go`).
 
 ## Deleveling (internal/swarm/hunt/delevel.go)
 

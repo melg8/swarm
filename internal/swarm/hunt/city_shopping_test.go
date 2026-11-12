@@ -124,6 +124,7 @@ func TestCityShopBuysCarryTheDisplacedKit(t *testing.T) {
         {ObjectID: 104, ItemID: 50, Count: 1, Equipped: true, Change: 1},
         {ObjectID: 105, ItemID: 38, Count: 1, Equipped: true, Change: 1},
         {ObjectID: 106, ItemID: 102, Count: 1, Equipped: true, Change: 1},
+        {ObjectID: 107, ItemID: 272, Count: 1},
     })
     paperdoll := [state.PaperdollSlots]int32{}
     for _, piece := range []struct {
@@ -164,10 +165,10 @@ func TestCityShopBuysCarryTheDisplacedKit(t *testing.T) {
 
     bowBuys := loop.cityShopBuys(cityShopBowStop)
     require.Len(t, bowBuys, 1)
-    require.Empty(t, bowBuys[0].SellFirst,
-        "the luring bow keeps the melee dress on")
-    require.Zero(t, bowBuys[0].SellCredit,
-        "the luring bow credits no sale")
+    require.Equal(t, []int32{107}, bowBuys[0].SellFirst,
+        "the weaker Forest Bow is replaced by the Composition Bow")
+    require.Equal(t, npcdata.ItemPrice(272)/2, bowBuys[0].SellCredit,
+        "the old bow feeds its sell value into the stop")
 }
 
 // TestCityShopTradeSellsBeforeTheBuy pins the stop wiring: the worn
@@ -239,6 +240,70 @@ func TestCityShopTradeSellsBeforeTheBuy(t *testing.T) {
     require.False(t, loop.cityShopTrade(now))
     require.NotEmpty(t, game.buys, "the replacement buy follows the sale")
     require.Equal(t, cityShopWeaponID, game.buys[0][0].ItemID)
+}
+
+// TestCityShopBowStopSellsTheOldBow pins the owner report: the bagged
+// Forest Bow is the lurer tool the Composition Bow replaces, so the
+// bow stop sells it before the buy request goes out.
+func TestCityShopBowStopSellsTheOldBow(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    bot.ApplyItemList([]state.InventoryItem{
+        {ObjectID: 200, ItemID: 272, Count: 1, Change: 1},
+        {ObjectID: 999, ItemID: 57, Count: cityShoppingWallet, Type2: 4},
+    })
+    stop := cityShopBowStop
+    arriveAtMerchantStand(bot, stop.merchant)
+    spawnMerchantNPC(bot, stop.merchant, 61)
+
+    buys := loop.cityShopBuys(stop)
+    require.Len(t, buys, 1)
+    require.Equal(t, []int32{200}, buys[0].SellFirst,
+        "the only owned bow is the replaced tool")
+    loop.tripPlan = buys
+    loop.sold = make(map[int32]bool)
+    loop.resetReplacementSales()
+    loop.tripStops = []tripStop{{
+        merchant: stop.merchant,
+        buys:     buys,
+        sell:     false,
+        teach:    false,
+        guide:    false,
+    }}
+    loop.sellPhaseAt = time.Now()
+
+    now := time.Now()
+    require.False(t, loop.cityShopTrade(now))
+    require.Equal(t, []int32{200}, loop.replaceQueue,
+        "the bagged bow is queued for the sale")
+    require.Empty(t, game.uses,
+        "the bagged bow comes off no paperdoll slot")
+    require.Empty(t, game.sells)
+    require.Empty(t, game.buys)
+
+    require.False(t, loop.cityShopTrade(now))
+    require.Len(t, game.sells, 1, "the old bow sells first")
+    require.Equal(t, int32(272), game.sells[0][0].ItemID)
+    require.Empty(t, game.buys, "the buy waits for the confirmed sale")
+
+    bot.ApplyInventoryUpdate([]state.InventoryItem{{
+        ObjectID: 200, ItemID: 272, Count: 0, Change: 3,
+    }})
+    loop.sellAt = now.Add(-transactionPause - time.Second)
+    loop.merchantID = 0
+    loop.merchantPick = now.Add(-2 * time.Second)
+    require.False(t, loop.cityShopTrade(now))
+    require.Equal(t, int32(61), loop.merchantID,
+        "the buy picks the weapon merchant")
+
+    loop.merchantPick = now.Add(-2 * time.Second)
+    require.False(t, loop.cityShopTrade(now))
+    require.Contains(t, game.forces, int32(61),
+        "the buy selects the weapon merchant")
+    bot.ApplySelfTarget(61)
+    loop.merchantPick = now.Add(-2 * time.Second)
+    require.False(t, loop.cityShopTrade(now))
+    require.NotEmpty(t, game.buys, "the bow buy follows the sale")
+    require.Equal(t, cityShopBowID, game.buys[0][0].ItemID)
 }
 
 // cityShoppingTestLoop builds a loop on the default elven ground with
@@ -452,6 +517,17 @@ func TestCityShoppingPlanCost(t *testing.T) {
         ownedKit).cityShoppingPlan()
     require.Equal(t, bowCost, cost)
     require.True(t, withBow, "the owned kit plans the bow alone")
+
+    withOldBow := make([]state.InventoryItem, 0, len(ownedKit)+1)
+    withOldBow = append(withOldBow, ownedKit...)
+    withOldBow = append(withOldBow, state.InventoryItem{
+        ObjectID: 300, ItemID: 272, Count: 1,
+    })
+    cost, withBow = cityShoppingTestLoop(int32(bowCost),
+        withOldBow).cityShoppingPlan()
+    require.Equal(t, bowCost, cost)
+    require.True(t, withBow,
+        "the weaker Forest Bow still plans the upgrade at the full price")
 }
 
 // TestCityShoppingPlanStops pins the frozen route: the kit stops in

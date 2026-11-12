@@ -21,10 +21,11 @@ import (
 // gatekeeper, teleports to Gludio, sells the village weapon and armor
 // the trip replaces, buys the top no-grade weapon and armor set at
 // the town shops, carries the top no-grade bow when the wallet covers
-// it, rides back to the Elven Village and resumes the hunt on its own
-// ground. The live bots run it whenever the wallet covers the missing
-// kit; the ordinary town trip keeps the rest of the shopping. The
-// policy and the gates: docs/hunting.md.
+// it (selling the weaker bow it replaces), rides back to the Elven
+// Village and resumes the hunt on its own ground. The live bots run it
+// whenever the wallet covers the missing kit; the ordinary town trip
+// keeps the rest of the shopping. The policy and the gates:
+// docs/hunting.md.
 //
 // The route and the stock are live Mobius C1 facts: Mirabel of the
 // Elven Village teleports to Gludio (the only direct link, 9 200
@@ -190,7 +191,8 @@ var cityShoppingStops = []cityShopStop{
 // counter and weapon list as the melee weapon, walked after the kit
 // stops so the other kit pieces are in the bag first. The purchase
 // keeps the melee dress on (the two hand tool would drop the
-// Falchion and the shield), so the stop displaces nothing.
+// Falchion and the shield) and sells the weaker owned bows it
+// replaces.
 var cityShopBowStop = cityShopStop{
     merchant: cityShoppingWeaponStop.merchant,
     listID:   cityShoppingWeaponStop.listID,
@@ -650,18 +652,45 @@ func cityShopBuyReason(itemID int32) string {
     return "the top grade kit of the city shop"
 }
 
-// cityShopDisplaced prices the equipped pieces one stop purchase
-// replaces. The bow displaces nothing: the two hand slot it would take
-// belongs to the Falchion and the shield the hunt keeps wearing, and
-// the errand carries the bow as the bagged tool of the melee dress.
+// cityShopDisplaced prices the pieces one stop purchase retires. A
+// kit purchase displaces the worn village piece of its slot; the bow
+// displaces nothing on the paperdoll - the two hand slot belongs to
+// the Falchion and the shield the melee dress keeps wearing - but it
+// retires the weaker owned bows: the junk keeps of the lurer preserve
+// only the strongest bow (see addLureToolKeeps), so every weaker copy
+// is junk once the Composition Bow lands, and the stop sells it first.
 func cityShopDisplaced(
     equipment gear.Equipment, itemID int32,
 ) (int64, []int32) {
     if itemID == cityShopBowID {
-        return 0, nil
+        return weakerBowSale(equipment, itemID)
     }
 
     return gear.DisplacedByItem(equipment, itemID)
+}
+
+// weakerBowSale collects the owned bows the purchase retires: every bow
+// of a lower attack than the bought one, equipped or bagged, each at
+// its sell value of referencePrice/2 (the Mobius RequestSellItem
+// price).
+func weakerBowSale(equipment gear.Equipment, itemID int32) (int64, []int32) {
+    bought, ok := npcdata.ItemGearStats(itemID)
+    if !ok {
+        return 0, nil
+    }
+    var credit int64
+    ids := make([]int32, 0, 1)
+    for _, item := range equipment.Items {
+        stats, statsOK := npcdata.ItemGearStats(item.ItemID)
+        if !statsOK || stats.WeaponType != weaponTypeBow ||
+            stats.PAtk >= bought.PAtk {
+            continue
+        }
+        credit += npcdata.ItemPrice(item.ItemID) / 2
+        ids = append(ids, item.ObjectID)
+    }
+
+    return credit, ids
 }
 
 // walkCityShopHome walks the character back to the spot the errand
