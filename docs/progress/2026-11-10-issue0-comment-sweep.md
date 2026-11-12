@@ -490,6 +490,22 @@ corner probe is a length, not a leg at all.
   `//nolint` form). `query.go` fell from 35.9 to 25.3 percent (128
   comment lines), no block above 8 lines.
 
+### 2026-11-12 - pathfind/navmesh/hierarchy.go keeps the search bounds
+
+- 50 blocks compress: the `42240` cluster nodes of the 165 region map
+  against `maxCoarseNodes`, the `32768` hop bound, the three
+  `maxCoarseAttempts` ban and replan cycles, the `4096` hop cache
+  capacity, the 24 region line prefetch cap, the `1.5*straight+8192`
+  give-up band, the one cluster dilation of the confined set against
+  the bay detours, the half weights of `corridorCostOf`. The doc
+  already carries the priced guide and the gate free HNA* chain
+  (`docs/navmesh.md`, the hierarchy section), so the blocks only lose
+  the retold code.
+- Verified: `task fmt`, `go build ./...`, the navmesh tests, `task
+  lint:new`. `hierarchy.go` fell from 17.8 to 16.1 percent (187
+  comment lines), no block above 8 lines; the tree share reads 12.9
+  percent.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -504,8 +520,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`, `hunt/shopping.go`,
 `hunt/loop_params.go`, `acceptance/archer_kite.go`, `hunt/user.go`,
 `hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go`,
-`hunt/learning.go` and `hunt/town_cursor_escape.go`, and
-`pathfind/navmesh/query.go`. Next: a fresh `task comment:audit --top 10`
-pick (the `proxy/game.go` and `hunt/loop_state.go` entries stay
-untouched while their fragments are active); the share and the block
-count are re-measured at the end.
+`hunt/learning.go` and `hunt/town_cursor_escape.go`,
+`pathfind/navmesh/query.go` and `pathfind/navmesh/hierarchy.go` (a
+second pass). Next: a fresh `task comment:audit --top 10` pick (the
+`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
+their fragments are active); the share and the block count are
+re-measured at the end.
