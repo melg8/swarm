@@ -209,14 +209,29 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.6 percent, 540 blocks,
   1,267 history markers.
 
+### 2026-11-12 - state/scans.go keeps the scan contracts only
+
+- 39 blocks compress: the target searches keep the projected position
+  rule (the once per second broadcast leaves a moving mob far from its
+  packet position), the 1500 unit engage radius against the 200 unit
+  priority bias, the 200 unit social help margin and the 600 unit z
+  limit, the single sided ALL clan, the 256 bucket median histogram and
+  the pooled scan arrays; the round stories drop. The doc facts stay in
+  `docs/hunting.md` (the projected ranking, the social fence, the
+  priority bias, the delevel median).
+- Verified: `task fmt`, `go build ./...`, the state tests,
+  `task lint:new`. The tree share reads 13.6 percent, 529 blocks,
+  1,262 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
 compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `shopping.go`, `cell_policy.go`, `user.go`, `quest_trip.go`,
 `town_walk.go` (twice), `loop_state.go`, `town_stuck.go`,
-`acceptance/archer_fleet.go`, `pathfind/search.go` and
-`pathfind/navmesh/hierarchy.go`. Next: `state/scans.go` (284 comment
-lines), `hunt/zones.go` (280), `hunt/town.go` (272), then the second
-pass over `hunt/kite.go` and `hunt/cell_policy.go`; the share and the
-block count are re-measured at the end.
+`acceptance/archer_fleet.go`, `pathfind/search.go`,
+`pathfind/navmesh/hierarchy.go` and `state/scans.go`. Next:
+`hunt/zones.go` (280 comment lines), `hunt/town.go` (272), then the
+second pass over `hunt/kite.go`, `hunt/cell_policy.go` and
+`hunt/loop_state.go`; the share and the block count are re-measured at
+the end.
