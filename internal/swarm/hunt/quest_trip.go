@@ -485,7 +485,7 @@ func (l *Loop) followPlannedSegment(
 // (stalled, the route re-plans) from a dead click (blocked, the plan
 // skips the waypoint) and a request error (failed).
 //
-//nolint:cyclop,gocognit // the refusal and stuck branches read side by side
+//nolint:cyclop,funlen,gocognit // the refusal branches read side by side
 func (l *Loop) followWaypoint(
     waypoints []pathfind.Vec3, index int, frameOffset float64,
     deadline time.Time,
