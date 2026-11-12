@@ -307,6 +307,21 @@ corner probe is a length, not a leg at all.
   1,224 history markers; `quest_chains.go` fell from 45.6 to
   35.2 percent (160 comment lines).
 
+### 2026-11-12 - hunt/quest_trip.go keeps the numbers only
+
+- 32 blocks compress: the trip engine keeps its bounds (the 6000 unit
+  npc scan, the 30 s find wait, the 10 minute walk, the 8000 unit
+  segment under the 1M expansion cap, the 5 s stuck window, the 3 s move
+  start, the 2000 unit arrival scatter and 20 s transfer wait, the 55
+  and 85 percent rest band, the 80 percent potion line, the 10 s potion
+  reuse, the 20 minute kill stage, the 700 ms attack period, the 1600
+  unit kill scan, the 250 unit interaction distance, the 20 percent
+  health floor, the 2600 unit retreat, the 39 percent measured walk
+  arrival) and the round stories drop.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. The tree share reads 13.3 percent, 497 blocks,
+  1,223 history markers; `quest_trip.go` reads 20.0 percent.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -317,7 +332,9 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `pathfind/navmesh/hierarchy.go`, `state/scans.go`, `hunt/zones.go` and
 `hunt/town.go`, `hunt/kite.go` and `hunt/cell_policy.go` (both second
 passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
-share of a struct file stays high by nature) and `hunt/quest_chains.go`.
-Next: `hunt/quest_trip.go` (253 comment lines), `hunt/shopping.go` (249)
-and `acceptance/archer_kite.go` (240, 28.3 percent); the share and the
-block count are re-measured at the end.
+share of a struct file stays high by nature), `hunt/quest_chains.go` and
+`hunt/quest_trip.go`. Next: `hunt/shopping.go` (249 comment lines),
+`hunt/loop_params.go` (240, 78.2 percent - a params registry, trim the
+prose not the facts), `acceptance/archer_kite.go` (240, 28.3 percent) and
+`hunt/loop_safety.go` (238, 35.2 percent); the share and the block count
+are re-measured at the end.
