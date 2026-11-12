@@ -73,8 +73,20 @@ corner probe is a length, not a leg at all.
 - Verified: `go build ./...`, the hunt package tests, `task lint:new`
   (0 issues), `task fmt:check`.
 
+### 2026-11-12 - town_walk.go keeps the oracle contract only
+
+- The 51 line `segmentAdvanceClear` doc and the 31 line
+  `resolveClickExtension` doc compress to eight and seven lines: the
+  gate/click one-oracle contract, the backward hold and the return
+  value stay, the plaza and teacher round history drops.
+- `docs/hunting.md` (the town walk) stops claiming a geodata line of
+  sight gate and names the click transport as that one oracle.
+- Verified: `task fmt`, the hunt tests, `task lint:new`.
+
 ## Status
 
-The tool and the rule are in; the renames are in the tree pending the
-build and the package tests. Next: the `hunt/kite.go` header
-compression, then the worst files one commit each.
+The tool, the rule and the renames are in. The kite header and the
+`town_walk.go` long docs are compressed. Next: `loop_state.go` (63.0
+percent comment share), then `shopping.go`, `cell_policy.go`,
+`user.go`, one commit each; the share and the block count are
+re-measured at the end.

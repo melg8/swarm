@@ -1500,7 +1500,8 @@ The short form:
   dead-cell skip verdict short-circuits it, so a dead transport still
   reaches the stuck recovery. Every skip is gated on the walkable
   line: the straight line from the actual standing cell to the
-  successor waypoint must pass the geodata line of sight, else the
+  successor waypoint must pass the server click transport - the same
+  oracle the click itself faces, `Navigator.ValidateClick` - else the
   waypoint stays the target until walking onto it re-opens the line -
   the server (the deployment runs PathFinding = 0) validates every
   click as a straight line and cancels a move whose first step hits a

@@ -425,37 +425,13 @@ func (l *Loop) anchorWaypointClick(
     return moveX, moveY, moveZ, dist
 }
 
-// resolveClickExtension runs the extension ladder of the aimed
-// waypoint click - the minWalkClick interplay and the backward holds.
-//
-// The rescue floor discipline runs IMMEDIATELY, no stuck verdict
-// needed: the server's findPath branch only takes a collapsed click
-// over the rescue threshold, a shorter one is silently canceled with
-// ActionFailed and never moves a cell (the 2026-09-11 11:34 dump
-// froze two whole trip cycles on the 22 unit first waypoint click) -
-// the sub-floor aim re-aims at the forward route samples before any
-// click leaves the bot. No sample validating keeps the plain waypoint
-// click: the refusal machinery of clickServerValidated answers it
-// exactly like today.
-//
-// The recovery of a stuck segment (extendArmed): the stuck proved the
-// plain clicks of this segment do not move the character (a server
-// side refusal the offline click validation cannot see), so the
-// primary target behind the character on the route gives way to the
-// forward route samples. No forward sample validating and the
-// waypoint behind: clicking it walks the character backward into the
-// pocket the route samples just escaped. Hold the click - the stuck
-// window re-plans from the standing cell, and the planner knows the
-// wall the server-side routing has to route around.
-//
-// The same hold without the armed extension: a backward click is
-// ground loss no matter the recovery state, and the stuck window owns
-// the answer (the skip ladder walks the first clear successor, the
-// re-path plans around the wall).
-//
-// Returns the click target to send and whether the click may leave
-// the bot at all - the hold verdicts answer false and the caller
-// drops the click.
+// resolveClickExtension runs the extension ladder of the aimed waypoint
+// click: an under-floor target re-aims at the forward route samples
+// (no stuck verdict needed), a backward target of an armed stuck
+// segment re-aims the same way, and every other backward click holds -
+// the stuck window owns the answer. It returns the click target and
+// whether the click may leave the bot; the rescue floor arithmetic and
+// the sample march: docs/hunting.md (the short click extension).
 func (l *Loop) resolveClickExtension(
     selfX, selfY, selfZ int32,
     dist float64, passedBehind bool,
@@ -840,57 +816,14 @@ func (l *Loop) clickEscapeHop(
     return false
 }
 
-// segmentAdvanceClear reports whether the follower may advance past the
-// waypoint whose successor sits at the index: the straight line from
-// the CURRENT character position to that next waypoint must be
-// walkable by the SERVER CLICK TRANSPORT - the same oracle the click
-// the follower would send for that waypoint passes (Navigator.
-// ValidateClick, the GeoEngine.getValidLocation port: the climb limit
-// with its layer step-over, the free drops, the source wall plus the
-// anti corner cut). The server validates every ground click as a
-// straight line (the deployment runs PathFinding = 0 so no server side
-// routing exists): a click whose first step hits a closed wall
-// resolves to the character's own position, the move is canceled at
-// once and the character never moves. The old follower skipped any
-// waypoint inside the 50 unit pass radius - tighter than the 16 unit
-// ramp steps of the trainer plaza approach - and clicked the far
-// waypoint straight through the plaza railing: the click canceled, the
-// 15 s stuck detector re-planned the identical deterministic route,
-// the follower skipped the same tight waypoints again and the third
-// budget burned into "town trip ended: aborted, walk stuck" (the
-// 2026-09-11 teacher walk, the lessons never reached the teacher). The
-// gate keeps the skipped-from waypoint as the target until walking
-// onto it re-opens the line.
-//
-// The oracle choice is the load bearing contract: the gate and the
-// click MUST answer through one semantics. The old gate asked the grid
-// engine's symmetric line of sight (the A* node rule: a step must
-// climb no more than the passable height up AND down, both cells'
-// walls open in both directions) while the clicks obeyed the
-// asymmetric server rule - on ordinary terrain (a terrace drop, a one
-// sided wall) the two disagree, the cursor pinned on a waypoint whose
-// click the server walked fine, the short click extension escaped
-// ~60 units out and the pinned cursor clicked the character right
-// back - the plaza ping-pong of the 2026-09-20 farm readiness report
-// (nine alternating MoveToLocation clicks between two points 63 units
-// apart while the server accepted every one of them, the frozen trip
-// verdict then banning the walkable plaza for the session). The
-// round 57 family pinned the same disagreement from the other side:
-// the pinned cursor kept re-clicking the 22 unit first waypoint the
-// server's rescue threshold silently canceled while the far segments
-// of the very plan validated fine.
-//
-// The gate mirrors the click exactly the follower would send: the
-// waypoint height anchored into the server frame (see
-// click_frame.go), the distance capped at the move request limit,
-// and the port's own verdict - a click the transport validates walks
-// the character SOMEWHERE along the line (a running click may stop
-// a hundred units short of the asked cell at a terrace lip; the
-// character still made that progress, the arrival test and the next
-// click converge from there), a click the transport collapses onto
-// the walker (the correction under the cancellation limit) never
-// moves a cell and the cursor keeps the skipped-from waypoint
-// targeted until walking onto it re-opens the line.
+// segmentAdvanceClear gates the advance past the waypoint whose
+// successor sits at the index: the straight line from the CURRENT
+// position to that successor must pass the server click transport
+// (Navigator.ValidateClick, the GeoEngine.getValidLocation port) - the
+// one oracle the click itself faces, so gate and click never disagree.
+// A refused line keeps the skipped-from waypoint targeted until walking
+// onto it re-opens it. The transport arithmetic and the failures the
+// split oracle caused: docs/hunting.md (the town walk).
 func (l *Loop) segmentAdvanceClear(
     selfX, selfY, selfZ int32, next int,
 ) bool {
