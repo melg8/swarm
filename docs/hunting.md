@@ -1387,8 +1387,12 @@ The short form:
   reachable. The trip machinery is shared: the ordinary sell stop
   leads (the junk sells), the guide stop plans behind the learning
   stops (`planGuideStop`), the refusal cooldown of a refused gate
-  keeps the later trips away for 10 minutes. The keep-one scroll
-  line of the shopping plan stays out of the trip justification
+  keeps the later trips away for 10 minutes. The support magic is
+  keyed by the character level: the buff windows widen and narrow
+  across the 8-24 band and the 16..19 band also carries the Life
+  Cubic (skill 67), so the deleveling never aims below 16 once the
+  character reached it (see the deleveling section). The keep-one
+  scroll line of the shopping plan stays out of the trip justification
   total (`shoppingWanted` skips the scroll): a scroll-only plan
   never clears the trip minimum, the stock rides the natural trip
   cadence and restores itself on the same trip that spends it.
@@ -1920,6 +1924,18 @@ safety net for servers where the deaths remove nothing: three
 consecutive penalty-free deaths abort the deleveling and arm a 30 min
 cooldown.
 
+The guide floor caps the descent for the characters that reached the
+support magic window: the Newbie Guide grants its buffs by level, and
+the Life Cubic (skill 67) rides the narrow 16..19 band of the gate
+(`SupportMagic.java`; the cubic is a summoned effect, never an
+`AbnormalStatusUpdate`). The owner rule keeps that level-keyed reward
+over the drop chance the deaths would restore below the window, so a
+level 16 character never starts a deleveling at all (the target would
+be the level itself) and the guard deaths of a level 17+ character stop
+at 16 - the target is the level floor, never the raw drop boundary
+that sits under it. A character under the window still delevels to the
+Lucky floor: it never held the cubic.
+
 The level gap rules of the drop calculation
 (`NpcTemplate.calculateGroupDrops`) set the farming window: item drops
 slide from 100 percent at mob level + 5 to 10 percent at + 10 and
@@ -1929,8 +1945,9 @@ elven fields mobs are levels 1-5, so a level 11 character gets 10
 percent item drops - the deleveling exists to fix that.
 
 The deleveling stops at the target level = median zone mob level + 5
-(the last level with the full item drop chance, floored at 9) and
-re-triggers after hunting raised the level back above the trigger. The
+(the last level with the full item drop chance, floored at 9 and, once
+the character stands above the guide window, at 16) and re-triggers
+after hunting raised the level back above the trigger. The
 fight stage re-paths when the guard ignores landed damage within 20 s
 and aborts the deleveling after 3 failed re-paths; a stage without a
 single landed blow never counts - the town guards sit at level 70

@@ -22,8 +22,8 @@ func setGuideLevel(bot *state.Bot, level int32) {
 
 // TestExpectedGuideBuffsByLevel pins the support magic windows of
 // the guide gate: the level band, the class branches and the grant
-// order of the deployed server data (the Life Cubic of the older
-// server versions stays excluded from the table).
+// order of the deployed server data (the Life Cubic of the 16..19
+// window is a summoned effect and stays out of the buff table).
 func TestExpectedGuideBuffsByLevel(t *testing.T) {
     for _, tc := range []struct {
         name  string
@@ -51,7 +51,7 @@ func TestExpectedGuideBuffsByLevel(t *testing.T) {
     }
     for _, buff := range guideBuffSkills {
         require.NotEqual(t, int32(67), buff.SkillID,
-            "the Life Cubic stays excluded")
+            "the Life Cubic is a summon, never an abnormal buff")
     }
 }
 

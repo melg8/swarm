@@ -28,10 +28,15 @@
 // just like players - removing a per level percentage of the level span
 // (data/stats/players/experienceLoss.xml, ~9% at low levels, capped at
 // 10%). The deleveling therefore never triggers below level 10 and its
-// target never aims below 9. The free death counter stays as the safety
-// net: if the deaths ever stop removing experience (a penalty disabled
-// by configuration, a rebalanced Lucky), a few penalty-free deaths
-// abort the deleveling instead of an endless death loop.
+// target never aims below 9. A character at the guide cubic band
+// (level 16) or above also never aims below level 16: the guide
+// grants its Life Cubic (skill 67) to the 16..19 band only, and the
+// owner rule keeps the level-keyed guide effect over the drop chance
+// the deaths would restore below the window (guide_buffs.go). The
+// free death counter stays as the safety net: if the deaths ever stop
+// removing experience (a penalty disabled by configuration, a
+// rebalanced Lucky), a few penalty-free deaths abort the deleveling
+// instead of an endless death loop.
 package hunt
 
 import (
@@ -64,6 +69,15 @@ const (
     // level 10 and up do. An attempt at level 9 or below can only
     // burn walks and deaths without dropping a single level.
     delevelMinLevel = luckyProtectLevel + 1
+    // delevelGuideFloorLevel is the lowest level the deleveling may
+    // aim at once the character stands above it: the Newbie Guide
+    // grants the Life Cubic (skill 67) to the 16..19 window only,
+    // and the guard deaths below 16 would strip it (the support
+    // magic gate: guideCubicLevelMin). The owner rule keeps the
+    // level-keyed guide effect over the drop chance the deaths
+    // would restore below the window - a character under level 16
+    // still delevels to the Lucky floor, it never held the cubic.
+    delevelGuideFloorLevel = guideCubicLevelMin
     // delevelMeleeRange is the approach distance of the provocation:
     // the deleveling strikes the archer guards in melee, where the
     // bow answer of the guard always lands (a far provocation may sit
@@ -205,12 +219,14 @@ func (l *Loop) delevelTriggerMedian() int32 {
 // static answer only stands where the live one would: the character
 // holds the ground the median belongs to, so a return walk or a trip
 // detour past an outleveled ground never starts a deleveling for it.
+// The guide floor gates the trigger: a target that cannot sit below
+// the current level (the floor reached) never starts the guard walk.
 func (l *Loop) delevelWanted() bool {
     if l.navigator == nil || !l.delevelCooldownOver() {
         return false
     }
     level := l.tracker.SelfLevel()
-    if level <= 0 {
+    if level < delevelMinLevel {
         return false
     }
     median := l.tracker.MedianZoneMobLevel(l.targetZone())
@@ -222,19 +238,32 @@ func (l *Loop) delevelWanted() bool {
         if median <= 0 {
             return false
         }
-
-        return level-median >= delevelTriggerDiff &&
-            level >= delevelMinLevel
+    } else if static := l.anchoredCellMedian(); static > 0 &&
+        level-static < delevelTriggerDiff {
+        return false
     }
     if level-median < delevelTriggerDiff {
         return false
     }
-    if static := l.anchoredCellMedian(); static > 0 &&
-        level-static < delevelTriggerDiff {
-        return false
+
+    return delevelTargetFor(level, median) < level
+}
+
+// delevelTargetFor computes the target level of a deleveling from
+// the character level over the median ground: the last level of the
+// full item drop chance (median + 5), raised to the Lucky protection
+// floor and, once the character stands at the guide cubic band or
+// above, to the guide floor that keeps the level-keyed support magic.
+func delevelTargetFor(level, median int32) int32 {
+    target := median + delevelTargetGap
+    if target < luckyProtectLevel {
+        target = luckyProtectLevel
+    }
+    if level >= delevelGuideFloorLevel && target < delevelGuideFloorLevel {
+        target = delevelGuideFloorLevel
     }
 
-    return level >= delevelMinLevel
+    return target
 }
 
 // anchoredCellMedian returns the count weighted median mob level of
@@ -259,14 +288,8 @@ func (l *Loop) startDelevel() {
         // a median, the next tick re-triggers with a fresh read.
         return
     }
-    target := median + delevelTargetGap
-    if target < luckyProtectLevel {
-        // The Lucky newbie protection absorbs the death exp penalty
-        // below this level: aim at the lowest reachable level instead.
-        // The last productive death happens at level 10 and drops
-        // the character to 9, where the deleveling finishes.
-        target = luckyProtectLevel
-    }
+    level := l.tracker.SelfLevel()
+    target := delevelTargetFor(level, median)
     l.rememberFarmSpot()
     l.tripStart = time.Now()
     l.rePaths = 0
@@ -276,7 +299,7 @@ func (l *Loop) startDelevel() {
     l.delevelFight = time.Time{}
     l.delevelTried = nil
     l.delevelExp = l.tracker.SelfExp()
-    l.delevelLevel = l.tracker.SelfLevel()
+    l.delevelLevel = level
     l.delevelFree = 0
     l.delevelCounted = false
     // The engage leftovers die with the phase switch: a selected mob
@@ -291,7 +314,7 @@ func (l *Loop) startDelevel() {
     l.phase = phaseDelevel
     l.logf("Hunt: level %d is too high for level %d mobs (the level "+
         "gap collapsed the drops), deleveling to %d at the town "+
-        "guards", l.tracker.SelfLevel(), median, target)
+        "guards", level, median, target)
 }
 
 // delevelAbortWait returns the pause the next aborted deleveling

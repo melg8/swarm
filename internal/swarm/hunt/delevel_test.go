@@ -108,6 +108,36 @@ func TestDelevelSkipsBelowLevel10(t *testing.T) {
         "level 9 is below the delevel minimum: deaths are free there")
 }
 
+// TestDelevelStopsAtTheGuideFloor verifies the owner rule of the
+// level-keyed guide magic: a character standing at level 16 never
+// starts the guard deaths - the Newbie Guide grants the Life Cubic
+// only to the 16..19 band, and the floor keeps it over the drop
+// chance the deaths would restore below the window.
+func TestDelevelStopsAtTheGuideFloor(t *testing.T) {
+    loop, _, _, _ := newDelevelLoop(delevelGuideFloorLevel)
+    spawnZoneMobs(loop.tracker)
+
+    loop.tick()
+    require.NotEqual(t, phaseDelevel, loop.phase,
+        "level 16 keeps the guide buffs instead of deleveling")
+    require.Zero(t, loop.delevelTarget, "no target was announced")
+}
+
+// TestDelevelTargetClampsAtTheGuideFloor verifies the target of a
+// character above the guide window: the guard deaths stop at level 16
+// instead of the raw drop boundary of the ground, so the guide buffs
+// survive the cycle.
+func TestDelevelTargetClampsAtTheGuideFloor(t *testing.T) {
+    loop, game, _, _ := newDelevelLoop(delevelGuideFloorLevel + 2)
+    spawnZoneMobs(loop.tracker)
+
+    loop.tick()
+    require.Equal(t, phaseDelevel, loop.phase)
+    require.Equal(t, delevelGuideFloorLevel, loop.delevelTarget,
+        "the target clamps at the guide floor, not at the drop boundary")
+    require.Len(t, game.walks, 1, "the walk to the guard starts")
+}
+
 // TestDelevelFightsTheGuard verifies the fight stage: the walk ends at
 // the guard, the guard npc is picked and attacked once per second.
 func TestDelevelFightsTheGuard(t *testing.T) {

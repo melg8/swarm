@@ -176,3 +176,27 @@ func TestDelevelOutranksTheTownTrip(t *testing.T) {
     require.Nil(t, loop.tripStops,
         "no trip stops were planned behind the guard walk")
 }
+
+// TestDelevelSkipsAtTheGuideFloorOnTheCell pins the owner rule on the
+// spawn spot: a level 16 character standing on the outleveled cell
+// never walks to the guards - the median 8 ground would answer the
+// trigger, but the target would clamp to the level itself (the guide
+// window floor), so the farming keeps the spot instead.
+func TestDelevelSkipsAtTheGuideFloorOnTheCell(t *testing.T) {
+    loop, game, bot := newDelevelCellLoop(t)
+    setZoneTestLevel(bot, delevelGuideFloorLevel)
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 300, TemplateID: 1000336, Attackable: true,
+        X: 46000, Y: 41400, Z: -3500, Name: "Green Dryad",
+    })
+    // The town trip cooldown holds the guide and weapon runs back:
+    // the engage owns the tick.
+    loop.tripEndedAt = time.Now()
+
+    loop.tick()
+    require.Equal(t, phaseEngage, loop.phase,
+        "the guide floor holds the guard deaths back")
+    require.Zero(t, loop.delevelTarget, "no target was announced")
+    require.NotEmpty(t, game.forces,
+        "the engage keeps farming the spot")
+}

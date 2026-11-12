@@ -17,6 +17,10 @@ package hunt
 // non-newbie accounts (the refusal answers as html, never as buffs)
 // - when the expected buffs do not land, the stop arms a cooldown
 // and moves on, the trip never retries the refusal in a loop.
+// The 16..19 band additionally grants the Life Cubic (skill 67): the
+// cubic is a summoned effect rather than an abnormal buff, so the
+// buff table below leaves it out and the delevel floor of
+// delevel.go reads its lower bound.
 
 import (
     "math"
@@ -33,6 +37,12 @@ const (
     guideMinLevel       = int32(8)
     guideMaxLevel       = int32(24)
     guideRefuseCooldown = 10 * time.Minute
+    // guideCubicLevelMin is the lower bound of the Life Cubic
+    // (skill 67) window of the support magic gate (16..19, the
+    // SupportMagic.java band): the cubic rides a summon, never an
+    // AbnormalStatusUpdate, so the buff table below stays without
+    // it and the delevel floor reads this bound instead.
+    guideCubicLevelMin = int32(16)
 )
 
 var guideBuffWait = 3 * time.Second
@@ -59,9 +69,10 @@ type guideBuff struct {
 }
 
 // guideBuffSkills are the support magic skills the guide grants
-// (the skill ids of the server gate, the Life Cubic of the older
-// server versions stays excluded - the deployed gate never grants
-// it). Durations are 1200 seconds, far above the learned auras.
+// (the abnormal buffs of the server gate; the Life Cubic of the
+// 16..19 window is a summoned effect, see guideCubicLevelMin, and
+// never shows up as a buff). Durations are 1200 seconds, far above
+// the learned auras.
 var guideBuffSkills = []guideBuff{
     // The auras of both class branches.
     {SkillID: 1204, MinLevel: 8, MaxLevel: 24, Branch: guideBothClasses},
