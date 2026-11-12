@@ -28,7 +28,7 @@ func TestPathFlowGallery(t *testing.T) {
         scroll:     `id="flow-scroll"`,
         pause:      `id="flow-pause"`,
         picked:     `id="flow-picked"`,
-        scriptTag:  `<script src="pathflow.js"></script>`,
+        scriptFile: "pathflow.js",
         scriptPath: "/pathflow.js",
         scriptMarkers: []string{
             "const FLOW_VARIANTS = [",

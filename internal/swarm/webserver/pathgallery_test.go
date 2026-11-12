@@ -14,9 +14,9 @@ import (
 )
 
 // galleryCase is the per mode expectation of the gallery boot chain:
-// the reported mode, the section markup, the script tag and file, the
-// mode handshake of main.js and the exported identifiers of the
-// gallery script.
+// the reported mode, the section markup, the lazily loaded script
+// file, the mode handshake of main.js and the exported identifiers of
+// the gallery script.
 type galleryCase struct {
     server        *Server
     mode          string
@@ -25,7 +25,7 @@ type galleryCase struct {
     scroll        string
     pause         string
     picked        string
-    scriptTag     string
+    scriptFile    string
     scriptPath    string
     scriptMarkers []string
     modeExpr      string
@@ -58,9 +58,10 @@ func assertGalleryConfig(t *testing.T, gallery galleryCase) {
 }
 
 // assertGalleryBootChain verifies the static asset chain of one
-// gallery mode end to end at the file level: the index page references
-// the section and the script, the script is served, the mode dispatch
-// of main.js boots it and the map tile of the cells resolves.
+// gallery mode end to end at the file level: the shared index page
+// carries the section but never the gallery script, the script is
+// served, the lazy loader of main.js maps the mode to it and the map
+// tile of the cells resolves.
 func assertGalleryBootChain(t *testing.T, gallery galleryCase) {
     t.Helper()
 
@@ -72,10 +73,13 @@ func assertGalleryBootChain(t *testing.T, gallery galleryCase) {
     require.Equal(t, http.StatusOK, recorder.Code)
     page := recorder.Body.String()
     for _, marker := range []string{gallery.section, gallery.grid,
-        gallery.scroll, gallery.pause, gallery.picked,
-        gallery.scriptTag} {
+        gallery.scroll, gallery.pause, gallery.picked} {
         require.Contains(t, page, marker)
     }
+    // The designs load on demand: the regular page never references a
+    // gallery script eagerly.
+    require.NotContains(t, page,
+        `<script src="`+gallery.scriptFile+`"></script>`)
 
     recorder = httptest.NewRecorder()
     handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet,
@@ -86,14 +90,16 @@ func assertGalleryBootChain(t *testing.T, gallery galleryCase) {
         require.Contains(t, script, marker)
     }
 
-    // The mode handshake of main.js must dispatch the gallery mode to
-    // the gallery boot.
+    // The mode handshake of main.js must map the gallery mode to the
+    // lazy script and boot the gallery after it executed.
     recorder = httptest.NewRecorder()
     handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet,
         "/main.js", nil))
     require.Equal(t, http.StatusOK, recorder.Code)
     mainScript := recorder.Body.String()
     require.Contains(t, mainScript, gallery.modeExpr)
+    require.Contains(t, mainScript,
+        `"`+gallery.mode+`": "`+gallery.scriptFile+`"`)
     require.Contains(t, mainScript, gallery.initCall)
 
     // The map tile background of the gallery cells: the starter keltir

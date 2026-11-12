@@ -28,7 +28,7 @@ func TestPathGallery(t *testing.T) {
         scroll:     `id="path-scroll"`,
         pause:      `id="path-pause"`,
         picked:     `id="path-picked"`,
-        scriptTag:  `<script src="pathtest.js"></script>`,
+        scriptFile: "pathtest.js",
         scriptPath: "/pathtest.js",
         scriptMarkers: []string{
             "const PATH_VARIANTS = [",

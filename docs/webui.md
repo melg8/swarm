@@ -10,9 +10,17 @@ keep it that way (embedded via go:embed). Watch out: top level `const`
 declarations are not `window` properties, so cross script references
 must use the bare binding name.
 
-## The five launch modes
+The five design galleries (`fight.js`, `fighttest.js`, `pathtest.js`,
+`pathcurve.js`, `pathflow.js` - about 270 KB together) are dev-only:
+`main.js` injects the script of the active gallery mode as a classic
+`<script>` element and boots it after it executed, so the regular bot
+page downloads none of them. The galleries stay classic scripts (no
+`export`) because the twelve `tools/repro_*.js` harnesses evaluate
+them with `vm.runInContext`.
 
-The UI boots in one of six modes chosen by `GET /api/config`:
+## The launch modes
+
+The UI boots in one of seven modes chosen by `GET /api/config`:
 
 1. **Bot control** (the default; `-web 127.0.0.1:8080`, `-web ""`
    disables it): the mode described in this document.

@@ -37,9 +37,10 @@ func TestFightConfigEndpoint(t *testing.T) {
 }
 
 // TestFightStaticAssets verifies the gallery boot chain end to end at
-// the file level: the index page references the fighttest script and
-// the fight section markup, the script itself is served and the map
-// tile the cells paint their background from resolves.
+// the file level: the index page references the fight section markup
+// but never the gallery script, the script itself is served, the lazy
+// loader of main.js maps the mode to it and the map tile the cells
+// paint their background from resolves.
 func TestFightStaticAssets(t *testing.T) {
     server := newFightGalleryServer()
     handler := server.httpServer.Handler
@@ -52,7 +53,7 @@ func TestFightStaticAssets(t *testing.T) {
     require.Contains(t, page, `id="fight-section"`)
     require.Contains(t, page, `id="fight-grid"`)
     require.Contains(t, page, `id="fight-scroll"`)
-    require.Contains(t, page, `<script src="fighttest.js"></script>`)
+    require.NotContains(t, page, `<script src="fighttest.js"></script>`)
 
     recorder = httptest.NewRecorder()
     handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet,
@@ -62,14 +63,15 @@ func TestFightStaticAssets(t *testing.T) {
     require.Contains(t, script, "const FIGHT_VARIANTS = [")
     require.Contains(t, script, "const FightTest = {")
 
-    // The mode handshake of main.js must dispatch "test-fight" to the
-    // gallery boot.
+    // The mode handshake of main.js must map "test-fight" to the lazy
+    // script and boot the gallery after it executed.
     recorder = httptest.NewRecorder()
     handler.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet,
         "/main.js", nil))
     require.Equal(t, http.StatusOK, recorder.Code)
     mainScript := recorder.Body.String()
     require.Contains(t, mainScript, `config.mode === "test-fight"`)
+    require.Contains(t, mainScript, `"test-fight": "fighttest.js"`)
     require.Contains(t, mainScript, "FightTest.init()")
 
     // The map tile background of the gallery cells: the starter

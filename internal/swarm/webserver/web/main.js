@@ -8,7 +8,16 @@ SPDX-License-Identifier: MIT
 
 // Boot the web interface. The server mode decides the shape: the
 // regular bot control boots the bot list and the event streams, the
-// pathfind test mode boots the interactive path search instead.
+// pathfind test mode boots the interactive path search instead, and
+// the design galleries load on demand.
+const galleryScripts = {
+  "fight": "fight.js",
+  "test-fight": "fighttest.js",
+  "test-path": "pathtest.js",
+  "test-path-v2": "pathcurve.js",
+  "test-path-v3": "pathflow.js",
+};
+
 window.addEventListener("DOMContentLoaded", async () => {
   initBuildWatch();
   initTheme();
@@ -44,35 +53,35 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   if (config && config.mode === "fight") {
     document.body.classList.add("mode-fight");
-    FightUI.init();
+    bootGallery("fight", () => FightUI.init());
 
     return;
   }
 
   if (config && config.mode === "test-fight") {
     document.body.classList.add("mode-test-fight");
-    FightTest.init();
+    bootGallery("test-fight", () => FightTest.init());
 
     return;
   }
 
   if (config && config.mode === "test-path") {
     document.body.classList.add("mode-test-path");
-    PathTest.init();
+    bootGallery("test-path", () => PathTest.init());
 
     return;
   }
 
   if (config && config.mode === "test-path-v2") {
     document.body.classList.add("mode-test-path-v2");
-    PathCurve.init();
+    bootGallery("test-path-v2", () => PathCurve.init());
 
     return;
   }
 
   if (config && config.mode === "test-path-v3") {
     document.body.classList.add("mode-test-path-v3");
-    PathFlow.init();
+    bootGallery("test-path-v3", () => PathFlow.init());
 
     return;
   }
@@ -95,6 +104,18 @@ window.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("log-filter")
     .addEventListener("input", () => { App.seenEvents = 0; resetPanels(); });
 });
+
+// bootGallery injects the classic script of the active mode and runs
+// its init once the script executed. The galleries keep the classic
+// form their vm harnesses evaluate, so no ES module import.
+function bootGallery(mode, boot) {
+  const src = galleryScripts[mode];
+  const element = document.createElement("script");
+  element.src = src;
+  element.onload = () => boot();
+  element.onerror = () => console.error("gallery boot failed:", src);
+  document.head.appendChild(element);
+}
 
 // Tab switching.
 function initTabs() {

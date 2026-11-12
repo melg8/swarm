@@ -52,7 +52,20 @@ func TestFightServerServesTheShowcasePage(t *testing.T) {
             http.MethodGet, "/", nil))
 
         require.Equal(t, http.StatusOK, recorder.Code)
-        require.Contains(t, recorder.Body.String(), "fight-strip")
+        page := recorder.Body.String()
+        require.Contains(t, page, "fight-strip")
+        require.NotContains(t, page, `<script src="fight.js"></script>`)
+    })
+
+    t.Run("lazy gallery entry", func(t *testing.T) {
+        recorder := httptest.NewRecorder()
+        handler.ServeHTTP(recorder, httptest.NewRequest(
+            http.MethodGet, "/main.js", nil))
+
+        require.Equal(t, http.StatusOK, recorder.Code)
+        body := recorder.Body.String()
+        require.Contains(t, body, `"fight": "fight.js"`)
+        require.Contains(t, body, "FightUI.init()")
     })
 
     t.Run("fight script", func(t *testing.T) {

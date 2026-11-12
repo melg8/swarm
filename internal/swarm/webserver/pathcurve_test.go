@@ -28,7 +28,7 @@ func TestPathCurveGallery(t *testing.T) {
         scroll:     `id="curve-scroll"`,
         pause:      `id="curve-pause"`,
         picked:     `id="curve-picked"`,
-        scriptTag:  `<script src="pathcurve.js"></script>`,
+        scriptFile: "pathcurve.js",
         scriptPath: "/pathcurve.js",
         scriptMarkers: []string{
             "const CURVE_VARIANTS = [",
