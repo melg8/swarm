@@ -18,9 +18,10 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// handleServerPacket logs and dispatches known in game packets. An
-// empty payload is the zero length frame the read loop reports as
-// no packet: skip it instead of indexing the opcode.
+// handleServerPacket accounts and dispatches one inbound game packet.
+// An empty payload is the zero length frame the read loop reports as
+// no packet: skip it instead of indexing the opcode. An unregistered
+// id keeps the unknown packet log.
 func (gc *GameClient) handleServerPacket(payload []byte) {
     if len(payload) == 0 {
         return
@@ -32,49 +33,102 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
         gc.logger.Printf("Trace packet id 0x%02x with %d bytes",
             payload[0], len(payload))
     }
+    handler := packetHandlers[payload[0]]
+    if handler == nil {
+        gc.logUnknownPacket(payload)
 
-    switch payload[0] {
-    case netPingResponseID:
-        gc.handleNetPing(payload)
-    case leaveWorldID:
-        gc.logger.Println("Server confirmed leave world")
-    case serverCloseID:
-        gc.logger.Println("Server is closing the connection")
-    case skillListID:
-        gc.applySkillList(payload)
-    case questListID:
-        gc.applyQuestList(payload)
-    case abnormalStatusID:
-        gc.applyAbnormalStatusUpdate(payload)
-    case npcHTMLMessageID:
-        gc.applyNpcHTMLMessage(payload)
-    default:
-        if gc.handleChatPacket(payload) {
-            return
-        }
-        gc.handleWorldPacket(payload)
+        return
     }
+    handler(gc, payload)
 }
 
-// handleChatPacket dispatches the chat and the interaction feedback
-// packets: the system message, the world chat line, the social
-// action and the action refusal. Returns false when the packet id is
-// not one of them so the caller falls through to the world dispatch.
-func (gc *GameClient) handleChatPacket(payload []byte) bool {
-    switch payload[0] {
-    case systemMessageID:
-        gc.applySystemMessage(payload)
-    case creatureSayID:
-        gc.applyCreatureSay(payload)
-    case socialActionID:
-        gc.applySocialAction(payload)
-    case actionFailedID:
-        gc.applyActionFailed(payload)
-    default:
-        return false
+// packetHandler handles one inbound packet payload of the session.
+type packetHandler func(gc *GameClient, payload []byte)
+
+// packetRoutes is the declarative dispatch table of the session: one
+// line per handled opcode, grouped by the packet family. The table is
+// the single place a new inbound packet registers; buildPacketHandlers
+// rejects a duplicate id at startup.
+var packetRoutes = []struct {
+    id     byte
+    handle packetHandler
+}{
+    // The session flow and the keepalive.
+    {netPingResponseID, (*GameClient).handleNetPing},
+    {leaveWorldID, (*GameClient).handleLeaveWorld},
+    {serverCloseID, (*GameClient).handleServerClose},
+    {skillListID, (*GameClient).applySkillList},
+    {questListID, (*GameClient).applyQuestList},
+    {abnormalStatusID, (*GameClient).applyAbnormalStatusUpdate},
+    {npcHTMLMessageID, (*GameClient).applyNpcHTMLMessage},
+    // The chat and the action feedback.
+    {systemMessageID, (*GameClient).applySystemMessage},
+    {creatureSayID, (*GameClient).applyCreatureSay},
+    {socialActionID, (*GameClient).applySocialAction},
+    {actionFailedID, (*GameClient).applyActionFailed},
+    // The observed world objects.
+    {userInfoID, (*GameClient).applyUserInfo},
+    {charInfoID, (*GameClient).applyCharInfo},
+    {npcInfoID, (*GameClient).applyNpcInfo},
+    {spawnItemID, (*GameClient).applySpawnItem},
+    {dropItemID, (*GameClient).applyDropItem},
+    {getItemID, (*GameClient).applyGetItem},
+    {deleteObjectID, (*GameClient).applyDeleteObject},
+    // The movement and the vitals.
+    {moveToLocationID, (*GameClient).applyMoveToLocation},
+    {moveToPawnID, (*GameClient).applyMoveToPawn},
+    {stopMoveID, (*GameClient).applyStopMove},
+    {validateLocationID, (*GameClient).applyValidateLocation},
+    {statusUpdateID, (*GameClient).applyStatusUpdate},
+    {setupGaugeID, (*GameClient).applySetupGauge},
+    // The turn, the movement mode and the wait type.
+    {beginRotationID, (*GameClient).applyBeginRotation},
+    {stopRotationID, (*GameClient).applyStopRotation},
+    {changeMoveTypeID, (*GameClient).applyChangeMoveType},
+    {changeWaitTypeID, (*GameClient).applyChangeWaitType},
+    {teleportID, (*GameClient).applyTeleport},
+    // The combat and the target selection.
+    {attackID, (*GameClient).applyAttack},
+    {autoAttackStartID, (*GameClient).applyAutoAttackStart},
+    {autoAttackStopID, (*GameClient).applyAutoAttackStop},
+    {myTargetSelectedID, (*GameClient).applyMyTargetSelected},
+    {magicSkillUseID, (*GameClient).applyMagicSkillUse},
+    {targetSelectedID, (*GameClient).applyTargetSelected},
+    {targetUnselectedID, (*GameClient).applyTargetUnselected},
+    // The inventory.
+    {itemListID, (*GameClient).applyItemList},
+    {inventoryUpdateID, (*GameClient).applyInventoryUpdate},
+}
+
+// packetHandlers is the indexed form of packetRoutes: one array read
+// per packet.
+var packetHandlers = buildPacketHandlers()
+
+// buildPacketHandlers indexes packetRoutes and rejects a duplicate
+// opcode: the second registration would be unreachable and the
+// compiler cannot see it.
+func buildPacketHandlers() [256]packetHandler {
+    var table [256]packetHandler
+    for _, route := range packetRoutes {
+        if table[route.id] != nil {
+            panic(fmt.Sprintf(
+                "connection: duplicate packet handler for 0x%02x", route.id))
+        }
+        table[route.id] = route.handle
     }
 
-    return true
+    return table
+}
+
+// handleLeaveWorld logs the server confirmation that the character
+// left the world.
+func (gc *GameClient) handleLeaveWorld([]byte) {
+    gc.logger.Println("Server confirmed leave world")
+}
+
+// handleServerClose logs the server shutdown notification.
+func (gc *GameClient) handleServerClose([]byte) {
+    gc.logger.Println("Server is closing the connection")
 }
 
 // applyActionFailed validates the refusal answer of the server and
@@ -178,130 +232,6 @@ func (gc *GameClient) applyMagicSkillUse(payload []byte) {
             HitTimeMs:    gc.magicSkillUse.HitTime,
             ReuseDelayMs: gc.magicSkillUse.ReuseDelay,
         })
-    }
-}
-
-// handleWorldPacket dispatches the packets that carry the observed world
-// state: characters, npcs, items, movement and combat.
-func (gc *GameClient) handleWorldPacket(payload []byte) {
-    if gc.handleObjectPacket(payload) {
-        return
-    }
-    if gc.handleCombatPacket(payload) {
-        return
-    }
-    if gc.handlePlacementPacket(payload) {
-        return
-    }
-    if gc.handleRotationPacket(payload) {
-        return
-    }
-    gc.handleInventoryPacket(payload)
-}
-
-// handleObjectPacket dispatches the spawn and remove packets. It reports
-// whether the packet was consumed.
-func (gc *GameClient) handleObjectPacket(payload []byte) bool {
-    switch payload[0] {
-    case userInfoID:
-        gc.applyUserInfo(payload)
-    case charInfoID:
-        gc.applyCharInfo(payload)
-    case npcInfoID:
-        gc.applyNpcInfo(payload)
-    case spawnItemID:
-        gc.applySpawnItem(payload)
-    case dropItemID:
-        gc.applyDropItem(payload)
-    case getItemID:
-        gc.applyGetItem(payload)
-    case deleteObjectID:
-        gc.applyDeleteObject(payload)
-    default:
-        return false
-    }
-
-    return true
-}
-
-// handlePlacementPacket dispatches movement and vitals packets. It
-// reports whether the packet was consumed.
-func (gc *GameClient) handlePlacementPacket(payload []byte) bool {
-    switch payload[0] {
-    case moveToLocationID:
-        gc.applyMoveToLocation(payload)
-    case moveToPawnID:
-        gc.applyMoveToPawn(payload)
-    case stopMoveID:
-        gc.applyStopMove(payload)
-    case validateLocationID:
-        gc.applyValidateLocation(payload)
-    case statusUpdateID:
-        gc.applyStatusUpdate(payload)
-    case setupGaugeID:
-        gc.applySetupGauge(payload)
-    default:
-        return false
-    }
-
-    return true
-}
-
-// handleRotationPacket dispatches the turn, movement mode and wait type
-// packets. It reports whether the packet was consumed.
-func (gc *GameClient) handleRotationPacket(payload []byte) bool {
-    switch payload[0] {
-    case beginRotationID:
-        gc.applyBeginRotation(payload)
-    case stopRotationID:
-        gc.applyStopRotation(payload)
-    case changeMoveTypeID:
-        gc.applyChangeMoveType(payload)
-    case changeWaitTypeID:
-        gc.applyChangeWaitType(payload)
-    case teleportID:
-        gc.applyTeleport(payload)
-    default:
-        return false
-    }
-
-    return true
-}
-
-// handleCombatPacket dispatches the combat and target packets. It
-// reports whether the packet was consumed.
-func (gc *GameClient) handleCombatPacket(payload []byte) bool {
-    switch payload[0] {
-    case attackID:
-        gc.applyAttack(payload)
-    case autoAttackStartID:
-        gc.applyAutoAttackStart(payload)
-    case autoAttackStopID:
-        gc.applyAutoAttackStop(payload)
-    case myTargetSelectedID:
-        gc.applyMyTargetSelected(payload)
-    case magicSkillUseID:
-        gc.applyMagicSkillUse(payload)
-    case targetSelectedID:
-        gc.applyTargetSelected(payload)
-    case targetUnselectedID:
-        gc.applyTargetUnselected(payload)
-    default:
-        return false
-    }
-
-    return true
-}
-
-// handleInventoryPacket dispatches the inventory packets.
-func (gc *GameClient) handleInventoryPacket(payload []byte) {
-    switch payload[0] {
-    case itemListID:
-        gc.applyItemList(payload)
-    case inventoryUpdateID:
-        gc.applyInventoryUpdate(payload)
-    default:
-        gc.logUnknownPacket(payload)
     }
 }
 

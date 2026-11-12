@@ -713,7 +713,9 @@ A new packet: the struct in the correct direction package (`from_*` /
 `to_*`), the parse and serialize through `packet.Reader`/`packet.Writer`,
 a unit test plus a benchmark, and the layout documented in
 `docs/protocol_description.md` with a link to the reference Mobius Java
-class.
+class. An inbound packet also registers one line in `packetRoutes`
+(`internal/swarm/connection/game_dispatch.go`), which is the only
+dispatch table of the session; the route names its `applyXxx` handler.
 
 ## Git conventions
 
