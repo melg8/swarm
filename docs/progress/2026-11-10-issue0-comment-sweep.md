@@ -389,6 +389,18 @@ corner probe is a length, not a leg at all.
   history markers; `archer_kite.go` fell from 28.3 to 21.0 percent
   (162 comment lines).
 
+### 2026-11-12 - hunt/user.go keeps the pacing numbers
+
+- 23 blocks compress: the manual mode keeps its bounds (the 60 unit
+  arrival radius, the 90 s walk and 30 minute cap, the 30 s pickup and
+  attack timeouts, the 150 unit approach, the 600 ms confirm window
+  and the 4 s re-send window over the ~1.5 s bow windup and ~3 s
+  cycle, the 150 unit drop range, the disabled UseItem flood
+  protector) and the retold code drops.
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. `user.go` fell from 21.7 to 19.4 percent (201
+  comment lines); the tree share is re-measured with the next commit.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -401,6 +413,6 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`. Next:
-`hunt/user.go` (232, 21.7 percent), `hunt/loop_movement.go` (223, 36.6
-percent) and `hunt/kite.go` (346, 31.1 percent - the largest remaining
-file); the share and the block count are re-measured at the end.
+`hunt/loop_movement.go` (223, 36.6 percent), `hunt/kite.go` (346, 31.1
+percent - the largest remaining file) and `hunt/cell_policy.go` (271,
+23.7 percent); the share and the block count are re-measured at the end.

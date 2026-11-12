@@ -14,11 +14,9 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// Manual command handling of the hunt loop: the web UI queues commands
-// on the tracker and the loop turns them into world actions. The one
-// shot inventory commands execute immediately, the movement commands
-// switch into the phaseUser manual mode until the action completes or
-// times out.
+// Manual command handling of the hunt loop: the web UI queues commands on the
+// tracker and the loop turns them into world actions. The one shot inventory
+// commands execute immediately, the movement commands enter the manual phase.
 
 // Timing and threshold constants of the manual mode.
 const (
@@ -43,26 +41,21 @@ const (
     // userApproachRadius is the search goal of a long manual move: the
     // walk ends within this 3D distance of the clicked point.
     userApproachRadius = 150.0
-    // inventoryConfirmTimeout bounds how long one inventory action
-    // blocks a DIFFERENT item: the gate releases as soon as the
-    // tracker sees the effect, the timeout only rescues a refused
-    // request from blocking the queue. The UseItem flood protector of
-    // this server build is disabled (FloodProtectorUseItemInterval =
-    // 0).
+    // inventoryConfirmTimeout bounds how long one inventory action blocks a
+    // different item: the gate releases as soon as the tracker sees the effect,
+    // the timeout only rescues a refused request. The UseItem flood protector
+    // of this build is disabled (FloodProtectorUseItemInterval = 0).
     inventoryConfirmTimeout = 600 * time.Millisecond
-    // inventoryResendTimeout bounds how long the SAME item stays
-    // gated against a re-send: the Mobius UseItem handler defers an
-    // equip that lands inside the attack window to the attack end (the
-    // ~1.5 s bow windup, ~3 s cycle), so the bound outlives one full
-    // bow cycle plus the tick cadence. A shorter bound re-sent the
-    // toggle into the deferral and unequipped the piece again.
+    // inventoryResendTimeout bounds how long the same item stays gated against
+    // a re-send: the Mobius UseItem handler defers an equip that lands inside
+    // the attack window to the attack end (~1.5 s bow windup, ~3 s cycle), so
+    // the bound outlives one full bow cycle plus the tick cadence.
     inventoryResendTimeout = 4 * time.Second
 )
 
-// consumeUserCommands drains the command queue of the bot: the
-// inventory commands execute right away (gated on the previous
-// confirmation), the movement commands reprogram the manual phase,
-// the newest wins.
+// consumeUserCommands drains the command queue of the bot: the inventory
+// commands execute right away (gated on the previous confirmation), the
+// movement commands reprogram the manual phase, the newest wins.
 func (l *Loop) consumeUserCommands() {
     l.flushDeferredCommands()
     for {
@@ -94,12 +87,10 @@ func (l *Loop) flushDeferredCommands() {
     l.userDeferred = kept
 }
 
-// gateInventoryCommand defers a command that would race an in-flight
-// inventory action on the server: the Mobius executor runs every
-// client packet on its own task, so two writes on the same item or
-// paperdoll slots can interleave and cancel each other. The gate
-// holds the newcomer until the tracker sees the effect, preserving
-// the pair order of a swap.
+// gateInventoryCommand defers a command that would race an in-flight inventory
+// action on the server: the Mobius executor runs every client packet on its own
+// task, so two writes on the same item or slots can cancel each other. The gate
+// holds the newcomer until the tracker sees the effect.
 func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
     switch cmd.Kind {
     case state.CommandUseItem, state.CommandDrop, state.CommandDestroy:
@@ -140,9 +131,7 @@ func (l *Loop) inventoryItemAllowed(objectID int32, slots []gear.Slot) bool {
         }
         if pendingID == objectID {
             // The same item: the re-send guard outlives the server's
-            // attack-window equip deferral (see
-            // inventoryResendTimeout) - a re-send inside it toggles
-            // the piece right back off.
+            // attack-window equip deferral (inventoryResendTimeout).
             return false
         }
         if now.Sub(pending.at) >= inventoryConfirmTimeout {
@@ -175,10 +164,9 @@ func (l *Loop) prunePendingActions(now time.Time) {
     }
 }
 
-// pendingInventoryConfirmed checks the tracked inventory for the
-// effect of one in flight action: any change of the equipped flag,
-// the stack count or the existence of the item means the server
-// processed the request.
+// pendingInventoryConfirmed checks the tracked inventory for the effect of one
+// in flight action: a change of the equipped flag, the stack count or the
+// existence of the item means the server processed the request.
 func (l *Loop) pendingInventoryConfirmed(
     objectID int32, pending pendingInventory,
 ) bool {
@@ -213,9 +201,8 @@ func (l *Loop) applyUserCommand(cmd state.Command) {
     }
 }
 
-// userSay sends one chat message through the character. The command is
-// a one shot request like the inventory actions: the web UI validated
-// the message against the Say2 refusals already, the packet validates
+// userSay sends one chat message through the character: the web UI validated
+// the message against the Say2 refusals already, and the packet validates
 // itself again (an invalid chat would disconnect the session).
 func (l *Loop) userSay(cmd state.Command) {
     if cmd.Text == "" {
@@ -246,10 +233,9 @@ func (l *Loop) markInventoryAction(objectID int32) {
     l.pendingActions[objectID] = pending
 }
 
-// userUseItem executes the equip/unequip toggle of one item right
-// away: the packet is a one shot request, the server applies or
-// refuses it by itself (the UseItem flood protector of this build
-// is disabled, the confirmation gate paces the pairs).
+// userUseItem executes the equip/unequip toggle of one item right away: the
+// packet is a one shot request, the server applies or refuses it, and the
+// confirmation gate paces the pairs.
 func (l *Loop) userUseItem(cmd state.Command) {
     if cmd.ObjectID == 0 {
         return
@@ -323,10 +309,9 @@ func (l *Loop) userMovement(cmd state.Command) {
     l.userStart = l.now()
     l.userDeadline = time.Time{}
     l.userMoveAt = time.Time{}
-    // The new command redirects a walk that is already running: the
-    // next tick re-issues the walk request at once instead of
-    // waiting for the old server walk to finish (the server replaces
-    // the destination of a running walk with the next move request).
+    // The new command redirects a running walk: the next tick re-issues the
+    // walk request at once instead of waiting for the old server walk (the
+    // server replaces the destination of a running walk).
     l.userRedirect = true
     l.userWaypoints = nil
     l.userSearch = nil
@@ -359,17 +344,15 @@ func (l *Loop) userMovement(cmd state.Command) {
     }
 }
 
-// tickUser advances the manual phase at the player action cadence
-// (one action per second) until it completes. A sitting character
-// stands up first: the server refuses every action of a sitting
-// session.
+// tickUser advances the manual phase at the player action cadence (one action
+// per second) until it completes. A sitting character stands up first: the
+// server refuses every action of a sitting session.
 func (l *Loop) tickUser() {
     now := l.now()
     if l.tracker.SelfSitting() && l.userKind != "" {
-        // The stand request shares the pending transition gate with
-        // the rest logic (never a double toggle); the walk starts on
-        // a later tick once the ChangeWaitType broadcast confirms the
-        // standing.
+        // The stand request shares the pending transition gate with the rest
+        // logic; the walk starts on a later tick, once the ChangeWaitType
+        // broadcast confirms the standing.
         if !l.standUpGuarded(now) {
             return
         }
@@ -438,11 +421,10 @@ func (l *Loop) tickUserMove(now time.Time) {
     }
 }
 
-// planUserWalk computes the mesh path of one long manual move: the
-// exact search first (the owner clicked the point), the approach
-// corridor as the fallback, the direct server walk without a plan.
-// The result becomes the segment plan the follower walks; a partial
-// corridor ends at the closest reachable point.
+// planUserWalk computes the mesh path of one long manual move: the exact search
+// first (the owner clicked the point), the approach corridor as the fallback,
+// the direct server walk without a plan. A partial corridor ends at the closest
+// reachable point.
 func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     from := pathfind.Vec3{
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
@@ -526,11 +508,9 @@ func (l *Loop) userSegmentRefused() bool {
         !l.tracker.OtherRequestBetween(l.userMoveAt, failedAt)
 }
 
-// sendUserVariedAim answers a refused manual walk click by varying
-// the aim at the waypoint: the refusal is target specific, and a
-// shorter prefix or a sideways offset often validates. The variants
-// ride the same server frame transport and offline gates as the
-// planned click.
+// sendUserVariedAim answers a refused manual walk click by varying the aim at
+// the waypoint: the refusal is target specific, and a shorter prefix or a
+// sideways offset often validates. The variants ride the same frame transport.
 func (l *Loop) sendUserVariedAim(
     selfX, selfY, selfZ int32, now time.Time,
 ) bool {
@@ -572,10 +552,9 @@ func (l *Loop) sendUserVariedAim(
     return false
 }
 
-// beginUserCursorKeyEscape hands a refused manual segment to the
-// cursor key escape: the keyboard mode 0 arm plus the claimed
-// ValidatePosition stream, which the server follows without click
-// validation. The ladder marches the planned waypoint line.
+// beginUserCursorKeyEscape hands a refused manual segment to the cursor key
+// escape: the keyboard mode 0 arm plus the claimed ValidatePosition stream,
+// which the server follows without click validation.
 func (l *Loop) beginUserCursorKeyEscape(
     selfX, selfY, selfZ, aimX, aimY, aimZ int32,
 ) bool {
@@ -609,11 +588,9 @@ func (l *Loop) beginUserCursorKeyEscape(
     return true
 }
 
-// followUserWaypoints walks the planned segments of a long manual
-// move: the click target spans the farthest waypoints the transport
-// delivers inside the aim window, longer segments split into
-// straight points, and a waypoint already passed ON THE ROUTE skips
-// ahead. The walk ends at the last waypoint or the manual deadline.
+// followUserWaypoints walks the planned segments of a long manual move: the
+// click spans the farthest waypoints inside the aim window, longer segments
+// split into straight points, and a passed waypoint skips ahead.
 func (l *Loop) followUserWaypoints(
     now time.Time, selfX int32, selfY int32, selfZ int32,
 ) {
@@ -647,11 +624,9 @@ func (l *Loop) followUserWaypoints(
     if !l.userMoveAt.IsZero() && now.Sub(l.userMoveAt) < walkRequestPeriod {
         return
     }
-    // The refusal ladder of the manual walk: the server answered the
-    // last click with ActionFailed while the character stood still.
-    // The ladder first varies the aim (the refusal is target
-    // specific) and hands the segment to the cursor key escape once
-    // the variants spent.
+    // The refusal ladder of the manual walk: the ladder varies the aim (the
+    // refusal is target specific) and hands the segment to the cursor key
+    // escape once the variants spent.
     if l.userSegmentRefused() {
         if l.sendUserVariedAim(selfX, selfY, selfZ, now) {
             return
@@ -694,10 +669,9 @@ func manualTravel(length, speed float64) time.Duration {
     return time.Duration(length / speed * float64(time.Second))
 }
 
-// userMoveExpired reports whether the manual walk spent its budget:
-// a planned route counts from its own deadline (set in planUserWalk),
-// the direct server routed walk keeps the base window from the
-// command.
+// userMoveExpired reports whether the manual walk spent its budget: a planned
+// route counts from its own deadline (planUserWalk), the direct server routed
+// walk keeps the base window.
 func (l *Loop) userMoveExpired(now time.Time) bool {
     if !l.userDeadline.IsZero() {
         return now.After(l.userDeadline)
@@ -832,10 +806,9 @@ func (l *Loop) publishedSegmentSearch() *state.WalkSearch {
     return l.segmentSearch
 }
 
-// engageRadiusFor picks the approach distance of an attack request
-// by the weapon in hand: a bow user shoots from the weapon range
-// (the Mobius bow attack range is ~500 units), a melee fighter
-// closes to the swing distance.
+// engageRadiusFor picks the approach distance of an attack request by the
+// weapon in hand: a bow user shoots from the weapon range (~500 units), a
+// melee fighter closes to the swing distance.
 func (l *Loop) engageRadiusFor() float64 {
     if l.bowEquipped() {
         return userBowEngageRadius
@@ -844,10 +817,9 @@ func (l *Loop) engageRadiusFor() float64 {
     return userEngageRadius
 }
 
-// stallRadiusFor picks the chase stall boundary by the weapon in
-// hand: a bow fight stands and shoots inside the weapon range and
-// closes no chase distance while doing it, which is progress, not a
-// stalled chase.
+// stallRadiusFor picks the chase stall boundary by the weapon in hand: a bow
+// fight stands and shoots inside the weapon range without closing distance,
+// which is progress, not a stalled chase.
 func (l *Loop) stallRadiusFor() float64 {
     if l.bowEquipped() {
         return userBowStallRadius
@@ -856,10 +828,9 @@ func (l *Loop) stallRadiusFor() float64 {
     return userEngageRadius
 }
 
-// bowEquipped reports whether the paperdoll weapon is a bow: a bow
-// user engages and fights at the weapon range, not at the melee
-// distance, so the attack order and the chase stall watchdog use the
-// ranged radii for it.
+// bowEquipped reports whether the paperdoll weapon is a bow: a bow user
+// engages and fights at the weapon range, so the attack order and the chase
+// stall watchdog use the ranged radii.
 func (l *Loop) bowEquipped() bool {
     for _, item := range l.tracker.InventoryItems() {
         if !item.Equipped {
@@ -874,10 +845,9 @@ func (l *Loop) bowEquipped() bool {
     return false
 }
 
-// tickUserAttack forces the attack on the clicked object until the
-// fight starts, then the server AI plays it out; a stalled chase is
-// walked by the loop. A dead target hands control to the loot phase,
-// a fight that never starts times out.
+// tickUserAttack forces the attack on the clicked object until the fight
+// starts, then the server AI plays it out; a stalled chase is walked by the
+// loop. A dead target hands control to the loot phase.
 //
 //nolint:cyclop,funlen,gocognit // the user attack decision tree
 func (l *Loop) tickUserAttack(now time.Time) {
@@ -975,10 +945,9 @@ func (l *Loop) tickUserAttack(now time.Time) {
     }
 }
 
-// tickUserPickup walks to the clicked ground item and picks it up. A
-// vanished item (picked up, despawned) ends the manual phase; the
-// walk plus click follow the same approach radius as the autonomous
-// looting.
+// tickUserPickup walks to the clicked ground item and picks it up: a vanished
+// item ends the manual phase, and the walk plus click follow the autonomous
+// looting approach radius.
 func (l *Loop) tickUserPickup(now time.Time) {
     item, ok := l.tracker.GroundItemByID(l.userTarget)
     if l.userTarget == 0 || !ok {
