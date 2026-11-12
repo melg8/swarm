@@ -126,13 +126,6 @@ const (
     // character as the penalty free server is, and the pause cannot
     // grow beyond a half hour.
     delevelAbortBackoffMax = delevelFreeCooldown
-    // returnWalkSegment caps the direct walk requests of the zone return:
-    // the server refuses move requests with a target farther than 9900
-    // units (MoveToLocation runImpl), and a village respawn, a guard
-    // post of the deleveling or a long chase easily starts farther than
-    // that from the zone center, which locked the loop into an endless
-    // stream of refused requests.
-    returnWalkSegment = 1000.0
     // delevelTimeout bounds a whole deleveling: 11 to 6 costs tens of
     // deaths at ~30 s each.
     delevelTimeout = 60 * time.Minute
