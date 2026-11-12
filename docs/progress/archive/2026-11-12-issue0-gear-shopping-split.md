@@ -1,4 +1,4 @@
-# The shop planner split: six files by responsibility (status: in progress)
+# The shop planner split: six files by responsibility (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner instruction: continue
 the refactor after the loop, town, walker, state and launcher rounds).
@@ -53,7 +53,8 @@ script (the AST range lister plus a verbatim copy, scratch) is next.
 
 ## Status
 
-Inventory done, the move is next.
+Complete: the six files land on `main` as `4133669d`; `task
+verify` green and the live run clean.
 
 ### 2026-11-12 - the move
 The split script (the AST range lister plus a verbatim copy, scratch,
@@ -85,3 +86,11 @@ Verified: `go build ./...`, `go vet ./internal/swarm/gear/...`,
 `go test ./internal/swarm/gear/... -count=1` ok in 0.4 s.
 
 Next: `task verify`, the live run, then the fragment archive.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole test
+suite, `fmt:check`). The live run on the Windows stack: the binary
+carries the `-ldflags` identity of `4133669d`, `-login
+127.0.0.3:2106 -hunt -web ""`, 65 s in world, then Ctrl+Break - the
+character hunted (the kite hold line), `Leaving the game world with
+test1` / `Bot finished`, exit code 0.
