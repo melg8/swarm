@@ -715,8 +715,6 @@ func (l *Loop) beginUserCursorKeyEscape(
 // short) re-issues at the walk request period. The running move is
 // re-aimed every period too: the server replaces the destination
 // without stopping the character, only a reached target stops it.
-//
-//nolint:cyclop,funlen // the follower ladder is one linear decision train
 func (l *Loop) followUserWaypoints(
     now time.Time, selfX int32, selfY int32, selfZ int32,
 ) {
