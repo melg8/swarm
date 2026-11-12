@@ -76,13 +76,13 @@ func (l *Loop) openTeleportDialog(npcObjID int32) error {
 // the wait lapses. A zero npcObjID on the first read means no dialog
 // arrived yet - the wait continues.
 func (l *Loop) awaitDialog(npcObjID int32) (string, error) {
-    deadline := time.Now().Add(gatekeeperDialogWait)
+    deadline := l.now().Add(gatekeeperDialogWait)
     for {
         id, html := l.game.LastHTMLDialog()
         if id == npcObjID && html != "" {
             return html, nil
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return "", errors.New(
                 "gatekeeper: the teleport list dialog never arrived")
         }

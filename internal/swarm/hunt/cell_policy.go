@@ -242,7 +242,7 @@ func (l *Loop) SetHuntingCells(cells []Cell) {
     l.zoneEmptyUntil = nil
     l.zoneMobPriority = nil
     l.cell.publishMesh(l)
-    l.cell.publishView(l, time.Now())
+    l.cell.publishView(l, l.now())
 }
 
 // SetCellPin locks the hunt to one named cell (the acceptance

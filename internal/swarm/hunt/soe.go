@@ -148,8 +148,8 @@ func (l *Loop) escapeWithSOE() bool {
 
         return false
     }
-    deadline := time.Now().Add(soeArrivalWait)
-    for time.Now().Before(deadline) {
+    deadline := l.now().Add(soeArrivalWait)
+    for l.now().Before(deadline) {
         pace(soeArrivalPoll)
         x, y, _, ok := l.tracker.SelfPosition()
         if ok && math.Hypot(float64(x-startX), float64(y-startY)) >

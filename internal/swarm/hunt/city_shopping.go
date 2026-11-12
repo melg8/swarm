@@ -353,7 +353,7 @@ func (l *Loop) cityShoppingWanted() bool {
         return false
     }
     if !l.cityShoppingTriedAt.IsZero() &&
-        time.Since(l.cityShoppingTriedAt) < cityShopCooldown {
+        l.now().Sub(l.cityShoppingTriedAt) < cityShopCooldown {
         return false
     }
     cost, _ := l.cityShoppingPlan()
@@ -394,9 +394,9 @@ func (l *Loop) maybeCityShopping(ctx context.Context) bool {
 // tick hunts from the spot the errand ended on. The tracker errand
 // status carries the outcome to the acceptance watch.
 func (l *Loop) startCityShopping(ctx context.Context) {
-    l.cityShoppingTriedAt = time.Now()
+    l.cityShoppingTriedAt = l.now()
     l.phase = phaseCityShop
-    started := time.Now()
+    started := l.now()
     l.tracker.SetHuntErrand(state.HuntErrand{
         Name:      CityShoppingErrand,
         StartedAt: started,
@@ -436,7 +436,7 @@ func (l *Loop) startCityShopping(ctx context.Context) {
     l.tracker.SetHuntErrand(state.HuntErrand{
         Name:      CityShoppingErrand,
         StartedAt: started,
-        EndedAt:   time.Now(),
+        EndedAt:   l.now(),
         Err:       errText,
     })
     l.phase = phaseEngage
@@ -533,7 +533,7 @@ func (l *Loop) cityShopOpen(stop cityShopStop) {
     l.merchantID = 0
     l.merchantPick = time.Time{}
     l.merchantDeckUntil = time.Time{}
-    l.sellPhaseAt = time.Now()
+    l.sellPhaseAt = l.now()
     l.resetBuyRequest()
 }
 
@@ -573,16 +573,16 @@ func (l *Loop) cityShopAt(
     }
     l.cityShopOpen(stop)
     defer l.cityShopClose()
-    deadline := time.Now().Add(cityShopStopTimeout)
+    deadline := l.now().Add(cityShopStopTimeout)
     for {
         if err := ctx.Err(); err != nil {
             return fmt.Errorf("cancelled: %w", err)
         }
-        now := time.Now()
+        now := l.now()
         if l.cityShopTrade(now) {
             break
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return fmt.Errorf(
                 "the stop at %s timed out", stop.merchant.Name)
         }
@@ -716,10 +716,10 @@ func (l *Loop) walkCityShopHome(x int32, y int32, z int32) error {
 // the tick settle (confirmed or timed out), so the blocking equip
 // loop re-plans against the settled paperdoll.
 func (l *Loop) awaitPendingEquips(wait time.Duration) {
-    deadline := time.Now().Add(wait)
+    deadline := l.now().Add(wait)
     for {
-        l.prunePendingActions(time.Now())
-        if len(l.pendingActions) == 0 || time.Now().After(deadline) {
+        l.prunePendingActions(l.now())
+        if len(l.pendingActions) == 0 || l.now().After(deadline) {
             return
         }
         pace(cityShopPoll)

@@ -20,7 +20,7 @@ import (
 // mana rest, the server target adoption, the safety verdicts, the pick,
 // the kite machinery and the attack request.
 func (l *Loop) engage() {
-    now := time.Now()
+    now := l.now()
     l.syncLure()
     if l.guardGround(now) {
         return

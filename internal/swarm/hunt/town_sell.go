@@ -17,7 +17,7 @@ import (
 // junk, the buy stops of the frozen plan only trade.
 func (l *Loop) enterSellPhase() {
     l.phase = phaseTownSell
-    l.sellPhaseAt = time.Now()
+    l.sellPhaseAt = l.now()
     l.sellAt = time.Time{}
     l.buyAt = time.Time{}
     l.merchantID = 0
@@ -49,7 +49,7 @@ func (l *Loop) enterSellPhase() {
 //
 //nolint:cyclop,gocognit // the town sell trip segments
 func (l *Loop) tickTownSell() {
-    now := time.Now()
+    now := l.now()
     if l.teachStop() {
         // The teacher stop: approach the class master, click it and
         // learn the queued lessons (see learning.go). The stop carries
@@ -401,7 +401,7 @@ func (l *Loop) junkRemaining() bool {
 // what it refuses to sell, so re-offering it forever would stall the
 // trip. An empty batch (nothing left to sell) ends the selling.
 func (l *Loop) sellJunk() {
-    now := time.Now()
+    now := l.now()
     if !l.transactionWindowFree(now) {
         return
     }

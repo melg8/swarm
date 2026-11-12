@@ -60,13 +60,13 @@ func (l *Loop) Run(ctx context.Context) {
         case <-ctx.Done():
             return
         case <-ticker.C:
-            started := time.Now()
+            started := l.now()
             l.tickContext(ctx)
             // The tick duration feeds the statistics view
             // of the web UI: the loop cadence health of a
             // loaded process (NoteHuntTick averages and
             // bounds the window max, see state metrics).
-            l.tracker.NoteHuntTick(time.Since(started))
+            l.tracker.NoteHuntTick(l.now().Sub(started))
         }
     }
 }
@@ -112,7 +112,7 @@ func (l *Loop) tickContext(ctx context.Context) {
 // stagnation watch. The defer reads l.phase at return time, so every
 // path of the tick publishes the phase it ended in.
 func (l *Loop) publishTickState() {
-    now := time.Now()
+    now := l.now()
     l.tracker.SetPhase(string(l.phase))
     l.publishShoppingView()
     l.tracker.SetHuntDiagnostics(l.diagnostics(now))
@@ -139,12 +139,12 @@ func (l *Loop) tickDeathOrSafety() bool {
         return true
     }
     if !l.panicAt.IsZero() {
-        l.panicPileUpRun(time.Now())
+        l.panicPileUpRun(l.now())
 
         return true
     }
 
-    return l.tickPileUp(time.Now())
+    return l.tickPileUp(l.now())
 }
 
 // tickPileUp answers a social pile up: several mobs already hold the
@@ -211,7 +211,7 @@ func (l *Loop) tickErrands(ctx context.Context) bool {
     l.maybeArmQuiver()
     l.maybeDestroyReplacedStarters()
     if l.cell != nil && l.cell.picked < 0 {
-        l.cellEvaluate(time.Now())
+        l.cellEvaluate(l.now())
     }
     if l.delevelWanted() {
         l.startDelevel()

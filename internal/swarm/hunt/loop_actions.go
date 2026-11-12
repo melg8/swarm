@@ -65,7 +65,7 @@ func (l *Loop) restSittingHeld(hp float64) bool {
 // transition is confirmed by the ChangeWaitType broadcast before
 // the opposite one is ever sent.
 func (l *Loop) rest() {
-    now := time.Now()
+    now := l.now()
     if now.Sub(l.lastActionAt) < selectPeriod {
         return
     }
@@ -270,7 +270,7 @@ func (l *Loop) killApproachWalk() bool {
     if !l.killPosKnown || l.killAt.IsZero() || l.killLooted {
         return false
     }
-    now := time.Now()
+    now := l.now()
     if now.Sub(l.killAt) > lootKillGrace {
         // The grace expired: whatever dropped is on the ground
         // within the scan radius or never dropped at all.
@@ -328,7 +328,7 @@ func (l *Loop) loot() {
     // health bar (the tanked pair, the hard single) leaves the
     // character picking up drops at a bar the survivor's next swing
     // can empty - drink before the walk to the corpse.
-    now := time.Now()
+    now := l.now()
     l.maybeDrinkFightPotion(now)
     if l.lootAnswerAttacker(now) {
         return

@@ -231,13 +231,13 @@ func (l *Loop) talkToNpc(npcObjID int32) error {
 func (l *Loop) awaitNewDialogPage(
     npcObjID int32, lastGen uint64,
 ) (string, uint64, error) {
-    deadline := time.Now().Add(questDialogWait)
+    deadline := l.now().Add(questDialogWait)
     for {
         id, html, gen := l.game.LastHTMLDialogArrival()
         if id == npcObjID && html != "" && gen > lastGen {
             return html, gen, nil
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return "", 0, errors.New(
                 "the next page never arrived")
         }

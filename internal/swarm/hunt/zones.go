@@ -377,14 +377,14 @@ func (l *Loop) stopForZoneSwitch() {
 // branch replaces the whole ladder economy with the spot policy.
 func (l *Loop) maybeSwitchZone() {
     if l.cell != nil {
-        l.cellEvaluate(time.Now())
+        l.cellEvaluate(l.now())
 
         return
     }
     if len(l.zones) == 0 {
         return
     }
-    now := time.Now()
+    now := l.now()
     l.resetZoneDeathState()
     l.maybeRotateEmptyZone(now)
     if l.zonePickedID != "" && now.Sub(l.zoneCheckAt) < zoneSwitchPeriod {
@@ -626,7 +626,7 @@ func (l *Loop) noteZoneDanger() {
 // honest for both callers.
 func (l *Loop) noteZoneRegression(kind string, kinds string) {
     if l.cell != nil {
-        l.cellNoteDeath(time.Now())
+        l.cellNoteDeath(l.now())
 
         return
     }

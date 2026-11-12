@@ -279,7 +279,7 @@ func (l *Loop) holdZoneReturn(now time.Time) {
 // switch that lands on a resting character first waits out the sit
 // transition, stands up and only then plans the walk.
 func (l *Loop) returnToZone() {
-    now := time.Now()
+    now := l.now()
     if !l.standUpGuarded(now) {
         return
     }
@@ -323,7 +323,7 @@ func (l *Loop) returnToZone() {
         return
     }
     dest := l.zoneReturnGoal(zone, selfZ)
-    l.tripStart = time.Now()
+    l.tripStart = l.now()
     l.rePaths = 0
     l.phase = phaseTownReturn
     l.segmentRadius = tripApproachRadius
@@ -597,7 +597,7 @@ func (l *Loop) guardZoneSegmentClick(
     if l.zoneFails >= zoneReturnFailBudget {
         l.zoneFails = 0
     }
-    now := time.Now()
+    now := l.now()
     if now.Sub(l.zoneSegmentLogAt) >= noPickLogPeriod {
         l.zoneSegmentLogAt = now
         l.logf("Hunt: the direct zone segment to %d %d is walled, "+

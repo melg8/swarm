@@ -143,7 +143,7 @@ func (l *Loop) teacherTemplates() []int32 {
 // affordable prefix) and the teacher stop (the lesson walk) - both
 // read it every tick, the view allocates.
 func (l *Loop) refreshLearnPlan() {
-    now := time.Now()
+    now := l.now()
     revision := l.tracker.SkillsRevision()
     if !l.learnPlanAt.IsZero() &&
         now.Sub(l.learnPlanAt) < learnPlanPeriod &&
@@ -633,10 +633,10 @@ func (l *Loop) tickTeacherLessons(now time.Time) bool {
 // retries on a later tick and the confirm machinery stays unarmed
 // until a packet is on the wire.
 func (l *Loop) sendLearnRequest(lesson lessonTarget) bool {
-    if !l.learnAt.IsZero() && time.Since(l.learnAt) < learnPause {
+    if !l.learnAt.IsZero() && l.now().Sub(l.learnAt) < learnPause {
         return false
     }
-    l.learnAt = time.Now()
+    l.learnAt = l.now()
     if err := l.game.AcquireSkill(lesson.skillID, lesson.level); err != nil {
         l.logger.Printf("Hunt: learn: acquire request failed: %v", err)
 

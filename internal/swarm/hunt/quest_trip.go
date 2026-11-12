@@ -159,14 +159,14 @@ func (l *Loop) FindQuestNpc(
     npc QuestNpc, wait time.Duration,
 ) (state.AttackTarget, error) {
     templates := []int32{npc.TemplateID + npcdata.NPCDisplayOffset}
-    deadline := time.Now().Add(wait)
+    deadline := l.now().Add(wait)
     for {
         found, ok := l.tracker.NearestNpcByTemplates(
             templates, questNpcScanRadius)
         if ok {
             return found, nil
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return state.AttackTarget{}, fmt.Errorf(
                 "the npc %s (template %d) never appeared",
                 npc.Name, npc.TemplateID)
@@ -195,14 +195,14 @@ func (l *Loop) walkToQuestPoint(
     if err := l.game.WalkTo(x, y, z); err != nil {
         return fmt.Errorf("the walk request failed: %w", err)
     }
-    deadline := time.Now().Add(timeout)
+    deadline := l.now().Add(timeout)
     for {
         selfX, selfY, _, ok := l.tracker.SelfPosition()
         if ok && math.Hypot(
             float64(selfX-x), float64(selfY-y)) <= questArriveRadius {
             return nil
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return fmt.Errorf(
                 "the walk to (%d, %d) did not arrive", x, y)
         }
@@ -222,7 +222,7 @@ func (l *Loop) fightTransitAttackers() error {
     }
     l.logf("quest: the transit fight - %s (object %d) chases",
         attacker.Name, attacker.ObjectID)
-    deadline := time.Now().Add(questTransitFightTimeout)
+    deadline := l.now().Add(questTransitFightTimeout)
     for {
         if l.tracker.SelfHealthPercent() <= 0 {
             return errors.New("the character died in the transit fight")
@@ -231,7 +231,7 @@ func (l *Loop) fightTransitAttackers() error {
         if !ok {
             return nil
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return fmt.Errorf(
                 "the transit fight with %s timed out", attacker.Name)
         }
@@ -242,8 +242,8 @@ func (l *Loop) fightTransitAttackers() error {
             attacker.X, attacker.Y, attacker.Z, attacker.ObjectID); err != nil {
             return err
         }
-        if time.Since(l.questFightLogAt) >= 3*time.Second {
-            l.questFightLogAt = time.Now()
+        if l.now().Sub(l.questFightLogAt) >= 3*time.Second {
+            l.questFightLogAt = l.now()
             l.logf("quest: the transit fight - %s at %.0f%% hp, "+
                 "the hunter at %.0f%%", attacker.Name,
                 l.tracker.ObjectHealthPercent(attacker.ObjectID),
@@ -268,10 +268,10 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
     // shoots from the weapon range, the melee walk would only delay
     // the shot (see engageRadiusFor).
     if math.Hypot(float64(x-selfX), float64(y-selfY)) > l.engageRadiusFor() {
-        if time.Since(l.questWalkAt) < walkRequestPeriod {
+        if l.now().Sub(l.questWalkAt) < walkRequestPeriod {
             return nil
         }
-        l.questWalkAt = time.Now()
+        l.questWalkAt = l.now()
         if err := l.game.WalkTo(x, y, z); err != nil {
             return fmt.Errorf("the approach walk: %w", err)
         }
@@ -296,7 +296,7 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
 //
 //nolint:gocognit // the quest segment branches read best side by side
 func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
-    deadline := time.Now().Add(timeout)
+    deadline := l.now().Add(timeout)
     for {
         // A seated character cannot walk: every click of the seated
         // answers ActionFailed. The stand runs first (a lost toggle
@@ -331,7 +331,7 @@ func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
             questArriveRadius {
             return nil
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return fmt.Errorf(
                 "the route walk to (%d, %d) did not arrive", x, y)
         }
@@ -344,7 +344,7 @@ func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
         // an obstacle and the loop re-plans above. The click
         // rides the same flood protector pacing as the planned
         // waypoints.
-        now := time.Now()
+        now := l.now()
         if now.Sub(l.questWalkAt) < walkRequestPeriod {
             pace(questWalkPoll)
 
@@ -498,7 +498,7 @@ func (l *Loop) followWaypoint(
     lastX, lastY := int32(0), int32(0)
     stuckSince := time.Time{}
     for {
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return waypointReached
         }
         selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
@@ -525,7 +525,7 @@ func (l *Loop) followWaypoint(
             lastX, lastY = selfX, selfY
             stuckSince = time.Time{}
         } else if stuckSince.IsZero() {
-            stuckSince = time.Now()
+            stuckSince = l.now()
         }
         // The potions ride the follower poll: one planned segment
         // runs over a minute and the chaser damage of that minute
@@ -536,7 +536,7 @@ func (l *Loop) followWaypoint(
 
             return waypointFailed
         }
-        if !stuckSince.IsZero() && time.Since(stuckSince) >= questStuckWait {
+        if !stuckSince.IsZero() && l.now().Sub(stuckSince) >= questStuckWait {
             return waypointStalled
         }
         // The move start watchdog: a click that started no movement
@@ -544,7 +544,7 @@ func (l *Loop) followWaypoint(
         // same way, so the wait runs to the verdict instead of
         // re-clicking. The movement broadcast of the started walk
         // keeps the tracker walking until the stop arrives.
-        now := time.Now()
+        now := l.now()
         if sent && selfX == clickX && selfY == clickY {
             if now.Sub(clickAt) >= questMoveStartWait &&
                 !l.tracker.SelfWalking() {
@@ -606,9 +606,9 @@ func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
     if !ok {
         return false
     }
-    clickAt := time.Now()
+    clickAt := l.now()
     for {
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return false
         }
         selfX, selfY, _, ok := l.tracker.SelfPosition()
@@ -629,7 +629,7 @@ func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
         // all is dead and the route gives up instead of standing out
         // the rest of the walk budget (the owner rule of the town
         // walker, see moveStartWindow).
-        if time.Since(clickAt) >= questMoveStartWait &&
+        if l.now().Sub(clickAt) >= questMoveStartWait &&
             !l.tracker.SelfWalking() {
             return false
         }
@@ -857,7 +857,7 @@ func (l *Loop) transferGeometry(npcObjID int32) string {
 func (l *Loop) awaitTransferPage(
     npcObjID int32, destLabel string, minGen uint64, wait time.Duration,
 ) ([]BypassButton, uint64, error) {
-    deadline := time.Now().Add(wait)
+    deadline := l.now().Add(wait)
     for {
         id, html, gen := l.game.LastHTMLDialogArrival()
         if id == npcObjID && html != "" && gen > minGen {
@@ -871,7 +871,7 @@ func (l *Loop) awaitTransferPage(
                 return buttons, gen, nil
             }
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return nil, 0, fmt.Errorf(
                 "the gatekeeper dialog with %q never arrived",
                 destLabel)
@@ -887,7 +887,7 @@ func (l *Loop) awaitTransferPage(
 func (l *Loop) awaitTransferArrival(
     ctx context.Context, transfer QuestTransfer,
 ) error {
-    deadline := time.Now().Add(questTransferArriveWait)
+    deadline := l.now().Add(questTransferArriveWait)
     for {
         if err := ctx.Err(); err != nil {
             return fmt.Errorf("cancelled: %w", err)
@@ -902,7 +902,7 @@ func (l *Loop) awaitTransferArrival(
 
             return nil
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             if !ok {
                 return fmt.Errorf(
                     "the teleport to %s never landed and the self "+
@@ -1021,7 +1021,7 @@ func (l *Loop) farmQuestStage(
     for _, mob := range kill.Mobs {
         templates = append(templates, mob+npcdata.NPCDisplayOffset)
     }
-    deadline := time.Now().Add(questKillStageTimeout)
+    deadline := l.now().Add(questKillStageTimeout)
     for {
         if err := ctx.Err(); err != nil {
             return err
@@ -1032,7 +1032,7 @@ func (l *Loop) farmQuestStage(
 
             return nil
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return fmt.Errorf(
                 "the kill stage timed out at %d of %d items",
                 questItemCount(l.tracker, kill.ItemIDs), kill.Target)
@@ -1100,8 +1100,8 @@ func (l *Loop) ensureStanding() error {
         if err := l.game.ActionSitStand(); err != nil {
             return fmt.Errorf("the stand request: %w", err)
         }
-        deadline := time.Now().Add(3 * time.Second)
-        for time.Now().Before(deadline) {
+        deadline := l.now().Add(3 * time.Second)
+        for l.now().Before(deadline) {
             if !l.tracker.SelfSitting() {
                 return nil
             }
@@ -1126,7 +1126,7 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
     if err := l.game.ActionSitStand(); err != nil {
         return fmt.Errorf("the sit request: %w", err)
     }
-    deadline := time.Now().Add(questRestTimeout)
+    deadline := l.now().Add(questRestTimeout)
     for {
         if err := ctx.Err(); err != nil {
             _ = l.game.ActionSitStand()
@@ -1149,7 +1149,7 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
         if hp >= questRestStandHP {
             break
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             l.logf("quest: the rest timed out at %.0f%% health", hp)
 
             break
@@ -1195,7 +1195,7 @@ func (l *Loop) drinkHealingPotionAt(threshold float64) error {
         return nil
     }
     if !l.questPotionAt.IsZero() &&
-        time.Since(l.questPotionAt) < questPotionReuse {
+        l.now().Sub(l.questPotionAt) < questPotionReuse {
         return nil
     }
     for _, item := range l.tracker.InventoryItems() {
@@ -1207,7 +1207,7 @@ func (l *Loop) drinkHealingPotionAt(threshold float64) error {
             if err := l.game.UseItem(item.ObjectID); err != nil {
                 return fmt.Errorf("the potion use: %w", err)
             }
-            l.questPotionAt = time.Now()
+            l.questPotionAt = l.now()
             l.awaitInventoryMutation(before, questEquipConfirmWait)
 
             return nil
@@ -1265,12 +1265,12 @@ func (l *Loop) EquipBaggedGear() error {
 func (l *Loop) awaitInventoryMutation(
     before uint64, wait time.Duration,
 ) bool {
-    deadline := time.Now().Add(wait)
+    deadline := l.now().Add(wait)
     for {
         if l.tracker.InventoryVersion() != before {
             return true
         }
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             return false
         }
         pace(gatekeeperPollPeriod)

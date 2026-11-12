@@ -176,7 +176,7 @@ func (l *Loop) guideWanted() bool {
     if level < guideMinLevel || level > guideMaxLevel {
         return false
     }
-    if !l.guideRefusedAt.IsZero() && time.Now().Before(l.guideRefusedAt) {
+    if !l.guideRefusedAt.IsZero() && l.now().Before(l.guideRefusedAt) {
         return false
     }
     for _, skillID := range expectedGuideBuffs(level, l.isCaster()) {
@@ -370,10 +370,10 @@ func (l *Loop) receiveGuideMagic() bool {
 
         return true
     }
-    l.guideAt = time.Now()
+    l.guideAt = l.now()
     deadline := l.guideAt.Add(guideBuffWait)
     for !l.guideBuffLanded() {
-        if time.Now().After(deadline) {
+        if l.now().After(deadline) {
             l.armGuideRefusal("the expected buffs never landed")
 
             return true
@@ -390,7 +390,7 @@ func (l *Loop) receiveGuideMagic() bool {
 // html) or the dialog died - the trip moves on and the later trips
 // stay away until the cooldown lapses.
 func (l *Loop) armGuideRefusal(reason string) {
-    l.guideRefusedAt = time.Now().Add(guideRefuseCooldown)
+    l.guideRefusedAt = l.now().Add(guideRefuseCooldown)
     l.logger.Printf("Hunt: guide: %s, cooldown for %s", reason,
         guideRefuseCooldown)
 }

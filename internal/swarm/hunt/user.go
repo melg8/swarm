@@ -167,7 +167,7 @@ type pendingInventory struct {
 // applies the flips, the timeout only rescues a refused request from
 // blocking the queue forever.
 func (l *Loop) inventoryItemAllowed(objectID int32, slots []gear.Slot) bool {
-    now := time.Now()
+    now := l.now()
     for pendingID, pending := range l.pendingActions {
         if l.pendingInventoryConfirmed(pendingID, pending) ||
             now.Sub(pending.at) >= inventoryResendTimeout {
@@ -279,7 +279,7 @@ func (l *Loop) markInventoryAction(objectID int32) {
     pending := pendingInventory{
         equip: false,
         count: 0,
-        at:    time.Now(),
+        at:    l.now(),
         slots: gear.ServerWriteSlots(l.equipment(), objectID),
     }
     if ok {
@@ -368,7 +368,7 @@ func (l *Loop) userMovement(cmd state.Command) {
     l.userY = cmd.Y
     l.userZ = cmd.Z
     l.userTarget = cmd.ObjectID
-    l.userStart = time.Now()
+    l.userStart = l.now()
     l.userDeadline = time.Time{}
     l.userMoveAt = time.Time{}
     // The new command redirects a walk that is already running: the
@@ -416,7 +416,7 @@ func (l *Loop) userMovement(cmd state.Command) {
 // bot sitting through an endless stream of refusals (the softlock of
 // a rest interrupted by a manual click).
 func (l *Loop) tickUser() {
-    now := time.Now()
+    now := l.now()
     if l.tracker.SelfSitting() && l.userKind != "" {
         // The stand request shares the pending transition gate with
         // the rest logic (never a double toggle); the walk starts on
@@ -551,7 +551,7 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     if speed <= 0 {
         speed = flowDefaultRunSpeed
     }
-    l.userDeadline = time.Now().Add(
+    l.userDeadline = l.now().Add(
         userMoveBudget(manualTravel(result.Length, speed)))
     // The manual plan publishes its search contract (the approach
     // radius of the answer - zero for the exact destination search,

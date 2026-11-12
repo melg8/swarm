@@ -196,12 +196,12 @@ func (l *Loop) walkTownWaypoints() bool {
     // recovery too - the refusing pocket branch of stuckTownWalk),
     // the click machinery stays down until the escape ends.
     if l.cursorEscape.armed {
-        l.driveCursorKeyEscape(time.Now(), selfX, selfY)
+        l.driveCursorKeyEscape(l.now(), selfX, selfY)
 
         return false
     }
 
-    return l.followWaypoints(selfX, selfY, selfZ, time.Now())
+    return l.followWaypoints(selfX, selfY, selfZ, l.now())
 }
 
 // advanceWaypoints walks the waypoint cursor forward as far as the

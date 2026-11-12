@@ -162,12 +162,12 @@ func delevelGuardTemplates() []int32 {
 // short cooldown after a finished or aborted run and the long cooldown
 // armed by the free death counter both have to be over.
 func (l *Loop) delevelCooldownOver() bool {
-    if !l.delevelWait.IsZero() && time.Now().Before(l.delevelWait) {
+    if !l.delevelWait.IsZero() && l.now().Before(l.delevelWait) {
         return false
     }
 
     return l.delevelEnd.IsZero() ||
-        time.Since(l.delevelEnd) >= delevelCooldown
+        l.now().Sub(l.delevelEnd) >= delevelCooldown
 }
 
 // delevelTriggerMedian returns the zone mob level the delevel trigger
@@ -285,7 +285,7 @@ func (l *Loop) startDelevel() {
     level := l.tracker.SelfLevel()
     target := delevelTargetFor(level, median)
     l.rememberFarmSpot()
-    l.tripStart = time.Now()
+    l.tripStart = l.now()
     l.rePaths = 0
     l.delevelTarget = target
     l.delevelMedian = median
@@ -334,7 +334,7 @@ func (l *Loop) delevelAbortWait() time.Duration {
 func (l *Loop) tickDelevel() {
     // The character is alive again: the next death counts fresh.
     l.delevelCounted = false
-    if time.Since(l.tripStart) > delevelTimeout {
+    if l.now().Sub(l.tripStart) > delevelTimeout {
         l.abortDelevel("delevel timed out")
 
         return
@@ -352,7 +352,7 @@ func (l *Loop) tickDelevel() {
         // cooldown from retrying the walks.
         l.abortDelevel("guard deaths remove no experience on this " +
             "server")
-        l.delevelWait = time.Now().Add(delevelFreeCooldown)
+        l.delevelWait = l.now().Add(delevelFreeCooldown)
 
         return
     }
@@ -366,7 +366,7 @@ func (l *Loop) tickDelevel() {
     if !l.walkTownWaypoints() {
         return
     }
-    l.fightDelevelGuard(time.Now())
+    l.fightDelevelGuard(l.now())
 }
 
 // planDelevelWalk plans the walk to the nearest guard spawn point.
@@ -560,7 +560,7 @@ func (l *Loop) noteDelevelDeath() {
 // LEGITIMATE cycle (the level climbed back over the trigger) starts
 // from the short pause again.
 func (l *Loop) finishDelevel() {
-    l.delevelEnd = time.Now()
+    l.delevelEnd = l.now()
     l.delevelTarget = 0
     l.delevelGuard = 0
     l.delevelAborts = 0
@@ -581,12 +581,12 @@ func (l *Loop) finishDelevel() {
 // named. The streak resets only on a finished deleveling
 // (finishDelevel), never on the next start.
 func (l *Loop) abortDelevel(reason string) {
-    l.delevelEnd = time.Now()
+    l.delevelEnd = l.now()
     l.delevelTarget = 0
     l.delevelGuard = 0
     l.delevelAborts++
     wait := l.delevelAbortWait()
-    l.delevelWait = time.Now().Add(wait)
+    l.delevelWait = l.now().Add(wait)
     l.logf("Hunt: delevel aborted: %s (the next attempt waits %s)",
         reason, wait)
     l.startDelevelReturnSegment()
@@ -597,7 +597,7 @@ func (l *Loop) abortDelevel(reason string) {
 // return segment must not inherit its elapsed time, or the trip timeout
 // would end the return before it started.
 func (l *Loop) startDelevelReturnSegment() {
-    l.tripStart = time.Now()
+    l.tripStart = l.now()
     l.rePaths = 0
     l.startReturnSegment()
 }

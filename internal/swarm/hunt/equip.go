@@ -289,7 +289,7 @@ func (l *Loop) maybeEquipGear() {
     if manager == nil || l.game == nil {
         return
     }
-    now := time.Now()
+    now := l.now()
     l.prunePendingActions(now)
     if len(l.userDeferred) > 0 {
         return
@@ -356,7 +356,7 @@ func (l *Loop) maybeDestroyReplacedStarters() {
     if manager == nil || l.game == nil {
         return
     }
-    now := time.Now()
+    now := l.now()
     if len(l.userDeferred) > 0 {
         return
     }

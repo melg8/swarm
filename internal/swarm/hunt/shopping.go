@@ -277,7 +277,7 @@ func (l *Loop) pendingBookBudget() int64 {
 // tick publish does not rebuild it (the rebuild was the dominant
 // allocation source of the 100 bot fleet under live profiling).
 func (l *Loop) refreshShoppingCache() {
-    now := time.Now()
+    now := l.now()
     if !l.shoppingPlanAt.IsZero() &&
         now.Sub(l.shoppingPlanAt) < shoppingPlanPeriod {
         return

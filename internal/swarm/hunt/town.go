@@ -62,7 +62,7 @@ func (l *Loop) tripCooldownOver() bool {
         cooldown = tripAbortCooldown(l.tripAbortRun)
     }
 
-    return time.Since(l.tripEndedAt) >= cooldown
+    return l.now().Sub(l.tripEndedAt) >= cooldown
 }
 
 // inventoryFull reports whether the inventory passed a trip trigger
@@ -93,7 +93,7 @@ func (l *Loop) maybeStartTownTrip() {
     // teach stop). The wait is bounded: a server that never lists
     // skills keeps the trips selling and shopping.
     if !l.tracker.SkillsListed() &&
-        time.Since(l.tracker.SessionStartedAt()) < skillListWaitLimit {
+        l.now().Sub(l.tracker.SessionStartedAt()) < skillListWaitLimit {
         return
     }
     // A bot outside the hunting zone returns first: the zone return
@@ -145,7 +145,7 @@ func (l *Loop) maybeStartTownTrip() {
     l.dropAttackTarget("the town trip owns the way")
     // The walk needs a standing character: a resting one stands up
     // first and the trip starts on a later tick.
-    if !l.standUpGuarded(time.Now()) {
+    if !l.standUpGuarded(l.now()) {
         return
     }
     selfX, selfY, _, ok := l.tracker.SelfPosition()
@@ -199,7 +199,7 @@ func (l *Loop) maybeStartTownTrip() {
     if !guideRun || l.inZoneSelf() {
         l.rememberFarmSpot()
     }
-    l.tripStart = time.Now()
+    l.tripStart = l.now()
     l.sold = make(map[int32]bool)
     l.rePaths = 0
     l.segmentRefused = false
@@ -348,12 +348,12 @@ func (l *Loop) rememberFarmSpot() {
 
 // tickTownTrip advances the running town trip by one decision.
 func (l *Loop) tickTownTrip() {
-    if time.Since(l.tripStart) > tripTimeout {
+    if l.now().Sub(l.tripStart) > tripTimeout {
         l.abortTownTrip("trip timed out")
 
         return
     }
-    if l.interruptTripForAttacker(time.Now()) {
+    if l.interruptTripForAttacker(l.now()) {
         return
     }
     switch l.phase {
@@ -456,7 +456,7 @@ func (l *Loop) engagesOnZoneEntry() bool {
     if l.weaponlessRunWanted() {
         return false
     }
-    now := time.Now()
+    now := l.now()
     if now.Sub(l.lastActionAt) < selectPeriod {
         return false
     }
@@ -582,11 +582,11 @@ func (l *Loop) endTownTrip(reason string) {
     l.shoppingPlanAdena = 0
     l.resetReplacementSales()
     l.resetLearnState()
-    l.tripEndedAt = time.Now()
+    l.tripEndedAt = l.now()
     l.noteTripAbortRun(reason)
     if l.journal != nil {
         l.journal.TripEnd(l.tracker.ID(), reason,
-            time.Since(l.tripStart))
+            l.now().Sub(l.tripStart))
     }
     l.logf("Hunt: town trip ended: %s", reason)
 }

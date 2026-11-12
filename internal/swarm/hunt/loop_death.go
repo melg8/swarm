@@ -56,7 +56,7 @@ func (l *Loop) resetFightClock() {
 // point of the exercise: the phase keeps running and replans the walk
 // to the guard from the restart point.
 func (l *Loop) recoverFromDeath() {
-    now := time.Now()
+    now := l.now()
     if !l.restartAt.IsZero() && now.Sub(l.restartAt) < deathRestartPeriod {
         return
     }
