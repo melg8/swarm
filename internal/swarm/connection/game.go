@@ -39,11 +39,6 @@ const (
     // clientX/clientY/clientZ view fresh at a whisper rate instead of
     // the movement rate, far under every flood protector threshold.
     validatePositionIdleGap = 15 * time.Second
-    // moveToLocationClientPacketID mirrors togameserver.
-    // moveToLocationPacketID: the send path classifies the request by
-    // its serialized opcode so the tracker can attribute the
-    // ActionFailed answers honestly (see sendPacket).
-    moveToLocationClientPacketID = 0x01
 )
 
 // silentSessionOpcodes lists the outbound maintenance opcodes that
@@ -86,54 +81,11 @@ var silentSessionOpcodes = map[byte]bool{
 // the unit tests shorten it to keep the silence case under a second.
 var gameSilenceTimeout = 3 * time.Minute
 
-// Packet ids used by the game flow state machine.
+// The session end notifications of the server carry no body, so no
+// parser owns their ids.
 const (
-    charSelectInfoID  = 0x1F
-    charCreateOkID    = 0x25
-    charCreateFailID  = 0x26
-    charSelectedID    = 0x21
-    userInfoID        = 0x04
-    leaveWorldID      = 0x96
-    serverCloseID     = 0x36
-    netPingResponseID = 0xEC
-)
-
-// Packet ids of the observed world packets.
-const (
-    moveToLocationID   = 0x01
-    charInfoID         = 0x03
-    attackID           = 0x06
-    spawnItemID        = 0x15
-    npcHTMLMessageID   = 0x1B
-    dropItemID         = 0x16
-    getItemID          = 0x17
-    statusUpdateID     = 0x1A
-    setupGaugeID       = 0x85
-    deleteObjectID     = 0x1E
-    npcInfoID          = 0x22
-    itemListID         = 0x27
-    inventoryUpdateID  = 0x37
-    changeMoveTypeID   = 0x3E
-    changeWaitTypeID   = 0x3F
-    targetSelectedID   = 0x39
-    targetUnselectedID = 0x3A
-    autoAttackStartID  = 0x3B
-    autoAttackStopID   = 0x3C
-    teleportID         = 0x38
-    stopMoveID         = 0x59
-    moveToPawnID       = 0x75
-    validateLocationID = 0x76
-    beginRotationID    = 0x77
-    stopRotationID     = 0x78
-    myTargetSelectedID = 0xBF
-    systemMessageID    = 0x7A
-    creatureSayID      = 0x5D
-    magicSkillUseID    = 0x5A
-    skillListID        = 0x6D
-    questListID        = 0x98
-    abnormalStatusID   = 0x97
-    socialActionID     = 0x3D
-    actionFailedID     = 0x35
+    leaveWorldID  = 0x96
+    serverCloseID = 0x36
 )
 
 // GameSessionParams carries the login session keys for the game server.
@@ -451,7 +403,7 @@ func (gc *GameClient) sendPacket(data crypt.Serializable) error {
         // of the bookkeeping (see silentSessionOpcodes).
         opcode := writer.Bytes()[0]
         now := time.Now()
-        if opcode == moveToLocationClientPacketID {
+        if opcode == togameserver.MoveToLocationPacketID {
             gc.tracker.ApplyMoveRequestSent(now)
         } else if !silentSessionOpcodes[opcode] {
             gc.tracker.ApplyOtherRequestSent(now)

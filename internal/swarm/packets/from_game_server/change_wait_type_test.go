@@ -12,7 +12,7 @@ import (
 
 func TestParseChangeWaitTypePacket(t *testing.T) {
     build := func(moveType int32) []byte {
-        data := []byte{changeWaitTypePacketID}
+        data := []byte{ChangeWaitTypePacketID}
         data = putInt32(data, 268473919)
         data = putInt32(data, moveType)
 
@@ -51,11 +51,11 @@ func TestParseChangeWaitTypePacket(t *testing.T) {
 
     t.Run("truncated object id", func(t *testing.T) {
         p := NewChangeWaitTypePacket()
-        require.Error(t, ParseChangeWaitTypePacket(p, []byte{changeWaitTypePacketID, 1}))
+        require.Error(t, ParseChangeWaitTypePacket(p, []byte{ChangeWaitTypePacketID, 1}))
     })
 
     t.Run("truncated move type", func(t *testing.T) {
-        data := []byte{changeWaitTypePacketID}
+        data := []byte{ChangeWaitTypePacketID}
         data = putInt32(data, 268473919)
 
         p := NewChangeWaitTypePacket()
@@ -69,7 +69,7 @@ func TestCharCreateOkPacketValue(t *testing.T) {
     })
 
     t.Run("confirmation value", func(t *testing.T) {
-        data := []byte{charCreateOkPacketID}
+        data := []byte{CharCreateOkPacketID}
         data = putInt32(data, 1)
 
         require.NoError(t, ParseCharCreateOkPacket(data))
@@ -100,11 +100,11 @@ func TestCharCreateFailReasonText(t *testing.T) {
 func TestParseKeyPacketTruncations(t *testing.T) {
     t.Run("missing result byte", func(t *testing.T) {
         p := NewKeyPacket()
-        require.Error(t, ParseKeyPacket(p, []byte{keyPacketID}))
+        require.Error(t, ParseKeyPacket(p, []byte{KeyPacketID}))
     })
 
     t.Run("missing tail", func(t *testing.T) {
-        data := []byte{keyPacketID, 0x01}
+        data := []byte{KeyPacketID, 0x01}
         data = append(data, make([]byte, keyPacketKeySize)...)
         data = putInt32(data, 1)
 

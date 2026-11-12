@@ -13,7 +13,7 @@ import (
 
 func TestParseActionFailedPacket(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(actionFailedPacketID))
+    require.NoError(t, writer.WriteInt8(ActionFailedPacketID))
 
     p := NewActionFailedPacket()
     require.NoError(t, ParseActionFailedPacket(p, writer.Bytes()))
@@ -21,7 +21,7 @@ func TestParseActionFailedPacket(t *testing.T) {
 
 func TestParseActionFailedPacketRejectsWrongID(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(socialActionPacketID))
+    require.NoError(t, writer.WriteInt8(SocialActionPacketID))
 
     p := NewActionFailedPacket()
     require.Error(t, ParseActionFailedPacket(p, writer.Bytes()))

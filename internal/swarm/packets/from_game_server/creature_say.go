@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const creatureSayPacketID = 0x5D
+const CreatureSayPacketID = 0x5D
 
 // CreatureSayPacket is one chat line of a creature in the world: the
 // sender object id, the ChatType client id of the channel, the sender
@@ -46,7 +46,7 @@ func ParseCreatureSayPacket(
     p *CreatureSayPacket, data []byte,
 ) error {
     reader := packet.NewReader(data)
-    if err := expectPacketID(reader, creatureSayPacketID); err != nil {
+    if err := expectPacketID(reader, CreatureSayPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID, &p.Channel); err != nil {

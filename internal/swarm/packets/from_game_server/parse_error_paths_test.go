@@ -188,7 +188,7 @@ func TestTruncatedCompactPacketPrefixesError(t *testing.T) {
 }
 
 func buildMyTargetSelectedData() []byte {
-    data := []byte{myTargetSelectedPacketID}
+    data := []byte{MyTargetSelectedPacketID}
     data = putInt32(data, 333333)
     data = append(data, 1, 0) // target color
 
@@ -196,7 +196,7 @@ func buildMyTargetSelectedData() []byte {
 }
 
 func buildTargetSelectedData() []byte {
-    data := []byte{targetSelectedPacketID}
+    data := []byte{TargetSelectedPacketID}
     for _, value := range []int32{333333, 444444, 46000, 51000, -3400, 0} {
         data = putInt32(data, value)
     }
@@ -205,7 +205,7 @@ func buildTargetSelectedData() []byte {
 }
 
 func buildTargetUnselectedData() []byte {
-    data := []byte{targetUnselectedPacketID}
+    data := []byte{TargetUnselectedPacketID}
     for _, value := range []int32{333333, 46000, 51000, -3400, 0} {
         data = putInt32(data, value)
     }
@@ -214,7 +214,7 @@ func buildTargetUnselectedData() []byte {
 }
 
 func buildBeginRotationData() []byte {
-    data := []byte{beginRotationPacketID}
+    data := []byte{BeginRotationPacketID}
     for _, value := range []int32{333333, 23456, 1, 400} {
         data = putInt32(data, value)
     }
@@ -223,7 +223,7 @@ func buildBeginRotationData() []byte {
 }
 
 func buildStopRotationData() []byte {
-    data := []byte{stopRotationPacketID}
+    data := []byte{StopRotationPacketID}
     for _, value := range []int32{333333, 34567, 400} {
         data = putInt32(data, value)
     }
@@ -233,7 +233,7 @@ func buildStopRotationData() []byte {
 }
 
 func buildChangeMoveTypeData() []byte {
-    data := []byte{changeMoveTypePacketID}
+    data := []byte{ChangeMoveTypePacketID}
     for _, value := range []int32{55, 1} {
         data = putInt32(data, value)
     }
@@ -242,7 +242,7 @@ func buildChangeMoveTypeData() []byte {
 }
 
 func buildTeleportToLocationData() []byte {
-    data := []byte{teleportToLocationPacketID}
+    data := []byte{TeleportToLocationPacketID}
     for _, value := range []int32{66, 46000, 51000, -3400, 1, 9000} {
         data = putInt32(data, value)
     }
@@ -251,7 +251,7 @@ func buildTeleportToLocationData() []byte {
 }
 
 func buildSocialActionData() []byte {
-    data := []byte{socialActionPacketID}
+    data := []byte{SocialActionPacketID}
     for _, value := range []int32{77, 15} {
         data = putInt32(data, value)
     }
@@ -260,28 +260,28 @@ func buildSocialActionData() []byte {
 }
 
 func buildAutoAttackStartData() []byte {
-    data := []byte{autoAttackStartPacketID}
+    data := []byte{AutoAttackStartPacketID}
     data = putInt32(data, 88)
 
     return data
 }
 
 func buildAutoAttackStopData() []byte {
-    data := []byte{autoAttackStopPacketID}
+    data := []byte{AutoAttackStopPacketID}
     data = putInt32(data, 88)
 
     return data
 }
 
 func buildDeleteObjectData() []byte {
-    data := []byte{deleteObjectPacketID}
+    data := []byte{DeleteObjectPacketID}
     data = putInt32(data, 99)
 
     return data
 }
 
 func buildMoveToLocationData() []byte {
-    data := []byte{moveToLocationPacketID}
+    data := []byte{MoveToLocationPacketID}
     for _, value := range []int32{11, 220, 330, 440, 120, 130, 140} {
         data = putInt32(data, value)
     }
@@ -290,7 +290,7 @@ func buildMoveToLocationData() []byte {
 }
 
 func buildMoveToPawnData() []byte {
-    data := []byte{moveToPawnPacketID}
+    data := []byte{MoveToPawnPacketID}
     for _, value := range []int32{111111, 222222, 50, 46000, 51000, -3400, 46200, 51200, -3300} {
         data = putInt32(data, value)
     }
@@ -299,7 +299,7 @@ func buildMoveToPawnData() []byte {
 }
 
 func buildStopMoveData() []byte {
-    data := []byte{stopMovePacketID}
+    data := []byte{StopMovePacketID}
     for _, value := range []int32{11, 220, 330, 440, 8192} {
         data = putInt32(data, value)
     }
@@ -308,7 +308,7 @@ func buildStopMoveData() []byte {
 }
 
 func buildValidateLocationData() []byte {
-    data := []byte{validateLocationPacketID}
+    data := []byte{ValidateLocationPacketID}
     for _, value := range []int32{222222, 46000, 51000, -3400, 49152} {
         data = putInt32(data, value)
     }
@@ -317,7 +317,7 @@ func buildValidateLocationData() []byte {
 }
 
 func buildDropItemData() []byte {
-    data := []byte{dropItemPacketID}
+    data := []byte{DropItemPacketID}
     // Dropper, object, template, x, y, z, stackable and count.
     for _, value := range []int32{101, 202, 5720, 46000, 51000, -3400, 1, 24} {
         data = putInt32(data, value)
@@ -327,7 +327,7 @@ func buildDropItemData() []byte {
 }
 
 func buildSpawnItemData() []byte {
-    data := []byte{spawnItemPacketID}
+    data := []byte{SpawnItemPacketID}
     for _, value := range []int32{202, 5720, 46000, 51000, -3400, 1, 24} {
         data = putInt32(data, value)
     }
@@ -336,7 +336,7 @@ func buildSpawnItemData() []byte {
 }
 
 func buildGetItemData() []byte {
-    data := []byte{getItemPacketID}
+    data := []byte{GetItemPacketID}
     for _, value := range []int32{101, 202, 46000, 51000, -3400} {
         data = putInt32(data, value)
     }
@@ -345,7 +345,7 @@ func buildGetItemData() []byte {
 }
 
 func buildStatusUpdateData() []byte {
-    data := []byte{statusUpdatePacketID}
+    data := []byte{StatusUpdatePacketID}
     for _, value := range []int32{222222, 2, 0x09, 60, 0x0A, 130} {
         data = putInt32(data, value)
     }
@@ -354,14 +354,14 @@ func buildStatusUpdateData() []byte {
 }
 
 func buildNetPingData() []byte {
-    data := []byte{netPingPacketID}
+    data := []byte{NetPingPacketID}
     data = putInt32(data, 470)
 
     return data
 }
 
 func buildAttackData() []byte {
-    data := []byte{attackPacketID}
+    data := []byte{AttackPacketID}
     data = putInt32(data, 111111)
     data = putInt32(data, 222222)
     data = putInt32(data, 33)
@@ -381,7 +381,7 @@ func buildAttackData() []byte {
 }
 
 func buildCharSelectedData() []byte {
-    data := []byte{charSelectedPacketID}
+    data := []byte{CharSelectedPacketID}
     data = append(data, utf16("sweep")...)
     data = putInt32(data, 555555)
     data = append(data, utf16("Sweeper")...)
@@ -404,7 +404,7 @@ func TestUserInfoTruncatedPrefixesError(t *testing.T) {
 }
 
 func buildUserInfoData() []byte {
-    data := []byte{userInfoPacketID}
+    data := []byte{UserInfoPacketID}
     // X, y, z and the vehicle id.
     for _, value := range []int32{46000, 51000, -3400, 0} {
         data = putInt32(data, value)
@@ -443,7 +443,7 @@ func TestNpcInfoTruncatedPrefixesError(t *testing.T) {
 }
 
 func buildNpcInfoData() []byte {
-    data := []byte{npcInfoPacketID}
+    data := []byte{NpcInfoPacketID}
     // Object id, template id and the attackable flag.
     for _, value := range []int32{222222, 1001278, 1} {
         data = putInt32(data, value)
@@ -505,7 +505,7 @@ func TestCharInfoTruncatedPrefixes(t *testing.T) {
 }
 
 func buildCharInfoData() []byte {
-    data := []byte{charInfoPacketID}
+    data := []byte{CharInfoPacketID}
     // X, y, z and the vehicle id.
     for _, value := range []int32{46000, 51000, -3400, 0} {
         data = putInt32(data, value)
@@ -532,7 +532,7 @@ func buildCharInfoData() []byte {
 }
 
 func TestCharSelectInfoTruncatedPrefixesError(t *testing.T) {
-    data := append([]byte{charSelectInfoPacketID}, putInt32(nil, 1)...)
+    data := append([]byte{CharSelectInfoPacketID}, putInt32(nil, 1)...)
     data = append(data, buildCharacterEntry("sweep", "sweep")...)
     parse := func(data []byte) error {
         return ParseCharSelectInfoPacket(NewCharSelectInfoPacket(), data)
@@ -544,7 +544,7 @@ func TestCharSelectInfoTruncatedPrefixesError(t *testing.T) {
 
 func TestParseSystemMessageParamTypes(t *testing.T) {
     t.Run("typed parameters", func(t *testing.T) {
-        data := []byte{systemMessagePacketID}
+        data := []byte{SystemMessagePacketID}
         data = putInt32(data, 42) // message id
         data = putInt32(data, 4)  // param count
         // Skill name parameter: id and level ints.
@@ -578,7 +578,7 @@ func TestParseSystemMessageParamTypes(t *testing.T) {
 
     t.Run("implausible param counts", func(t *testing.T) {
         for _, count := range []int32{systemParamsCap + 1, -1} {
-            data := []byte{systemMessagePacketID}
+            data := []byte{SystemMessagePacketID}
             data = putInt32(data, 1)
             data = putInt32(data, count)
 
@@ -588,7 +588,7 @@ func TestParseSystemMessageParamTypes(t *testing.T) {
     })
 
     t.Run("truncated prefixes error", func(t *testing.T) {
-        data := []byte{systemMessagePacketID}
+        data := []byte{SystemMessagePacketID}
         data = putInt32(data, 42)
         data = putInt32(data, 2)
         // One text parameter and one truncated int parameter.
@@ -607,7 +607,7 @@ func TestParseSystemMessageParamTypes(t *testing.T) {
 }
 
 func TestStatusUpdateForEachCapsStoredAttributes(t *testing.T) {
-    data := []byte{statusUpdatePacketID}
+    data := []byte{StatusUpdatePacketID}
     data = putInt32(data, 222222)
     data = putInt32(data, 12)
     for i := range 12 {
@@ -632,7 +632,7 @@ func TestItemListTruncatedEntryStops(t *testing.T) {
     // A truncated item entry stops the list without a parse error: the
     // entries parsed so far stay and the rest is dropped.
     for size := range entry {
-        data := []byte{itemListPacketID}
+        data := []byte{ItemListPacketID}
         data = putInt16(data, 0)
         data = putInt16(data, 1)
         data = append(data, entry[:size]...)
@@ -644,7 +644,7 @@ func TestItemListTruncatedEntryStops(t *testing.T) {
 }
 
 func TestInventoryUpdateTruncatedPrefixesError(t *testing.T) {
-    data := []byte{inventoryUpdatePacketID}
+    data := []byte{InventoryUpdatePacketID}
     data = putInt16(data, 1)
     data = putInt16(data, 1) // change code: add
     data = inventoryItemEntry(data, 3, 57, 25, 4, 0)

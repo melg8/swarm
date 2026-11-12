@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const charSelectedPacketID = 0x21
+const CharSelectedPacketID = 0x21
 
 // CharSelectedPacket is sent as a response to character selection and moves
 // the connection into the entering world state.
@@ -49,7 +49,7 @@ func NewCharSelectedPacket() *CharSelectedPacket {
 func ParseCharSelectedPacket(p *CharSelectedPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, charSelectedPacketID); err != nil {
+    if err := expectPacketID(reader, CharSelectedPacketID); err != nil {
         return err
     }
 

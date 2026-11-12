@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const moveToLocationPacketID = 0x01
+const MoveToLocationPacketID = 0x01
 
 // MoveMode classifies the origin of a client MoveToLocation request.
 const (
@@ -67,7 +67,7 @@ func NewMoveToLocationRequestPacket() *MoveToLocationRequestPacket {
 
 // ToBytes serializes the packet.
 func (p *MoveToLocationRequestPacket) ToBytes(writer *packet.Writer) error {
-    if err := writer.WriteInt8(moveToLocationPacketID); err != nil {
+    if err := writer.WriteInt8(MoveToLocationPacketID); err != nil {
         return fmt.Errorf("failed to write move to location id: %w", err)
     }
     if err := writer.WriteInt32(p.TargetX); err != nil {

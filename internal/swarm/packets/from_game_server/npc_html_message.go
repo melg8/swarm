@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const npcHTMLMessagePacketID = 0x1B
+const NpcHTMLMessagePacketID = 0x1B
 
 // NpcHTMLMessage is the server html dialog packet a gatekeeper (or any
 // npc) sends in response to a bypass or a talk. The bot reads the html
@@ -47,7 +47,7 @@ func NewNpcHTMLMessage() *NpcHTMLMessage {
 // and the trailing item id.
 func ParseNpcHTMLMessage(p *NpcHTMLMessage, data []byte) error {
     reader := packet.NewReader(data)
-    if err := expectPacketID(reader, npcHTMLMessagePacketID); err != nil {
+    if err := expectPacketID(reader, NpcHTMLMessagePacketID); err != nil {
         return err
     }
     var err error

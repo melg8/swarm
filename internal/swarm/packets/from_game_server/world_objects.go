@@ -14,14 +14,14 @@ import (
 // ValidateLocation, DeleteObject, DropItem, SpawnItem and GetItem.
 
 const (
-    moveToLocationPacketID   = 0x01
-    moveToPawnPacketID       = 0x75
-    stopMovePacketID         = 0x59
-    validateLocationPacketID = 0x76
-    deleteObjectPacketID     = 0x1E
-    dropItemPacketID         = 0x16
-    spawnItemPacketID        = 0x15
-    getItemPacketID          = 0x17
+    MoveToLocationPacketID   = 0x01
+    MoveToPawnPacketID       = 0x75
+    StopMovePacketID         = 0x59
+    ValidateLocationPacketID = 0x76
+    DeleteObjectPacketID     = 0x1E
+    DropItemPacketID         = 0x16
+    SpawnItemPacketID        = 0x15
+    GetItemPacketID          = 0x17
 )
 
 // MoveToLocationPacket announces an object movement.
@@ -55,7 +55,7 @@ func NewMoveToLocationPacket() *MoveToLocationPacket {
 func ParseMoveToLocationPacket(p *MoveToLocationPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, moveToLocationPacketID); err != nil {
+    if err := expectPacketID(reader, MoveToLocationPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader,
@@ -103,7 +103,7 @@ func NewMoveToPawnPacket() *MoveToPawnPacket {
 func ParseMoveToPawnPacket(p *MoveToPawnPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, moveToPawnPacketID); err != nil {
+    if err := expectPacketID(reader, MoveToPawnPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader,
@@ -141,7 +141,7 @@ func NewStopMovePacket() *StopMovePacket {
 func ParseStopMovePacket(p *StopMovePacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, stopMovePacketID); err != nil {
+    if err := expectPacketID(reader, StopMovePacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader,
@@ -178,7 +178,7 @@ func NewValidateLocationPacket() *ValidateLocationPacket {
 func ParseValidateLocationPacket(p *ValidateLocationPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, validateLocationPacketID); err != nil {
+    if err := expectPacketID(reader, ValidateLocationPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader,
@@ -204,7 +204,7 @@ func NewDeleteObjectPacket() *DeleteObjectPacket {
 func ParseDeleteObjectPacket(p *DeleteObjectPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, deleteObjectPacketID); err != nil {
+    if err := expectPacketID(reader, DeleteObjectPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID); err != nil {
@@ -245,7 +245,7 @@ func NewDropItemPacket() *DropItemPacket {
 func ParseDropItemPacket(p *DropItemPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, dropItemPacketID); err != nil {
+    if err := expectPacketID(reader, DropItemPacketID); err != nil {
         return err
     }
     // Skip the dropper object id.
@@ -301,7 +301,7 @@ func NewSpawnItemPacket() *SpawnItemPacket {
 func ParseSpawnItemPacket(p *SpawnItemPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, spawnItemPacketID); err != nil {
+    if err := expectPacketID(reader, SpawnItemPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader,
@@ -347,7 +347,7 @@ func NewGetItemPacket() *GetItemPacket {
 func ParseGetItemPacket(p *GetItemPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, getItemPacketID); err != nil {
+    if err := expectPacketID(reader, GetItemPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(

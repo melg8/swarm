@@ -11,7 +11,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const statusUpdatePacketID = 0x1A
+const StatusUpdatePacketID = 0x1A
 
 // statusUpdateMaxAttrs bounds the stored attributes; packets with more
 // pairs are fully consumed but the tail pairs are ignored.
@@ -48,7 +48,7 @@ func NewStatusUpdatePacket() *StatusUpdatePacket {
 func ParseStatusUpdatePacket(p *StatusUpdatePacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, statusUpdatePacketID); err != nil {
+    if err := expectPacketID(reader, StatusUpdatePacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID, &p.Count); err != nil {

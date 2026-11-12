@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const userInfoPacketID = 0x04
+const UserInfoPacketID = 0x04
 
 // Paperdoll slot count of the UserInfo paperdoll object id block (see
 // UserInfo.writeImpl: the server writes 15 slot ids, the last one is a
@@ -114,7 +114,7 @@ func NewUserInfoPacket() *UserInfoPacket {
 func ParseUserInfoPacket(p *UserInfoPacket, data []byte) error { //nolint:cyclop
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, userInfoPacketID); err != nil {
+    if err := expectPacketID(reader, UserInfoPacketID); err != nil {
         return err
     }
 

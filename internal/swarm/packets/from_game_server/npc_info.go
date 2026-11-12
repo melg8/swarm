@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const npcInfoPacketID = 0x22
+const NpcInfoPacketID = 0x22
 
 // NpcInfo skipped field groups of the wire format, counted in bytes.
 const (
@@ -91,7 +91,7 @@ func NewNpcInfoPacket() *NpcInfoPacket {
 func ParseNpcInfoPacket(p *NpcInfoPacket, data []byte) error { //nolint:cyclop
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, npcInfoPacketID); err != nil {
+    if err := expectPacketID(reader, NpcInfoPacketID); err != nil {
         return err
     }
 

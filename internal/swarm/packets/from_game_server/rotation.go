@@ -14,10 +14,10 @@ import (
 // ChangeMoveType and TeleportToLocation.
 
 const (
-    beginRotationPacketID      = 0x77
-    stopRotationPacketID       = 0x78
-    changeMoveTypePacketID     = 0x3E
-    teleportToLocationPacketID = 0x38
+    BeginRotationPacketID      = 0x77
+    StopRotationPacketID       = 0x78
+    ChangeMoveTypePacketID     = 0x3E
+    TeleportToLocationPacketID = 0x38
 )
 
 // moveTypeRun marks a running creature in ChangeMoveType.
@@ -43,7 +43,7 @@ func NewBeginRotationPacket() *BeginRotationPacket {
 func ParseBeginRotationPacket(p *BeginRotationPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, beginRotationPacketID); err != nil {
+    if err := expectPacketID(reader, BeginRotationPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID, &p.Heading); err != nil {
@@ -74,7 +74,7 @@ func NewStopRotationPacket() *StopRotationPacket {
 func ParseStopRotationPacket(p *StopRotationPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, stopRotationPacketID); err != nil {
+    if err := expectPacketID(reader, StopRotationPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID, &p.Heading); err != nil {
@@ -106,7 +106,7 @@ func NewChangeMoveTypePacket() *ChangeMoveTypePacket {
 func ParseChangeMoveTypePacket(p *ChangeMoveTypePacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, changeMoveTypePacketID); err != nil {
+    if err := expectPacketID(reader, ChangeMoveTypePacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID); err != nil {
@@ -150,7 +150,7 @@ func ParseTeleportToLocationPacket(
 ) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, teleportToLocationPacketID); err != nil {
+    if err := expectPacketID(reader, TeleportToLocationPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(

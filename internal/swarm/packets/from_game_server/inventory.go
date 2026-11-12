@@ -13,8 +13,8 @@ import (
 // Inventory packets: ItemList and InventoryUpdate.
 
 const (
-    itemListPacketID        = 0x27
-    inventoryUpdatePacketID = 0x37
+    ItemListPacketID        = 0x27
+    InventoryUpdatePacketID = 0x37
 )
 
 // inventoryItemsCapacity bounds the stored inventory entries; the server
@@ -73,7 +73,7 @@ func NewItemListPacket() *ItemListPacket {
 func ParseItemListPacket(p *ItemListPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, itemListPacketID); err != nil {
+    if err := expectPacketID(reader, ItemListPacketID); err != nil {
         return err
     }
     showWindow, err := reader.ReadInt16()
@@ -132,7 +132,7 @@ func NewInventoryUpdatePacket() *InventoryUpdatePacket {
 func ParseInventoryUpdatePacket(p *InventoryUpdatePacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, inventoryUpdatePacketID); err != nil {
+    if err := expectPacketID(reader, InventoryUpdatePacketID); err != nil {
         return err
     }
     count, err := reader.ReadInt16()

@@ -11,7 +11,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const charSelectInfoPacketID = 0x1F
+const CharSelectInfoPacketID = 0x1F
 
 const (
     // charInfoIntsAfterAccount skips sessionId, clan and builder fields.
@@ -237,7 +237,7 @@ func parseCharacterResources(reader *packet.Reader, info *CharacterInfo) error {
 func ParseCharSelectInfoPacket(p *CharSelectInfoPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, charSelectInfoPacketID); err != nil {
+    if err := expectPacketID(reader, CharSelectInfoPacketID); err != nil {
         return err
     }
 
@@ -283,7 +283,7 @@ func (p *CharSelectInfoPacket) FindCharacterByName(
 // proxy, mirroring the byte layout of the Mobius CharSelectionInfo
 // writeImpl (see the parser above for the field order).
 func (p *CharSelectInfoPacket) ToBytes(writer *packet.Writer) error {
-    if err := writer.WriteInt8(charSelectInfoPacketID); err != nil {
+    if err := writer.WriteInt8(CharSelectInfoPacketID); err != nil {
         return err
     }
     if err := writer.WriteInt32(p.Count); err != nil {

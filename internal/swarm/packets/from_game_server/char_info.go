@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const charInfoPacketID = 0x03
+const CharInfoPacketID = 0x03
 
 // CharInfoPacket describes another player around the character.
 // Wire format (see CharInfo.writeImpl): [opcode 0x03][x: 4][y: 4][z: 4]
@@ -77,7 +77,7 @@ func NewCharInfoPacket() *CharInfoPacket {
 func ParseCharInfoPacket(p *CharInfoPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, charInfoPacketID); err != nil {
+    if err := expectPacketID(reader, CharInfoPacketID); err != nil {
         return err
     }
 

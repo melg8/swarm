@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const systemMessagePacketID = 0x7A
+const SystemMessagePacketID = 0x7A
 
 // Parameter types of the SystemMessage packet (SystemMessage.java of
 // the Mobius server).
@@ -109,7 +109,7 @@ func readSystemMessageParam(
 func ParseSystemMessagePacket(p *SystemMessagePacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, systemMessagePacketID); err != nil {
+    if err := expectPacketID(reader, SystemMessagePacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.MessageID); err != nil {

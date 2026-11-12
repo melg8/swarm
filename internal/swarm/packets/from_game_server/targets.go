@@ -13,9 +13,9 @@ import (
 // Target packets: MyTargetSelected, TargetSelected and TargetUnselected.
 
 const (
-    myTargetSelectedPacketID = 0xBF
-    targetSelectedPacketID   = 0x39
-    targetUnselectedPacketID = 0x3A
+    MyTargetSelectedPacketID = 0xBF
+    TargetSelectedPacketID   = 0x39
+    TargetUnselectedPacketID = 0x3A
 )
 
 // MyTargetSelectedPacket tells the client which object it now targets.
@@ -37,7 +37,7 @@ func NewMyTargetSelectedPacket() *MyTargetSelectedPacket {
 func ParseMyTargetSelectedPacket(p *MyTargetSelectedPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, myTargetSelectedPacketID); err != nil {
+    if err := expectPacketID(reader, MyTargetSelectedPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID); err != nil {
@@ -78,7 +78,7 @@ func NewTargetSelectedPacket() *TargetSelectedPacket {
 func ParseTargetSelectedPacket(p *TargetSelectedPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, targetSelectedPacketID); err != nil {
+    if err := expectPacketID(reader, TargetSelectedPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(
@@ -111,7 +111,7 @@ func NewTargetUnselectedPacket() *TargetUnselectedPacket {
 func ParseTargetUnselectedPacket(p *TargetUnselectedPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, targetUnselectedPacketID); err != nil {
+    if err := expectPacketID(reader, TargetUnselectedPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID); err != nil {

@@ -11,8 +11,8 @@ import (
 )
 
 const (
-    charCreateOkPacketID   = 0x25
-    charCreateFailPacketID = 0x26
+    CharCreateOkPacketID   = 0x25
+    CharCreateFailPacketID = 0x26
 )
 
 // CharCreateOkPacket confirms a successful character creation.
@@ -28,7 +28,7 @@ func NewCharCreateOkPacket() *CharCreateOkPacket {
 func ParseCharCreateOkPacket(data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, charCreateOkPacketID); err != nil {
+    if err := expectPacketID(reader, CharCreateOkPacketID); err != nil {
         return err
     }
 
@@ -59,7 +59,7 @@ func NewCharCreateFailPacket() *CharCreateFailPacket {
 func ParseCharCreateFailPacket(p *CharCreateFailPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, charCreateFailPacketID); err != nil {
+    if err := expectPacketID(reader, CharCreateFailPacketID); err != nil {
         return err
     }
 

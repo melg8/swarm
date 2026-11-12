@@ -73,7 +73,7 @@ func (gc *GameClient) Authenticate(
     if len(payload) == 0 {
         return nil, errors.New("empty character list packet")
     }
-    if payload[0] != charSelectInfoID {
+    if payload[0] != fromgameserver.CharSelectInfoPacketID {
         return nil, fmt.Errorf(
             "unexpected packet id 0x%02x while waiting for characters",
             payload[0])
@@ -169,7 +169,7 @@ func (gc *GameClient) drainCharCreateOk() {
         if len(payload) == 0 {
             continue
         }
-        if payload[0] == charCreateOkID {
+        if payload[0] == fromgameserver.CharCreateOkPacketID {
             gc.logger.Println("Character create confirmed")
 
             break
@@ -215,14 +215,14 @@ func (gc *GameClient) handleCharCreatePacket(
     name string, payload []byte,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
     switch payload[0] {
-    case charCreateOkID:
+    case fromgameserver.CharCreateOkPacketID:
         if err := fromgameserver.ParseCharCreateOkPacket(payload); err != nil {
             return false, nil, err
         }
         gc.logger.Println("Character " + name + " created")
-    case charCreateFailID:
+    case fromgameserver.CharCreateFailPacketID:
         return gc.handleCharCreateFail(payload)
-    case charSelectInfoID:
+    case fromgameserver.CharSelectInfoPacketID:
         return gc.handleUpdatedCharList(name, payload)
     default:
         gc.logger.Printf("Ignoring packet id 0x%02x while creating character",
@@ -341,7 +341,7 @@ func (gc *GameClient) awaitCharSelected(
         if len(payload) == 0 {
             continue
         }
-        if payload[0] == charSelectedID {
+        if payload[0] == fromgameserver.CharSelectedPacketID {
             if err := fromgameserver.ParseCharSelectedPacket(
                 selected, payload); err != nil {
                 return false, fmt.Errorf(

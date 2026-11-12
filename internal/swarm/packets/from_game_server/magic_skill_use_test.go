@@ -16,7 +16,7 @@ import (
 func writeMagicSkillUse(t *testing.T, critical bool) []byte {
     t.Helper()
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(magicSkillUsePacketID))
+    require.NoError(t, writer.WriteInt8(MagicSkillUsePacketID))
     require.NoError(t, writer.WriteInt32(100))  // caster
     require.NoError(t, writer.WriteInt32(300))  // target
     require.NoError(t, writer.WriteInt32(1077)) // skill id
@@ -71,7 +71,7 @@ func TestParseMagicSkillUsePacketCritical(t *testing.T) {
 
 func TestParseMagicSkillUsePacketRejectsWrongID(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(socialActionPacketID))
+    require.NoError(t, writer.WriteInt8(SocialActionPacketID))
 
     p := NewMagicSkillUsePacket()
     require.Error(t, ParseMagicSkillUsePacket(p, writer.Bytes()))
@@ -79,7 +79,7 @@ func TestParseMagicSkillUsePacketRejectsWrongID(t *testing.T) {
 
 func TestParseMagicSkillUsePacketRejectsTruncated(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(magicSkillUsePacketID))
+    require.NoError(t, writer.WriteInt8(MagicSkillUsePacketID))
     require.NoError(t, writer.WriteInt32(100))
     require.NoError(t, writer.WriteInt32(300))
 

@@ -13,7 +13,7 @@ import (
 
 func TestParseCreatureSayPacket(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(creatureSayPacketID))
+    require.NoError(t, writer.WriteInt8(CreatureSayPacketID))
     require.NoError(t, writer.WriteInt32(1234))
     require.NoError(t, writer.WriteInt32(1))
     require.NoError(t, writer.WriteStringAsUtf16("Melg"))
@@ -29,7 +29,7 @@ func TestParseCreatureSayPacket(t *testing.T) {
 
 func TestParseCreatureSayPacketEmptyText(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(creatureSayPacketID))
+    require.NoError(t, writer.WriteInt8(CreatureSayPacketID))
     require.NoError(t, writer.WriteInt32(7))
     require.NoError(t, writer.WriteInt32(0))
     require.NoError(t, writer.WriteStringAsUtf16("Someone"))
@@ -43,7 +43,7 @@ func TestParseCreatureSayPacketEmptyText(t *testing.T) {
 
 func TestParseCreatureSayPacketRejectsWrongID(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(systemMessagePacketID))
+    require.NoError(t, writer.WriteInt8(SystemMessagePacketID))
     require.NoError(t, writer.WriteInt32(1))
     require.NoError(t, writer.WriteInt32(0))
     require.NoError(t, writer.WriteStringAsUtf16("Melg"))
@@ -55,7 +55,7 @@ func TestParseCreatureSayPacketRejectsWrongID(t *testing.T) {
 
 func TestParseCreatureSayPacketRejectsTruncated(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(creatureSayPacketID))
+    require.NoError(t, writer.WriteInt8(CreatureSayPacketID))
     require.NoError(t, writer.WriteInt32(1234))
 
     p := NewCreatureSayPacket()

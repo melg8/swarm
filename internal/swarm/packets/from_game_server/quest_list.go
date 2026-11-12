@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const questListPacketID byte = 0x98
+const QuestListPacketID byte = 0x98
 
 // questCountCap bounds the plausible quest count of the packet: the
 // engine refuses to start more than 25 quests per character
@@ -70,7 +70,7 @@ func NewQuestListPacket() *QuestListPacket {
 func ParseQuestListPacket(p *QuestListPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, questListPacketID); err != nil {
+    if err := expectPacketID(reader, QuestListPacketID); err != nil {
         return err
     }
     if err := readQuestEntries(reader, p); err != nil {

@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const abnormalStatusUpdatePacketID = 0x97
+const AbnormalStatusUpdatePacketID = 0x97
 
 // abnormalBuffCap bounds the plausible buff count of the packet: the
 // C1 buff window holds at most twenty slots, so 64 leaves generous
@@ -55,7 +55,7 @@ func ParseAbnormalStatusUpdatePacket(
     reader := packet.NewReader(data)
 
     if err := expectPacketID(
-        reader, abnormalStatusUpdatePacketID); err != nil {
+        reader, AbnormalStatusUpdatePacketID); err != nil {
         return err
     }
     count, err := reader.ReadInt16()

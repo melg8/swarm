@@ -8,6 +8,7 @@ import (
     "log"
     "testing"
 
+    fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
     "github.com/stretchr/testify/require"
 )
 
@@ -41,15 +42,19 @@ func TestPacketRouterDispatch(t *testing.T) {
         {"unknown id", 0xFE, "Received packet id 0xfe"},
         {"leave world", leaveWorldID, "Server confirmed leave world"},
         {"server close", serverCloseID, "Server is closing the connection"},
-        {"user info", userInfoID, "Failed to parse user info"},
-        {"npc html", npcHTMLMessageID, "Failed to parse npc html"},
-        {"skill list", skillListID, "Failed to parse skill list"},
-        {"system message", systemMessageID, "Failed to parse system message"},
-        {"movement", moveToLocationID, "Failed to parse movement"},
-        {"teleport", teleportID, "Failed to parse teleport"},
-        {"attack", attackID, "Failed to parse attack"},
-        {"item list", itemListID, "Failed to parse item list"},
-        {"net ping", netPingResponseID, "Failed to parse net ping"},
+        {"user info", fromgameserver.UserInfoPacketID,
+            "Failed to parse user info"},
+        {"npc html", fromgameserver.NpcHTMLMessagePacketID,
+            "Failed to parse npc html"},
+        {"skill list", fromgameserver.SkillListPacketID,
+            "Failed to parse skill list"},
+        {"system message", fromgameserver.SystemMessagePacketID,
+            "Failed to parse system message"},
+        {"movement", fromgameserver.MoveToLocationPacketID, "Failed to parse movement"},
+        {"teleport", fromgameserver.TeleportToLocationPacketID, "Failed to parse teleport"},
+        {"attack", fromgameserver.AttackPacketID, "Failed to parse attack"},
+        {"item list", fromgameserver.ItemListPacketID, "Failed to parse item list"},
+        {"net ping", fromgameserver.NetPingPacketID, "Failed to parse net ping"},
     }
     for _, tt := range tests {
         t.Run(tt.name, func(t *testing.T) {

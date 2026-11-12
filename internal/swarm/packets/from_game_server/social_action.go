@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const socialActionPacketID = 0x3D
+const SocialActionPacketID = 0x3D
 
 // SocialActionLevelUp is the social action id the server broadcasts
 // when any character reaches a new level (SocialAction.LEVEL_UP). The
@@ -37,7 +37,7 @@ func NewSocialActionPacket() *SocialActionPacket {
 func ParseSocialActionPacket(p *SocialActionPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, socialActionPacketID); err != nil {
+    if err := expectPacketID(reader, SocialActionPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID, &p.ActionID); err != nil {

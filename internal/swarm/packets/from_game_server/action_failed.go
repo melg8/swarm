@@ -8,7 +8,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const actionFailedPacketID = 0x35
+const ActionFailedPacketID = 0x35
 
 // ActionFailedPacket is the one byte server answer to a refused
 // request: a flood protector rejection, a click on a non interactable
@@ -27,5 +27,5 @@ func NewActionFailedPacket() *ActionFailedPacket {
 func ParseActionFailedPacket(_ *ActionFailedPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    return expectPacketID(reader, actionFailedPacketID)
+    return expectPacketID(reader, ActionFailedPacketID)
 }

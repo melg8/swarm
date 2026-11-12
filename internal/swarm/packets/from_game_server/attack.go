@@ -13,9 +13,9 @@ import (
 // Combat packets: Attack, AutoAttackStart and AutoAttackStop.
 
 const (
-    attackPacketID          = 0x06
-    autoAttackStartPacketID = 0x3B
-    autoAttackStopPacketID  = 0x3C
+    AttackPacketID          = 0x06
+    AutoAttackStartPacketID = 0x3B
+    AutoAttackStopPacketID  = 0x3C
 )
 
 // attackHitsCapacity bounds the stored hits of one Attack packet. Extra
@@ -70,7 +70,7 @@ func ParseAttackPacket(p *AttackPacket, data []byte) error {
     reader := packet.NewReader(data)
     p.HitCount = 0
 
-    if err := expectPacketID(reader, attackPacketID); err != nil {
+    if err := expectPacketID(reader, AttackPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.AttackerID); err != nil {
@@ -149,7 +149,7 @@ func NewAutoAttackStartPacket() *AutoAttackStartPacket {
 func ParseAutoAttackStartPacket(p *AutoAttackStartPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, autoAttackStartPacketID); err != nil {
+    if err := expectPacketID(reader, AutoAttackStartPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID); err != nil {
@@ -175,7 +175,7 @@ func NewAutoAttackStopPacket() *AutoAttackStopPacket {
 func ParseAutoAttackStopPacket(p *AutoAttackStopPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, autoAttackStopPacketID); err != nil {
+    if err := expectPacketID(reader, AutoAttackStopPacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID); err != nil {

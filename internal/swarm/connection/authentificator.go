@@ -20,8 +20,6 @@ import (
 )
 
 const (
-    initPacketID = 0x00
-    loginFailID  = 0x01
     // loginReadTimeout bounds one blocking read of the login flow.
     // Every step is a single request/response round trip, so a stalled
     // or half-open login server surfaces as a deadline error instead
@@ -117,7 +115,7 @@ func (lc *LoginClient) readInitPacket() (*fromauthserver.InitPacket, error) {
     if len(payload) < 1 {
         return nil, errors.New("empty init packet")
     }
-    if payload[0] != initPacketID {
+    if payload[0] != fromauthserver.InitPacketID {
         return nil, fmt.Errorf(
             "unexpected packet id 0x%02x while waiting for init",
             payload[0])
@@ -156,7 +154,7 @@ func (lc *LoginClient) readAuthedPacket() ([]byte, error) {
     if len(content) < 1 {
         return nil, errors.New("empty packet from login server")
     }
-    if content[0] == loginFailID {
+    if content[0] == fromauthserver.LoginFailPacketID {
         var failPacket fromauthserver.LoginFailPacket
         if err := fromauthserver.ParseLoginFailPacket(
             &failPacket, content); err != nil {

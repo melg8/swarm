@@ -11,7 +11,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const loginFailPacketID = 0x01
+const LoginFailPacketID = 0x01
 
 // LoginFailPacket reports a failed account login attempt.
 // Wire format: [opcode 0x01][reason: 4].
@@ -33,7 +33,7 @@ func ParseLoginFailPacket(p *LoginFailPacket, data []byte) error {
     if err != nil {
         return err
     }
-    if id != loginFailPacketID {
+    if id != LoginFailPacketID {
         return errors.New("invalid login fail packet id")
     }
 

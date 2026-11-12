@@ -15,7 +15,7 @@ import (
 // entries: [count: 4] then per skill [passive: 4][level: 4][id: 4].
 func buildSkillListPayload(skills [][3]int32) []byte {
     writer := packet.NewWriter()
-    writer.WriteByte(skillListPacketID)
+    writer.WriteByte(SkillListPacketID)
     writer.WriteInt32(int32(len(skills)))
     for _, skill := range skills {
         writer.WriteInt32(skill[0]) // passive
@@ -76,7 +76,7 @@ func TestParseSkillListPacketRejectsBadID(t *testing.T) {
 func TestParseSkillListPacketRejectsImplausibleCount(t *testing.T) {
     p := NewSkillListPacket()
     writer := packet.NewWriter()
-    writer.WriteByte(skillListPacketID)
+    writer.WriteByte(SkillListPacketID)
     writer.WriteInt32(skillListCap + 1)
 
     err := ParseSkillListPacket(p, writer.Bytes())

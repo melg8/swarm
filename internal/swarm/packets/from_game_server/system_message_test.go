@@ -13,7 +13,7 @@ import (
 
 func TestParseSocialActionPacket(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(socialActionPacketID))
+    require.NoError(t, writer.WriteInt8(SocialActionPacketID))
     require.NoError(t, writer.WriteInt32(268450291))
     require.NoError(t, writer.WriteInt32(SocialActionLevelUp))
 
@@ -26,7 +26,7 @@ func TestParseSocialActionPacket(t *testing.T) {
 func TestParseSystemMessagePacket(t *testing.T) {
     // id 28 "You picked up $s1 adena." with one int parameter.
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(systemMessagePacketID))
+    require.NoError(t, writer.WriteInt8(SystemMessagePacketID))
     require.NoError(t, writer.WriteInt32(28))
     require.NoError(t, writer.WriteInt32(1))
     require.NoError(t, writer.WriteInt32(sysParamIntNumber))
@@ -41,7 +41,7 @@ func TestParseSystemMessagePacket(t *testing.T) {
 
     // Reuse: the second parse replaces the parameters.
     writer2 := packet.NewWriter()
-    require.NoError(t, writer2.WriteInt8(systemMessagePacketID))
+    require.NoError(t, writer2.WriteInt8(SystemMessagePacketID))
     require.NoError(t, writer2.WriteInt32(30))
     require.NoError(t, writer2.WriteInt32(2))
     require.NoError(t, writer2.WriteInt32(sysParamItemName))
@@ -58,7 +58,7 @@ func TestParseSystemMessagePacket(t *testing.T) {
 
 func TestParseSystemMessagePacketRejectsImplausibleCount(t *testing.T) {
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(systemMessagePacketID))
+    require.NoError(t, writer.WriteInt8(SystemMessagePacketID))
     require.NoError(t, writer.WriteInt32(28))
     require.NoError(t, writer.WriteInt32(1000))
 
@@ -71,7 +71,7 @@ func TestParseSystemMessageSkillParamCarriesLevel(t *testing.T) {
     // skill id then the skill level (SystemMessage.writeImpl writes
     // both; id 46 "Use $s1." with Power Strike 3 here).
     writer := packet.NewWriter()
-    require.NoError(t, writer.WriteInt8(systemMessagePacketID))
+    require.NoError(t, writer.WriteInt8(SystemMessagePacketID))
     require.NoError(t, writer.WriteInt32(46))
     require.NoError(t, writer.WriteInt32(1))
     require.NoError(t, writer.WriteInt32(sysParamSkillName))

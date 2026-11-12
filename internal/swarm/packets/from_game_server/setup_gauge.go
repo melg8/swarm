@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const setupGaugePacketID = 0x85
+const SetupGaugePacketID = 0x85
 
 // gaugeColorRed is the RED gauge color of the SetupGauge packet (the
 // SetupGauge.RED constant of the Mobius server; the other colors are
@@ -41,7 +41,7 @@ func NewSetupGaugePacket() *SetupGaugePacket {
 func ParseSetupGaugePacket(p *SetupGaugePacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, setupGaugePacketID); err != nil {
+    if err := expectPacketID(reader, SetupGaugePacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.Color, &p.Current,

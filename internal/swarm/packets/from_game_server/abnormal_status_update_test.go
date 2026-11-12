@@ -16,7 +16,7 @@ import (
 // [skillId: 4][level: 2][time: 4].
 func buildAbnormalStatusUpdatePayload(buffs [][3]int32) []byte {
     writer := packet.NewWriter()
-    writer.WriteByte(abnormalStatusUpdatePacketID)
+    writer.WriteByte(AbnormalStatusUpdatePacketID)
     writer.WriteInt16(int16(len(buffs)))
     for _, buff := range buffs {
         writer.WriteInt32(buff[0])        // skill id
@@ -81,7 +81,7 @@ func TestParseAbnormalStatusUpdatePacketRejectsBadID(t *testing.T) {
 func TestParseAbnormalStatusUpdatePacketRejectsImplausibleCount(t *testing.T) {
     p := NewAbnormalStatusUpdatePacket()
     writer := packet.NewWriter()
-    writer.WriteByte(abnormalStatusUpdatePacketID)
+    writer.WriteByte(AbnormalStatusUpdatePacketID)
     writer.WriteInt16(abnormalBuffCap + 1)
 
     err := ParseAbnormalStatusUpdatePacket(p, writer.Bytes())
@@ -91,7 +91,7 @@ func TestParseAbnormalStatusUpdatePacketRejectsImplausibleCount(t *testing.T) {
 func TestParseAbnormalStatusUpdatePacketRejectsTruncatedEntry(t *testing.T) {
     p := NewAbnormalStatusUpdatePacket()
     writer := packet.NewWriter()
-    writer.WriteByte(abnormalStatusUpdatePacketID)
+    writer.WriteByte(AbnormalStatusUpdatePacketID)
     writer.WriteInt16(2)
     writer.WriteInt32(91)
     writer.WriteInt16(1)

@@ -8,7 +8,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const netPingPacketID byte = 0xEC
+const NetPingPacketID byte = 0xEC
 
 // NetPingPacket is the server response to a client ping request.
 // Wire format: [opcode 0xEC][gameTime: 4].
@@ -25,7 +25,7 @@ func NewNetPingPacket() *NetPingPacket {
 func ParseNetPingPacket(p *NetPingPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, netPingPacketID); err != nil {
+    if err := expectPacketID(reader, NetPingPacketID); err != nil {
         return err
     }
 

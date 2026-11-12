@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const skillListPacketID = 0x6D
+const SkillListPacketID = 0x6D
 
 // skillListCap bounds the plausible skill count of the packet: the
 // biggest C1 class trees carry a few hundred skills, so 512 leaves
@@ -48,7 +48,7 @@ func NewSkillListPacket() *SkillListPacket {
 func ParseSkillListPacket(p *SkillListPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, skillListPacketID); err != nil {
+    if err := expectPacketID(reader, SkillListPacketID); err != nil {
         return err
     }
     count, err := reader.ReadInt32()

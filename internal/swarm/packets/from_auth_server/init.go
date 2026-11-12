@@ -14,6 +14,10 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
+// InitPacketID is the opcode of the unencrypted first packet of
+// the login server.
+const InitPacketID = 0x00
+
 type InitPacket struct {
     SessionID       int32
     ProtocolVersion int32

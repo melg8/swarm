@@ -19,7 +19,7 @@ func buildQuestListPayload(
     quests [][2]int32, items [][4]int32,
 ) []byte {
     writer := packet.NewWriter()
-    writer.WriteByte(questListPacketID)
+    writer.WriteByte(QuestListPacketID)
     writer.WriteInt16(int16(len(quests)))
     for _, quest := range quests {
         writer.WriteInt32(quest[0]) // quest id
@@ -151,7 +151,7 @@ func TestParseQuestListPacketImplausibleCounts(t *testing.T) {
 // the caps can be tested without building the entries.
 func buildRawQuestListCount(quests int16, items int16) []byte {
     writer := packet.NewWriter()
-    writer.WriteByte(questListPacketID)
+    writer.WriteByte(QuestListPacketID)
     writer.WriteInt16(quests)
     writer.WriteInt16(items)
 

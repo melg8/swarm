@@ -11,7 +11,7 @@ import (
 )
 
 func buildSetupGauge(color, current, maxMS int32) []byte {
-    data := []byte{setupGaugePacketID}
+    data := []byte{SetupGaugePacketID}
     data = putInt32(data, color)
     data = putInt32(data, current)
     data = putInt32(data, maxMS)
@@ -58,6 +58,6 @@ func TestParseSetupGaugePacket(t *testing.T) {
 
     t.Run("truncated payload", func(t *testing.T) {
         p := NewSetupGaugePacket()
-        require.Error(t, ParseSetupGaugePacket(p, []byte{setupGaugePacketID, 1}))
+        require.Error(t, ParseSetupGaugePacket(p, []byte{SetupGaugePacketID, 1}))
     })
 }

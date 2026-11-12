@@ -10,9 +10,9 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-// magicSkillUsePacketID is the C1 opcode of the cast broadcast
+// MagicSkillUsePacketID is the C1 opcode of the cast broadcast
 // (ServerPackets.MAGIC_SKILL_USE, 0x5A).
-const magicSkillUsePacketID = 0x5A
+const MagicSkillUsePacketID = 0x5A
 
 // MagicSkillUsePacket announces one creature starting a skill cast.
 // The hit time is the cast animation length in milliseconds (the
@@ -68,7 +68,7 @@ func ParseMagicSkillUsePacket(
 ) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, magicSkillUsePacketID); err != nil {
+    if err := expectPacketID(reader, MagicSkillUsePacketID); err != nil {
         return err
     }
     if err := readInt32Fields(

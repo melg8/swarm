@@ -14,7 +14,7 @@ import (
 )
 
 const (
-    keyPacketID      = 0x00
+    KeyPacketID      = 0x00
     keyPacketKeySize = crypt.GameCryptKeySize
 )
 
@@ -36,7 +36,7 @@ func NewKeyPacket() *KeyPacket {
 func ParseKeyPacket(p *KeyPacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, keyPacketID); err != nil {
+    if err := expectPacketID(reader, KeyPacketID); err != nil {
         return err
     }
 

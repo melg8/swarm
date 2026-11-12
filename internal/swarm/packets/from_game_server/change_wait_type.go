@@ -10,7 +10,7 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-const changeWaitTypePacketID = 0x3F
+const ChangeWaitTypePacketID = 0x3F
 
 // Wait type values of the ChangeWaitType packet (ChangeWaitType enum of
 // the Mobius server).
@@ -39,7 +39,7 @@ func NewChangeWaitTypePacket() *ChangeWaitTypePacket {
 func ParseChangeWaitTypePacket(p *ChangeWaitTypePacket, data []byte) error {
     reader := packet.NewReader(data)
 
-    if err := expectPacketID(reader, changeWaitTypePacketID); err != nil {
+    if err := expectPacketID(reader, ChangeWaitTypePacketID); err != nil {
         return err
     }
     if err := readInt32Fields(reader, &p.ObjectID); err != nil {
