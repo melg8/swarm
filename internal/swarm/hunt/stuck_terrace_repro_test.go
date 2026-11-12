@@ -87,7 +87,7 @@ func testReproStuckTerraceWalksOut(
         if escaped {
             break
         }
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
             continue

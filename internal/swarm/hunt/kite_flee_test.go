@@ -53,7 +53,7 @@ func kiteFleeBot(t *testing.T) (*state.Bot, *fakeGame, *Loop) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     return bot, game, loop
 }

@@ -259,7 +259,7 @@ func TestEngagesOnZoneEntryHoldsWhenWeaponless(t *testing.T) {
     spawnMob(bot)
     loop.SetHuntingZone(45000, 50000, 2000)
     loop.phase = phaseTownReturn
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     require.False(t, loop.engagesOnZoneEntry(),
         "the zone entry engage holds while weaponless")
@@ -371,7 +371,7 @@ func TestRoadFightBudgetResumesTheWalkHome(t *testing.T) {
     // The budget spent: the next attacker is left alone, the leash
     // walks the character home instead.
     attack(7 + roadFightBudget)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
 
     require.Equal(t, int32(0), loop.target,

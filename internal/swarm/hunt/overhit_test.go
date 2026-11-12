@@ -37,7 +37,7 @@ func overhitFightBot() *state.Bot {
 // loop re-decides the cast on every tick.
 func paceTicks(loop *Loop, n int) {
     for range n {
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.castAt = time.Time{}
         loop.tick()
     }

@@ -42,7 +42,7 @@ func TestLoopSwitchesToTheAggroWhenThePickHoldsUs(t *testing.T) {
     loop := NewLoop(game, bot)
     loop.target = 7
     loop.engageAt = time.Now()
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Equal(t, int32(8), loop.target,
@@ -64,7 +64,7 @@ func TestLoopAnswersTheAggroAheadOfTheStuckTimeout(t *testing.T) {
     loop := NewLoop(game, bot)
     loop.target = 7
     loop.engageAt = time.Now().Add(-time.Minute)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Equal(t, int32(8), loop.target,
@@ -191,7 +191,7 @@ func TestKiteKeepsThePickWhenThePackJoins(t *testing.T) {
     loop := NewLoop(&fakeGame{}, bot)
     loop.target = 7
     loop.engageAt = time.Now()
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     require.False(t, bot.SelfFighting(7),
         "the reload tail carries no fresh swing")
     require.True(t, bot.SelfEngagedBy(7),
@@ -223,7 +223,7 @@ func TestKiteAnswersTheAddOnAPeacefulApproach(t *testing.T) {
     loop := NewLoop(&fakeGame{}, bot)
     loop.target = 7
     loop.engageAt = time.Now()
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     require.False(t, bot.SelfEngagedBy(7),
         "the peaceful pick engages nobody")
 
@@ -255,7 +255,7 @@ func TestTargetlessAggroKeepsFlyingTheBowAdd(t *testing.T) {
     hurtTo(bot, 65)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     require.True(t, loop.attackerEngageable(9),
         "the melee chaser alone is engageable")
 
@@ -279,7 +279,7 @@ func TestTargetlessAggroKeepsTheFleeSkip(t *testing.T) {
     hurtTo(bot, 65)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.targetSkip = map[int32]time.Time{
         7: time.Now().Add(time.Minute),
     }

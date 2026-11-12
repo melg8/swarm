@@ -35,7 +35,7 @@ func newCasterBot(curMP int32) *state.Bot {
 // the second tick runs inside the engage phase with the fresh combat
 // window, exactly where the combat casting lives.
 func startFight(loop *Loop, bot *state.Bot) {
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     bot.ApplySelfTarget(7)
     bot.ApplyPawnMovement(state.PawnMovement{
@@ -43,7 +43,7 @@ func startFight(loop *Loop, bot *state.Bot) {
         X: 45000, Y: 50000, TargetX: 45960, TargetY: 50000,
         TargetZ: -3500,
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
 }
 
@@ -107,7 +107,7 @@ func TestLoopSkipsStrikeOfOtherWeaponFamily(t *testing.T) {
     // A few more paced ticks: the retry period passes, the strike of
     // another weapon family still never goes out.
     for range 10 {
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.castAt = time.Time{}
         loop.tick()
     }
@@ -193,7 +193,7 @@ func TestSkillReuseBlocksTheSecondCast(t *testing.T) {
             X: 45000, Y: 50000, TargetX: 45960, TargetY: 50000,
             TargetZ: -3500,
         })
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.tick()
     }
 
@@ -211,7 +211,7 @@ func TestSelfBuffCastsBetweenFights(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 
@@ -231,7 +231,7 @@ func TestSelfBuffSkippedWhileEffectRuns(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 
@@ -251,7 +251,7 @@ func TestSelfBuffSkippedWhileSitting(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 
@@ -270,7 +270,7 @@ func TestOutOfManaMageDropsTheFight(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     // The fight starts while the mana still pays, then the bar drops
     // under the sit threshold.
@@ -286,7 +286,7 @@ func TestOutOfManaMageDropsTheFight(t *testing.T) {
     bot.ApplyStatusUpdate(100, []state.Attribute{
         {ID: state.AttrCurMP, Value: 10},
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Zero(t, loop.target,
         "the dry mage drops the fight")
@@ -294,7 +294,7 @@ func TestOutOfManaMageDropsTheFight(t *testing.T) {
         "no further attack requests of the dropped fight")
 
     // The next ticks sit the character down.
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, 1, game.sits,
         "the dry mage sits down to regenerate")
@@ -308,10 +308,10 @@ func TestManaHeldMageHoldsNewFights(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     for range 3 {
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.tick()
     }
 
@@ -330,7 +330,7 @@ func TestManaHeldMageAnswersWhenAttacked(t *testing.T) {
     mobHitsCharacter(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 
@@ -349,7 +349,7 @@ func TestSittingMageStandsWhenManaRecovered(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 
@@ -368,7 +368,7 @@ func TestSittingMageKeepsSittingBelowStandThreshold(t *testing.T) {
     loop := NewLoop(game, bot)
 
     for range 3 {
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.tick()
     }
 
@@ -389,7 +389,7 @@ func TestFighterNeverRestsOnMana(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 

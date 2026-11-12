@@ -23,7 +23,7 @@ func TestLoopPublishesHuntDiagnostics(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetLogger(recordingLogger(bot))
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     // The fresh tracker carries no hunt view: the first tick
     // publishes it.

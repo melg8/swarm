@@ -95,7 +95,7 @@ func nearestPlanWaypoint(
 func TestReproEscapeClaimsMarkWalkedWaypointsPassed(t *testing.T) {
     loop, game, bot, sim, sink := spawnDumpLoop(t)
 
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.returnToZone()
     require.Equal(t, phaseTownReturn, loop.phase)
     require.Greater(t, len(loop.waypoints), 1,
@@ -247,7 +247,7 @@ func TestReproEscapeClaimsMarkWalkedWaypointsPassed(t *testing.T) {
 func TestReproEscapeClaimsCarryTheServerHeading(t *testing.T) {
     loop, game, bot, sim, _ := spawnDumpLoop(t)
 
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.returnToZone()
     require.Equal(t, phaseTownReturn, loop.phase)
 
@@ -335,7 +335,7 @@ func TestCursorEscapeHeadingMatchesTheServerConvention(t *testing.T) {
 func TestEscapeSettleRebaselinesTheStuckWindow(t *testing.T) {
     loop, game, bot, sim, sink := spawnDumpLoop(t)
 
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.returnToZone()
     require.Equal(t, phaseTownReturn, loop.phase)
 

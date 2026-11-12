@@ -60,7 +60,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
     loop.kite = DefaultKiteParams()
     loop.segmentRadius = tripApproachRadius
     loop.zoneDeathCap = -1
-    loop.skipped = make(map[int32]time.Time)
+    loop.itemSkip = make(map[int32]time.Time)
     loop.sold = make(map[int32]bool)
     loop.skillReuse = make(map[int32]time.Time)
     loop.gearDebt = make(map[int]int32)

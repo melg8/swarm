@@ -66,10 +66,10 @@ func (l *Loop) restSittingHeld(hp float64) bool {
 // the opposite one is ever sent.
 func (l *Loop) rest() {
     now := time.Now()
-    if now.Sub(l.lastHit) < selectPeriod {
+    if now.Sub(l.lastActionAt) < selectPeriod {
         return
     }
-    l.lastHit = now
+    l.lastActionAt = now
     hp := l.tracker.SelfHealthPercent()
     wantSit := false
     standToHeal := false
@@ -343,7 +343,7 @@ func (l *Loop) loot() {
             }
         }
     }
-    item, ok := l.tracker.NearestGroundItemExcluding(radius, l.skipped, nil)
+    item, ok := l.tracker.NearestGroundItemExcluding(radius, l.itemSkip, nil)
     if ok {
         // A drop of the kill is in sight: the ordinary pickup flow
         // owns the phase (the approach walk to it, the pickup
@@ -368,7 +368,7 @@ func (l *Loop) loot() {
     if now.Sub(l.lootAt) > pickupTimeout {
         // The pickup did not finish: the item is protected or
         // unreachable. Skip it for a while and try the next one.
-        l.skipped[item.ObjectID] = now.Add(pickupRetryDelay)
+        l.itemSkip[item.ObjectID] = now.Add(pickupRetryDelay)
         l.lootID = 0
         l.logf("Hunt: pickup of %d timed out, skipping", item.ObjectID)
 

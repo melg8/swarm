@@ -210,7 +210,7 @@ func (l *Loop) stagnationSoftReset(now time.Time) {
     l.fleeSince = time.Time{}
     l.clearEscapeAnchor()
     l.noTargetSince = time.Time{}
-    l.lastHit = time.Time{}
+    l.lastActionAt = time.Time{}
     // A trip caught mid freeze restarts from scratch: the frozen
     // waypoints drop and the trigger re-plans from wherever the
     // character stands (the junk, the books and the adena all stay

@@ -41,7 +41,7 @@ func kiteBowBot(t *testing.T, mobX int32) (*state.Bot, *fakeGame, *Loop) {
     // The fight runs: the character swings at the mob (the running
     // fight view of SelfFighting).
     selfSwingsAt(bot, mobX)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     return bot, game, loop
 }
@@ -108,7 +108,7 @@ func TestKiteIsBowOnly(t *testing.T) {
     loop.target = 7
     loop.engageAt = time.Now()
     selfSwingsAt(bot, 45200)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     selfX := int32(45000)
@@ -461,7 +461,7 @@ func TestKiteStallWatchdogRespectsTheWalkWindow(t *testing.T) {
     loop.kiteWalkUntil = time.Now().Add(-time.Millisecond)
     loop.combatAvoidUntil = loop.kiteWalkUntil
     selfShotFrom(bot, 44600, 50000, 45300, 50000)
-    loop.lastHit = time.Now().Add(-2 * engageRetryPeriod)
+    loop.lastActionAt = time.Now().Add(-2 * engageRetryPeriod)
     loop.tick()
     require.Len(t, game.walks, 1,
         "past the window the ordinary stall answer owns the move")

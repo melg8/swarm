@@ -44,7 +44,7 @@ func TestSelfHealReplacesTheRest(t *testing.T) {
     bot := healFightBot(40, 50)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 
@@ -61,18 +61,18 @@ func TestSelfHealWaitsForTheLandingBeforeSitting(t *testing.T) {
     bot := healFightBot(40, 50)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Equal(t, []int32{1216}, game.casts)
 
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Zero(t, game.sits,
         "the sit request waits for the heal landing")
 
     loop.healFlightUntil = time.Now().Add(-time.Second)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, 1, game.sits,
         "the landed heal hands the still low bar back to the sit")
@@ -85,7 +85,7 @@ func TestSelfHealWithoutManaSits(t *testing.T) {
     bot := healFightBot(40, 5)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 
@@ -102,7 +102,7 @@ func TestSelfHealOnReuseSits(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.skillReuse[1216] = time.Now().Add(time.Minute)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 
@@ -119,7 +119,7 @@ func TestSittingCharacterStandsToHeal(t *testing.T) {
     bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: true})
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Empty(t, game.casts,
@@ -129,7 +129,7 @@ func TestSittingCharacterStandsToHeal(t *testing.T) {
 
     // The server confirms the stand, the next window casts.
     bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: false})
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
 
     require.Equal(t, []int32{1216}, game.casts,
@@ -145,7 +145,7 @@ func TestSelfHealSkippedWhileUnderAttack(t *testing.T) {
     mobHitsCharacter(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.rest()
 
@@ -168,7 +168,7 @@ func TestMysticManaRestKeepsSittingDespiteHeal(t *testing.T) {
     loop := NewLoop(game, bot)
 
     for range 3 {
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.tick()
     }
 
@@ -190,7 +190,7 @@ func TestNoSelfHealSkillKeepsTheOldRest(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
 

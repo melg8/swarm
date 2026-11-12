@@ -74,7 +74,7 @@ func TestQuestSegmentPartialWalksClosestReachable(t *testing.T) {
     nav := &fakeNavigator{found: true}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     partial := []pathfind.Vec3{
         {X: 45000, Y: 50600, Z: -3500},
         {X: 45000, Y: 51000, Z: -3500},

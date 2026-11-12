@@ -72,7 +72,7 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
         X: 45000, Y: 50000, TargetX: 45200, TargetY: 50000,
         TargetZ: -3500,
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Len(t, game.walks, 1,
@@ -111,7 +111,7 @@ func TestArcherArchetypeComposesTheLayers(t *testing.T) {
     loop2.target = 7
     loop2.engageAt = time.Now()
     selfSwingsAt(bot2, 45200)
-    loop2.lastHit = time.Now().Add(-time.Minute)
+    loop2.lastActionAt = time.Now().Add(-time.Minute)
     // A wall behind the retreat corners the archetype: the sealed
     // pocket refuses every straight click, the same pocket the
     // shot-paced corner test of kite_shot_test.go stages. The

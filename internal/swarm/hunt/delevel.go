@@ -515,10 +515,10 @@ func (l *Loop) fightDelevelGuard(now time.Time) {
 
         return
     }
-    if now.Sub(l.lastHit) < engageRetryPeriod {
+    if now.Sub(l.lastActionAt) < engageRetryPeriod {
         return
     }
-    l.lastHit = now
+    l.lastActionAt = now
     if err := l.game.AttackTarget(l.delevelGuard); err != nil {
         l.logf("Hunt: guard attack failed: %v", err)
     }

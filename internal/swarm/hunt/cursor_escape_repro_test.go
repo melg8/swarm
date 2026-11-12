@@ -241,7 +241,7 @@ func TestReproCursorKeyEscapeWalksOutOfTheRefusingCell(t *testing.T) {
         if arrived {
             break
         }
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
             continue
@@ -305,7 +305,7 @@ func TestReproCursorKeyEscapeAbortsWhenTheServerIgnoresTheClaims(
     loop, game, bot, sim, sink := cursorEscapeDumpLoop(t, false)
 
     for range 4 {
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
             continue

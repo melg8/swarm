@@ -227,7 +227,7 @@ func TestReproWalledApproachEscapesThroughTheClaims(t *testing.T) {
 
     arrived := false
     for trip := 0; trip < 30 && !arrived; trip++ {
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
             // The budget hold of the eliminated direct zone segments: the
@@ -335,7 +335,7 @@ func TestReproZoneSegmentGrindStallReArmsThePathfoundReturn(t *testing.T) {
         "the grind is no longer silent")
 
     // The re-armed return plans a geodata route on the next tick.
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.returnToZone()
     require.Equal(t, phaseTownReturn, loop.phase,
         "the pathfound zone return owns the walk again")

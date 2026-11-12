@@ -52,7 +52,7 @@ func newDelevelCellLoop(t *testing.T) (*Loop, *fakeGame, *state.Bot) {
     loop := NewLoop(game, bot)
     loop.SetHuntingCells([]Cell{delevelCell(46112, 41500)})
     loop.SetNavigator(&fakeNavigator{found: true})
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     t.Cleanup(func() {
         if loop.cell != nil && loop.cell.leave != nil {
             loop.cell.leave()

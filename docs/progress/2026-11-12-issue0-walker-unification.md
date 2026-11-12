@@ -106,3 +106,34 @@ where they are, which is the deferred half of the unification.
 Verified: build, vet, lint 0 issues, hunt tests ok in 97.5 s.
 
 Next: `lastHit` and the skip conventions (slice 3).
+
+### 2026-11-12 - slice 3: the pacing and skip names
+`lastHit` is `lastActionAt`: it never meant a hit. Every reader is an
+action gate (the pick, the engage retry, the far target walk, the
+corpse approach, the trip start, the delevel guard pick) and every
+writer stamps the moment the loop sent its action, so the name now
+says what the field is - the package wide action pacing.
+
+The two skip lists keep one convention, which the probe confirmed:
+both `targetSkip` (the mobs held out of the target search) and the
+old `skipped` (the drops on the pickup retry) store an expiry
+deadline and answer `now.Before(until)`. The second list is now
+`itemSkip`, so the pair reads as what it is: the mob list of
+`combatState` and the drop list of `lootState`, same deadline rule.
+The struct comments state both facts.
+
+A rename only: 272 `lastActionAt` references (the tests included),
+no logic touched.
+
+Verified: build, vet, lint 0 issues, hunt tests ok in 97.5 s,
+`fmt:check` exit 0.
+
+## Status
+
+Slices 1-3 land the parameter hoist, the shared click/cursor core
+and the naming clean-up. The remaining P07 item - folding the four
+followers into one walker type - is a control flow rewrite (the quest
+walker is a blocking sleep loop with its own potion cadence, the town
+and manual walkers are tick driven with different recovery
+ladders); it needs its own round with a live acceptance of the town
+trip, so the fragment closes here.

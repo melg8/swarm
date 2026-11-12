@@ -93,7 +93,7 @@ func TestTownTripWeaponRunStartsOutsideTheZone(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(&fakeNavigator{found: true})
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.zoneCX = 45000
     loop.zoneCY = 50000
     loop.zoneHalf = 1448

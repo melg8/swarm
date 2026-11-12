@@ -35,7 +35,7 @@ func newLearnLoop(sp int32) (*Loop, *fakeGame, *state.Bot) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(&fakeNavigator{found: true})
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     // The standard kit rides the fixture: the escape scroll of the
     // keep one stock is owned, so the learning flow under test never
     // carries the scroll buy of the shopping plan (the SOE economy
@@ -266,7 +266,7 @@ func TestLearnTripBuysTheSpellbooks(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(&fakeNavigator{found: true})
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.True(t, loop.tripActive())
@@ -358,7 +358,7 @@ func TestTripWaitsForTheSkillList(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(&fakeNavigator{found: true})
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     fillInventory(bot)
 
     // The inventory is full, but the skill list has not arrived: the
@@ -394,7 +394,7 @@ func TestTripWaitsForTheSkillListAfterAReconnect(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(&fakeNavigator{found: true})
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     fillInventory(bot)
 
     // The skills were listed long ago. The session drops and
@@ -419,7 +419,7 @@ func TestTripWaitsForTheSkillListAfterAReconnect(t *testing.T) {
     bot.ApplyUserInfo(state.UserInfo{
         Name: "unittest1", Level: 5, ClassID: 18, Race: 1, Sp: 500,
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.True(t, loop.tripActive())
     require.True(t, loop.learnTripWanted(),

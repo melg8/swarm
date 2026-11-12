@@ -109,7 +109,7 @@ func TestStuckWindowCountsMarchedGround(t *testing.T) {
         {X: 45600, Y: 50600, Z: -3500},
     }
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     // The march state: the cursor pinned on wp 0, the character 126
     // units along the route (past the aimed waypoint, inside the

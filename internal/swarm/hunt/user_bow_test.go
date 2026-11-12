@@ -30,7 +30,7 @@ func TestUserAttackBowOrderShootsFromRange(t *testing.T) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{Kind: state.CommandAttack, ObjectID: 7})
     loop.tick()
@@ -58,7 +58,7 @@ func TestUserAttackMeleeOrderStillWalksFirst(t *testing.T) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{Kind: state.CommandAttack, ObjectID: 7})
     loop.tick()
@@ -89,7 +89,7 @@ func TestUserAttackBowFightInsideWeaponRangeStaysQuiet(t *testing.T) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{Kind: state.CommandAttack, ObjectID: 7})
     loop.tick()

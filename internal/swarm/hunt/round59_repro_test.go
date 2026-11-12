@@ -109,7 +109,7 @@ func reproRound59Scene(t *testing.T) (*Loop, *fakeGame, *state.Bot) {
     loop.SetHuntingZone(reproRound59ZoneX, reproRound59ZoneY, 1448)
     loop.target = reproRound59Target
     loop.engageAt = time.Now().Add(-3 * time.Second)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     return loop, game, bot
 }
@@ -196,7 +196,7 @@ func TestReproRound59PhantomChaseSwitchesTarget(t *testing.T) {
     // refused attack disarms itself, the view ages out, the loop
     // re-requests - and the answer is the same refusal again).
     waitPastFightingFresh()
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Len(t, game.forces, 1,
         "the handoff re-requests the attack from the vantage point")
@@ -215,7 +215,7 @@ func TestReproRound59PhantomChaseSwitchesTarget(t *testing.T) {
     // The third refusal meets the spent budget: the target is dropped
     // and skipped instead of a third walk around the same obstacle.
     waitPastFightingFresh()
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Len(t, game.forces, 2)
     bot.ApplySystemMessage(state.SystemMessage{ID: 181})
@@ -228,7 +228,7 @@ func TestReproRound59PhantomChaseSwitchesTarget(t *testing.T) {
     require.Zero(t, loop.losAt, "the recovery bookkeeping clears")
 
     // The next pick takes the Spore Fungus of the dump scene.
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, reproRound59Spare, loop.target,
         "the hunt continues on the spare mob of the dump")
@@ -270,7 +270,7 @@ func TestReproRound59EngageClockHoldsPastRefusal(t *testing.T) {
         TargetX: reproRound59TargetX, TargetY: reproRound59TargetY,
         TargetZ: reproRound59Z,
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     anchored := time.Now()
     loop.tick()
 

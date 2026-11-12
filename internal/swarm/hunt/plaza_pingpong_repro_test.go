@@ -164,7 +164,7 @@ func plazaPingPongLoop(
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     sink := &bytes.Buffer{}
     loop.SetLogger(log.New(
         io.MultiWriter(sink, eventMirror{bot: bot}), "", 0))

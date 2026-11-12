@@ -162,7 +162,7 @@ func TestTeacherWalkRecoversFromTheDumpStuckSpot(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     sim := &reproServer{nav: engine, minZ: -2808}
 
     // The dump state: the teach stop is current, the teacher segment

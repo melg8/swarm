@@ -131,7 +131,7 @@ func TestReproDumpStandingBotExplainsItselfInLog(t *testing.T) {
     require.Equal(t, "elven-2019_23-b1", loop.zonePickedID)
 
     // The first targetless tick arms the patience, nothing fires yet.
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Empty(t, game.forces, "nothing is attackable in the square")
     require.Empty(t, game.walks, "no far target and no patrol segment exist")
@@ -141,7 +141,7 @@ func TestReproDumpStandingBotExplainsItselfInLog(t *testing.T) {
     // holds nothing pickable, the diagnostic line fires with the
     // dump's own data.
     loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Empty(t, game.forces)
     require.Empty(t, game.walks)
@@ -155,7 +155,7 @@ func TestReproDumpStandingBotExplainsItselfInLog(t *testing.T) {
     // The pacing holds the line back within the period, so the
     // standing wait never floods the log.
     lines := strings.Count(logged, "no pickable target")
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, lines, strings.Count(logBuf.String(), "no pickable target"))
 }
@@ -172,10 +172,10 @@ func TestReproDumpStandingBotRotatesOutOfTheFencedSquare(t *testing.T) {
 
     // The standing wait: the emptiness window arms while the pick
     // stays empty, the diagnostic explains the opponents.
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.False(t, loop.zoneEmptySince.IsZero(),
         "the pick-empty square arms the emptiness window")
@@ -186,7 +186,7 @@ func TestReproDumpStandingBotRotatesOutOfTheFencedSquare(t *testing.T) {
     // cleared-out one, its cooldown keeps it out of the next contests
     // and the hunter starts walking into the next ground.
     loop.zoneEmptySince = time.Now().Add(-zoneRotateAfter - time.Second)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.NotEqual(t, "elven-2019_23-b1", loop.zonePickedID,
         "the fenced square rotates away")

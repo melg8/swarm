@@ -24,7 +24,7 @@ func armBlindEngage(t *testing.T, bot *state.Bot, loop *Loop) {
     bot.ApplySelfTarget(7)
     bot.ApplySystemMessage(state.SystemMessage{ID: 181})
     loop.target = 7
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 }
 
 // TestEngageRepositionsBlindTarget pins level A of the recovery: a
@@ -109,7 +109,7 @@ func TestEngageBlindRepositionArrivesAndReEngages(t *testing.T) {
         "the re-request still waits out the action pacing")
 
     // The attack is re-requested from the vantage point.
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, []int32{7}, game.forces)
 }
@@ -138,7 +138,7 @@ func TestEngageSwitchesBlindTargetWithoutGeodata(t *testing.T) {
 
     // The next pick takes the other mob: the selection of a different
     // object id also clears the stale server side attack stance.
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, int32(8), loop.target)
 }
@@ -223,7 +223,7 @@ func TestEngageBlindRecoveryRetriesOnce(t *testing.T) {
     // The arrival hands the engage back and the attack is re-requested.
     loop.tick()
     require.True(t, loop.losAt.IsZero())
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, []int32{7}, game.forces)
 
@@ -264,7 +264,7 @@ func TestEngageStuckTimeoutFiresThroughStaleAttackStance(t *testing.T) {
     bot.ApplyAutoAttackStart(100)
     bot.ApplySelfTarget(7)
     loop.target = 7
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.engageAt = time.Now().Add(-(engageStuckTimeout + time.Second))
 
     // The combat mark went stale: three seconds (the state tracker's
@@ -289,7 +289,7 @@ func TestEngageStuckTimeoutHeldDuringBlindRecovery(t *testing.T) {
     loop.SetNavigator(&fakeNavigator{found: true})
     bot.ApplySelfTarget(7)
     loop.target = 7
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.engageAt = time.Now().Add(-(engageStuckTimeout + time.Minute))
     loop.losAt = time.Now().Add(-2 * time.Second)
     loop.losWaypoints = []pathfind.Vec3{
@@ -324,7 +324,7 @@ func TestEngageBlindDetectionIgnoresStaleRefusal(t *testing.T) {
     bot.ApplySystemMessage(state.SystemMessage{ID: 181})
     time.Sleep(2100 * time.Millisecond)
     loop.target = 7
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.engageAt = time.Now().Add(-2050 * time.Millisecond)
 
     loop.tick()
@@ -353,7 +353,7 @@ func TestEngageBlindDetectionQuietWhileFighting(t *testing.T) {
         X: 45000, Y: 50000, TargetX: 45115, TargetY: 50015, TargetZ: -3500,
     })
     loop.target = 7
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.engageAt = time.Now().Add(-time.Minute)
 
     loop.tick()

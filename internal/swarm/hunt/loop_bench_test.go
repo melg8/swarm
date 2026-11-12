@@ -81,7 +81,7 @@ func benchWorldBot(npcCount int) *state.Bot {
 func BenchmarkHuntTickEngage(b *testing.B) {
     bot := benchWorldBot(50)
     loop := NewLoop(&benchGame{}, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     // Two stale targets held out of the search: the activeSkips
     // rebuild runs on every tick.
     loop.targetSkip = map[int32]time.Time{

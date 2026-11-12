@@ -146,7 +146,7 @@ func TestReproRound57ShortClickFreezeWalksThePlan(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     sim := &shortClickFreezeServer{engine: engine}
 
     // The zone return segment: the destination the returnToZone flow
@@ -258,7 +258,7 @@ func TestRound57ZoneReturnFromEveryVillageStart(t *testing.T) {
             game := &fakeGame{}
             loop := NewLoop(game, bot)
             loop.SetNavigator(nav)
-            loop.lastHit = time.Now().Add(-time.Minute)
+            loop.lastActionAt = time.Now().Add(-time.Minute)
             sim := &shortClickFreezeServer{engine: engine}
 
             require.True(t, loop.startZoneReturnSegment(dest),
@@ -304,7 +304,7 @@ func TestReproRound57FrozenServerEscalatesFast(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     dest := pathfind.Vec3{
         X: float64(reproRound57ZoneX),

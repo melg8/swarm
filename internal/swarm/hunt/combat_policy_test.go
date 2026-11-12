@@ -79,7 +79,7 @@ func TestLoopAnswersAttackerDuringApproach(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Equal(t, []int32{7}, game.forces)
@@ -91,7 +91,7 @@ func TestLoopAnswersAttackerDuringApproach(t *testing.T) {
     spawnMobAt(bot, 8, 45500)
     attackerHits(bot, 8, 45500)
 
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, []int32{7, 8}, game.forces,
         "the aggroed mob outranks the peaceful pick")
@@ -109,14 +109,14 @@ func TestLoopKeepsTheAnsweredPick(t *testing.T) {
     attackerHits(bot, 8, 45300)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Equal(t, int32(8), loop.target,
         "the aggro answer picks the nearest attacker")
     require.Equal(t, []int32{8}, game.forces)
 
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, int32(8), loop.target,
         "the answered pick stays, no target shuffle")
@@ -135,7 +135,7 @@ func TestLoopTanksAWinnablePileUp(t *testing.T) {
     attackerHits(bot, 8, 45400)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Zero(t, game.logouts,
@@ -148,7 +148,7 @@ func TestLoopTanksAWinnablePileUp(t *testing.T) {
     // The fight grinds the health down: the tank verdict flips and
     // the panic run takes over.
     hurtTo(bot, 40)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.False(t, loop.panicAt.IsZero(),
         "the hurt character arms the pile up run")
@@ -170,7 +170,7 @@ func TestFightPotionDrinksUnderHalf(t *testing.T) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     // The running fight: the mob swings, the character swings back.
     // The target is set directly - the aggro answer would flee the
@@ -186,7 +186,7 @@ func TestFightPotionDrinksUnderHalf(t *testing.T) {
 
     // The reuse window holds the next potion back.
     game.uses = nil
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Empty(t, game.uses,
         "the potion reuse window paces the uses")

@@ -116,7 +116,7 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     // The farm spot the trip return plans back to. Without it the
     // zero spot sends the return segment dry search across the whole world
     // pack - seconds of A* inside one tick (the production farm spot
@@ -162,7 +162,7 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     // The farm spot the trip return plans back to. Without it the
     // zero spot sends the return segment dry search across the whole world
     // pack - seconds of A* inside one tick (the production farm spot

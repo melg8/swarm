@@ -457,7 +457,7 @@ func (l *Loop) engagesOnZoneEntry() bool {
         return false
     }
     now := time.Now()
-    if now.Sub(l.lastHit) < selectPeriod {
+    if now.Sub(l.lastActionAt) < selectPeriod {
         return false
     }
     pick, ok := l.tracker.NearestAttackablePreferred(

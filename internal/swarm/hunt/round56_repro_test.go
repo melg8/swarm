@@ -114,7 +114,7 @@ func TestReproRound56AisleWalksToEllenia(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     sim := &villageClickServer{engine: engine}
 
     require.True(t, walkToEllenia(t, loop, bot, game, sim),
@@ -151,7 +151,7 @@ func TestReproRound56StuckSkipNeverCreepsIntoThePocket(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     sim := &villageClickServer{engine: engine}
 
     require.True(t, loop.startWalkSegment(pathfind.Vec3{

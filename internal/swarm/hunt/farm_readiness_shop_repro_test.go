@@ -73,7 +73,7 @@ func TestReproFarmReadinessShopRound(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     sim := &reproServer{nav: engine, minZ: reproStuckZ}
 
     // The knownlist broadcasts of the shop quarter and the teacher:

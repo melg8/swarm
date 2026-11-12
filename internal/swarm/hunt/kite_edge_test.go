@@ -199,7 +199,7 @@ func TestKiteCorneredHoldKeepsShooting(t *testing.T) {
     // of a standing fight between swings): the ordinary re-request
     // re-arms the attack, the target stays, nothing walks.
     time.Sleep(3200 * time.Millisecond)
-    loop.lastHit = time.Now().Add(-2 * time.Second)
+    loop.lastActionAt = time.Now().Add(-2 * time.Second)
     loop.tick()
     require.Equal(t, int32(7), loop.target,
         "the cornered kite never switches its target away")
@@ -527,7 +527,7 @@ func TestKiteFleesTheMeleeAttackerPastTheCeiling(t *testing.T) {
     mobChasesSelf(bot, 7, 45200, -3500)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     level, ok := bot.ObjectLevel(7)
     require.True(t, ok)
     require.Equal(t, int32(10), level,
@@ -867,7 +867,7 @@ func TestKiteFlightHoldsAgainstTheFreshAttacker(t *testing.T) {
     mobChasesSelf(bot, 9, 45200, -3500)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.targetSkip = map[int32]time.Time{
         8: time.Now().Add(fleeSkipDelay),
     }

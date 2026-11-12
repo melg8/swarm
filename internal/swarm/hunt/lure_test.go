@@ -145,12 +145,12 @@ func TestLureAnswersTheCoveredPick(t *testing.T) {
     // The pulled Dryad runs to the shooter: once it closes to the
     // melee range the sword swaps back and the fight continues the
     // ordinary way. The attack retry pacing of the pull stamps
-    // lastHit - the arrival tick waits out its window.
+    // lastActionAt - the arrival tick waits out its window.
     bot.ApplyPlacement(state.Placement{
         ObjectID: 7001, X: loop.lure.standX + 150, Y: loop.lure.standY,
         Z: -3500,
     })
-    loop.lastHit = time.Now().Add(-engageRetryPeriod)
+    loop.lastActionAt = time.Now().Add(-engageRetryPeriod)
     loop.tick()
     require.Nil(t, loop.lure, "the arrival ends the lure")
     require.Equal(t, []int32{502, 503, 501}, game.uses,

@@ -839,7 +839,7 @@ func TestZoneMobPriorityGuidesTheEngage(t *testing.T) {
         X: 46312, Y: 41500, Name: "Gremlin",
     })
     loop.target = 0
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, int32(74), loop.target,
         "the doorstep mob beats the far preferred one")
@@ -896,7 +896,7 @@ func TestZoneMobPriorityTranslatesTheRegistryIDs(t *testing.T) {
         ObjectID: 82, TemplateID: 1000473, Attackable: true,
         X: 45412, Y: 41500, Name: "Kaboo Orc Fighter Lieutenant",
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, int32(82), loop.target,
         "the translated priority bias guides the pick on the wire ids")

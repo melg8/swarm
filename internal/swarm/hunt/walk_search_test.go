@@ -31,13 +31,13 @@ func TestZoneReturnPlanCarriesSearchContract(t *testing.T) {
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
     loop.SetHuntingZone(46112, 41500, 450)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     bot.ApplyMovement(state.Movement{
         ObjectID: 100, X: 49308, Y: 44213, Z: -3539,
         DestX: 49308, DestY: 44213, DestZ: -3539,
     })
-    loop.lastHit = time.Now().Add(-2 * time.Second)
+    loop.lastActionAt = time.Now().Add(-2 * time.Second)
     loop.tick()
     require.Equal(t, phaseTownReturn, loop.phase)
 

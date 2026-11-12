@@ -288,7 +288,7 @@ func (l *Loop) pickTarget(now time.Time, manaHeld bool) bool {
     if l.maybeSelfBuff(now) {
         return true
     }
-    if now.Sub(l.lastHit) < selectPeriod {
+    if now.Sub(l.lastActionAt) < selectPeriod {
         return true
     }
     if l.pickNearestAttacker(now) {
@@ -493,10 +493,10 @@ func (l *Loop) walkStalledChase(now time.Time) {
         !now.After(l.combatAvoidUntil) ||
         l.chaseProgress(&l.engLastDist, &l.engDistAt, dist, now) ||
         l.tracker.SelfWalking() ||
-        now.Sub(l.lastHit) < engageRetryPeriod {
+        now.Sub(l.lastActionAt) < engageRetryPeriod {
         return
     }
-    l.lastHit = now
+    l.lastActionAt = now
     l.logf("Hunt: chase on %d stalled at %d units, walking to the target",
         l.target, int(dist))
     if err := l.game.WalkTo(x, y, z); err != nil {
@@ -516,7 +516,7 @@ func (l *Loop) requestAttack(now time.Time) {
         // server-side.
         return
     }
-    if now.Sub(l.lastHit) < engageRetryPeriod {
+    if now.Sub(l.lastActionAt) < engageRetryPeriod {
         return
     }
     if l.lureArmed() && l.lureTick(now) {
@@ -527,7 +527,7 @@ func (l *Loop) requestAttack(now time.Time) {
 
         return
     }
-    l.lastHit = now
+    l.lastActionAt = now
 }
 
 // losingFight reports whether the running fight turned into a death

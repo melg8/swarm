@@ -76,7 +76,7 @@ func TestReproRound58VillageStuckCellWalksToZone(t *testing.T) {
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
     loop.SetHuntingZone(reproRound58ZoneX, reproRound58ZoneY, 1448)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     // The post-abort state of the dump: the frozen re-path aborted the
     // return segment, abortFrozenTrip armed the fail budget and the zone
     // return flag survived the deleveling (the "back in the zone" reset
@@ -89,7 +89,7 @@ func TestReproRound58VillageStuckCellWalksToZone(t *testing.T) {
     for i := 0; i < 2400 && !arrived; i++ {
         // The pacing gates are bypassed between the ticks to keep the
         // test fast (the tick period is the real 250ms cadence).
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.moveAt = time.Time{}
         loop.tick()
         sim.consume(game, bot)

@@ -58,7 +58,7 @@ func kiteBowBotChaseFresh(
         X: 45000, Y: 50000, TargetX: mobX, TargetY: 50000,
         TargetZ: -3500,
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     return bot, game, loop
 }

@@ -41,7 +41,7 @@ func lapseKiteWalk(loop *Loop) {
         loop.combatAvoidUntil = until
     }
     loop.kiteWalkUntil = until
-    loop.lastHit = time.Now().Add(-2 * engageRetryPeriod)
+    loop.lastActionAt = time.Now().Add(-2 * engageRetryPeriod)
 }
 
 // TestKiteWindowEndFiresTheShotAtMeleeRange pins the core contract of
@@ -120,7 +120,7 @@ func TestKiteArrivalKeepsTheHoldUntilTheDisableEnd(t *testing.T) {
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 45200, Y: 50000, Name: "Keltir",
     })
-    loop.lastHit = time.Now().Add(-2 * engageRetryPeriod)
+    loop.lastActionAt = time.Now().Add(-2 * engageRetryPeriod)
     ageKiteReclick(loop)
     loop.tick()
     require.Len(t, game.walks, 1,

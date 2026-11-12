@@ -593,7 +593,7 @@ func TestCellPickTakesVisibleEnemyOutsideHeldCell(t *testing.T) {
         ObjectID: 300, TemplateID: 1000001, Attackable: true,
         X: 47500, Y: 41500, Name: "Neighbor Gremlin",
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, int32(300), loop.target,
         "the pick takes the visible enemy outside the held hexagon")
@@ -655,7 +655,7 @@ func TestCellOutGroundEnemiesKeepTheHunt(t *testing.T) {
         ObjectID: 300, TemplateID: 1000001, Attackable: true,
         X: 49600, Y: 41500, Name: "Roam Gremlin",
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, phaseEngage, loop.phase,
         "the hunt keeps running outside the ground")
@@ -673,7 +673,7 @@ func TestCellOutGroundWalksHomeWhenNothingVisible(t *testing.T) {
     bot.ApplyPlacement(state.Placement{
         ObjectID: 100, X: 49500, Y: 41500, Z: -3400,
     })
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Empty(t, game.forces, "nothing is engaged")
     require.NotEmpty(t, game.walks,

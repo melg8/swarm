@@ -366,7 +366,7 @@ func TestReproTownTripFromTheUserStuckSpot(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     fillInventory(bot)
     sim := &reproServer{nav: engine, minZ: reproStuckZ}
 

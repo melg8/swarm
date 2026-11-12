@@ -228,7 +228,7 @@ func TestReproRefusedSpawnNeverWalksTheDirectLine(t *testing.T) {
 
     // The pathfound return plans a real route over the mesh (the 64
     // waypoint answer of the offline probe).
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.returnToZone()
     require.Equal(t, phaseTownReturn, loop.phase,
         "the zone return plans the walk")
@@ -361,7 +361,7 @@ func TestReproRefusedSpawnLadderArmsTheEscapeWithoutServerAnswers(
 ) {
     loop, game, bot, sim, sink := spawnDumpLoop(t)
 
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.returnToZone()
     require.Equal(t, phaseTownReturn, loop.phase)
 

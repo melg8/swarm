@@ -141,7 +141,7 @@ func (l *Loop) activeSkipCount(now time.Time) int {
             count++
         }
     }
-    for _, until := range l.skipped {
+    for _, until := range l.itemSkip {
         if now.Before(until) {
             count++
         }

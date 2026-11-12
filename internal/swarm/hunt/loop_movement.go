@@ -42,7 +42,7 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
     if now.Sub(l.noTargetSince) < noTargetPatience {
         return false
     }
-    if now.Sub(l.lastHit) < selectPeriod {
+    if now.Sub(l.lastActionAt) < selectPeriod {
         return true
     }
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
@@ -69,7 +69,7 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
         // it from here.
         return false
     }
-    l.lastHit = now
+    l.lastActionAt = now
     moveX, moveY, _ := walkClickSegment(selfX, selfY, selfZ,
         float64(pick.X), float64(pick.Y), float64(selfZ),
         returnWalkSegment)
@@ -155,7 +155,7 @@ func (l *Loop) patrolToCenter(now time.Time) {
     if now.Sub(l.noTargetSince) < noTargetPatience {
         return
     }
-    if now.Sub(l.lastHit) < selectPeriod {
+    if now.Sub(l.lastActionAt) < selectPeriod {
         return
     }
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
@@ -166,7 +166,7 @@ func (l *Loop) patrolToCenter(now time.Time) {
     if dist < patrolCenterMinDist {
         return
     }
-    l.lastHit = now
+    l.lastActionAt = now
     l.walkZoneSegment(zone, selfX, selfY, selfZ, now)
 }
 
@@ -283,10 +283,10 @@ func (l *Loop) returnToZone() {
     if !l.standUpGuarded(now) {
         return
     }
-    if now.Sub(l.lastHit) < selectPeriod {
+    if now.Sub(l.lastActionAt) < selectPeriod {
         return
     }
-    l.lastHit = now
+    l.lastActionAt = now
     zone := l.zone()
     if zone == nil {
         return

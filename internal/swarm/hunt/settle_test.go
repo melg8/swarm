@@ -36,7 +36,7 @@ func settleTestBot(t *testing.T) (*state.Bot, *fakeGame, *Loop) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.EnableSpawnSettle()
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     return bot, game, loop
 }
@@ -102,7 +102,7 @@ func TestSettleArmsTheBowFirstStrike(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.EnableSpawnSettle()
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.NotNil(t, loop.lure, "the first strike arms the bow lure")
@@ -139,7 +139,7 @@ func TestSettleOffByDefault(t *testing.T) {
     settleTestWorld(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.True(t, loop.settleHoldAt.IsZero(),
@@ -162,7 +162,7 @@ func TestSettleWaitsForTheWorldWarmup(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.EnableSpawnSettle()
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.False(t, loop.settled,

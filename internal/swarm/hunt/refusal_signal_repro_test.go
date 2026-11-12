@@ -174,7 +174,7 @@ func TestReproRefusedClickSkipsTheCorridorBan(t *testing.T) {
     loop, game, bot, sim, sink := refusalDumpLoop(t, true, 0)
 
     for range 4 {
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
             // The post-abort state: the return holds or re-plans on
@@ -227,7 +227,7 @@ func TestReproRefusedClickVariedAimWalksOut(t *testing.T) {
         if arrived {
             break
         }
-        loop.lastHit = time.Now().Add(-time.Minute)
+        loop.lastActionAt = time.Now().Add(-time.Minute)
         loop.returnToZone()
         if loop.phase != phaseTownReturn {
             continue

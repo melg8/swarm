@@ -37,7 +37,7 @@ func newDelevelLoop(level int32) (*Loop, *fakeGame, *state.Bot, *fakeNavigator) 
     loop := NewLoop(game, bot)
     loop.SetNavigator(nav)
     loop.SetHuntingZone(46112, 41500, 1650)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     return loop, game, bot, nav
 }
@@ -160,7 +160,7 @@ func TestDelevelFightsTheGuard(t *testing.T) {
         "the first request selects the guard")
 
     // The attack repeats once per second until the death.
-    loop.lastHit = time.Now().Add(-2 * time.Second)
+    loop.lastActionAt = time.Now().Add(-2 * time.Second)
     loop.tick()
     require.Equal(t, []int32{77, 77}, game.forces)
 }

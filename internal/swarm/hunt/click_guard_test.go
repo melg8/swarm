@@ -44,7 +44,7 @@ func newClickGuardLoop(
     }
     loop.wpIndex = 0
     loop.segmentDest = pathfind.Vec3{X: 1600, Y: 1000, Z: 0}
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     return loop, game, nav
 }

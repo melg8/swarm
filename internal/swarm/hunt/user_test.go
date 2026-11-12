@@ -27,7 +27,7 @@ func TestUserUseItemCommandRunsImmediately(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     spawnMob(bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{Kind: state.CommandUseItem, ObjectID: 555})
     loop.tick()
@@ -63,7 +63,7 @@ func TestUserSayCommandSendsChat(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     spawnMob(bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{
         Kind: state.CommandSay, Text: "hello world",
@@ -102,7 +102,7 @@ func TestUserMoveCommandSwitchesToManualPhase(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     spawnMob(bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{
         Kind: state.CommandMove, X: 45600, Y: 50400, Z: -3500,
@@ -204,7 +204,7 @@ func TestUserAttackCommandEngages(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{Kind: state.CommandAttack, ObjectID: 7})
     loop.tick()
@@ -443,7 +443,7 @@ func TestManualOnlyModeRunsCommandsAndStaysIdle(t *testing.T) {
     game := &fakeGame{}
     loop := NewLoop(game, bot)
     loop.SetAutonomy(false)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
     require.Empty(t, game.forces,
@@ -521,7 +521,7 @@ func TestUserMoveFarWalkPlansSegments(t *testing.T) {
     loop := NewLoop(game, bot)
     navigator := &fakeNavigator{found: true}
     loop.SetNavigator(navigator)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     // The click lands 6000 units south: past the planning threshold.
     pushCommand(bot, state.Command{
@@ -583,7 +583,7 @@ func TestUserMoveNearWalkPlansToo(t *testing.T) {
     loop := NewLoop(game, bot)
     navigator := &fakeNavigator{found: true}
     loop.SetNavigator(navigator)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{
         Kind: state.CommandMove, X: 45600, Y: 50400, Z: -3500,
@@ -608,7 +608,7 @@ func TestUserMoveReplaceDropsThePlannedPath(t *testing.T) {
     loop := NewLoop(game, bot)
     navigator := &fakeNavigator{found: true}
     loop.SetNavigator(navigator)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     pushCommand(bot, state.Command{
         Kind: state.CommandMove, X: 45000, Y: 44000, Z: -3500,
@@ -888,7 +888,7 @@ func TestUserMoveStandsUpTheRestingCharacter(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
 
     // The character rests (the sit toggle confirmed by the ChangeWaitType
     // broadcast) and the user clicks a spot on the map: the server refuses
@@ -909,7 +909,7 @@ func TestUserMoveStandsUpTheRestingCharacter(t *testing.T) {
     // The stand transition confirms: the walk request goes out on the
     // next tick.
     bot.ApplyWaitType(state.WaitType{ObjectID: 100, Sitting: false})
-    loop.lastHit = time.Now().Add(-time.Minute)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.NotEmpty(t, game.walks,
         "the manual walk starts once the character stands")

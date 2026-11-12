@@ -16,8 +16,12 @@ import (
 // the fight clocks, the skip lists, the lure and the blind engage
 // recovery.
 type combatState struct {
-    target  int32
-    lastHit time.Time
+    target int32
+    // lastActionAt is the pacing stamp of the last action the loop
+    // initiated (a pick, an engage attempt, a trip start, a walk):
+    // every action gate of the package reads it against its own
+    // period, so two actions of the loop never share one window.
+    lastActionAt time.Time
     // fightStartAt and fightStartFor hold the start of the CURRENT
     // fight: set when the server confirms the running fight of a
     // new target, keyed by the target id (a stale pair is ignored).
@@ -26,7 +30,10 @@ type combatState struct {
     fightStartAt  time.Time
     fightStartFor int32
     engageAt      time.Time
-    targetSkip    map[int32]time.Time
+    // targetSkip holds the mobs the target search holds out, each
+    // on its own expiry deadline (the same convention as itemSkip,
+    // the ground drop list of lootState).
+    targetSkip map[int32]time.Time
     // The lure is the ranged luring state of the current pick (nil when
     // no lure runs): the melee answer to a covered target, see
     // lure.go.
@@ -104,12 +111,12 @@ type combatState struct {
 }
 
 // lootState is the loot phase state: the in-flight pickup and the
-// skipped drops.
+// drops standing on their pickup retry deadline.
 type lootState struct {
     lootID     int32
     lootAt     time.Time
     lootMoveAt time.Time
-    skipped    map[int32]time.Time
+    itemSkip   map[int32]time.Time
 }
 
 // restState is the rest phase state: the sit/stand toggle and the
