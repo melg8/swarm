@@ -153,7 +153,45 @@ The clearance machinery lives in `capsule.go` and serves both engines:
 The clearance of a point is the distance to the nearest closed wall
 edge of the walkable layer nearest its reference z, exact within one
 cell (the 3x3 cell neighborhood holds every wall edge closer than 16
-units; a radius below 16 never needs more).
+units; a radius below 16 never needs more). The probe answers
+`capsuleMaxDistance` 32 when no wall sits within the neighborhood - the
+cap only marks "no wall nearby", it never hides a closer edge.
+
+The post pass runs in two phases over a copy of the plan. Phase A pushes
+every interior waypoint whose clearance falls below the radius clear
+(`pushClear`): the damped projection follows the current nearest obstacle
+(the closest point on the wall edge, or the declaring cell center when
+the point sits exactly on it), so a point squeezed between two walls - a
+corridor corner - converges onto the clearance ridge instead of
+oscillating between the two constraint normals. The travel bounds at 16
+units over `capsuleMaxPushSteps` 12 steps with `capsulePushDamping` 0.75
+per step. Phase B samples every segment at `capsuleSampleStep` 4 units
+(the wall field changes at the 16 unit cell granularity, a 4 unit sample
+cannot step over a tight spot) and bends the grazing ones through
+pushed-in anchors (`bendAnchors`, `fixSegment`): the push follows the
+segment perpendicular first (away from a wall the segment runs along,
+around the end of a face it runs into), falls back to the nearest wall
+projection, and every candidate snaps back onto the geodata surface. The
+anchors keep `capsuleAnchorSpacing` 16 and cap at `capsuleMaxAnchors` 64
+per segment, the bend recursion caps at `capsuleMaxBendDepth` 4, and a
+chain the walk rules refuse falls back to the original straight segment.
+The push aims at the radius plus `capsulePushHeadroom` 0.5.
+
+The fold (`ShortenPath`) is the second consumer of the oracle: the greedy
+farthest visible merge walks the ordered points and keeps every chord
+that answers `SegmentClear`, the first and the last waypoints never move,
+and the scan window of 32 caps the merge horizon per anchor (the wall
+bends chain every handful of points, a longer chord beyond the window is
+rare enough to leave unexplored). The server move clamps split here as
+well: a segment issued from over water splits at `waterMoveSegment` 700
+(the `Creature.moveToLocation` clamp of every swimming request - a target
+beyond it never answers and the follower would never see the arrival),
+while the dry land moves run the server's own `getValidLocation`
+truncation and pathfinding, so the planner pre-splits nothing there. The
+grid oracle of the fold is water blind: on the elven mismatch report it
+folded a whole mesh route into one straight chord across the lake the bot
+detours, which is why every plan repro link arms `fold=0`
+(docs/navmesh.md, the route search contract).
 
 ## Pathfind test UI
 

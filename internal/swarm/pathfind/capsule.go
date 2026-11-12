@@ -6,58 +6,29 @@ package pathfind
 
 import "math"
 
-// The capsule clearance post-pass. The planned waypoints of both
-// engines (the grid A* smoothing and the mesh funnel) may sit closer
-// to a wall than the character's collision cylinder allows: the funnel
-// pivots at the portal span ends - exactly on the wall boundary - and
-// a smoothed segment can graze a wall corner while staying inside open
-// cells. A character that walks such a plan clips every wall edge and
-// corner with its capsule and sticks (the owner report: the path
-// points "too close to the wall edges and corners").
-//
-// The server itself never checks the capsule against the geodata (the
-// Mobius movement validation is cell level: the paired NSWE walls and
-// the anti corner cut), so keeping the clearance is the planner's own
-// job. This file implements it as a geometric post-pass over the
-// planned waypoints:
-//
-//  1. the clearance of a point is the distance to the nearest closed
-//     wall edge of the walkable layer nearest its reference z, exact
-//     within one cell (the 3x3 neighborhood holds every wall edge
-//     closer than 16 units; cell edges further away cannot matter for
-//     a radius below 16),
-//  2. every interior waypoint whose clearance falls below the radius
-//     is pushed away from the nearest wall until it clears it (the
-//     move is validated against the engine's own walk rules and
-//     dropped when the validation refuses it),
-//  3. every segment is sampled; a segment that grazes a wall is bent around
-//     the tightest spot at a pushed-in anchor point (bounded depth,
-//     the original segment stays when no valid bend exists).
-//
-// The first and the last waypoint never move: the start is where the
-// character actually stands and the end is the destination the caller
-// asked for (the approach contracts measure their distance to it).
+// The capsule clearance post-pass: the planned waypoints of both engines may
+// sit closer to a wall than the character's collision cylinder allows, so this
+// file pushes the interior waypoints clear and bends the grazing segments
+// around the walls. The server never checks the capsule (its movement
+// validation is cell level), so the clearance is the planner's own job
+// (docs/pathfinding.md, the capsule clearance section).
 
-// DefaultCollisionRadius is the collision radius of the C1 player
-// capsule: the elven fighter templates carry 7.5 units
+// DefaultCollisionRadius is the collision radius of the C1 player capsule: the
+// elven fighter template carries 7.5 units
 // (dist/game/data/stats/players/templates/StartingClass/ElvenFighter.xml,
-// collisionMale radius - the character class the bot creates). The
-// geodata cell is 16 units wide, so the capsule fits one cell with
-// half a unit of slack: a cell center waypoint always clears the
-// walls of its own cell, a funnel span end never does.
+// collisionMale radius). The 16 unit geodata cell fits the capsule with half a
+// unit of slack.
 const DefaultCollisionRadius = 7.5
 
-// capsuleMaxDistance caps the reported clearance. Every wall edge
-// outside the 3x3 cell neighborhood of the probe is at least one full
-// cell (16 units) away, so the cap only marks "no wall nearby"; any
-// clearance question for a radius below 16 is answered exactly.
+// capsuleMaxDistance caps the reported clearance: every wall edge outside the
+// 3x3 cell neighborhood is at least a full 16 unit cell away, so the cap only
+// marks "no wall nearby" and any radius below 16 is answered exactly.
 const capsuleMaxDistance = 32.0
 
-// The post-pass tunables: the segment sampling step (the clearance field
-// changes at the 16 unit cell granularity, a 4 unit sample cannot
-// step over a tight spot), the push headroom over the radius, the
-// minimum anchor spacing of a bend chain and the bend recursion
-// depth.
+// The post pass tunables: the 4 unit sample cannot step over a tight spot at
+// the 16 unit cell granularity, the push headroom over the radius, the anchor
+// spacing and cap of a bend chain, and the push steps, damping and bend
+// recursion depth.
 const (
     capsuleSampleStep    = 4.0
     capsulePushHeadroom  = 0.5
@@ -68,9 +39,9 @@ const (
     capsuleMaxBendDepth  = 4
 )
 
-// Capsule answers wall clearance questions for one engine's geodata.
-// It is safe for concurrent use (every method only reads the engine's
-// parsed regions under the engine cache lock).
+// Capsule answers wall clearance questions for one engine's geodata and is safe
+// for concurrent use (every method only reads the engine's parsed regions under
+// the engine cache lock).
 type Capsule struct {
     engine *Engine
 }
@@ -80,36 +51,33 @@ func NewCapsule(engine *Engine) *Capsule {
     return &Capsule{engine: engine}
 }
 
-// SetCapsuleClearance arms the engine side post-pass: every search of
-// this engine runs its smoothed waypoints through the capsule
-// clearance pass with the given radius. A radius of zero (the
-// default) disables the pass - the engine answers the raw smoothed
-// waypoints, the contract the existing tests and the acceptance
-// scenarios pin.
+// SetCapsuleClearance arms the engine side post-pass: every search of this
+// engine runs its smoothed waypoints through the capsule clearance pass with
+// the given radius. A radius of zero (the default) disables the pass and the
+// engine answers the raw smoothed waypoints.
 func (e *Engine) SetCapsuleClearance(radius float64) {
     e.capsuleRadius = radius
 }
 
-// CapsuleRadius returns the armed clearance radius of the engine
-// (zero when the post-pass is disabled).
+// CapsuleRadius returns the armed clearance radius of the engine (zero when the
+// post-pass is disabled).
 func (e *Engine) CapsuleRadius() float64 {
     return e.capsuleRadius
 }
 
-// capsuleObstacle is the nearest wall edge of a probe: the distance to
-// it, the closest point on the edge and the world center of the cell
-// that declared the wall closed (the open side the character stands
-// on - the push direction when the probe sits exactly on the edge).
+// capsuleObstacle is the nearest wall edge of a probe: the distance, the
+// closest point on the edge and the world center of the cell that declared the
+// wall closed (the push direction when the probe sits exactly on the edge).
 type capsuleObstacle struct {
     dist   float64
     px, py float64
     cx, cy float64
 }
 
-// Clearance returns the distance from the point to the nearest closed
-// wall edge of the walkable layer nearest refZ, among the cells of
-// the 3x3 neighborhood. A point without geodata under it or without
-// any wall within one cell answers capsuleMaxDistance.
+// Clearance returns the distance from the point to the nearest closed wall edge
+// of the walkable layer nearest refZ among the cells of the 3x3 neighborhood; a
+// point without geodata under it or without any wall within one cell answers
+// capsuleMaxDistance.
 func (c *Capsule) Clearance(x, y float64, refZ int16) float64 {
     return c.nearestWall(x, y, refZ).dist
 }
@@ -147,9 +115,8 @@ func (c *Capsule) nearestWall(x, y float64, refZ int16) capsuleObstacle {
     return best
 }
 
-// closestLayerOf picks the layer of a cell stack whose height is the
-// closest to z (the Region.ClosestLayer semantics without the span
-// unpacking, the stack is already resolved).
+// closestLayerOf picks the layer of a cell stack whose height is closest to z
+// (the Region.ClosestLayer semantics without the span unpacking).
 func closestLayerOf(stack []Layer, z int16) Layer {
     best := stack[0]
     bestDelta := heightDelta(best.Height, z)
@@ -162,9 +129,9 @@ func closestLayerOf(stack []Layer, z int16) Layer {
     return best
 }
 
-// mergeCellWalls folds the closed wall edges of one cell into the
-// best obstacle tracking. The wall directions follow the search
-// semantics: north is -y, south +y, east +x, west -x.
+// mergeCellWalls folds the closed wall edges of one cell into the best obstacle
+// tracking; the wall directions follow the search semantics (north is -y, south
+// +y, east +x, west -x).
 func mergeCellWalls(best capsuleObstacle, x, y float64,
     key RegionKey, nx, ny int, layer Layer,
 ) capsuleObstacle {
@@ -201,8 +168,8 @@ func mergeCellWalls(best capsuleObstacle, x, y float64,
     return best
 }
 
-// segmentDistance is the distance of the point to the segment with
-// the closest point on it.
+// segmentDistance is the distance of the point to the segment with the closest
+// point on it.
 func segmentDistance(x, y, ax, ay, bx, by float64,
 ) (float64, float64, float64) {
     dx, dy := bx-ax, by-ay
@@ -219,14 +186,10 @@ func segmentDistance(x, y, ax, ay, bx, by float64,
 }
 
 // SegmentClear answers whether the straight segment walks the server accurate
-// grid safely: the line of sight the movement channel applies (the
-// supercover raster with the strict symmetric height rule) passes end
-// to end and every sampled point of the segment keeps the radius from the
-// nearest closed wall edge (the 4 unit sample of the bend pass - the
-// wall field changes at the 16 unit cell granularity, a 4 unit sample
-// cannot step over a tight spot). The mesh wall spans of the shortcut
-// pass are the side level approximation; this oracle is the authority
-// the grid movement validation enforces.
+// grid safely: the line of sight the movement channel applies passes end to end
+// and every sampled point keeps the radius from the nearest closed wall edge.
+// The mesh wall spans of the shortcut pass are the side level approximation;
+// this oracle is the authority the grid movement validation enforces.
 func (c *Capsule) SegmentClear(ax, ay, az, bx, by, bz, radius float64) bool {
     if c == nil || c.engine == nil {
         return true
@@ -237,16 +200,12 @@ func (c *Capsule) SegmentClear(ax, ay, az, bx, by, bz, radius float64) bool {
         c.engine.MaxPassableHeight())
 }
 
-// ShortenPath folds the waypoint path into the longest segments the grid
-// wall oracle allows (greedy farthest visible over the ordered
-// points): every surviving segment answers SegmentClear - the server walk
-// rules end to end and the capsule radius off every sampled wall -
-// and the server move clamps (the 9900 unit packet refusal is the
-// walker's own maxMoveDistance concern, the water clamp of the swimming
-// moves splits here). The first and the last waypoints never move.
-// The scan window caps the merge horizon per anchor: the wall bends
-// chain every handful of points, a longer chord beyond the window is
-// rare enough to leave unexplored.
+// ShortenPath folds the waypoint path into the longest segments the grid wall
+// oracle allows (greedy farthest visible over the ordered points): every
+// surviving segment answers SegmentClear, the first and the last waypoints
+// never move, and the scan window of 32 caps the merge horizon per anchor. The
+// server move clamps split here too: the water moves at the 700 unit sphere,
+// the land moves through the server's own getValidLocation truncation.
 func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
 ) []Vec3 {
     if c == nil || c.engine == nil || len(waypoints) < 3 {
@@ -278,17 +237,15 @@ func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
         if limit, capped := c.segmentLimit(anchor); capped {
             segment := math.Hypot(target.X-anchor.X, target.Y-anchor.Y)
             if segment > limit {
-                // The server would truncate this move on its own:
-                // the fold cuts it at the same distance first, so
-                // the waypoint the walker aims at is the waypoint
-                // the character actually reaches.
+                // The server would truncate this move: the fold cuts it at
+                // the same distance, so the aim is the point the character
+                // actually reaches.
                 split := c.snapZ(
                     segmentPoint(anchor, target, limit/segment), anchor.Z)
                 out = append(out, split)
                 anchor = split
-                // The index holds: the fold resumes from the split
-                // point over the same horizon and re-answers the
-                // remainder of the capped chord.
+                // The index holds: the fold resumes from the split point
+                // over the same horizon.
                 continue
             }
         }
@@ -301,23 +258,15 @@ func (c *Capsule) ShortenPath(waypoints []Vec3, radius float64,
 }
 
 // waterMoveSegment mirrors the server clamp of the water moves: the
-// moveToLocation of the game server scales the destination of every
-// swimming move request onto the 700 unit sphere around the current
-// position (Creature.moveToLocation - the isInWater divider), and a
-// target beyond it never answers. The smoothing over open water
-// merges the funnel pinholes into segments several times the clamp - the
-// server would stop the character short of every such waypoint and
-// the follower would never see the arrival (the path "is not
-// passed", the owner report). The fold splits the water anchored
-// segments at the clamp instead.
+// moveToLocation of the game server scales the destination of every swimming
+// move request onto the 700 unit sphere around the current position
+// (Creature.moveToLocation, the isInWater divider), so the fold splits the
+// water anchored segments at the clamp instead of aiming past it.
 const waterMoveSegment = 700.0
 
-// segmentLimit answers the server move clamp of a walk that leaves the
-// point. A water anchored segment truncates at the water move limit: the
-// character issues the click from the water, the server clamps the
-// destination. A dry segment answers no cap - the land moves run the
-// server's own getValidLocation truncation and pathfinding instead,
-// nothing the planner has to pre-split.
+// segmentLimit answers the server move clamp of a walk that leaves the point: a
+// water anchored segment truncates at the water move limit, a dry segment
+// answers no cap (the land moves run the server's own truncation).
 func (c *Capsule) segmentLimit(from Vec3) (float64, bool) {
     if c.engine.OverWater(from.X, from.Y, int16(from.Z)) {
         return waterMoveSegment, true
@@ -326,14 +275,12 @@ func (c *Capsule) segmentLimit(from Vec3) (float64, bool) {
     return 0, false
 }
 
-// ApplyPath returns the waypoint path with the capsule clearance
-// enforced: every interior waypoint clears the walls by the radius
-// and every segment passes no closer than the radius to a wall edge. The
-// first and the last waypoints never move. Every adjustment is
-// validated against the engine's own walk rules (the line of sight
-// the server movement channel applies) and falls back to the
-// original geometry when the validation refuses it, so the answer is
-// never worse than the input plan - it can only add clearance.
+// ApplyPath returns the waypoint path with the capsule clearance enforced:
+// every interior waypoint clears the walls by the radius and every segment
+// passes no closer than the radius to a wall edge. The first and the last
+// waypoints never move, and every adjustment is validated against the engine's
+// own walk rules and falls back to the original geometry when the validation
+// refuses it, so the answer can only add clearance.
 func (c *Capsule) ApplyPath(waypoints []Vec3, radius float64) []Vec3 {
     if c == nil || c.engine == nil || len(waypoints) < 2 || radius <= 0 {
         return waypoints
@@ -366,15 +313,12 @@ func (c *Capsule) ApplyPath(waypoints []Vec3, radius float64) []Vec3 {
     return result
 }
 
-// pushClear moves the point away from the nearest wall until its
-// clearance reaches the radius. The projection direction follows the
-// current nearest obstacle (the closest point on the wall edge, or
-// the declaring cell center when the point sits on the edge); the
-// step length damps every iteration, so a point squeezed between two
-// walls (a corridor corner) converges onto the clearance ridge
-// instead of oscillating between the two constraint normals. The
-// travel is bounded by maxTravel; a point that never clears the
-// radius answers false.
+// pushClear moves the point away from the nearest wall until its clearance
+// reaches the radius: the projection follows the current nearest obstacle (the
+// closest point on the wall edge, or the declaring cell center when the point
+// sits on the edge), the damped step converges onto the clearance ridge between
+// two walls instead of oscillating, and a point that never clears within
+// maxTravel answers false.
 func (c *Capsule) pushClear(point Vec3, radius float64,
     maxTravel float64,
 ) (Vec3, bool) {
@@ -409,13 +353,11 @@ func (c *Capsule) pushClear(point Vec3, radius float64,
     return point, false
 }
 
-// fixSegment walks the segment from a to b and bends it around the walls:
-// every sampled point whose clearance falls below the radius becomes
-// a pushed-in anchor (the clearance projection), the anchor chain
-// replaces the straight segment and the chain segments recurse. A segment that
-// clears the radius passes through unchanged; a chain the walk rules
-// refuse falls back to the original straight segment - the original plan
-// is the honest fallback, never a broken one.
+// fixSegment walks the segment from a to b and bends it around the walls: every
+// tight sample becomes a pushed-in anchor, the anchor chain replaces the
+// straight segment and the chain segments recurse. A segment that clears the
+// radius passes through unchanged, and a chain the walk rules refuse falls back
+// to the original straight segment.
 func (c *Capsule) fixSegment(a, b Vec3, radius float64, depth int) []Vec3 {
     anchors := c.bendAnchors(a, b, radius)
     if len(anchors) == 0 {
@@ -443,14 +385,13 @@ func (c *Capsule) fixSegment(a, b Vec3, radius float64, depth int) []Vec3 {
     return result
 }
 
-// bendAnchors samples the segment at capsuleSampleStep and lifts every
-// tight sample out of the wall danger zone. The push follows the segment
-// perpendicular first (the detour direction - away from a wall the
-// segment runs along, around the end of a face it runs into), falls back
-// to the nearest wall projection, and every candidate is snapped back
-// onto the geodata surface. The anchors keep a minimum spacing so a
-// long wall-parallel segment bends at a handful of ridge points instead
-// of one waypoint per sample, and the count is capped per segment.
+// bendAnchors samples the segment at capsuleSampleStep and lifts every tight
+// sample out of the wall danger zone: the push follows the segment
+// perpendicular first (away from a wall the segment runs along, around the end
+// of a face it runs into), falls back to the nearest wall projection and snaps
+// back onto the geodata surface. The anchors keep a minimum spacing and a per
+// segment cap, so a long wall-parallel segment bends at a handful of ridge
+// points.
 func (c *Capsule) bendAnchors(a, b Vec3, radius float64) []Vec3 {
     length := math.Hypot(b.X-a.X, b.Y-a.Y)
     samples := int(length/capsuleSampleStep) + 1
@@ -494,9 +435,8 @@ func (c *Capsule) bendAnchors(a, b Vec3, radius float64) []Vec3 {
     return anchors
 }
 
-// pushDirected marches the point along the unit direction until the
-// clearance reaches the target (bounded travel). It answers the
-// first point that clears; false when none does within the bound.
+// pushDirected marches the point along the unit direction until the clearance
+// reaches the target (bounded travel) and answers the first clearing point.
 func (c *Capsule) pushDirected(point Vec3, nx, ny, target float64,
 ) (Vec3, bool) {
     length := math.Hypot(nx, ny)
@@ -525,19 +465,17 @@ func segmentPoint(a, b Vec3, t float64) Vec3 {
     }
 }
 
-// segmentWalkable answers the engine line of sight for one adjusted segment:
-// the walk rules the server movement channel applies (the supercover
-// raster with the strict symmetric height rule). An error (no geodata
-// under an endpoint) reads as not walkable - the caller keeps the
-// original geometry then.
+// segmentWalkable answers the engine line of sight for one adjusted segment;
+// an error (no geodata under an endpoint) reads as not walkable, so the caller
+// keeps the original geometry.
 func (c *Capsule) segmentWalkable(a, b Vec3) bool {
     ok, err := c.engine.LineOfSight(a, b, c.engine.MaxPassableHeight())
 
     return err == nil && ok
 }
 
-// snapZ puts a moved waypoint back onto the geodata surface: the
-// height of the layer closest to the reference z at the new cell.
+// snapZ puts a moved waypoint back onto the geodata surface: the height of the
+// layer closest to the reference z at the new cell.
 func (c *Capsule) snapZ(point Vec3, refZ float64) Vec3 {
     height, err := c.engine.ClosestHeight(point.X, point.Y, int16(refZ))
     if err != nil {
