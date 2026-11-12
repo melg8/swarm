@@ -1,4 +1,4 @@
-# The city shopping errand buys the top no-grade bow (status: in progress)
+# The city shopping errand buys the top no-grade bow (status: complete)
 
 Started 2026-11-12, branch main, issue #0 (owner request).
 
@@ -81,7 +81,29 @@ plan.
 - The acceptance scenario: 800 000 adena, the `bow` check after the
   armor (latched), the home gate waits for the bow, the description
   and the tests follow the new check order.
+- Drive-by gate repair: the waypoint follower of `hunt/user.go` left a
+  stale `//nolint:cyclop,funlen` that both linters had outgrown, so
+  `task lint` was red on main; the directive is gone.
+
+### 2026-11-12 - the live acceptance passed
+
+`go run ./cmd/swarm -acceptance city-shopping -login 127.0.0.3:2106`
+(log `logs/acceptance/city-shopping-20261112-141702-21008-1.log`)
+printed `PASSED after 7m48s` with 9 of 9 checks:
+
+- the plan line "the 800000 adena wallet covers the 748560 adena plan,
+  walking to Gludio with 3 stops" and "the plan carries the
+  Composition Bow";
+- Sydnia delivered the Falchion, Simplon the six armor pieces, then
+  Sydnia again the Composition Bow (273) - the bow check closed at
+  +150 s, before the return;
+- the old village gear sold at Gludio (the bow purchase displaced
+  nothing), the kit stayed worn 7 of 7 after the bow landed, the walk
+  home and the resumed farm followed;
+- `task verify` (build, vet, lint, the full suite, `fmt:check`) is
+  green.
 
 ## Status
 
-In progress: the live acceptance run and the gate.
+Complete: the errand and its acceptance round are pushed on main.
+
