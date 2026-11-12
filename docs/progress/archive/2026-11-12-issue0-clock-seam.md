@@ -1,4 +1,4 @@
-# P06: the clock seam of state and hunt (status: in progress)
+# P06: the clock seam of state and hunt (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner instruction: continue
 the refactor after the file split rounds, the packet router and the
@@ -59,8 +59,9 @@ tests.
 
 ## Status
 
-The seam, the state and hunt conversions and the test migration are in.
-Next: `task verify`, the live run, then the fragment archive.
+Complete: the seam, the state and hunt conversions, the test migration,
+`task verify` and the live runs are done. The fragment archives with the
+devlog record of the round.
 
 ### 2026-11-12 - the state conversion
 The 62 direct reads inside `*Bot` methods now call `b.now()`
@@ -119,3 +120,18 @@ dialog pacing rides the real bypass window).
 
 Verified: `go build ./...`, `go vet ./internal/swarm/hunt/...`,
 `golangci-lint run` 0 issues, the full hunt suite green, `task fmt:check`.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole test
+suite, `fmt:check`). Two live runs on the Windows stack with the
+`-ldflags` identity of `d9a7a36e`: the first without geodata (the
+temp-directory recipe) hunted, killed and looted Kaboo Orc Fighters
+and reported the town trips disabled, exactly the documented
+consequence of a missing `data/geodata`; the second with `-geodata
+E:/work/swarm/data/geodata` loaded the 165 regions, walked the trip to
+the guard Starden and steered around the mobs. Both stayed in the
+world 65 s and exited 0 on Ctrl+Break.
+
+Complete: the seam and the conversions land on `main`; the hunt suite
+dropped from 97.3 s to 27.7 s. The round record is
+`docs/devlog/2026-11-12-issue0-clock-seam.md`.
