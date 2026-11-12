@@ -552,6 +552,24 @@ corner probe is a length, not a leg at all.
   lint:new`. `quest_walker.go` fell from 48.5 to 30.5 percent (68
   comment lines), no block above 8 lines.
 
+### 2026-11-12 - pathfind/navmesh/pocket.go moves the escape facts to the doc
+
+- 20 blocks compress: the file header (41 lines) and the sealing
+  geometry, the `pocketMaxSide` 2048 bound, the `pocketExitRadius` 768
+  ring, the 8x water price (the 936 unit deck sandwich bed) and the 4x
+  foreign ban price, the `pocketExitZWindow` 1024 and the one unit
+  horizontal floor (the deck at 32 against the honest edge at 36), the
+  aim march depths of 288/256/224 past the 150 unit arrival slack, the
+  horizontal march, the island and start footprint guards, the flood
+  box abort and the component rect guard. The `docs/navmesh.md` pocket
+  bullet grew three entries carrying the moved facts (the 52 and 29
+  polygon terraces, the 640x752 and 592x432 boxes, why the
+  walk-what-you-can partial does not serve them, the constants) in the
+  same commit.
+- Verified: `task fmt`, `go build ./...`, the navmesh tests, `task
+  lint:new`. `pocket.go` fell from 41.4 to 24.5 percent (75 comment
+  lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -568,8 +586,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go`,
 `hunt/learning.go` and `hunt/town_cursor_escape.go`,
 `pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
-`hunt/loop_avoid.go`, `hunt/stagnation.go` and `hunt/quest_walker.go`
-(second passes). Next: a fresh `task comment:audit --top 10` pick (the
-`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
-their fragments are active); the share and the block count are
-re-measured at the end.
+`pathfind/navmesh/pocket.go`, `hunt/loop_avoid.go`, `hunt/stagnation.go`
+and `hunt/quest_walker.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/loop_state.go` entries stay untouched while their fragments are
+active); the share and the block count are re-measured at the end.

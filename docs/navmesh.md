@@ -748,6 +748,42 @@ engine answered.
   direction the strict link graph cannot know). The flood is bounded
   by the component bounding box (pocketMaxSide), so wide honest
   ground - sealed yards, whole islands - keeps the plain answers.
+- The stranded spots reach past the one cell island to the terrace
+  scale: the elven village terraces that stranded the bots isolate
+  link components of 52 and 29 polygons (the 640x752 and 592x432
+  boxes), the same sealing geometry at a bigger footprint. The
+  walk-what-you-can partial does not serve them - the star walks the
+  character to the component's inner boundary and leaves it there
+  (the next cycle replans the same partial) - so the escape is the
+  only answer that walks it out. The constants of the scan:
+  `pocketMaxSide` 2048 bounds the component box, with the flood
+  aborting once a polygon would stretch it further (the cost stays a
+  fraction of the astar budget the failed search just spent);
+  `pocketExitRadius` 768 rings the box the exit scan;
+  `pocketExitWaterPenalty` 8x prices the water (the deck sandwich bed
+  lies 936 units under the elven village decks); `pocketExitBanPenalty`
+  4x prices the ground under a foreign recovery ban, while the own
+  ban ring keeps its way out - the escape from the ban that holds the
+  start crosses its own ground; `pocketExitZWindow` 1024 bounds the
+  exit heights (the deck sandwiches stack a few hundred units apart,
+  the cliffs measure under a thousand).
+- The aim (`pocketAim`) marches horizontal from the boundary point at
+  288, 256 or 224 units - every depth past the 150 unit arrival slack
+  of the walk follower, whose aim inside it would arrive without a
+  click and spin the plan in place - and snaps onto ground that is
+  neither the pocket nor another island; the boundary point itself
+  stays the last resort. The march stays horizontal because the walk
+  is a ground walk and the surface snap owns the height, so a
+  boundary poly a deck step above or below the start cannot tilt the
+  aim into the air. The one unit horizontal displacement floor
+  rejects the ground directly under the standing point: the stacked
+  layers and the diagonal corner neighbors answer the closest 3D
+  points of the scan (a deck 32 units down beats the honest edge at
+  36), yet the character cannot walk down onto them and the boundary
+  they form carries no direction. The plan is the exit waypoint, not
+  the boundary point (it sits under the server rescue click floor and
+  inside the follower's arrival slack) and not the start position (the
+  follower would click its own cell).
 
 The runtime wiring (cmd/swarm/pathfind_mode.go): the `-navmesh` flag names the
 tile directory explicitly, the empty value autodetects
