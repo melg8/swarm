@@ -19,6 +19,16 @@ const (
     goblinTemplateID   = 1000000 + goblinDisplayID
     keltirDisplayID    = 532
     keltirTemplateID   = 1000000 + keltirDisplayID
+    dreVanulDisplayID  = 117
+    dreVanulTemplateID = 1000000 + dreVanulDisplayID
+    kabooDisplayID     = 471
+    kabooTemplateID    = 1000000 + kabooDisplayID
+    gilbertDisplayID   = 7039
+    gilbertTemplateID  = 1000000 + gilbertDisplayID
+    queenAntDisplayID  = 12001
+    queenAntTemplateID = 1000000 + queenAntDisplayID
+    pixyDisplayID      = 12084
+    pixyTemplateID     = 1000000 + pixyDisplayID
     shortSwordItemID   = 1
     adenaItemID        = 57
     unknownTemplateID  = 999999999
@@ -71,11 +81,6 @@ func TestNPCLevel(t *testing.T) {
 }
 
 func TestNPCAggroRange(t *testing.T) {
-    t.Run("known npc resolves non zero or zero", func(_ *testing.T) {
-        r := NPCAggroRange(goblinTemplateID)
-        _ = r
-    })
-
     t.Run("template id at offset returns zero", func(t *testing.T) {
         require.Equal(t, int32(0), NPCAggroRange(npcTemplateOffset2))
     })
@@ -85,26 +90,52 @@ func TestNPCAggroRange(t *testing.T) {
         require.Equal(t, int32(0), NPCAggroRange(-1))
     })
 
-    t.Run("xml ranges above the server clamp resolve to the clamp", func(t *testing.T) {
-        // The Mobius C1 NpcTemplate caps every ai aggroRange at
-        // MaxAggroRange (NPC.ini ships 450), so the xml 1000 of the
-        // aggressive monsters never reaches the world: the resolved
-        // range must draw the number the server acts on.
-        require.Equal(t, int32(450), NPCAggroRange(1000000+12))
-        require.Equal(t, int32(450), NPCAggroRange(1000000+17))
+    t.Run("monster xml range above the clamp resolves to the clamp", func(t *testing.T) {
+        // The Mobius C1 NpcTemplate caps the ai aggroRange at
+        // MaxAggroRange (NPC.ini ships 450) for the Monster type only:
+        // the xml 1000 of the monsters never reaches the world.
+        require.Equal(t, int32(450), NPCAggroRange(dreVanulTemplateID))
+        require.Equal(t, int32(450), NPCAggroRange(kabooTemplateID))
+        require.Equal(t, int32(450), NPCAggroRange(goblinTemplateID))
     })
 
-    t.Run("no resolved range exceeds the server clamp", func(t *testing.T) {
-        for id := int32(1); id < 20000; id++ {
-            require.LessOrEqual(t,
-                NPCAggroRange(1000000+id), int32(450))
-        }
+    t.Run("non monster types keep the raw xml range", func(t *testing.T) {
+        // The clamp branch tests type.equalsIgnoreCase("Monster"), so
+        // a guard (1000) and a grand boss (2000) keep their raw value.
+        require.Equal(t, int32(1000), NPCAggroRange(gilbertTemplateID))
+        require.Equal(t, int32(2000), NPCAggroRange(queenAntTemplateID))
     })
 }
 
 func TestNPCIsAggressive(t *testing.T) {
-    t.Run("known npc resolves", func(_ *testing.T) {
-        _ = NPCIsAggressive(goblinTemplateID)
+    t.Run("aggressive monster resolves true", func(t *testing.T) {
+        require.True(t, NPCIsAggressive(dreVanulTemplateID))
+    })
+
+    t.Run("monster with the default isAggressive resolves true", func(t *testing.T) {
+        // Kaboo Orc Fighter omits the attribute; NpcTemplate defaults
+        // isAggressive to true.
+        require.True(t, NPCIsAggressive(kabooTemplateID))
+    })
+
+    t.Run("passive monster resolves false", func(t *testing.T) {
+        require.False(t, NPCIsAggressive(goblinTemplateID))
+        require.False(t, NPCIsAggressive(keltirTemplateID))
+    })
+
+    t.Run("guard never attacks a neutral player on sight", func(t *testing.T) {
+        // The Guard branch of AttackableAI returns true only for a
+        // player with karma or an aggressive monster, so the raw
+        // isAggressive=true of the xml stays out of the map layer.
+        require.False(t, NPCIsAggressive(gilbertTemplateID))
+    })
+
+    t.Run("friendly mob never attacks a neutral player on sight", func(t *testing.T) {
+        require.False(t, NPCIsAggressive(pixyTemplateID))
+    })
+
+    t.Run("passive grand boss resolves false", func(t *testing.T) {
+        require.False(t, NPCIsAggressive(queenAntTemplateID))
     })
 
     t.Run("template id at offset returns false", func(t *testing.T) {

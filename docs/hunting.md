@@ -2077,6 +2077,15 @@ server integrity rules in AGENTS.md).
   `isAggressive` falls back to TRUE when the npc xml omits the
   attribute, so a mob like the Kaboo Orc Fighter attacks players on
   sight; the generated npc data mirrors this since the clan round.
+  The effective on-sight attack is that flag AND a monster class
+  template AND a positive effective range. `NpcTemplate` clamps the
+  xml `aggroRange` at `MaxAggroRange` 450 (NPC.ini) for the `Monster`
+  type only, so every aggressive C1 monster triggers at 450; the
+  grand bosses keep their raw 1000-2000 but all four are
+  `isAggressive=false`. Guards and friendly mobs reuse `AttackableAI`
+  but their branches answer only a player with karma (or an
+  aggressive monster), and folk never attack, so their xml
+  `isAggressive=true` is not an on-sight threat.
 - **Archer guards always retaliate, melee guards may not**: an archer
   guard in the attack intention shoots at everything within its 850+
   unit bow range (the thinkAttack doAttack branch applies no karma

@@ -33,35 +33,28 @@ func NPCLevel(templateID int32) int32 {
     return npcLevels[templateID-npcTemplateOffset]
 }
 
-// mobiusMaxAggroRange is the MaxAggroRange clamp of the Mobius C1
-// server (dist/game/config/NPC.ini, "Maximum distance mobs can get
-// aggro": L2jMobius ships 450 against the L2J default 1500). The
-// NpcTemplate constructor caps every npc's ai aggroRange at it, so
-// the xml values above it (most monsters carry 1000) never reach the
-// world: the on-sight attack check of AttackableAI
-// (isInsideRadius3D against getAggroRange) runs against the clamped
-// value. The map circles and the tooltips must draw the same number
-// the server actually acts on.
-const mobiusMaxAggroRange = 450
-
-// NPCAggroRange resolves the effective on-sight aggro range of an npc
-// by the raw NpcInfo template id: the ai aggroRange of the xml data
-// capped at the server wide MaxAggroRange clamp. It returns zero when
-// the template is unknown or passive.
+// NPCAggroRange resolves the effective aggro range the server builds
+// into the template of an npc by the raw NpcInfo template id: the xml
+// ai aggroRange capped at the deployed MaxAggroRange (NPC.ini) for the
+// Monster type only, the raw xml value for every other type. It is the
+// radius AttackableAI tests with isInsideRadius3D before it consults
+// the effective aggression flag, not a promise that the npc attacks on
+// sight. It returns zero when the template is unknown or carries no
+// range.
 func NPCAggroRange(templateID int32) int32 {
     if templateID <= npcTemplateOffset {
         return 0
     }
-    value := npcAggroRanges[templateID-npcTemplateOffset]
-    if value > mobiusMaxAggroRange {
-        return mobiusMaxAggroRange
-    }
 
-    return value
+    return npcAggroRanges[templateID-npcTemplateOffset]
 }
 
-// NPCIsAggressive resolves the ai isAggressive flag of an npc by the raw
-// NpcInfo template id: aggressive npcs attack players on sight.
+// NPCIsAggressive resolves the effective on-sight aggression of an npc
+// by the raw NpcInfo template id: a monster class template (Monster,
+// RaidBoss, GrandBoss) with a true ai isAggressive flag and a positive
+// effective aggro range attacks a neutral player on sight. Guards and
+// friendly mobs answer only players with karma, folk never attack, so
+// they resolve false even when their xml flags suggest otherwise.
 func NPCIsAggressive(templateID int32) bool {
     if templateID <= npcTemplateOffset {
         return false

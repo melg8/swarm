@@ -145,8 +145,8 @@ func TestNpcInfoCarriesSpeedAndAggro(t *testing.T) {
     require.InDelta(t, 165*1.2, obj.Speed, 0.001)
     require.False(t, obj.Aggressive)
     // The xml ai aggroRange of the keltir is 1000, but the Mobius C1
-    // NpcTemplate caps every range at MaxAggroRange 450 (NPC.ini): the
-    // snapshot carries the number the server actually attacks from.
+    // NpcTemplate caps the Monster type at MaxAggroRange 450 (NPC.ini):
+    // the snapshot carries the number the server actually attacks from.
     require.Equal(t, int32(450), obj.AggroRange)
     require.Equal(t, int32(2), obj.Level)
     //nolint:testifylint // Positive is unavailable in testify 1.4

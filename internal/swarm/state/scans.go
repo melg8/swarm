@@ -285,7 +285,8 @@ type AggroThreat struct {
     Y          float64
     Z          int32
     // AggroRange is the effective on-sight trigger radius of the mob
-    // (the xml aggroRange capped at the Mobius MaxAggroRange clamp).
+    // (the server template value: the xml aggroRange clamped at
+    // MaxAggroRange for the Monster type).
     AggroRange float64
 }
 

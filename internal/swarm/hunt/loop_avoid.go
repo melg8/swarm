@@ -9,8 +9,9 @@ package hunt
 // of the spot economy) steer clear of the aggressive mobs camped on
 // their lines. The Mobius AttackableAI attacks a player on sight when
 // the 3D distance drops inside the mob's effective aggro range (the
-// xml value clamped at the server wide MaxAggroRange, 450 on this
-// deployment) and a line of sight exists, so a walk that passes an
+// xml value clamped at the server wide MaxAggroRange, 450 for the
+// Monster type on this deployment) and a line of sight exists, so a
+// walk that passes an
 // idle aggressive mob closer than that collects a chaser - the train
 // that later forces the pile up run and the emergency relogin. The
 // steering deflects one walk segment at a time around such camps: the segment

@@ -130,11 +130,13 @@ type objectHot struct {
 // cost bandwidth only on the 300 ms snapshot polls of a watched bot,
 // not on the hunt loop ticks.
 type objectCold struct {
-    Name            string
-    Title           string
-    TemplateID      int32
-    Heading         int32
-    Count           int32
+    Name       string
+    Title      string
+    TemplateID int32
+    Heading    int32
+    Count      int32
+    // AggroRange is the effective server aggro radius of the template
+    // (npcdata.NPCAggroRange), not a promise that the npc is hostile.
     AggroRange      int32
     CollisionRadius float64
     // Sitting marks the rest state of the creature (the zZ icon of
