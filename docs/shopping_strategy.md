@@ -143,17 +143,36 @@ Supporting rules that survived the rework unchanged:
   batch recorded at the request moment (the Mobius inventory merges
   the delivery into the carried stack - the entry list never grows,
   only the count does).
-- **The top-tier slot guard**: within the weapon and shield picks the
-  guard records the best viable gain per paperdoll slot and drops
-  every candidate aspired above that record, whatever its value per
-  adena. The guard holds across the whole plan: the eroding budget of
-  the later phases must not crowd the top tier out and push a cheaper
+- **The top-tier slot guard**: `viableCandidates` runs the guard
+  before the phase ranking and drops every viable candidate that
+  another viable candidate outgains on an overlapping set of
+  paperdoll slots, whatever its value per adena - a slot ladder
+  contributes only its best viable step and the phase ranking decides
+  between the per-slot winners. Without it the cheap ladder steps win
+  the ranking: the full weapon gain over the 883 adena Short Sword
+  beats the same slot's 62k top tier by an order of magnitude, so
+  after selling the replaced weapon the plan bought the 1k
+  intermediate sword back and the one-per-slot guard blocked the
+  affordable top tier for the trip. The gain (the net paperdoll delta
+  with the family clears) is the dominance measure, so the two hand
+  versus one hand plus shield tradeoffs keep their semantics: the
+  strictly better end state dominates, an equal gain at a lower price
+  does not (the phase ranking keeps the cheaper pick). `ladderTop`
+  carries the best gain ever seen per slot, so the guard holds across
+  the whole plan, not only one walk round: the eroding budget of the
+  later phases must not crowd the top tier out and push a cheaper
   rung in - the slot stays unpurchased and waits for the next trip.
-  The floors bypass it (they deliberately buy the cheapest offers of
-  the empty families) and the wanted tail of the widget queue walks
-  without it (the unbounded budget of the tail would collapse the
-  displayed ladder of a slot to its top step and hide the milestones
-  the bot saves for).
+  The recording runs in the score descending scan order of the
+  candidates, so within one round the scan itself drops every
+  same-slot rung below the best viable tier (a lower score item
+  cannot outgain a higher score one on overlapping slots - the shared
+  displacement subtracts the same scores). A nil `ladderTop` switches
+  the guard off: the wanted tail of the widget queue walks the
+  unbounded budget, where the guard would collapse the displayed
+  ladder of a slot to its top step and hide the milestones the bot
+  saves for. The floor offers bypass it too (the jewel floor
+  deliberately buys the cheapest offers of the empty families, the
+  guard governs the upgrade phases only).
 
 **Rule 2 - buy at the town trip, sell first - and sell everything.**
 The purchases run inside the town trips the loop already makes: the
@@ -391,6 +410,30 @@ the town trip consults.
 The sell-first rule, the one town visit, the wallet reservation for
 the spellbooks and the auto equipment all carry over unchanged: the
 strategy is catalog-agnostic, the Dion round only swaps the catalog.
+
+## The candidate caches
+
+`catalogCandidates` and `cachedCheapestJewelIDs` cache their answers
+in the `candidateCache` and `jewelIDCache` maps, keyed by the profile
+name and a content hash of the catalog. The catalog and the profile
+are both static for a bot class and a region (the elven village
+merchants never change their stock, the melee fighter profile scores
+items the same way every call), so one build per pair serves the
+process lifetime: before the cache the 100 bot fleet rebuilt the same
+offers map once per bot per 5 s refresh - 17 MB of allocations over a
+3 minute fleet run.
+
+The key hashes the catalog content (the merchant template ids, the
+tax rates and the buylist ids of every shop, FNV-1a) plus the profile
+name, never a pointer: the catalog parameter travels by value, so a
+pointer key addressed the per call copy - every call missed the cache
+and stored a fresh entry (a full candidate slice) that nothing ever
+freed, the slow continuous heap growth of the long runs (about a
+megabyte per bot per minute). The hash is order sensitive, which is
+fine: the catalogs are process lifetime singletons built once
+(`townShopCatalog` and `dionShopCatalog` in the hunt package). The
+maps are never cleared; the number of distinct pairs is bounded by
+the bot classes times the regions.
 
 ## Where each piece lives
 

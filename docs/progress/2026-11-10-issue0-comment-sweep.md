@@ -644,6 +644,24 @@ corner probe is a length, not a leg at all.
   lint:new`. `burst.go` fell from 33.4 to 23.5 percent (60 comment
   lines), no block above 8 lines.
 
+### 2026-11-12 - gear/shopping_candidates.go moves the guard facts to the doc
+
+- 22 blocks compress: the 29 line `viableCandidates` header (the family
+  copy count, the 883 adena Short Sword versus the 62k top tier
+  incident, the gain dominance measure, the `ladderTop` persistence and
+  the score descending scan order), the 21 line `catalogCandidates`
+  cache header (the 17 MB fleet run, the by value pointer key and the
+  megabyte per bot per minute leak), the `walkView`, `shopStrategy` and
+  `classify` contracts, the jewel floor gate, the candidate and jewel
+  caches, the `catalogHash`, `bestPick`, `slotMarks`, `floorOffer`,
+  `aspiredAbove`, `familyCopies`, `FamilyCopiesOf` and `purchaseGain`
+  comments. The top-tier guard bullet of `docs/shopping_strategy.md`
+  gained the moved facts and a new `## The candidate caches` section
+  carries the cache history in the same commit.
+- Verified: `task fmt`, `go build ./...`, the gear tests, `task
+  lint:new`. `shopping_candidates.go` fell from 28.5 to 18.7 percent
+  (111 comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -662,8 +680,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
 `pathfind/navmesh/pocket.go`, `pathfind/capsule.go`, `hunt/loop_avoid.go`,
 `hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go`,
-`hunt/walk_params.go`, `pathfind/navmesh/smooth.go` and
-`gear/burst.go` (second passes). Next: a fresh
+`hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go` and
+`gear/shopping_candidates.go` (second passes). Next: a fresh
 `task comment:audit --top 10` pick (the `proxy/game.go` and
 `hunt/loop_state.go` entries stay untouched while their fragments are
 active); the share and the block count are re-measured at the end.
