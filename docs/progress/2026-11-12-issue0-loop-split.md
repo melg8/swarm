@@ -106,7 +106,30 @@ Verified: `go build ./...`, `task fmt` + `task fmt:check`,
 `go test ./internal/swarm/hunt/... -count=1` (97.6 s),
 `golangci-lint run ./internal/swarm/hunt/...` (0 issues).
 
+### 2026-11-12 - hunt: split the engage decision tree
+`engage` (571 lines, the only `//nolint:cyclop,funlen,gocognit,maintidx`
+of the tree) became a 21 line ordered gate chain and lost the
+suppression. The helpers, in the exact previous order: `syncLure`,
+`guardGround` (the hunting ground gate, the out-of-zone fight adoption
+and the weaponless run), `restOnLowMana`, `adoptServerTarget` (the
+async server selection, the attackable gate and the dead target loot
+switch), `answerApproachAggro` (the live kite pick, the kite-answerable
+add, the over-ceiling flee, the adopt), `switchStaleEngage` (the stuck
+timeout and skip), `respondLosingFight`, `answerBlindEngage`,
+`pickTarget` (with `restBeforePick` and `pickNearestAttacker`),
+`engageKiteTick` (the ledger, the re-click ladder, the deferred click,
+the shot and proximity steps), `fightTick` (with `walkStalledChase`)
+and `requestAttack`. The gate order, the return semantics and every
+log string are preserved. The long bug-history comments were compressed
+to the mechanism they protect (the facts stay in `docs/hunting.md`).
+One real bug was caught by the suite mid-refactor and fixed: the
+`walkStalledChase` early return had inverted the `chaseProgress`
+polarity, which the kite stall watchdog test reported. Verified: `go
+build ./...`, `task fmt` + `task fmt:check`, `go test
+./internal/swarm/hunt/... -count=1` (97.7 s), `golangci-lint run
+./internal/swarm/hunt/...` (0 issues).
+
 ## Status
 
-Commits 1-3 done. Next: the `engage` split (commit 4), full verify and
-E2E.
+Commits 1-4 done. Next: full verify (`task verify`), live E2E and the
+fragment archive.
