@@ -1690,6 +1690,8 @@ func TestLoopRestsAtTheKillSpot(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     bot.ApplyNpcInfo(state.NpcInfo{
         ObjectID: 8, TemplateID: 1000001, Attackable: true,
         X: 45200, Y: 50000, Name: "Dying Gremlin",
@@ -1717,7 +1719,7 @@ func TestLoopRestsAtTheKillSpot(t *testing.T) {
     // The kill registers, the loot phase finds nothing and the engage
     // runs into the hurt gate: no escape run from the bystander.
     for range 4 {
-        loop.lastActionAt = time.Now().Add(-2 * time.Second)
+        loop.lastActionAt = clock.Now().Add(-2 * time.Second)
         loop.tick()
     }
     require.Empty(t, game.walks,
@@ -1726,8 +1728,8 @@ func TestLoopRestsAtTheKillSpot(t *testing.T) {
 
     // The under attack window (3 s) expires: the character sits down
     // right at the kill spot.
-    time.Sleep(3*time.Second + 300*time.Millisecond)
-    loop.lastActionAt = time.Now().Add(-2 * time.Second)
+    clock.Advance(3*time.Second + 300*time.Millisecond)
+    loop.lastActionAt = clock.Now().Add(-2 * time.Second)
     loop.tick()
     require.Equal(t, 1, game.sits, "the character rests at the kill spot")
     require.Empty(t, game.walks, "the rest happens without running away")

@@ -120,7 +120,7 @@ func reproRound59Scene(t *testing.T) (*Loop, *fakeGame, *state.Bot) {
 // a fresh fight view) and keeps answering the attack attempts with
 // "Cannot see target." - the answer lands AFTER the newest chase step,
 // so the refusal is the newest fight activity of the livelock.
-func reproRound59PhantomChase(bot *state.Bot) {
+func reproRound59PhantomChase(clock *fakeClock, bot *state.Bot) {
     // The phantom chase step: the character chases the target, the
     // destination collapses onto the walker (the wall holds it), the
     // tracker still records the fresh fight activity and the fighting
@@ -134,7 +134,7 @@ func reproRound59PhantomChase(bot *state.Bot) {
     // The refusal of the armed attack: the doAttack of the chase
     // failed the line of sight check - the answer is fresher than the
     // chase step it answered.
-    time.Sleep(10 * time.Millisecond)
+    clock.Advance(10 * time.Millisecond)
     bot.ApplySystemMessage(state.SystemMessage{ID: 181})
 }
 
@@ -146,12 +146,14 @@ func reproRound59PhantomChase(bot *state.Bot) {
 // the dump signature (a character standing forever, no walk, no switch).
 func TestReproRound59PhantomChaseArmsBlindRecovery(t *testing.T) {
     loop, game, bot := reproRound59Scene(t)
+    clock := newFakeClock()
+    clock.install(loop)
     nav := &fakeNavigator{found: true, route: []pathfind.Vec3{
         {X: 35190, Y: 47230, Z: -3656},
         {X: 35150, Y: 47190, Z: -3656},
     }}
     loop.SetNavigator(nav)
-    reproRound59PhantomChase(bot)
+    reproRound59PhantomChase(clock, bot)
 
     loop.tick()
 
@@ -177,8 +179,10 @@ func TestReproRound59PhantomChaseArmsBlindRecovery(t *testing.T) {
 // for over a minute; the fixed loop is off it inside two attempts.
 func TestReproRound59PhantomChaseSwitchesTarget(t *testing.T) {
     loop, game, bot := reproRound59Scene(t)
+    clock := newFakeClock()
+    clock.install(loop)
     loop.SetNavigator(&fakeNavigator{found: true})
-    reproRound59PhantomChase(bot)
+    reproRound59PhantomChase(clock, bot)
 
     // Attempt one: the recovery arms and walks.
     loop.tick()
@@ -195,8 +199,8 @@ func TestReproRound59PhantomChaseSwitchesTarget(t *testing.T) {
     // of the setup goes stale (the live server cycle: the chase of the
     // refused attack disarms itself, the view ages out, the loop
     // re-requests - and the answer is the same refusal again).
-    waitPastFightingFresh()
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    clock.Advance(3*time.Second + 150*time.Millisecond)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     loop.tick()
     require.Len(t, game.forces, 1,
         "the handoff re-requests the attack from the vantage point")
@@ -214,8 +218,8 @@ func TestReproRound59PhantomChaseSwitchesTarget(t *testing.T) {
 
     // The third refusal meets the spent budget: the target is dropped
     // and skipped instead of a third walk around the same obstacle.
-    waitPastFightingFresh()
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    clock.Advance(3*time.Second + 150*time.Millisecond)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     loop.tick()
     require.Len(t, game.forces, 2)
     bot.ApplySystemMessage(state.SystemMessage{ID: 181})
@@ -223,24 +227,15 @@ func TestReproRound59PhantomChaseSwitchesTarget(t *testing.T) {
 
     require.Zero(t, loop.target,
         "the persisting blind engage ends in the target switch")
-    require.True(t, loop.targetSkipped(reproRound59Target, time.Now()),
+    require.True(t, loop.targetSkipped(reproRound59Target, clock.Now()),
         "the obstructed Kaboo is held out of the search")
     require.Zero(t, loop.losAt, "the recovery bookkeeping clears")
 
     // The next pick takes the Spore Fungus of the dump scene.
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     loop.tick()
     require.Equal(t, reproRound59Spare, loop.target,
         "the hunt continues on the spare mob of the dump")
-}
-
-// waitPastFightingFresh sleeps past the tracker's fighting fresh
-// window: the phantom chase step of the setup must age out before the
-// loop re-requests the attack (the fresh chase view holds the
-// re-request back exactly like the live disarm gap of the server
-// cycle).
-func waitPastFightingFresh() {
-    time.Sleep(3*time.Second + 150*time.Millisecond)
 }
 
 // TestReproRound59EngageClockHoldsPastRefusal pins the clock half of
@@ -250,10 +245,12 @@ func waitPastFightingFresh() {
 // stuck timeout and the detection delay measure the true engage age.
 func TestReproRound59EngageClockHoldsPastRefusal(t *testing.T) {
     loop, _, bot := reproRound59Scene(t)
+    clock := newFakeClock()
+    clock.install(loop)
     // The detection delay still holds (the engage is one second old),
     // so the tick reaches the fighting branch of the phantom chase.
-    loop.engageAt = time.Now().Add(-1 * time.Second)
-    reproRound59PhantomChase(bot)
+    loop.engageAt = clock.Now().Add(-1 * time.Second)
+    reproRound59PhantomChase(clock, bot)
     before := loop.engageAt
 
     loop.tick()
@@ -270,8 +267,8 @@ func TestReproRound59EngageClockHoldsPastRefusal(t *testing.T) {
         TargetX: reproRound59TargetX, TargetY: reproRound59TargetY,
         TargetZ: reproRound59Z,
     })
-    loop.lastActionAt = time.Now().Add(-time.Minute)
-    anchored := time.Now()
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
+    anchored := clock.Now()
     loop.tick()
 
     require.False(t, loop.engageAt.Before(anchored),

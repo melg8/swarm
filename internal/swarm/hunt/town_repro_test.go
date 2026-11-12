@@ -366,8 +366,10 @@ func TestReproTownTripFromTheUserStuckSpot(t *testing.T) {
     moveSelfTo(bot, reproStuckX, reproStuckY, reproStuckZ)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     loop.SetNavigator(nav)
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     fillInventory(bot)
     sim := &reproServer{nav: engine, minZ: reproStuckZ}
 
@@ -394,15 +396,15 @@ func TestReproTownTripFromTheUserStuckSpot(t *testing.T) {
     // Walk the plan under the simulated server: the follower paces a
     // walk request every two seconds, the sim advances the character
     // along each requested segment.
-    deadline := time.Now().Add(40 * time.Second)
-    for time.Now().Before(deadline) {
+    deadline := clock.Now().Add(40 * time.Second)
+    for clock.Now().Before(deadline) {
         loop.tick()
         sim.consume(game)
         sim.advance(bot)
         if loop.phase == phaseTownSell {
             break
         }
-        time.Sleep(100 * time.Millisecond)
+        clock.Advance(100 * time.Millisecond)
     }
     require.Equal(t, phaseTownSell, loop.phase,
         "the walk must reach the shop ring from the stuck spot")
@@ -425,8 +427,8 @@ func TestReproTownTripFromTheUserStuckSpot(t *testing.T) {
         X:          reproUnorenX, Y: reproUnorenY, Z: reproUnorenZ,
         Name: "Unoren",
     })
-    sellDeadline := time.Now().Add(15 * time.Second)
-    for len(game.sells) == 0 && time.Now().Before(sellDeadline) {
+    sellDeadline := clock.Now().Add(15 * time.Second)
+    for len(game.sells) == 0 && clock.Now().Before(sellDeadline) {
         loop.tick()
         for _, forced := range game.forces {
             if forced == reproUnorenID {
@@ -434,7 +436,7 @@ func TestReproTownTripFromTheUserStuckSpot(t *testing.T) {
                 bot.ApplySelfTarget(reproUnorenID)
             }
         }
-        time.Sleep(250 * time.Millisecond)
+        clock.Advance(250 * time.Millisecond)
     }
     require.NotEmpty(t, game.sells,
         "the sale must run at the reached merchant")

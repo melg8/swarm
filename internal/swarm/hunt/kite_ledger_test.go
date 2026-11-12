@@ -29,20 +29,22 @@ import (
 // to shrink, and a fresh hold verdict names the pocket answer.
 func TestKiteLedgerKindNamesTheStandingReason(t *testing.T) {
     bot, _, loop := kiteBowBot(t, 45200)
+    clock := newFakeClock()
+    clock.install(loop)
     // The own shot is fresh (the scene's swing broadcast), the
     // character never moved: the windup bucket.
-    require.Equal(t, kiteMotionWindup, loop.kiteLedgerKind(time.Now()),
+    require.Equal(t, kiteMotionWindup, loop.kiteLedgerKind(clock.Now()),
         "a fresh own shot with no movement books the windup")
 
     // The windup lapses with no hold verdict: the idle bucket.
-    time.Sleep(1800 * time.Millisecond)
-    require.Equal(t, kiteMotionIdle, loop.kiteLedgerKind(time.Now()),
+    clock.Advance(1800 * time.Millisecond)
+    require.Equal(t, kiteMotionIdle, loop.kiteLedgerKind(clock.Now()),
         "a standstill past the windup with no verdict books the idle")
 
     // A fresh hold verdict: the hold bucket.
     loop.kiteHeldFor = 7
-    loop.kiteHeldAt = time.Now()
-    require.Equal(t, kiteMotionHold, loop.kiteLedgerKind(time.Now()),
+    loop.kiteHeldAt = clock.Now()
+    require.Equal(t, kiteMotionHold, loop.kiteLedgerKind(clock.Now()),
         "a fresh hold verdict books the hold")
 
     // A walking character is MOVING whatever walk it runs (the
@@ -53,7 +55,7 @@ func TestKiteLedgerKindNamesTheStandingReason(t *testing.T) {
         DestX: 45100, DestY: 50000, DestZ: -3500,
     })
     require.Equal(t, kiteMotionMoving,
-        loop.kiteLedgerKind(time.Now()),
+        loop.kiteLedgerKind(clock.Now()),
         "a walking character books the moving bucket")
 }
 

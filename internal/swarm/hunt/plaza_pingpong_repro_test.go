@@ -155,7 +155,7 @@ func (s *plazaServer) consumeAt(
 // (the npc rung search with its close radius).
 func plazaPingPongLoop(
     t *testing.T,
-) (*Loop, *fakeGame, *state.Bot, *plazaServer, *bytes.Buffer) {
+) (*Loop, *fakeGame, *state.Bot, *plazaServer, *bytes.Buffer, *fakeClock) {
     t.Helper()
     engine := reproEngine(t)
     nav := NewNavmeshNavigator(engine, spawnDumpMesh(t))
@@ -163,15 +163,17 @@ func plazaPingPongLoop(
     moveSelfTo(bot, plazaPingPongX, plazaPingPongY, plazaPingPongZ)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     loop.SetNavigator(nav)
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     sink := &bytes.Buffer{}
     loop.SetLogger(log.New(
         io.MultiWriter(sink, eventMirror{bot: bot}), "", 0))
     sim := &plazaServer{engine: engine}
 
     loop.phase = phaseTownWalk
-    loop.tripStart = time.Now()
+    loop.tripStart = clock.Now()
     loop.tripStops = []tripStop{{
         merchant: townNpc{
             TemplateID: 7150, Name: "Herbiel",
@@ -184,7 +186,7 @@ func plazaPingPongLoop(
         Z: float64(herbielStandZ),
     }), "the Herbiel npc segment must plan on the real pack")
 
-    return loop, game, bot, sim, sink
+    return loop, game, bot, sim, sink, clock
 }
 
 // TestReproPlazaPingPongWalksToHerbiel pins the whole report contract:
@@ -197,15 +199,15 @@ func plazaPingPongLoop(
 // search of the session into "no path at all").
 func TestReproPlazaPingPongWalksToHerbiel(t *testing.T) {
     disablePace(t)
-    loop, game, bot, sim, sink := plazaPingPongLoop(t)
+    loop, game, bot, sim, sink, clock := plazaPingPongLoop(t)
 
     var backClicks int
     walkCount := 0
     leftPlaza := false
-    deadline := time.Now().Add(180 * time.Second)
-    for time.Now().Before(deadline) {
+    deadline := clock.Now().Add(180 * time.Second)
+    for clock.Now().Before(deadline) {
         loop.tick()
-        sim.consumeAt(game, bot, time.Now())
+        sim.consumeAt(game, bot, clock.Now())
         selfX, selfY, _, ok := bot.SelfPosition()
         if !ok {
             continue
@@ -248,7 +250,7 @@ func TestReproPlazaPingPongWalksToHerbiel(t *testing.T) {
 
             break
         }
-        time.Sleep(10 * time.Millisecond)
+        clock.Advance(10 * time.Millisecond)
     }
 
     selfX, selfY, _, ok := bot.SelfPosition()
@@ -284,7 +286,7 @@ func TestReproPlazaPingPongWalksToHerbiel(t *testing.T) {
 // it (the server walked the click on every hop of the dump).
 func TestSegmentAdvanceClearFollowsTheClickTransport(t *testing.T) {
     disablePace(t)
-    loop, _, bot, _, _ := plazaPingPongLoop(t)
+    loop, _, bot, _, _, _ := plazaPingPongLoop(t)
 
     selfX, selfY, selfZ, ok := bot.SelfPosition()
     require.True(t, ok)

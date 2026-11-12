@@ -166,6 +166,8 @@ func TestClosedDistanceBoundsTheChaserLag(t *testing.T) {
 // actual).
 func TestKiteThreatUsesTheClosedDistance(t *testing.T) {
     bot, _, loop := kiteBowBot(t, 45512)
+    clock := newFakeClock()
+    clock.install(loop)
     // The chaser runs: fast enough to cross the 32 unit gap the raw
     // reading hides inside a few milliseconds of segment age.
     bot.ApplyNpcInfo(state.NpcInfo{
@@ -177,10 +179,10 @@ func TestKiteThreatUsesTheClosedDistance(t *testing.T) {
         X: 45512, Y: 50000, TargetX: 45000, TargetY: 50000,
         TargetZ: -3500,
     })
-    time.Sleep(150 * time.Millisecond)
+    clock.Advance(150 * time.Millisecond)
 
     id, dist, ok := loop.kiteThreat(
-        time.Now(), 45000, 50000, -3500)
+        clock.Now(), 45000, 50000, -3500)
     require.True(t, ok)
     require.Equal(t, int32(7), id)
     require.Less(t, dist, 512.0,
@@ -193,7 +195,7 @@ func TestKiteThreatUsesTheClosedDistance(t *testing.T) {
         ObjectID: 7, TemplateID: 1000001, Attackable: true,
         X: 45512, Y: 50000, Name: "Keltir",
     })
-    _, dist, ok = loop.kiteThreat(time.Now(), 45000, 50000, -3500)
+    _, dist, ok = loop.kiteThreat(clock.Now(), 45000, 50000, -3500)
     require.True(t, ok)
     require.InDelta(t, 512.0, dist, 0.001,
         "a standing chaser keeps the raw gap")

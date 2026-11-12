@@ -254,6 +254,8 @@ func TestEngageStuckTimeoutFiresThroughStaleAttackStance(t *testing.T) {
     spawnCloseMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     // The chase step armed the stance (FightingTargetID, auto attack
     // flag, one fresh combat mark), the swing behind the column never
     // landed and no AutoAttackStop ever arrives.
@@ -264,18 +266,18 @@ func TestEngageStuckTimeoutFiresThroughStaleAttackStance(t *testing.T) {
     bot.ApplyAutoAttackStart(100)
     bot.ApplySelfTarget(7)
     loop.target = 7
-    loop.lastActionAt = time.Now().Add(-time.Minute)
-    loop.engageAt = time.Now().Add(-(engageStuckTimeout + time.Second))
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
+    loop.engageAt = clock.Now().Add(-(engageStuckTimeout + time.Second))
 
     // The combat mark went stale: three seconds (the state tracker's
     // fightingFreshWindow) without a swing or a chase step while the
     // stance flags linger.
-    time.Sleep(3*time.Second + 150*time.Millisecond)
+    clock.Advance(3*time.Second + 150*time.Millisecond)
     loop.tick()
 
     require.Zero(t, loop.target,
         "the stale stance must not hold the stuck timeout")
-    require.True(t, loop.targetSkipped(7, time.Now()))
+    require.True(t, loop.targetSkipped(7, clock.Now()))
 }
 
 // TestEngageStuckTimeoutHeldDuringBlindRecovery pins the timeout hold:
@@ -318,14 +320,16 @@ func TestEngageBlindDetectionIgnoresStaleRefusal(t *testing.T) {
     spawnCloseMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     // The refusal of the previous target landed, then the character
     // re-engaged: the fresh attempt started after the answer.
     bot.ApplySelfTarget(7)
     bot.ApplySystemMessage(state.SystemMessage{ID: 181})
-    time.Sleep(2100 * time.Millisecond)
+    clock.Advance(2100 * time.Millisecond)
     loop.target = 7
-    loop.lastActionAt = time.Now().Add(-time.Minute)
-    loop.engageAt = time.Now().Add(-2050 * time.Millisecond)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
+    loop.engageAt = clock.Now().Add(-2050 * time.Millisecond)
 
     loop.tick()
 

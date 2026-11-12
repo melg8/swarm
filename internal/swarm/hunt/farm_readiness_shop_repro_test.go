@@ -73,8 +73,10 @@ func TestReproFarmReadinessShopRound(t *testing.T) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     loop.SetNavigator(nav)
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     sim := &reproServer{nav: engine, minZ: reproStuckZ}
 
     // The knownlist broadcasts of the shop quarter and the teacher:
@@ -102,10 +104,10 @@ func TestReproFarmReadinessShopRound(t *testing.T) {
         })
     }
 
-    deadline := time.Now().Add(90 * time.Second)
+    deadline := clock.Now().Add(90 * time.Second)
     phase := phaseEngage
     walksSeen := 0
-    for time.Now().Before(deadline) {
+    for clock.Now().Before(deadline) {
         loop.tick()
         sim.consume(game)
         sim.advance(bot)
@@ -136,7 +138,7 @@ func TestReproFarmReadinessShopRound(t *testing.T) {
         if len(game.buys) > 0 {
             break
         }
-        time.Sleep(100 * time.Millisecond)
+        clock.Advance(100 * time.Millisecond)
     }
 
     selfX, selfY, selfZ, ok := bot.SelfPosition()

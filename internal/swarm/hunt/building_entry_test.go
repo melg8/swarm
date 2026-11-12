@@ -63,10 +63,10 @@ func aisleWalledServer(engine *pathfind.Engine) *reproServer {
 
 // armTeachStop arms the learn segment of the dump: the character walks to
 // the teacher Ellenia inside the trainer hall.
-func armTeachStop(t *testing.T, loop *Loop) {
+func armTeachStop(t *testing.T, loop *Loop, clock *fakeClock) {
     t.Helper()
     loop.phase = phaseTownWalk
-    loop.tripStart = time.Now()
+    loop.tripStart = clock.Now()
     loop.tripStops = []tripStop{{
         merchant: townNpc{
             TemplateID: 7156, Name: "Ellenia",
@@ -116,14 +116,16 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
     moveSelfTo(bot, aisleEntranceX, aisleEntranceY, aisleEntranceZ)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     loop.SetNavigator(nav)
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     // The farm spot the trip return plans back to. Without it the
     // zero spot sends the return segment dry search across the whole world
     // pack - seconds of A* inside one tick (the production farm spot
     // always sits inside the hunting zone, the search stays local).
     loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
-    armTeachStop(t, loop)
+    armTeachStop(t, loop, clock)
     sim := &reproServer{nav: engine, minZ: aisleEntranceZ}
     spawnEllenia(bot)
     loop.teacherID = elleniaObjectID
@@ -137,7 +139,7 @@ func TestBuildingEntryWalksFromTheAisleEntrance(t *testing.T) {
         last.X-float64(elleniaX), last.Y-float64(elleniaY)), 200.0,
         "the route ends inside the teacher approach ring")
 
-    walkToTheTalk(t, loop, game, bot, sim)
+    walkToTheTalk(t, loop, game, bot, sim, clock)
     require.Zero(t, loop.rePaths,
         "the agreeing server walks the plan without any recovery")
 }
@@ -162,14 +164,16 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
     moveSelfTo(bot, aisleEntranceX, aisleEntranceY, aisleEntranceZ)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     loop.SetNavigator(nav)
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     // The farm spot the trip return plans back to. Without it the
     // zero spot sends the return segment dry search across the whole world
     // pack - seconds of A* inside one tick (the production farm spot
     // always sits inside the hunting zone, the search stays local).
     loop.farmX, loop.farmY, loop.farmZ = elleniaX, elleniaY, elleniaZ
-    armTeachStop(t, loop)
+    armTeachStop(t, loop, clock)
     sim := aisleWalledServer(engine)
     spawnEllenia(bot)
     loop.teacherID = elleniaObjectID
@@ -180,13 +184,13 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
     // seconds instead of the 15 s real window) and the frozen abort
     // hands the walk to the cursor key escape.
     drive := newWalkDrive()
-    deadline := time.Now().Add(60 * time.Second)
-    for time.Now().Before(deadline) {
+    deadline := clock.Now().Add(60 * time.Second)
+    for clock.Now().Before(deadline) {
         drive.step(loop, game, bot, sim)
         if loop.cursorEscape.armed {
             break
         }
-        time.Sleep(5 * time.Millisecond)
+        clock.Advance(5 * time.Millisecond)
     }
     require.True(t, loop.cursorEscape.armed,
         "the walled aisle must freeze the plan and arm the cursor "+
@@ -208,8 +212,8 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
     // the same expiry branch the real 45 s wait would take, without
     // the wait itself (the production semantics of the branch stay
     // pinned by npc_approach_test.go).
-    loop.teacherWalkUntil = time.Now().Add(-time.Second)
-    walkToTheTalkMax(t, loop, game, bot, sim, npcInteractionDist)
+    loop.teacherWalkUntil = clock.Now().Add(-time.Second)
+    walkToTheTalkMax(t, loop, game, bot, sim, clock, npcInteractionDist)
 }
 
 // walkToTheTalk drives the loop and the simulated server until the
@@ -218,9 +222,11 @@ func TestBuildingEntryEscapesTheWalledAisle(t *testing.T) {
 // approach radius the geodata segment ends on) and the talk click fired.
 func walkToTheTalk(
     t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
+    clock *fakeClock,
 ) {
     t.Helper()
-    walkToTheTalkMax(t, loop, game, bot, sim, npcApproachOffset+hopCoincideDist)
+    walkToTheTalkMax(t, loop, game, bot, sim, clock,
+        npcApproachOffset+hopCoincideDist)
 }
 
 // walkToTheTalkMax is walkToTheTalk with the accepted talking
@@ -229,17 +235,17 @@ func walkToTheTalk(
 // server interaction distance after the approach window).
 func walkToTheTalkMax(
     t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot, sim *reproServer,
-    maxDist2D float64,
+    clock *fakeClock, maxDist2D float64,
 ) {
     t.Helper()
     drive := newWalkDrive()
-    deadline := time.Now().Add(120 * time.Second)
-    for time.Now().Before(deadline) {
+    deadline := clock.Now().Add(120 * time.Second)
+    for clock.Now().Before(deadline) {
         drive.step(loop, game, bot, sim)
         if containsClick(game.clicks, elleniaObjectID) {
             break
         }
-        time.Sleep(5 * time.Millisecond)
+        clock.Advance(5 * time.Millisecond)
     }
     require.True(t, containsClick(game.clicks, elleniaObjectID),
         "the teach stop must click the teacher npc")

@@ -161,15 +161,17 @@ func TestTeacherWalkRecoversFromTheDumpStuckSpot(t *testing.T) {
     moveSelfTo(bot, 46152, 51656, -2808)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     loop.SetNavigator(nav)
-    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
     sim := &reproServer{nav: engine, minZ: -2808}
 
     // The dump state: the teach stop is current, the teacher segment
     // planned from the standing position (the re-planned corner
     // route, exactly what the stuck re-path machinery produces).
     loop.phase = phaseTownWalk
-    loop.tripStart = time.Now()
+    loop.tripStart = clock.Now()
     loop.tripStops = []tripStop{{
         merchant: townNpc{
             TemplateID: 7155, Name: "Ellenia",
@@ -189,15 +191,15 @@ func TestTeacherWalkRecoversFromTheDumpStuckSpot(t *testing.T) {
     require.Equal(t, [3]int32{46152, 51640, -2808}, game.walks[0],
         "the recovery click must go to the ramp foot waypoint")
 
-    deadline := time.Now().Add(60 * time.Second)
-    for time.Now().Before(deadline) {
+    deadline := clock.Now().Add(60 * time.Second)
+    for clock.Now().Before(deadline) {
         loop.tick()
         sim.consume(game)
         sim.advance(bot)
         if loop.phase != phaseTownWalk {
             break
         }
-        time.Sleep(100 * time.Millisecond)
+        clock.Advance(100 * time.Millisecond)
     }
     require.Equal(t, phaseTownSell, loop.phase,
         "the teacher segment must complete into the stop phase, no abort")

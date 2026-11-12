@@ -364,6 +364,8 @@ func TestUserAttackReRequestsStaleEngagement(t *testing.T) {
     })
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
 
     pushCommand(bot, state.Command{Kind: state.CommandAttack, ObjectID: 7})
     loop.tick()
@@ -382,19 +384,16 @@ func TestUserAttackReRequestsStaleEngagement(t *testing.T) {
 
     // The fight stops without the server clearing anything: the swings
     // stop landing and the engagement goes stale while the loose combat
-    // window (10 seconds) still claims the fight is running. The poll
-    // self calibrates on the public views instead of pinning the exact
-    // fresh window constant.
-    deadline := time.Now().Add(6 * time.Second)
-    for bot.SelfFighting(7) && time.Now().Before(deadline) {
-        time.Sleep(100 * time.Millisecond)
-    }
+    // window (10 seconds) still claims the fight is running. The
+    // advance self calibrates on the public views instead of pinning
+    // the exact fresh window constant.
+    clock.Advance(6 * time.Second)
     require.False(t, bot.SelfFighting(7),
         "the fight must go stale without swings")
     require.True(t, bot.SelfEngaged(7),
         "the loose combat window must still claim the fight")
 
-    loop.userMoveAt = time.Now().Add(-2 * time.Second)
+    loop.userMoveAt = clock.Now().Add(-2 * time.Second)
     loop.tick()
 
     require.Equal(t, []int32{7, 7}, game.forces,
@@ -814,6 +813,8 @@ func TestUserAttackWalksStalledChase(t *testing.T) {
     spawnMob(bot)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
 
     pushCommand(bot, state.Command{Kind: state.CommandAttack, ObjectID: 7})
     loop.tick()
@@ -838,12 +839,8 @@ func TestUserAttackWalksStalledChase(t *testing.T) {
     loop.tick()
     require.False(t, loop.userDistAt.IsZero(),
         "the first sample must record the chase distance")
-    deadline := time.Now().Add(6 * time.Second)
-    for time.Since(loop.userDistAt) < chaseProgressWindow &&
-        time.Now().Before(deadline) {
-        time.Sleep(100 * time.Millisecond)
-    }
-    loop.userMoveAt = time.Now().Add(-2 * selectPeriod)
+    clock.Advance(chaseProgressWindow + 50*time.Millisecond)
+    loop.userMoveAt = clock.Now().Add(-2 * selectPeriod)
     loop.tick()
 
     require.Empty(t, game.forces[1:],

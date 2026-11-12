@@ -304,6 +304,8 @@ func TestInventoryResendOutlivesTheAttackDeferral(t *testing.T) {
     bot := newTestBot()
     game := &fakeGame{}
     loop := NewLoop(game, bot)
+    clock := newFakeClock()
+    clock.install(loop)
     bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 555, ItemID: shortSwordItemID, Count: 1},
         {ObjectID: 556, ItemID: 23, Count: 1},
@@ -318,7 +320,7 @@ func TestInventoryResendOutlivesTheAttackDeferral(t *testing.T) {
     // 700 ms past the click - the OLD expiry line, deep inside the
     // server's attack-window deferral: the same item is STILL
     // gated...
-    time.Sleep(700 * time.Millisecond)
+    clock.Advance(700 * time.Millisecond)
     require.False(t, loop.inventoryItemAllowed(marked, nil),
         "the same item stays gated through the attack deferral")
 
@@ -330,7 +332,7 @@ func TestInventoryResendOutlivesTheAttackDeferral(t *testing.T) {
 
     // The deferral outlived: past the 4 s same-item window the
     // refused request finally retries.
-    time.Sleep(3400 * time.Millisecond)
+    clock.Advance(3400 * time.Millisecond)
     require.True(t, loop.inventoryItemAllowed(marked, nil),
         "the same-item guard lapses at the resend timeout")
 }

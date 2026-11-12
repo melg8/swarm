@@ -171,6 +171,8 @@ func TestKiteEncircledTrainBreaksThroughTheGap(t *testing.T) {
 // walk drags the archer INTO the melee range).
 func TestKiteCorneredHoldKeepsShooting(t *testing.T) {
     _, game, loop := kiteEdgeBot(t)
+    clock := newFakeClock()
+    clock.install(loop)
     // The pocket is SEALED: the server-side click validation refuses
     // every straight rung, so the away hemisphere is a wall the walk
     // cannot cross (the live contract is the server answer, not the
@@ -198,8 +200,8 @@ func TestKiteCorneredHoldKeepsShooting(t *testing.T) {
     // swing freshness only in the dump sense - the honest timeline
     // of a standing fight between swings): the ordinary re-request
     // re-arms the attack, the target stays, nothing walks.
-    time.Sleep(3200 * time.Millisecond)
-    loop.lastActionAt = time.Now().Add(-2 * time.Second)
+    clock.Advance(3200 * time.Millisecond)
+    loop.lastActionAt = clock.Now().Add(-2 * time.Second)
     loop.tick()
     require.Equal(t, int32(7), loop.target,
         "the cornered kite never switches its target away")
