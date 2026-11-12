@@ -28,6 +28,9 @@ type Loop struct {
     journal    *session.Journal
     phase      phase
     autonomous bool
+    // nowFn is the time source of the decision logic (see clock.go):
+    // nil reads the system clock, the tests inject their own.
+    nowFn func() time.Time
     combatState
     lootState
     restState

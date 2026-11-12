@@ -27,6 +27,10 @@ type Bot struct {
     // them out of the fleet bot list. Set once at construction;
     // the sidebar reads it through Info().
     kind string
+    // nowFn is the time source of the decision logic (see clock.go):
+    // nil reads the system clock, the hunt loop and the tests inject
+    // their own.
+    nowFn func() time.Time
     // phaseAt records when the phase last changed: the
     // diagnostics report the age of the current phase (a bot
     // stuck in one phase for minutes is the top stuck
