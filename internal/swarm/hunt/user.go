@@ -15,11 +15,10 @@ import (
 )
 
 // Manual command handling of the hunt loop: the web UI queues commands
-// on the bot tracker (state.Bot.PushCommand) and the loop turns them
-// into world actions. The one shot inventory commands (useItem, drop)
-// execute immediately, the movement commands (move, attack, pickup)
-// switch the loop into the phaseUser manual mode that overrides the
-// autonomous hunting until the action completes or times out.
+// on the tracker and the loop turns them into world actions. The one
+// shot inventory commands execute immediately, the movement commands
+// switch into the phaseUser manual mode until the action completes or
+// times out.
 
 // Timing and threshold constants of the manual mode.
 const (
@@ -27,11 +26,9 @@ const (
     // as arrived (the server stops creatures a collision radius short
     // of the destination anyway).
     userArriveRadius = 60.0
-    // userMoveTimeout bounds one manual walk with no planned route:
-    // the direct server routed click and the short in-town
-    // destinations return control to the autonomous hunt when the
-    // move never arrives (blocked, too far, interrupted). A planned
-    // mesh route carries its own priced budget (see userMoveBudget).
+    // userMoveTimeout bounds one manual walk without a planned route;
+    // a planned mesh route carries its own priced budget
+    // (userMoveBudget).
     userMoveTimeout = 90 * time.Second
     // userMoveTimeoutMax caps the manual walk budget of a long
     // planned route: a cross-map click is valid, an endless walk is
@@ -43,49 +40,29 @@ const (
     // userAttackTimeout bounds a manual attack that never starts the
     // fight (an unreachable or protected target).
     userAttackTimeout = 30 * time.Second
-    // userApproachRadius is the geodata search goal of a long manual
-    // move: the walk ends within this 3D distance of the clicked point,
-    // so a click onto a shop interior cell or a walled structure still
-    // lands on the reachable deck around it instead of routing through
-    // the water below.
+    // userApproachRadius is the search goal of a long manual move: the
+    // walk ends within this 3D distance of the clicked point.
     userApproachRadius = 150.0
     // inventoryConfirmTimeout bounds how long one inventory action
-    // blocks a DIFFERENT item whose slots it writes: the gate
-    // normally releases as soon as the tracker observed the effect
-    // of the previous action (the equipped flag flipped, the count
-    // changed, the item vanished), so a swap pair continues at the
-    // speed the server actually processes it; the timeout only
-    // rescues a refused request from blocking the queue. The UseItem
-    // flood protector of this server build is disabled
-    // (FloodProtectorUseItemInterval = 0, retail matching), so once
-    // the packet race is serialized nothing on the server side rate
-    // limits the pair.
+    // blocks a DIFFERENT item: the gate releases as soon as the
+    // tracker sees the effect, the timeout only rescues a refused
+    // request from blocking the queue. The UseItem flood protector of
+    // this server build is disabled (FloodProtectorUseItemInterval =
+    // 0).
     inventoryConfirmTimeout = 600 * time.Millisecond
     // inventoryResendTimeout bounds how long the SAME item stays
-    // gated against a re-send (issue #70, the fleet dress audit):
-    // the Mobius UseItem handler DEFERS an equip that lands inside
-    // the attack window to the attack end (UseItem.java schedules
-    // useEquippableItem at attackEndTime - the ~1.5 s bow windup,
-    // the ~3 s cycle of the measured kite timing findings), so a
-    // fresh bot attacked mid-dress holds its confirmation for up to
-    // a whole cycle. The old shared 600 ms expiry re-sent the item
-    // INTO that deferral, and the second packet (UseItem is a
-    // toggle) unequipped the piece the deferred first one had just
-    // placed - the equip/unequip toggle war the acceptance fleet
-    // measured as the "super slow" dress (a stretched quiver leaves
-    // the bow unable to shoot at all). The bound outlives one full
-    // bow cycle plus the tick cadence; a genuinely refused equip
-    // retries after it, bounded and rare.
+    // gated against a re-send: the Mobius UseItem handler defers an
+    // equip that lands inside the attack window to the attack end (the
+    // ~1.5 s bow windup, ~3 s cycle), so the bound outlives one full
+    // bow cycle plus the tick cadence. A shorter bound re-sent the
+    // toggle into the deferral and unequipped the piece again.
     inventoryResendTimeout = 4 * time.Second
 )
 
-// consumeUserCommands drains the command queue of the bot and applies
-// every entry. One shot inventory commands execute right away (gated
-// on the server confirmation of the previous one, see
-// gateInventoryCommand), the movement commands (move, attack,
-// pickup) reprogram the manual phase (the newest command wins).
-// Deferred commands retry first so the gate never reorders a swap
-// pair.
+// consumeUserCommands drains the command queue of the bot: the
+// inventory commands execute right away (gated on the previous
+// confirmation), the movement commands reprogram the manual phase,
+// the newest wins.
 func (l *Loop) consumeUserCommands() {
     l.flushDeferredCommands()
     for {
@@ -117,17 +94,12 @@ func (l *Loop) flushDeferredCommands() {
     l.userDeferred = kept
 }
 
-// gateInventoryCommand defers one command when it is an inventory
-// action that would race an in flight one on the server: the Mobius
-// packet executor runs every client packet as its own thread pool
-// task, so two requests racing on the same item or the same paperdoll
-// slots can interleave their reads and writes and cancel each other.
-// The gate holds the newcomer until the tracker observed the effect
-// of the racing action (or its confirmation window expired), so the
-// pair continues as fast as the server actually processes it - not
-// on a fixed pause. The deferred list preserves the pair order of a
-// swap (the older command was already sent, this one waits for its
-// server game tick).
+// gateInventoryCommand defers a command that would race an in-flight
+// inventory action on the server: the Mobius executor runs every
+// client packet on its own task, so two writes on the same item or
+// paperdoll slots can interleave and cancel each other. The gate
+// holds the newcomer until the tracker sees the effect, preserving
+// the pair order of a swap.
 func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
     switch cmd.Kind {
     case state.CommandUseItem, state.CommandDrop, state.CommandDestroy:
@@ -145,11 +117,8 @@ func (l *Loop) gateInventoryCommand(cmd state.Command) bool {
     return true
 }
 
-// pendingInventory is one in flight inventory action waiting for its
-// server confirmation: the item state as it was when the request left
-// and the paperdoll slots the server write set of the request touches
-// (the equip landing plus the pieces it displaces, see
-// gear.ServerWriteSlots).
+// pendingInventory is one in-flight inventory action: the item state
+// at the request and the paperdoll slots its write set touches.
 type pendingInventory struct {
     equip bool
     count int32
@@ -157,15 +126,9 @@ type pendingInventory struct {
     slots []gear.Slot
 }
 
-// inventoryItemAllowed reports whether a new inventory action on the
-// item may go out: no in flight action exists for the same item (a
-// second request would toggle the first one's effect back) and no in
-// flight action writes a paperdoll slot the new request touches (the
-// concurrent packet tasks of the Mobius executor would race on the
-// slot). The confirmed and expired pendings prune on the check: the
-// confirmation releases the item at the speed the server actually
-// applies the flips, the timeout only rescues a refused request from
-// blocking the queue forever.
+// inventoryItemAllowed reports whether a new action on the item may
+// go out: no in-flight action on the same item and none writing a
+// paperdoll slot the new request touches.
 func (l *Loop) inventoryItemAllowed(objectID int32, slots []gear.Slot) bool {
     now := l.now()
     for pendingID, pending := range l.pendingActions {
@@ -200,12 +163,9 @@ func (l *Loop) inventoryItemAllowed(objectID int32, slots []gear.Slot) bool {
     return true
 }
 
-// prunePendingActions drops the in flight actions the tracker already
-// confirmed or whose re-send window expired: the map holds only the
-// requests that still gate the new ones. The bound is the SAME-ITEM
-// re-send window (inventoryResendTimeout) - the map entry IS the
-// same-item guard, a shorter prune would re-open the toggle the
-// guard exists to close.
+// prunePendingActions drops the in-flight actions the tracker
+// confirmed or whose re-send window expired; the bound is the
+// inventoryResendTimeout same-item window.
 func (l *Loop) prunePendingActions(now time.Time) {
     for pendingID, pending := range l.pendingActions {
         if l.pendingInventoryConfirmed(pendingID, pending) ||
@@ -268,12 +228,9 @@ func (l *Loop) userSay(cmd state.Command) {
     }
 }
 
-// markInventoryAction records one in flight inventory action: the
-// item state as it was when the request left plus the paperdoll slots
-// the server write set of the request touches (see
-// gear.ServerWriteSlots). The gate watches the tracker for the actual
-// server effect per item (see pendingInventoryConfirmed) and holds
-// back only the requests that would race the write set.
+// markInventoryAction records one in-flight inventory action: the
+// item state at the request plus the paperdoll slots its write set
+// touches.
 func (l *Loop) markInventoryAction(objectID int32) {
     item, ok := l.tracker.InventoryItemState(objectID)
     pending := pendingInventory{
@@ -326,10 +283,7 @@ func (l *Loop) userDrop(cmd state.Command) {
 }
 
 // userDestroy destroys inventory items without dropping them: the
-// trash target of the equipment widget sends it. The server (see
-// RequestDestroyItem.runImpl) splits the stack by the count and even
-// unequips an equipped item before destroying it, so no extra request
-// is needed.
+// server splits the stack and unequips an equipped item itself.
 func (l *Loop) userDestroy(cmd state.Command) {
     if cmd.ObjectID == 0 || cmd.Count < 1 {
         return
@@ -343,10 +297,8 @@ func (l *Loop) userDestroy(cmd state.Command) {
 }
 
 // userMovement switches the loop into the manual phase for a move,
-// attack or pickup click of the map. The manual phase overrides the
-// autonomous hunting: an active town trip is cancelled, the deleveling
-// keeps running (its guard walk must finish for the level to drop) and
-// refuses the command instead.
+// attack or pickup click: an active town trip is cancelled, a
+// deleveling refuses the command.
 func (l *Loop) userMovement(cmd state.Command) {
     if l.phase == phaseDelevel {
         l.logf("Hunt: user command %q ignored while deleveling",
@@ -407,14 +359,10 @@ func (l *Loop) userMovement(cmd state.Command) {
     }
 }
 
-// tickUser advances the manual phase: it re-issues the action at the
-// player action cadence (the Mobius flood protector allows one action
-// per second) until it completes, then the autonomous hunting resumes.
-// A sitting character stands up first: the server refuses every move,
-// attack and pickup request of a sitting session with a bare
-// ActionFailed, so walking straight into the request loop leaves the
-// bot sitting through an endless stream of refusals (the softlock of
-// a rest interrupted by a manual click).
+// tickUser advances the manual phase at the player action cadence
+// (one action per second) until it completes. A sitting character
+// stands up first: the server refuses every action of a sitting
+// session.
 func (l *Loop) tickUser() {
     now := l.now()
     if l.tracker.SelfSitting() && l.userKind != "" {
@@ -438,12 +386,8 @@ func (l *Loop) tickUser() {
     }
 }
 
-// tickUserMove walks to the clicked point until the character arrives
-// or the walk times out. The request repeats only when the walk
-// actually stalled: the server pathfinds and runs the walk on its own,
-// and re-clicking every second would restart its path search and slow
-// the walk down. A stall shows up as a stopped character (the server
-// broadcasts the stop) or a silent moving flag (a lost stop packet).
+// tickUserMove walks to the clicked point until it arrives or the
+// walk times out; the request repeats only when the walk stalled.
 func (l *Loop) tickUserMove(now time.Time) {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
@@ -471,12 +415,9 @@ func (l *Loop) tickUserMove(now time.Time) {
         return
     }
     if l.navigator != nil && !l.userPathTried {
-        // Every manual move plans through the navigator (the owner
-        // request: the map double click IS the pathfind call - the
-        // planned waypoints publish into the walk plan view and the
-        // state dump exactly like the bot's own planned walks, so a
-        // stuck segment reads at a glance). A failed or missing path
-        // falls through to the direct server routed walk.
+        // Every manual move plans through the navigator, so a stuck
+        // segment reads in the walk plan view like a bot walk. A
+        // failed path falls through to the direct walk.
         l.userPathTried = true
         l.planUserWalk(selfX, selfY, selfZ)
 
@@ -497,20 +438,11 @@ func (l *Loop) tickUserMove(now time.Time) {
     }
 }
 
-// planUserWalk computes the mesh path of one long manual move. The
-// exact search runs first (the owner clicked the point - the walk
-// must arrive at it): the approach ring of the NPC segments is the
-// fallback only, because the ring can catch an early corridor
-// polygon and end the plan short - the temple entrance round of the
-// owner report (the doorway polygon 147 units short of the clicked
-// interior cell inside the 150 ring) held the walk at the door
-// forever. A failed exact search (the clicked point on ground the
-// mesh does not reach) falls back to the approach corridor, a
-// missing tile or a bare not found leaves the direct server routed
-// walk. The result becomes the segment plan the follower walks one
-// server accepted segment at a time; a partial corridor (the
-// destination unreachable under the filter) walks the closest
-// reachable point instead.
+// planUserWalk computes the mesh path of one long manual move: the
+// exact search first (the owner clicked the point), the approach
+// corridor as the fallback, the direct server walk without a plan.
+// The result becomes the segment plan the follower walks; a partial
+// corridor ends at the closest reachable point.
 func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     from := pathfind.Vec3{
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
@@ -554,19 +486,12 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     l.userDeadline = l.now().Add(
         userMoveBudget(manualTravel(result.Length, speed)))
     // The manual plan publishes its search contract (the approach
-    // radius of the answer - zero for the exact destination search,
-    // the user approach radius of the fallback corridor - and no
-    // bans): the 3D pathfind link rebuilds the very search instead
-    // of a lookalike.
+    // radius of the answer): the 3D pathfind link rebuilds the very
+    // search.
     l.userSearch = &state.WalkSearch{Approach: approach,
         Avoid: nil}
-    // The manual walk plan opens with the same frame measurement as
-    // every fresh plan (see click_frame.go): the route's first
-    // waypoint is the character's own cell resolved on the pack, its
-    // z against the server vouched standing z is the vintage shift
-    // the follower's clicks ride. A swimming character measures no
-    // shift: the swim z against the mesh floor is geometry, not a
-    // pack disagreement.
+    // The plan opens with the same frame measurement as every fresh
+    // plan (click_frame.go); a swimming character measures no shift.
     l.userFrameOffset = 0
     if !l.navigator.OverWater(
         float64(selfX), float64(selfY), int16(selfZ)) {
@@ -587,14 +512,9 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
         result.Length, result.Duration.Seconds())
 }
 
-// userSegmentRefused reports whether the server answered the last manual
-// walk click with ActionFailed while the character stood still: the
-// same sent click attribution the town walk follower applies (see
-// refusalEvidence - the one byte refusal answer is the only online
-// channel that names a server side move refusal, and the answer
-// carries no request identity, so the correlation skips the answers
-// that belong to a non walk request sent between the click and the
-// refusal).
+// userSegmentRefused reports whether the server answered the last
+// manual walk click with ActionFailed while the character stood
+// still (the same attribution as refusalEvidence).
 func (l *Loop) userSegmentRefused() bool {
     if l.userMoveAt.IsZero() {
         return false
@@ -607,16 +527,10 @@ func (l *Loop) userSegmentRefused() bool {
 }
 
 // sendUserVariedAim answers a refused manual walk click by varying
-// the aim at the current waypoint: the refusal of the server is
-// target specific - the Bresenham raster of a shorter prefix or a
-// sideways offset of the same waypoint often validates where the
-// plain aim bounced (the temple entrance porch: the straight line to
-// the interior clipped the door frame, the east sideways aim crossed
-// the opening). The variants ride the same server frame transport
-// and the same offline gates as the planned click (the click
-// validation port on the line, the geometry inside the move limit)
-// and share the refusalVariantTarget ladder of the town walk. It
-// reports whether a variant was sent.
+// the aim at the waypoint: the refusal is target specific, and a
+// shorter prefix or a sideways offset often validates. The variants
+// ride the same server frame transport and offline gates as the
+// planned click.
 func (l *Loop) sendUserVariedAim(
     selfX, selfY, selfZ int32, now time.Time,
 ) bool {
@@ -658,16 +572,10 @@ func (l *Loop) sendUserVariedAim(
     return false
 }
 
-// beginUserCursorKeyEscape hands a refused manual segment to the cursor
-// key escape: the keyboard mode 0 arm plus the claimed
-// ValidatePosition stream the server follows without any click
-// validation (the 2026-09-14 15:10 report proved a server that
-// answers NO mouse click from a cell still walks the arrow key
-// claims - the same recovery the town walk follower owns). The
-// claimed ladder marches the planned waypoint line in run speed
-// strides - the claims follow the plan's own ground, never a
-// straight cut the planner did not draw. It reports
-// whether the escape armed.
+// beginUserCursorKeyEscape hands a refused manual segment to the
+// cursor key escape: the keyboard mode 0 arm plus the claimed
+// ValidatePosition stream, which the server follows without click
+// validation. The ladder marches the planned waypoint line.
 func (l *Loop) beginUserCursorKeyEscape(
     selfX, selfY, selfZ, aimX, aimY, aimZ int32,
 ) bool {
@@ -701,20 +609,11 @@ func (l *Loop) beginUserCursorKeyEscape(
     return true
 }
 
-// followUserWaypoints walks the planned segments of a long manual move:
-// the click target spans the farthest waypoints the server transport
-// delivers inside the aim window (see flowAdvance), so the character
-// crosses the dense plan points without an arrival stop; segments
-// longer than the server move limit split into straight intermediate
-// points (the smoothing keeps the line of sight of every segment),
-// and a waypoint the character already passed ON THE ROUTE skips
-// ahead (the projection pass test of the town walker - a character
-// beside the route keeps targeting the waypoint it missed). The walk
-// ends when the last waypoint is reached or the manual deadline
-// passes; a segment that stalls (the server stopped the character
-// short) re-issues at the walk request period. The running move is
-// re-aimed every period too: the server replaces the destination
-// without stopping the character, only a reached target stops it.
+// followUserWaypoints walks the planned segments of a long manual
+// move: the click target spans the farthest waypoints the transport
+// delivers inside the aim window, longer segments split into
+// straight points, and a waypoint already passed ON THE ROUTE skips
+// ahead. The walk ends at the last waypoint or the manual deadline.
 func (l *Loop) followUserWaypoints(
     now time.Time, selfX int32, selfY int32, selfZ int32,
 ) {
@@ -738,12 +637,8 @@ func (l *Loop) followUserWaypoints(
         return
     }
     // The cursor key escape owns the walk while it runs: the claim
-    // ladder drives the character past the refusing ground (the
-    // server follows the claimed ValidatePosition stream without any
-    // click validation), the click machinery stays down until the
-    // escape ends - the same ownership the town walk follower
-    // applies (the 2026-09-14 15:10 report: a server that answers NO
-    // click from a cell still walks the arrow key claims).
+    // ladder drives past the refusing ground, the click machinery
+    // stays down.
     if l.cursorEscape.armed {
         l.driveCursorKeyEscape(now, selfX, selfY)
 
@@ -753,17 +648,10 @@ func (l *Loop) followUserWaypoints(
         return
     }
     // The refusal ladder of the manual walk: the server answered the
-    // last click of this segment with ActionFailed while the character
-    // stood still. The plain follower re-clicked the same aim every
-    // period and the same refusal bounced forever (the temple
-    // entrance round: the server stopped its own walk at the door
-    // frame and refused every straight re-click from the porch while
-    // the character stood there for the whole walk window). The
-    // ladder first varies the aim (the refusal is target specific -
-    // a shorter prefix or a sideways offset validates where the
-    // plain aim bounced) and hands the segment to the cursor key escape
-    // once the variants spent: the claims walk without any click
-    // validation, so the ground no click leaves is still walkable.
+    // last click with ActionFailed while the character stood still.
+    // The ladder first varies the aim (the refusal is target
+    // specific) and hands the segment to the cursor key escape once
+    // the variants spent.
     if l.userSegmentRefused() {
         if l.sendUserVariedAim(selfX, selfY, selfZ, now) {
             return
@@ -783,11 +671,9 @@ func (l *Loop) followUserWaypoints(
     l.clickUserWaypoint(now, selfX, selfY, selfZ)
 }
 
-// userMoveBudget resolves the time budget of a manual walk over a
-// planned route: the base window plus twice the estimated travel time
-// (the click cadence, the server corrections and the slower swim
-// segments), capped at userMoveTimeoutMax. Without a plan the base
-// window alone bounds the walk.
+// userMoveBudget resolves the time budget of a manual walk: the base
+// window plus twice the estimated travel, capped at
+// userMoveTimeoutMax.
 func userMoveBudget(travel time.Duration) time.Duration {
     budget := userMoveTimeout + 2*travel
     if budget > userMoveTimeoutMax {
@@ -820,12 +706,9 @@ func (l *Loop) userMoveExpired(now time.Time) bool {
     return now.Sub(l.userStart) > userMoveTimeout
 }
 
-// clickUserWaypoint sends the ground click toward the current manual
-// waypoint: the click z rides the server frame transport of the
-// manual plan (see click_frame.go), and a segment longer than the
-// server move limit splits into a straight intermediate point - the
-// smoothing verified the whole segment, the server only gets the
-// short piece it accepts.
+// clickUserWaypoint sends the click toward the current manual
+// waypoint: the z rides the manual plan's frame transport and a long
+// segment splits into a straight intermediate point.
 func (l *Loop) clickUserWaypoint(
     now time.Time, selfX int32, selfY int32, selfZ int32,
 ) {
@@ -841,15 +724,9 @@ func (l *Loop) clickUserWaypoint(
     }
 }
 
-// publishWalkPlan refreshes the walk plan view of the web UI: while a
-// walk runs (a manual move, a town trip segment or a deleveling guard
-// walk), the full plan of the current segment publishes - the planning
-// origin, every planned waypoint with the follower cursor and the
-// final destination - so the map draws the planned line against the
-// live character position and the state dump reads the whole walk at
-// a glance. Every other state of the loop clears the plan; the tracker
-// also expires it on its own, so an abrupt exit never leaves a stale
-// line.
+// publishWalkPlan refreshes the walk plan view: while a walk runs the
+// full plan of the current segment publishes, every other state
+// clears it.
 func (l *Loop) publishWalkPlan() {
     plan := l.activeWalkPlan()
     if plan == nil {
@@ -860,13 +737,8 @@ func (l *Loop) publishWalkPlan() {
     l.tracker.SetWalkPlan(*plan)
 }
 
-// activeWalkPlan returns the walk plan of the segment the loop is
-// currently following: the planning origin, the full waypoint list,
-// the waypoint the follower currently heads to and the final
-// destination. Returns nil when the loop is not walking a planned
-// path right now. The manual move plan carries the clicked
-// destination; the town trip and deleveling plans carry the geodata
-// waypoints to their target.
+// activeWalkPlan returns the walk plan of the followed segment, nil
+// when the loop walks no planned path.
 func (l *Loop) activeWalkPlan() *state.WalkPlan {
     switch l.phase {
     case phaseUser:
@@ -882,12 +754,8 @@ func (l *Loop) activeWalkPlan() *state.WalkPlan {
     }
 }
 
-// userWalkPlan builds the walk plan of a manual move: the position of
-// the character at the click (the origin), the full geodata waypoints
-// of the planned walk (a direct walk carries the clicked destination
-// alone), the follower cursor and the clicked destination. The
-// destination stays its own field even when the waypoints carry it -
-// the map destination marker pins the click itself.
+// userWalkPlan builds the walk plan of a manual move: the origin, the
+// waypoints, the follower cursor and the clicked destination.
 func (l *Loop) userWalkPlan() *state.WalkPlan {
     dest := state.WalkPoint{X: l.userX, Y: l.userY, Z: l.userZ}
     pts := []state.WalkPoint{}
@@ -915,15 +783,9 @@ func (l *Loop) userWalkPlan() *state.WalkPlan {
     }
 }
 
-// geodataWalkPlan builds the walk plan of a town trip or a deleveling
-// guard walk: the planning origin (the position startWalkSegment planned
-// from, the point where we wanted to go), the full waypoint list
-// (shared l.waypoints slice, l.wpIndex cursor) and the segment destination
-// last. startWalkSegment arms l.segmentDest with the destination it planned
-// the walk to (the merchant spawn, the farm spot, the guard spawn), so
-// the map can draw the final target even when the smoothing collapsed
-// it into the last waypoint. Returns nil when the loop is between
-// segments (no waypoints, no destination).
+// geodataWalkPlan builds the walk plan of a town trip or guard walk:
+// the planning origin, the waypoint list with the cursor, and the
+// segment destination startWalkSegment armed.
 func (l *Loop) geodataWalkPlan() *state.WalkPlan {
     if len(l.waypoints) == 0 {
         return nil
@@ -1013,16 +875,9 @@ func (l *Loop) bowEquipped() bool {
 }
 
 // tickUserAttack forces the attack on the clicked object until the
-// fight starts, then the fight plays out under the server AI. The
-// first request selects the target, the repeated request forces the
-// attack; a target beyond melee range is chased by the server AI, and
-// when that chase stalls (the Mobius path search gives up on some
-// routes while the engagement keeps looking fresh) the loop walks the
-// stretch itself. A dead or vanished target hands control to the
-// looting phase so the drops of a killed mob are picked up; a fight
-// that never starts times out and the autonomous hunting resumes.
-// Pre-consolidation phase debt; the hunt loop cleanup is planned
-// (docs/quality_review_and_agent_prompts.md P07).
+// fight starts, then the server AI plays it out; a stalled chase is
+// walked by the loop. A dead target hands control to the loot phase,
+// a fight that never starts times out.
 //
 //nolint:cyclop,funlen,gocognit // the user attack decision tree
 func (l *Loop) tickUserAttack(now time.Time) {
@@ -1164,10 +1019,7 @@ func (l *Loop) tickUserPickup(now time.Time) {
 }
 
 // chaseProgress samples the distance to the chase target once per
-// progress window and reports whether the chase still closes in: a
-// healthy chase covers well past the step distance per window, a stall
-// (the Mobius path search gave up while the engagement stays fresh
-// through stuck chase packets) needs the fallback walk.
+// progress window and reports whether the chase still closes in.
 func (l *Loop) chaseProgress(
     sampler *float64, at *time.Time, dist float64, now time.Time,
 ) bool {

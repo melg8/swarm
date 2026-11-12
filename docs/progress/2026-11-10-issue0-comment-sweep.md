@@ -115,6 +115,15 @@ corner probe is a length, not a leg at all.
   and dump stories.
 - Verified: `task fmt`, the hunt tests, `task lint:new`.
 
+### 2026-11-12 - user.go keeps the pacing and ownership rules only
+
+- 33 blocks compress: the 600 ms confirmation gate, the 4 s same-item
+  re-send window over the ~1.5 s windup and ~3 s bow cycle, the one
+  action per second manual cadence, the cursor key escape ownership
+  and the refusal ladder stay; the walk plan and attribution stories
+  drop. The pre-consolidation debt note leaves `tickUserAttack`.
+- Verified: `task fmt`, the hunt tests, `task lint:new`.
+
 ## Status
 
 The tool, the rule and the renames are in. The kite header and the
