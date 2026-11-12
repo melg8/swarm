@@ -95,6 +95,17 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The file leaves the audit top list; the tree share
   reads 14.4 percent, 663 blocks, 1,385 history markers.
 
+### 2026-11-12 - shopping.go keeps the pacing numbers only
+
+- The `shopping.go` comment blocks drop the round evidence and keep
+  the server numbers: the 1250 ms transaction window over the 1 s
+  flood interval, the 15 s buy confirmation, the 60 s sale timeout,
+  the 45 s weapon run cooldown, the 20 percent Dion tax. 49 blocks
+  compress in one pass, each still naming the function that owns the
+  detail.
+- Verified: `task fmt`, the hunt tests, `task lint:new`. The tree
+  share reads 14.3 percent, 647 blocks, 1,380 history markers.
+
 ## Status
 
 The tool, the rule and the renames are in. The kite header and the
