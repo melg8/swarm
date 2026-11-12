@@ -154,7 +154,7 @@ port of the spot economy, the geometry replaced):
   ping-pongs the registry (the pacing floor, the window and the
   starve-cooldown guards).
 
-## The enemy-first roam (hunt/loop.go)
+## The enemy-first roam (hunt/loop_zone.go)
 
 The user order of 2026-09-13: before moving, the bot picks the zone
 that holds the enemies it already SEES from the current position; a

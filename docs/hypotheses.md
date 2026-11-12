@@ -147,7 +147,7 @@ conversation or in a commit message: it lives in this registry.
   state of its own: the move start watchdog names it, and the
   recovery must not answer it with more of the same transport.
 - Relied on by: the frozen skip rule of the town walk follower
-  (skipMoveFresh, internal/swarm/hunt/town.go) - a skip that moved
+  (skipMoveFresh, internal/swarm/hunt/town_stuck.go) - a skip that moved
   the character nothing may not repeat, the re-path ladder and the
   cursor key escape own the dead click transport instead. The kite
   re-click ladder of the archer retreat (kiteReclickWalk,

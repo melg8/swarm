@@ -152,7 +152,7 @@ would have paid for.
   refresh-while-farming, manual/offline quiet, the tick path
   coverage, the event feed surface, the diagnostics wiring).
 
-## Combat safety (hunt/loop.go + the constrained target search of state)
+## Combat safety (hunt/loop_safety.go + the constrained target search of state)
 
 - The engage never initiates on mobs above the character level + 2 or
   on social pulls - a mob whose clan mates stand within its
@@ -418,7 +418,7 @@ hold, the lane fan of the early design (#19, PR #25; the fan retired
 by the straight-lane rule of the 2026-11-09 round), the archetype
 composition (#21, PR #31).
 
-The radii of the ranged fight (hunt/loop.go): the melee swing range
+The radii of the ranged fight (hunt/kite.go, hunt/loop_params.go): the melee swing range
 sits around 150 units and the chasers run 120+ units per second, so
 the kite trigger `kiteRetreatRadius` (250) fires while the closing
 hostile is still a second or two from the blows; the bow approach
@@ -1311,7 +1311,9 @@ The short form:
   budget plus the sell credits of the displaced pieces; **one item
   per paperdoll slot per trip** - the next trip re-plans from the
   reached paperdoll.
-- The town trips (internal/swarm/hunt/town.go) trigger when the
+- The town trips (internal/swarm/hunt/town.go, the trip lifecycle;
+  the walk, the sell and the recovery files of the same package hold
+  the rest) trigger when the
   inventory passes 50% of the slots or 50% of the maximum weight. A
   trip start never interrupts a fight: `fightBusy` (a living target, a
   pending loot pickup or an incoming hit) holds it until the
@@ -1755,7 +1757,8 @@ The short form:
   the character at the stuck spot through the database and captures
   the mid-walk state dump).
 - The counter stand round (2026-09-20): the merchant stops target the
-  curated customer stand table (`merchantStands` in town.go) instead
+  curated customer stand table (`merchantStands` in
+  town_merchants.go) instead
   of the merchant spawn. The spawn cell of a stall merchant sits
   inside the roofed stall the geodata pack models as roof-only cells
   (the cell holds no floor layer - nobody can stand on it directly,

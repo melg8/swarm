@@ -358,7 +358,7 @@ chain) and shops the D-grade gear the band needs there. The shopping
 strategy reuses the same planner; the only difference is the catalog
 the town trip consults.
 
-- The Dion merchants (`internal/swarm/hunt/town.go::dionMerchants`):
+- The Dion merchants (`internal/swarm/hunt/town_merchants.go::dionMerchants`):
   Sabrin (7060, weapons), Casey (7061, armor), Sonia (7062, jewels +
   spellbooks) and Lara (7063, grocery), at the spawn positions of
   `spawns/Dion/DionNPCs.xml`. The buylist ids (3006000-3006300) are
