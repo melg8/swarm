@@ -1,4 +1,4 @@
-# P03 residue: the bench playground and the offset duplicate (status: in progress)
+# P03 residue: the bench playground and the offset duplicate (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner instruction: continue
 the refactor after the file split rounds and the packet router).
@@ -57,7 +57,8 @@ Measured 2026-11-12 before the change:
 
 ## Status
 
-Both slices land; the full gate and the live run are next.
+Complete: the two slices land on `main` as `646cd8b4` and
+`d704adfb`; `task verify` green and the live run clean.
 
 ### 2026-11-12 - the offset unification
 `npcdata.NPCDisplayOffset` is the single definition: the package's own
@@ -72,3 +73,11 @@ Verified: `go build ./...`, `go vet` on the four touched packages,
 `golangci-lint run` 0 issues on them, `go test` of `npcdata` (0.4 s),
 `state` (1.2 s) and `hunt` (97 s) green, the three `InitPacket`
 benchmarks run.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole test
+suite, `fmt:check`). The live run on the Windows stack: the binary
+carries the `-ldflags` identity of `d704adfb`, `-login
+127.0.0.3:2106 -hunt -web ""`, 65 s in world, then Ctrl+Break - the
+character pulled, shot and planned the retreat, `Leaving the game
+world with test1` / `Bot finished`, exit code 0.
