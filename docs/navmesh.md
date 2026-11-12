@@ -648,7 +648,9 @@ answer keeps the pivots no safe chord skips, so it never adds a turn;
 the raw funnel answer rides along in `Route.RawWaypoints` for the
 comparison. The open spans of the mesh are whole geodata cells
 (16 units), so every span holds a crossing a 7.5 capsule clears and
-the pass never dead ends.
+the pass never dead ends. The wall distance comparison relaxes by
+`smoothEpsilon` 1e-6: the pivots sit exactly one radius off the wall
+edges, so a chord through them must survive the float rounding.
 
 ## The wall oracle (the SegmentGuard seam)
 

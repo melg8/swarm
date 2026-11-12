@@ -615,6 +615,20 @@ corner probe is a length, not a leg at all.
   lint:new`. `walk_params.go` fell from 81.8 to 69.1 percent (96
   comment lines), no block above 8 lines.
 
+### 2026-11-12 - pathfind/navmesh/smooth.go keeps the pass contract only
+
+- 9 blocks compress: the 25 line shortcut pass header (the portal span
+  crossing, the clearance radius, the merged answer that never adds a
+  turn), the epsilon, the wall span cache and the complement derivation
+  (the NSWE wall and the climb limit), the side segment mapping, the
+  complement gaps and the Ericson segment distance. The
+  `## The shortcut pass` section of `docs/navmesh.md` already carried
+  the rules and gained the `smoothEpsilon` float rounding sentence in
+  the same commit.
+- Verified: `task fmt`, `go build ./...`, the navmesh tests, `task
+  lint:new`. `smooth.go` fell from 30.3 to 14.0 percent (30 comment
+  lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -632,8 +646,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/learning.go` and `hunt/town_cursor_escape.go`,
 `pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
 `pathfind/navmesh/pocket.go`, `pathfind/capsule.go`, `hunt/loop_avoid.go`,
-`hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go` and
-`hunt/walk_params.go` (second passes). Next: a fresh
-`task comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go`,
+`hunt/walk_params.go` and `pathfind/navmesh/smooth.go` (second passes).
+Next: a fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
 `hunt/loop_state.go` entries stay untouched while their fragments are
 active); the share and the block count are re-measured at the end.

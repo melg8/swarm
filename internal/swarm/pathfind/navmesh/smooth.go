@@ -6,46 +6,24 @@ package navmesh
 
 import "sort"
 
-// The shortcut pass of the route answer (the smoothing): the funnel
-// pivots where the walls of the corridor force the turns and the
-// wall run chains them into pivot farms (a tight wall the corridor
-// threads pivot by pivot), so a long walk micro steers through the
-// dense turn runs (the owner report: the bot hooks and sticks on the
-// dense turns). The pass merges the funnel waypoints into the longest
-// chords the corridor geometry allows:
-//
-//  1. the chord from waypoint i to waypoint k must cross every
-//     intermediate portal inside its open span - a crossing outside
-//     the span is a wall the server movement validation refuses (the
-//     paired NSWE walls and the anti corner cut);
-//  2. the chord must keep the clearance radius away from every wall
-//     edge of the polygons it passes: the walls are the side portions
-//     without a link (the complement of the open spans), the same
-//     closed edges the capsule clearance pass pushes away from. A
-//     straight segment closer than the radius to a wall edge sweeps the
-//     capsule into it - the hook the pivot offset removed from the
-//     turns comes back through the merged segments.
-//
-// The open spans of this mesh are whole geodata cells (16 units), so
-// every span holds a crossing a 7.5 capsule clears (16 > 2 * 7.5) and
-// the pass never dead ends. The merged answer keeps the funnel
-// waypoints it could not merge, so it never adds a turn and never
-// leaves the corridor.
+// The shortcut pass of the route answer: the funnel pivots where the corridor
+// walls force the turns, so the pass merges them into the longest chords the
+// corridor geometry allows. A chord must cross every intermediate portal
+// inside its open span and keep the clearance radius off every wall edge of the
+// crossed polygons; the merged answer keeps the waypoints it could not merge,
+// so it never adds a turn (docs/navmesh.md, the shortcut pass).
 
-// smoothEpsilon relaxes the wall distance rule by a hair: the funnel
-// pivots sit exactly one radius off the wall edges (shrunkPortalSpan)
-// and the chords through them must survive the float rounding of the
-// distance comparison.
+// smoothEpsilon relaxes the wall distance rule by a hair: the pivots sit
+// exactly one radius off the wall edges, so the chords through them survive
+// the float rounding of the comparison.
 const smoothEpsilon = 1e-6
 
-// wallSpan is one closed wall portion of a polygon side in world
-// coordinates (the segment form the distance check consumes).
+// wallSpan is one closed wall portion of a polygon side in world coordinates.
 type wallSpan struct {
     ax, ay, bx, by float64
 }
 
-// wallSpansOf returns the wall spans of one polygon, computing them
-// once per shortcut pass (the cache holds every corridor polygon).
+// wallSpansOf returns the wall spans of one polygon, cached once per pass.
 func wallSpansOf(m *Mesh, ref PolyRef,
     walls map[PolyRef]*[4][]wallSpan,
 ) *[4][]wallSpan {
@@ -58,12 +36,10 @@ func wallSpansOf(m *Mesh, ref PolyRef,
     return spans
 }
 
-// computeWallSpans derives the closed wall portions of the polygon
-// sides: every side spans the whole rectangle edge; the link chain
-// carves the open spans out of it; the complement is the wall. An
-// unlinked portion is an edge the server movement validation blocks -
-// the NSWE wall or the height step beyond the climb limit - the same
-// closed edges the capsule clearance pass treats as obstacles.
+// computeWallSpans derives the closed wall portions of the polygon sides: the
+// link chain carves the open spans out of each rectangle edge and the
+// complement is the wall - the NSWE wall or the height step beyond the climb
+// limit the server movement validation blocks.
 func (m *Mesh) computeWallSpans(ref PolyRef) *[4][]wallSpan {
     tile, poly := m.polyOfRef(ref)
     if tile == nil || poly == nil {
@@ -93,9 +69,9 @@ func (m *Mesh) computeWallSpans(ref PolyRef) *[4][]wallSpan {
     return spans
 }
 
-// sideSpanSegment maps a cell range of one polygon side onto the
-// world segment of the rectangle edge (the side fixes the axis and
-// the coordinate, the cell range walks the other axis).
+// sideSpanSegment maps a cell range of one polygon side onto the world segment
+// of the rectangle edge (the side fixes the axis and the coordinate, the cell
+// range walks the other axis).
 func (t *Tile) sideSpanSegment(side uint8, poly *Poly, c0, c1 int32,
 ) wallSpan {
     wx := func(c int32) float64 {
@@ -117,8 +93,8 @@ func (t *Tile) sideSpanSegment(side uint8, poly *Poly, c0, c1 int32,
     }
 }
 
-// complementSpans returns the gaps the open spans leave inside the
-// cell range [lo, hi): the closed portions of the side.
+// complementSpans returns the gaps the open spans leave inside the cell range
+// [lo, hi): the closed portions of the side.
 func complementSpans(lo, hi int32, open [][2]int32) [][2]int32 {
     if hi <= lo {
         return nil
@@ -156,9 +132,9 @@ func complementSpans(lo, hi int32, open [][2]int32) [][2]int32 {
     return gaps
 }
 
-// polyWallClear answers whether the segment keeps the clearance from
-// every wall span of the polygon (2D: the capsule sweeps the segment, a
-// wall edge closer than the radius eats the capsule side).
+// polyWallClear answers whether the segment keeps the clearance from every wall
+// span of the polygon (2D: the capsule sweeps the segment, a wall edge closer
+// than the radius eats the capsule side).
 func polyWallClear(spans *[4][]wallSpan, a, b Pos, clearance float64,
 ) bool {
     limit := clearance - smoothEpsilon
@@ -178,9 +154,9 @@ func polyWallClear(spans *[4][]wallSpan, a, b Pos, clearance float64,
     return true
 }
 
-// segSegDistSqr2D is the squared distance between two 2D segments
-// (the clamped closest points of Ericson's Real-Time Collision
-// Detection, the degenerate cases included).
+// segSegDistSqr2D is the squared distance between two 2D segments (the clamped
+// closest points of Ericson's Real-Time Collision Detection, the degenerate
+// cases included).
 func segSegDistSqr2D(ax, ay, bx, by, cx, cy, dx, dy float64) float64 {
     d1x, d1y := bx-ax, by-ay
     d2x, d2y := dx-cx, dy-cy
