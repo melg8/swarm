@@ -214,15 +214,10 @@ func (l *Loop) lureApproachTick(lure *lureState, now time.Time) bool {
         return true
     }
     lure.segmentAt = now
-    moveX, moveY := lure.standX, lure.standY
-    dx := float64(lure.standX - selfX)
-    dy := float64(lure.standY - selfY)
-    if dist > returnWalkSegment {
-        frac := returnWalkSegment / dist
-        moveX = int32(float64(selfX) + dx*frac)
-        moveY = int32(float64(selfY) + dy*frac)
-    }
-    if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+    moveX, moveY, _ := walkClickSegment(selfX, selfY, selfZ,
+        float64(lure.standX), float64(lure.standY), float64(selfZ),
+        returnWalkSegment)
+    if err := l.game.WalkTo(int32(moveX), int32(moveY), selfZ); err != nil {
         l.logf("Hunt: lure approach walk failed: %v", err)
     }
 

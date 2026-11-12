@@ -79,3 +79,30 @@ Verified: `go build ./...`, `go vet`, `golangci-lint run
 -count=1` ok in 97.5 s.
 
 Next: the follower core (slice 2).
+
+### 2026-11-12 - slice 2: the shared click and cursor core
+`walk_core.go` carries the two duplicated primitives of the walkers:
+
+- `walkClickSegment` clips a ground click onto one server move request
+  (the point on the line at the limit, the z interpolated along it).
+  It replaces seven inline copies: the town waypoint click, the manual
+  walk click, the far target walk, the blind reposition walk, the
+  corpse approach, the lure approach, the respawn drift walk, the zone
+  segment click and the advance line gate of `routeAdvanceClear`.
+  The int-only callers pass their own z as the target height, which
+  interpolates back to exactly the standing z they sent before;
+- `advanceWalkCursor` walks the plan cursor over the reached and the
+  passed-along-route waypoints behind the walker's optional line
+  gate. The town follower (`advanceWaypoints`, gated by the click
+  validation) and the manual follower (ungated) now share it; each
+  resets its own click timestamp when the cursor moved.
+
+`walk_core_test.go` pins both: the clip ring, the kept line, the
+reached/passed advance, the gate, the plan end and the tight final
+radius. The control flow of each walker is untouched - the recovery
+ladders (the town stuck window, the manual refusal variants) stay
+where they are, which is the deferred half of the unification.
+
+Verified: build, vet, lint 0 issues, hunt tests ok in 97.5 s.
+
+Next: `lastHit` and the skip conventions (slice 3).

@@ -299,15 +299,10 @@ func (l *Loop) killApproachWalk() bool {
     }
     l.killWalked = true
     l.lootMoveAt = now
-    moveX, moveY := l.killX, l.killY
-    dx := float64(l.killX - selfX)
-    dy := float64(l.killY - selfY)
-    if dist > returnWalkSegment {
-        frac := returnWalkSegment / dist
-        moveX = int32(float64(selfX) + dx*frac)
-        moveY = int32(float64(selfY) + dy*frac)
-    }
-    if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+    moveX, moveY, _ := walkClickSegment(selfX, selfY, selfZ,
+        float64(l.killX), float64(l.killY), float64(selfZ),
+        returnWalkSegment)
+    if err := l.game.WalkTo(int32(moveX), int32(moveY), selfZ); err != nil {
         l.logf("Hunt: corpse approach walk failed: %v", err)
     }
 

@@ -718,28 +718,12 @@ func (l *Loop) beginUserCursorKeyEscape(
 func (l *Loop) followUserWaypoints(
     now time.Time, selfX int32, selfY int32, selfZ int32,
 ) {
-    for l.userWpIndex < len(l.userWaypoints) {
-        if waypointArrived(l.userWaypoints, l.userWpIndex,
-            selfX, selfY, selfZ, l.userFrameOffset, waypointArriveDist) {
-            l.userWpIndex++
-            l.userMoveAt = time.Time{}
-            l.userRefusalVariants = 0
-
-            continue
-        }
-        // Not reached: skip it only when the character already
-        // passed it on the route towards the next waypoint.
-        if l.userWpIndex+1 < len(l.userWaypoints) &&
-            waypointPassed(l.userWaypoints[l.userWpIndex],
-                l.userWaypoints[l.userWpIndex+1], selfX, selfY) {
-            l.userWpIndex++
-            l.userMoveAt = time.Time{}
-            l.userRefusalVariants = 0
-
-            continue
-        }
-
-        break
+    next, moved := advanceWalkCursor(l.userWaypoints, l.userWpIndex,
+        selfX, selfY, selfZ, l.userFrameOffset, waypointArriveDist, nil)
+    l.userWpIndex = next
+    if moved {
+        l.userMoveAt = time.Time{}
+        l.userRefusalVariants = 0
     }
     if l.userWpIndex >= len(l.userWaypoints) {
         l.logf("Hunt: manual walk arrived (path done)")
@@ -846,17 +830,9 @@ func (l *Loop) clickUserWaypoint(
     now time.Time, selfX int32, selfY int32, selfZ int32,
 ) {
     wp := l.userWaypoints[l.userWpIndex]
-    dx := wp.X - float64(selfX)
-    dy := wp.Y - float64(selfY)
-    dist := math.Hypot(dx, dy)
     wpZ := anchorZToServerFrame(wp.Z, l.userFrameOffset)
-    moveX, moveY, moveZ := wp.X, wp.Y, wpZ
-    if dist > maxMoveDistance {
-        scale := maxMoveDistance / dist
-        moveX = float64(selfX) + dx*scale
-        moveY = float64(selfY) + dy*scale
-        moveZ = float64(selfZ) + (wpZ-float64(selfZ))*scale
-    }
+    moveX, moveY, moveZ := walkClickSegment(
+        selfX, selfY, selfZ, wp.X, wp.Y, wpZ, maxMoveDistance)
     l.userRedirect = false
     l.userMoveAt = now
     if err := l.game.WalkTo(

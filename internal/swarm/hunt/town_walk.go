@@ -217,20 +217,13 @@ func (l *Loop) walkTownWaypoints() bool {
 // plaza waypoint through the railing). The gated waypoint stays the
 // target: walking onto it re-opens the line.
 func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
-    for l.wpIndex < len(l.waypoints) {
-        arrived := waypointArrived(
-            l.waypoints, l.wpIndex, selfX, selfY, selfZ,
-            l.segmentFrameOffset, l.finalArriveRadius())
-        passed := !arrived && l.wpIndex+1 < len(l.waypoints) &&
-            waypointPassed(l.waypoints[l.wpIndex],
-                l.waypoints[l.wpIndex+1], selfX, selfY)
-        if !arrived && !passed {
-            return
-        }
-        if !l.segmentAdvanceClear(selfX, selfY, selfZ, l.wpIndex+1) {
-            return
-        }
-        l.wpIndex++
+    next, moved := advanceWalkCursor(l.waypoints, l.wpIndex,
+        selfX, selfY, selfZ, l.segmentFrameOffset, l.finalArriveRadius(),
+        func(next int) bool {
+            return l.segmentAdvanceClear(selfX, selfY, selfZ, next)
+        })
+    l.wpIndex = next
+    if moved {
         l.moveAt = time.Time{}
     }
 }
@@ -426,13 +419,8 @@ func (l *Loop) anchorWaypointClick(
     dy := wp.Y - float64(selfY)
     dist = math.Hypot(dx, dy)
     wpZ := anchorZToServerFrame(wp.Z, l.segmentFrameOffset)
-    moveX, moveY, moveZ = wp.X, wp.Y, wpZ
-    if dist > maxMoveDistance {
-        frac := maxMoveDistance / dist
-        moveX = float64(selfX) + dx*frac
-        moveY = float64(selfY) + dy*frac
-        moveZ = float64(selfZ) + (wpZ-float64(selfZ))*frac
-    }
+    moveX, moveY, moveZ = walkClickSegment(
+        selfX, selfY, selfZ, wp.X, wp.Y, wpZ, maxMoveDistance)
 
     return moveX, moveY, moveZ, dist
 }
@@ -922,16 +910,9 @@ func (l *Loop) routeAdvanceClear(
         return true
     }
     wp := waypoints[next]
-    targetX, targetY := wp.X, wp.Y
-    targetZ := anchorZToServerFrame(wp.Z, frameOffset)
-    dx := targetX - float64(selfX)
-    dy := targetY - float64(selfY)
-    if dist := math.Hypot(dx, dy); dist > maxMoveDistance {
-        frac := maxMoveDistance / dist
-        targetX = float64(selfX) + dx*frac
-        targetY = float64(selfY) + dy*frac
-        targetZ = float64(selfZ) + (targetZ-float64(selfZ))*frac
-    }
+    clickZ := anchorZToServerFrame(wp.Z, frameOffset)
+    targetX, targetY, targetZ := walkClickSegment(
+        selfX, selfY, selfZ, wp.X, wp.Y, clickZ, maxMoveDistance)
     from := pathfind.Vec3{
         X: float64(selfX), Y: float64(selfY), Z: float64(selfZ),
     }

@@ -310,15 +310,9 @@ func (l *Loop) walkBlindWaypoints(now time.Time) {
     }
     l.losMoveAt = now
     wp := l.losWaypoints[l.losWpIndex]
-    moveX, moveY := int32(wp.X), int32(wp.Y)
-    dx := wp.X - float64(selfX)
-    dy := wp.Y - float64(selfY)
-    if segment := math.Hypot(dx, dy); segment > maxMoveDistance {
-        frac := maxMoveDistance / segment
-        moveX = int32(float64(selfX) + dx*frac)
-        moveY = int32(float64(selfY) + dy*frac)
-    }
-    if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+    moveX, moveY, _ := walkClickSegment(selfX, selfY, selfZ, wp.X, wp.Y,
+        float64(selfZ), maxMoveDistance)
+    if err := l.game.WalkTo(int32(moveX), int32(moveY), selfZ); err != nil {
         l.logger.Printf("Hunt: blind reposition walk failed: %v", err)
     }
 }

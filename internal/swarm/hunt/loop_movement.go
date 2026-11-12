@@ -70,15 +70,10 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
         return false
     }
     l.lastHit = now
-    moveX, moveY := pick.X, pick.Y
-    dx := float64(pick.X - selfX)
-    dy := float64(pick.Y - selfY)
-    if dist > returnWalkSegment {
-        frac := returnWalkSegment / dist
-        moveX = int32(float64(selfX) + dx*frac)
-        moveY = int32(float64(selfY) + dy*frac)
-    }
-    if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+    moveX, moveY, _ := walkClickSegment(selfX, selfY, selfZ,
+        float64(pick.X), float64(pick.Y), float64(selfZ),
+        returnWalkSegment)
+    if err := l.game.WalkTo(int32(moveX), int32(moveY), selfZ); err != nil {
         l.logf("Hunt: far target walk failed: %v", err)
     }
 
@@ -468,14 +463,10 @@ func (l *Loop) walkZoneSegment(
     if l.noteZoneSegmentStall(now, selfX, selfY) {
         return
     }
-    moveX, moveY := zone.CX, zone.CY
-    dx := float64(zone.CX - selfX)
-    dy := float64(zone.CY - selfY)
-    if dist := math.Hypot(dx, dy); dist > returnWalkSegment {
-        frac := returnWalkSegment / dist
-        moveX = int32(float64(selfX) + dx*frac)
-        moveY = int32(float64(selfY) + dy*frac)
-    }
+    clickX, clickY, _ := walkClickSegment(selfX, selfY, selfZ,
+        float64(zone.CX), float64(zone.CY), float64(selfZ),
+        returnWalkSegment)
+    moveX, moveY := int32(clickX), int32(clickY)
     if ax, ay, dodged := l.steerClearOfAggro(
         selfX, selfY, selfZ, moveX, moveY, selfZ, zone.CX, zone.CY,
         now); dodged {

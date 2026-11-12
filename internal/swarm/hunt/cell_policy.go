@@ -1081,15 +1081,9 @@ func (h *cellHunter) waitWalk(
         return
     }
     h.lastWaitWalkAt = now
-    moveX, moveY := x, y
-    dx := float64(x - selfX)
-    dy := float64(y - selfY)
-    if dist > returnWalkSegment {
-        frac := returnWalkSegment / dist
-        moveX = int32(float64(selfX) + dx*frac)
-        moveY = int32(float64(selfY) + dy*frac)
-    }
-    if err := l.game.WalkTo(moveX, moveY, selfZ); err != nil {
+    moveX, moveY, _ := walkClickSegment(selfX, selfY, selfZ, float64(x),
+        float64(y), float64(selfZ), returnWalkSegment)
+    if err := l.game.WalkTo(int32(moveX), int32(moveY), selfZ); err != nil {
         l.logger.Printf("Hunt: respawn drift walk failed: %v", err)
     }
 }
