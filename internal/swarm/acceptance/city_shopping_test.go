@@ -31,8 +31,9 @@ func TestCityShoppingDefinition(t *testing.T) {
         require.Equal(t, cityShoppingTimeout, def.Timeout)
         require.NotNil(t, def.Scenario)
         for _, needle := range []string{
-            "36000 50229 -3456", "level 15", "500 000 adena",
+            "36000 50229 -3456", "level 15", "800 000 adena",
             "Mirabel", "Gludio", "Sydnia", "Simplon", "Bella",
+            "Composition Bow",
         } {
             require.Contains(t, def.Description, needle)
         }
@@ -55,7 +56,7 @@ func TestCityShoppingSlotsMatchTheKit(t *testing.T) {
 }
 
 // TestCityShoppingResetShape pins the injected start state: the
-// level 15 vitals, the 500 000 adena wallet and the village dress in
+// level 15 vitals, the 800 000 adena wallet and the village dress in
 // the bag on the Kaboo ground.
 func TestCityShoppingResetShape(t *testing.T) {
     reset := cityShoppingReset(cityShoppingAccount)
@@ -105,6 +106,7 @@ func TestCityShoppingCheckStory(t *testing.T) {
         checkCityShopGludio,
         checkCityShopWeapon,
         checkCityShopArmor,
+        checkCityShopBow,
         checkCityShopSold,
         checkCityShopWorn,
         checkCityShopHome,
@@ -242,10 +244,10 @@ func TestCityShoppingWatchAbort(t *testing.T) {
             if testCase.wantDetail == "" {
                 return
             }
-            require.Contains(t, test.checks[7].Detail,
+            require.Contains(t, test.checks[8].Detail,
                 testCase.wantDetail)
-            require.Equal(t, checkCityShopFarm, test.checks[7].ID)
-            require.False(t, test.checks[7].Done)
+            require.Equal(t, checkCityShopFarm, test.checks[8].ID)
+            require.False(t, test.checks[8].Done)
         })
     }
 }
@@ -287,7 +289,7 @@ func TestCityShoppingWatchLatchesTheStory(t *testing.T) {
     bot.ApplyPaperdoll(doll)
     watch.evaluate(bot, test)
     require.True(t, test.checks[1].Done, "the Gludio arrival latches")
-    require.True(t, test.checks[5].Done, "the worn kit latches")
+    require.True(t, test.checks[6].Done, "the worn kit latches")
 
     // Back home with the paperdoll emptied: the live predicates are
     // false, the latched checks stay done.
@@ -301,7 +303,7 @@ func TestCityShoppingWatchLatchesTheStory(t *testing.T) {
     watch.evaluate(bot, test)
     require.True(t, test.checks[1].Done,
         "the Gludio arrival stays proven after the return")
-    require.True(t, test.checks[5].Done,
+    require.True(t, test.checks[6].Done,
         "the worn kit stays proven after a gear swap")
 }
 
@@ -352,8 +354,8 @@ func TestCityShoppingWatchSellsTheOldKit(t *testing.T) {
     test := &Test{}
     test.setChecks(cityShoppingChecks())
     watch.evaluate(sold, test)
-    require.True(t, test.checks[4].Done, "the sale latches")
-    require.Equal(t, checkCityShopSold, test.checks[4].ID)
+    require.True(t, test.checks[5].Done, "the sale latches")
+    require.Equal(t, checkCityShopSold, test.checks[5].ID)
 
     // A leftover old piece keeps the check open with its count.
     leftover := newBot(true)
@@ -362,8 +364,8 @@ func TestCityShoppingWatchSellsTheOldKit(t *testing.T) {
     test = &Test{}
     test.setChecks(cityShoppingChecks())
     watch.evaluate(leftover, test)
-    require.False(t, test.checks[4].Done)
-    require.Contains(t, test.checks[4].Detail, "1 of 7 old pieces")
+    require.False(t, test.checks[5].Done)
+    require.Contains(t, test.checks[5].Detail, "1 of 7 old pieces")
 
     // The restock trip after the errand sells the leftover: the
     // ended errand never turns the check green.
@@ -377,6 +379,46 @@ func TestCityShoppingWatchSellsTheOldKit(t *testing.T) {
         Err:       "",
     })
     watch.evaluate(leftover, test)
-    require.False(t, test.checks[4].Done,
+    require.False(t, test.checks[5].Done,
         "the post errand junk sale never masks the defect")
+}
+
+// TestCityShoppingWatchLatchesTheBow pins the bow latch: the check
+// closes when the Composition Bow lands in the bag and stays closed
+// when a later junk flow sells a duplicate of a weaker tool.
+func TestCityShoppingWatchLatchesTheBow(t *testing.T) {
+    bot := state.NewBot(cityShoppingAccount)
+    bot.SetCharacter(cityShoppingAccount, 100, 18,
+        cityShoppingGludioX, cityShoppingGludioY, -3114,
+        level15HP, level15MP)
+    bot.SetOnline(cityShoppingAccount)
+    bot.ApplyUserInfo(state.UserInfo{
+        Name: cityShoppingAccount, Level: 15, ClassID: 18,
+        X: cityShoppingGludioX, Y: cityShoppingGludioY, Z: -3114,
+        MaxHP: level15HP, CurHP: level15HP,
+        MaxMP: level15MP, CurMP: level15MP,
+    })
+    watch := &cityShoppingWatch{}
+    test := &Test{}
+    test.setChecks(cityShoppingChecks())
+
+    watch.evaluate(bot, test)
+    require.False(t, test.checks[4].Done, "no bow in the bag yet")
+    require.Equal(t, checkCityShopBow, test.checks[4].ID)
+
+    bot.ApplyInventoryUpdate([]state.InventoryItem{{
+        ObjectID: 5000, ItemID: hunt.CityShoppingBowID(), Count: 1,
+        Change: 1,
+    }})
+    watch.evaluate(bot, test)
+    require.True(t, test.checks[4].Done, "the bow purchase latches")
+    require.Contains(t, test.checks[4].Detail, "Composition Bow")
+
+    bot.ApplyInventoryUpdate([]state.InventoryItem{{
+        ObjectID: 5000, ItemID: hunt.CityShoppingBowID(), Count: 0,
+        Change: 3,
+    }})
+    watch.evaluate(bot, test)
+    require.True(t, test.checks[4].Done,
+        "the bow stays proven after a later sale")
 }

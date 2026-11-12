@@ -125,18 +125,19 @@ func Definitions() []TestDef {
             Description: "Start: the elven fighter temp25 resets onto " +
                 "the Kaboo Orc Grunt SW-5 cell focus (36000 50229 " +
                 "-3456) as the level 15 character in the village " +
-                "dress with 500 000 adena in the wallet. Flow: the " +
+                "dress with 800 000 adena in the wallet. Flow: the " +
                 "acceptance-only city shopping seam of the hunt " +
                 "loop arms, the bot walks to the Elven Village " +
                 "gatekeeper Mirabel, teleports to Gludio, sells the " +
                 "village weapon and armor it replaces at Sydnia and " +
-                "Simplon, buys the Falchion and the whole no-grade " +
-                "armor set there, dresses the new kit, teleports " +
-                "back with Bella and walks to the start ground, " +
-                "where the hunt resumes. Pass: every stage holds - " +
-                "the Gludio arrival, the bought weapon and armor, " +
-                "the sale of the old dress, the worn kit, the " +
-                "return home and a kill after the return.",
+                "Simplon, buys the Falchion, the whole no-grade " +
+                "armor set and the Composition Bow there, dresses " +
+                "the new kit, teleports back with Bella and walks " +
+                "to the start ground, where the hunt resumes. Pass: " +
+                "every stage holds - the Gludio arrival, the bought " +
+                "weapon, the armor and the bow, the sale of the old " +
+                "dress, the worn kit, the return home and a kill " +
+                "after the return.",
             Scenario: cityShoppingScenario,
         },
         {

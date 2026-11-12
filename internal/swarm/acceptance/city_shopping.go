@@ -15,13 +15,13 @@ import (
 )
 
 // The city shopping acceptance scenario: a character that already
-// wears the village dress and has saved 500 000 adena walks to the
+// wears the village dress and has saved 800 000 adena walks to the
 // Elven Village gatekeeper, teleports to Gludio, buys the top
-// no-grade weapon and armor set at the town shops, rides back to the
-// Elven Village and resumes the hunt on the start ground. The errand
-// itself lives in hunt/city_shopping.go and starts from the
-// production trigger; the scenario only sets the start state and
-// watches the story.
+// no-grade weapon and armor set at the town shops, carries the top
+// no-grade bow beside them, rides back to the Elven Village and
+// resumes the hunt on the start ground. The errand itself lives in
+// hunt/city_shopping.go and starts from the production trigger; the
+// scenario only sets the start state and watches the story.
 
 // cityShoppingScenarioID is the scenario registry id.
 const cityShoppingScenarioID = "city-shopping"
@@ -62,14 +62,14 @@ const cityShoppingFarmWindow = 10 * time.Minute
 // The start state of the errand: the level 15 vitals on the Kaboo
 // Orc Grunt SW-5 cell (elven-hex-104), where the cell median of 9
 // stays under the delevel trigger and the hunt resumes on the
-// return. The 500 000 adena cover the 455 760 Gludio counter price
-// of the top no-grade kit.
+// return. The 800 000 adena cover the 748 560 Gludio counter price of
+// the top no-grade kit and the bow behind it.
 const (
     cityShoppingSpawnX = 36000
     cityShoppingSpawnY = 50229
     cityShoppingSpawnZ = -3456
     cityShoppingLevel  = 15
-    cityShoppingAdena  = 500000
+    cityShoppingAdena  = 800000
 )
 
 // The arrival and return gates of the watch: the Gludio teleport
@@ -91,6 +91,9 @@ const (
     // checkCityShopArmor holds once every armor piece of the kit is
     // in the bag.
     checkCityShopArmor = "armor"
+    // checkCityShopBow holds once the top no-grade bow is in the bag
+    // beside the melee kit.
+    checkCityShopBow = "bow"
     // checkCityShopSold holds once the replaced village gear left the
     // bag during the errand.
     checkCityShopSold = "sold"
@@ -151,7 +154,7 @@ var cityShoppingSlots = []cityShoppingSlot{
 }
 
 // cityShoppingReset returns the start state of the errand: the level
-// 15 vitals and experience of the checkpoint table, the 500 000
+// 15 vitals and experience of the checkpoint table, the 800 000
 // adena wallet and the village dress in the bag on the Kaboo ground.
 func cityShoppingReset(account string) characterReset {
     return characterReset{
@@ -195,6 +198,11 @@ func cityShoppingChecks() []Check {
             Done:  false, Detail: "",
         },
         {
+            ID:    checkCityShopBow,
+            Label: "Sydnia sold the top no-grade bow",
+            Done:  false, Detail: "",
+        },
+        {
             ID:    checkCityShopSold,
             Label: "the replaced weapon and armor were sold",
             Done:  false, Detail: "",
@@ -235,7 +243,7 @@ func startCitySession(
 }
 
 // cityShoppingScenario runs the errand round: the temp character
-// wakes with the village dress in the bag and the 500 000 adena
+// wakes with the village dress in the bag and the 800 000 adena
 // wallet, the armed hunt loop walks it through the city purchase and
 // the watch verifies every stage of the story.
 func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
@@ -264,7 +272,7 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
         return err
     }
     test.appendLog("acceptance: the bot is in the world with the " +
-        "village dress and 500 000 adena, watching the city shopping " +
+        "village dress and 800 000 adena, watching the city shopping " +
         "errand")
 
     watch := &cityShoppingWatch{}
@@ -283,8 +291,8 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
             return err
         }
         if allChecksDone(test) {
-            test.appendLog("acceptance: the kit is worn and the hunt " +
-                "resumed, stopping the bot")
+            test.appendLog("acceptance: the kit and the bow are in " +
+                "and the hunt resumed, stopping the bot")
             cancelSession()
             if err := <-sessionDone; err != nil {
                 return fmt.Errorf("session end: %w", err)
@@ -313,6 +321,9 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
 type cityShoppingWatch struct {
     weaponBought bool
     armorBought  bool
+    bowBought    bool
+    bowSeen      bool
+    bowDetail    string
     gludioSeen   bool
     gludioDetail string
     soldSeen     bool
@@ -355,6 +366,7 @@ func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
         tracker, cityShoppingSlots[1:])
     w.armorBought = armorBought == len(cityShoppingSlots)-1
     test.updateCheck(checkCityShopArmor, w.armorBought, armorDetail)
+    w.evaluateBow(tracker, test)
     w.evaluateSales(tracker, test)
     worn, wornDetail := cityShoppingWornDetail(tracker)
     if worn == len(cityShoppingSlots) {
@@ -365,7 +377,7 @@ func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
         wornDetail = w.wornDetail
     }
     test.updateCheck(checkCityShopWorn, w.wornSeen, wornDetail)
-    if !w.weaponBought || !w.armorBought || !posOK {
+    if !w.weaponBought || !w.armorBought || !w.bowBought || !posOK {
         return
     }
     atHome := math.Hypot(
@@ -382,6 +394,30 @@ func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
     test.updateCheck(checkCityShopHome, true,
         fmt.Sprintf("back at %d,%d after the city run", selfX, selfY))
     w.evaluateFarming(tracker, test)
+}
+
+// evaluateBow latches the bow purchase: the tool rides the last
+// Gludio stop, behind the melee kit. The latch retires the live bag
+// predicate - the junk flows may sell a duplicate later and would
+// reopen the proven fact.
+func (w *cityShoppingWatch) evaluateBow(
+    tracker *state.Bot, test *Test,
+) {
+    if w.bowSeen {
+        test.updateCheck(checkCityShopBow, true, w.bowDetail)
+
+        return
+    }
+    w.bowBought = tracker.InventoryHasItem(hunt.CityShoppingBowID())
+    if w.bowBought {
+        w.bowSeen = true
+        w.bowDetail = "the Composition Bow is in the bag"
+    }
+    detail := w.bowDetail
+    if detail == "" {
+        detail = "waiting for the bow purchase"
+    }
+    test.updateCheck(checkCityShopBow, w.bowSeen, detail)
 }
 
 // evaluateSales latches the sale of the replaced village gear: the
