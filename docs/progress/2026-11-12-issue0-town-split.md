@@ -68,8 +68,19 @@ exit 0.
 
 Next: the `standUpGuarded` move into `loop_safety.go` (commit 2).
 
+### 2026-11-12 - the stand guard moves to the rest layer (commit 2)
+`standUpGuarded` left the town file for `loop_actions.go`, not the
+planned `loop_safety.go`: the guard is the other half of the pending
+transition gate implemented by `restToggleTo` (`restActionAt` /
+`restActionSit`), so the two live in one file instead of the guard
+sitting with the escape walks that merely call it. `town.go` is 684
+lines now, `loop_actions.go` 462.
+
+The same gate: `go build ./...`, `go vet`, `golangci-lint run
+./internal/swarm/hunt/...` 0 issues, `go test ./internal/swarm/hunt/...
+-count=1` ok in 97.6 s, `task fmt:check` exit 0.
+
 ## Status
 
-Commit 1 (the split) is verified and committed. Next: move
-`standUpGuarded` to `loop_safety.go`, then `task verify` and the live
-E2E before archiving the fragment.
+Both commits are verified. Next: `task verify`, the live E2E, then
+archive the fragment.
