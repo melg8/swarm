@@ -134,6 +134,15 @@ corner probe is a length, not a leg at all.
   ids and the repeated one-lane story.
 - Verified: `task fmt`, the hunt tests, `task lint:new`.
 
+### 2026-11-12 - quest_trip.go keeps the walk numbers only
+
+- 35 blocks compress: the 20 line engine header becomes eight and
+  points at `docs/quest_protocol.md`; the blocks keep the 10 min walk,
+  the 8000 unit segment over the 1M expansion cap, the 3 s move start
+  window, the 55 and 80 percent health floors and the 250 unit
+  interaction distance.
+- Verified: `task fmt`, the hunt tests, `task lint:new`.
+
 ## Status
 
 The tool, the rule and the renames are in. The kite header and the
