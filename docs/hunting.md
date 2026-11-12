@@ -1758,10 +1758,13 @@ The short form:
   and the destination - for exactly this class of debugging (see
   docs/webui.md).
 - Path layer selection: the trip segments navigate through the
-  Navigator's mesh corridor search (FindPathApproach /
-  FindPathApproachAvoiding with the session's frozen corridor bans)
-  and the segment approach radius. Every npc destination walk (the
-  merchant stops, the teacher stops, the delevel guard walks) plans
+  Navigator's mesh corridor search (FindPathApproach) and the segment
+  approach radius. The avoiding form (FindPathApproachAvoiding) stays
+  on the seam for the library contract; the session's frozen corridor
+  bans are gone - the plaza ping-pong round removed them because the
+  rectangle granularity sealed whole mesh sheets. Every npc
+  destination walk (the merchant stops, the teacher stops, the delevel
+  guard walks) plans
   through the npc stop ladder (`startWalkNpcSegment`): the npc rung
   searches with the npc search radius (`npcApproachRadius`, 10 units -
   the user rule of the 2026-09-20 report: the plan must end at the

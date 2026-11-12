@@ -677,6 +677,19 @@ corner probe is a length, not a leg at all.
   lint:new`. `town_segment.go` fell from 40.0 to 29.2 percent (109
   comment lines), no block above 8 lines.
 
+### 2026-11-12 - acceptance/plaza_herbiel.go keeps the repro contract
+
+- 8 blocks compress: the 26 line scenario header (the ping-pong report,
+  the farm readiness start state, the pass contract), the plaza cell,
+  the corridor sample, the interaction ring, the timeout, the reset and
+  the scenario contract. The header keeps the 63 unit ping-pong and the
+  pass contract; the two stale "frozen corridor bans" mentions of
+  `docs/hunting.md` and `docs/navmesh.md` now record that the session
+  bans are gone (the avoiding form stays for the library contract).
+- Verified: `task fmt`, `go build ./...`, the acceptance tests, `task
+  lint:new`. `plaza_herbiel.go` fell from 29.1 to 18.4 percent (38
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -696,8 +709,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `pathfind/navmesh/pocket.go`, `pathfind/capsule.go`, `hunt/loop_avoid.go`,
 `hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go`,
 `hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go`,
-`gear/shopping_candidates.go` and `hunt/town_segment.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
-`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
-their fragments are active); the share and the block count are
-re-measured at the end.
+`gear/shopping_candidates.go`, `hunt/town_segment.go` and
+`acceptance/plaza_herbiel.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/loop_state.go` entries stay untouched while their fragments are
+active); the share and the block count are re-measured at the end.

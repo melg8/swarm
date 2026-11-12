@@ -691,11 +691,11 @@ trips and the user walks plan their routes without knowing which
 engine answered.
 
 - **The route queries serve from the mesh**: FindPathApproach, both
-  avoiding forms (the frozen corridor bans of the session convert
-  into mesh ban disks) and FindPath run the corridor
-  search with the approach radius goal (the polygon-granularity form
-  of the grid nodeReached) and answer the funnel waypoints as the
-  pathfind.Result contract of the seam.
+  avoiding forms (the avoid areas convert into mesh ban disks, the
+  library contract; the session's frozen corridor bans are gone) and
+  FindPath run the corridor search with the approach radius goal (the
+  polygon-granularity form of the grid nodeReached) and answer the
+  funnel waypoints as the pathfind.Result contract of the seam.
 - **Every answer the mesh cannot serve falls back to the grid
   engine**: a missing tile under an endpoint, ground the sheet
   decomposition dropped, a sealed goal under the bans. The grid

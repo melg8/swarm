@@ -13,36 +13,17 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The plaza Herbiel walk round (the 2026-09-20 17:09 farm readiness
-// ping-pong report): the shopping trip of the report walked from the
-// shop plaza to the grocery trader Herbiel and the follower
-// ping-ponged between the plaza cell A (44584 46944, the Unoren
-// customer stand the character traded at) and the first route sample
-// 63 units out - nine alternating MoveToLocation clicks while the
-// server accepted and delivered every one of them, then the frozen
-// corridor verdict banned the plaza for the session and every later
-// route search of the run answered from the sealed plaza. The round
-// of the fix made the follower's advance gate answer through the same
-// server click transport the clicks obey (the follower keeps one
-// oracle end to end) and removed the corridor ban system.
-//
-// The scenario is the micro reproduction of the report: the character
-// wakes ON the plaza cell the ping-pong lived on, in the exact start
-// state of the farm readiness round (the level 15 elven fighter with
-// the 20,000 SP, the 100,000 adena and the empty bag of the fresh
-// character), so the weapon run trip arms at once and the stop ladder
-// walks the very legs of the report - the sells at the Unoren stand
-// the character already stands on, the gear buys, then the walk to
-// Herbiel through the village corridor the ping-pong froze in. The
-// pass contract pins the three observable halves of the fixed walk:
-// the character leaves the plaza band (the ping-pong never left it),
-// the walk makes real progress through the western corridor, and the
-// character arrives within the interaction distance of Herbiel's
-// spawn - the stand the trip aimed at.
+// The plaza Herbiel walk round: the micro reproduction of the plaza ping-pong
+// report (the follower alternated two clicks 63 units apart while the server
+// delivered both, then the frozen corridor ban sealed the plaza for the
+// session). The character wakes ON the report's plaza cell in the farm
+// readiness state, so the weapon run trip arms at once and walks the report
+// legs - the sells at the stand, the gear buys, then the walk to Herbiel.
+// Pass: the character leaves the plaza band, crosses the western corridor and
+// arrives within the interaction distance of Herbiel's spawn.
 const (
-    // plazaHerbielX/Y/Z is the plaza cell A of the report: the Unoren
-    // customer stand the report's character traded at (the tracker z
-    // is the live server frame of the village deck).
+    // plazaHerbielX/Y/Z is the report's plaza cell: the Unoren customer stand
+    // in the live server frame of the village deck.
     plazaHerbielX = 44584
     plazaHerbielY = 46944
     plazaHerbielZ = -2920
@@ -50,9 +31,8 @@ const (
     // npc the interaction distance check reads): the walk's aim.
     herbielNpcX = 42766
     herbielNpcY = 50037
-    // corridorHerbielX/Y is the western corridor sample the planned
-    // route crosses (the third waypoint of the offline repro): the
-    // mid-route progress check reads the character's distance to it.
+    // corridorHerbielX/Y is the western corridor sample the planned route
+    // crosses; the mid-route progress check reads the distance to it.
     corridorHerbielX = 43520
     corridorHerbielY = 47312
     // plazaHerbielLeft is the distance from the plaza cell beyond
@@ -61,9 +41,8 @@ const (
     // corridorHerbielSeen is the distance from the corridor sample
     // within which the walk counts as crossing the western corridor.
     corridorHerbielSeen = 300.0
-    // herbielInteraction is the server interaction distance ring the
-    // arrival check accepts (the stand sits across the counter from
-    // the spawn).
+    // herbielInteraction is the interaction distance ring the arrival check
+    // accepts (the stand sits across the counter from the spawn).
     herbielInteraction = 250.0
     // plazaHerbielTimeout bounds the round: the walk covers ~3 km of
     // village corridor plus the buy transaction windows of the two
@@ -85,11 +64,8 @@ const (
     checkHerbielArrive = "herbiel"
 )
 
-// plazaHerbielReset returns the start state of the scenario: the farm
-// readiness shape (the level 15 fighter with the 20,000 SP, the
-// 100,000 adena and the empty bag) positioned ON the plaza cell of
-// the report - the character is already at the place the ping-pong
-// lived on, no walk-in needed.
+// plazaHerbielReset returns the start state: the farm readiness shape
+// positioned ON the report's plaza cell, no walk-in needed.
 func plazaHerbielReset(account string) characterReset {
     reset := farmReadinessReset(account)
     reset.X = plazaHerbielX
@@ -123,15 +99,10 @@ func plazaHerbielChecks() []Check {
     }
 }
 
-// plazaHerbielScenario runs the micro round of the report: the temp
-// character wakes on the plaza cell in the farm readiness start
-// state, the weapon run trip arms at once (the empty bag, no weapon)
-// and the stop ladder walks the legs of the report - the sells at the
-// stand the character stands on, the gear buys, then the walk to
-// Herbiel through the corridor the ping-pong froze in. Pass: the
-// character left the plaza band, crossed the western corridor and
-// stands within the interaction distance of Herbiel's spawn within
-// the budget.
+// plazaHerbielScenario runs the round: the temp character wakes on the plaza
+// cell in the farm readiness state, the weapon run trip arms at once and the
+// stop ladder walks the report's legs; the pass contract is the check list of
+// plazaHerbielChecks.
 func plazaHerbielScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(plazaHerbielChecks())
@@ -195,10 +166,8 @@ func plazaHerbielScenario(ctx context.Context, m *Manager, t *Test) error {
     }
 }
 
-// evaluatePlazaHerbiel rewrites the check list of the scenario from
-// the live tracker state: the character left the plaza band, crossed
-// the western corridor and stands within the Herbiel interaction
-// distance. It reports whether every check holds.
+// evaluatePlazaHerbiel rewrites the check list from the live tracker state and
+// reports whether every check holds.
 func evaluatePlazaHerbiel(
     tracker *state.Bot, test *Test,
 ) (bool, string) {
