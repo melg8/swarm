@@ -10,15 +10,6 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-func BenchmarkPlusPlus(b *testing.B) {
-    for range b.N {
-        value := 2 + 2
-        if value != 4 {
-            b.Fatal("value is not 4")
-        }
-    }
-}
-
 func dataForBenchmark() []byte {
     data := make([]byte, 1024)
     for i := range data {
