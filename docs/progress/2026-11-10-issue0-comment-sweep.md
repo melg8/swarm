@@ -165,6 +165,17 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, the hunt tests, `task lint:new`. The tree
   share reads 13.8 percent, 571 blocks, 1,299 history markers.
 
+### 2026-11-12 - archer_fleet.go keeps the thresholds only
+
+- 30 blocks compress: the scenario header, the threshold table and the
+  telemetry narratives keep the numbers (the 3 minute window, the 40 s
+  launch budget, the 250 unit range floor, the 2200 ms lag ceiling, the
+  400 unit re-shot floor, the 1500 unit leash, the 40 degree turn, the
+  1650 ms windup, the 0.35 standing share, the 214 HP / 82 MP vitals)
+  and drop the round evidence.
+- Verified: `task fmt`, `go build ./...`, the acceptance tests,
+  `task lint:new`.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
