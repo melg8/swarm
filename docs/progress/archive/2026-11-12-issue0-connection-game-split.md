@@ -1,4 +1,4 @@
-# The game session split: core, actions, movement, login (status: in progress)
+# The game session split: core, actions, movement, login (status: complete)
 
 Started 2026-11-12, branch main, issue0 (owner instruction: continue
 the refactor after the loop, town, walker, state, launcher and shop
@@ -50,7 +50,8 @@ script (the AST range lister plus a verbatim copy, scratch) is next.
 
 ## Status
 
-Inventory done, the move is next.
+Complete: the four files land on `main` as `b28fc14e`; `task
+verify` green and the live run clean.
 
 ### 2026-11-12 - the move
 The split script (the AST range lister plus a verbatim copy, scratch,
@@ -79,3 +80,11 @@ Verified: `go build ./...`, `go vet ./internal/swarm/connection/...`,
 `go test ./internal/swarm/connection/... -count=1` ok in 10.5 s.
 
 Next: `task verify`, the live run, then the fragment archive.
+
+### 2026-11-12 - the gate and the live run
+`task verify` exit 0 (build, vet, the full tree lint, the whole test
+suite, `fmt:check`). The live run on the Windows stack: the binary
+carries the `-ldflags` identity of `b28fc14e`, `-login
+127.0.0.3:2106 -hunt -web ""`, 65 s in world, then Ctrl+Break - the
+handshake, the spawn burst, the action stream, `Leaving the game world
+with test1` / `Bot finished`, exit code 0.
