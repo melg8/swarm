@@ -1331,10 +1331,10 @@ const MapView = {
     this.drawAggroRanges(ctx, rect);
     this.drawSocialLinks(ctx, rect);
     this.drawObjects(ctx, rect);
+    this.drawWalkPlan(ctx);
     this.drawSelf(ctx);
     this.drawSelfCast(ctx);
     this.drawCombatEffects(ctx);
-    this.drawWalkPlan(ctx);
     this.drawUserIntent(ctx);
     if (this.lastSnap
       && document.getElementById("show-labels").checked) {
@@ -3200,8 +3200,8 @@ const MapView = {
 
     // The server side walk of the character gets the same dashed
     // destination line as every other moving object (the paths
-    // toggle): the manual walk plan of drawWalkPlan adds the full
-    // planned route on top of it.
+    // toggle): the manual walk plan of drawWalkPlan paints the full
+    // planned route under the marker.
     if (document.getElementById("show-dest").checked && c.moving) {
       const d = this.worldToScreen(c.destX, c.destY);
       ctx.save();
@@ -3677,7 +3677,8 @@ const MapView = {
   // its own route fraction (deeper than the line, so a bead reads
   // apart from the ribbon), the waypoint the follower aims at
   // pulses a soft ring and the destination itself carries the
-  // pulsing marker.
+  // pulsing marker. The whole plan paints under the self marker, so
+  // the route never cuts the character icon in two.
   drawWalkPlan(ctx) {
     const plan = this.lastSnap.walkPath;
     if (!plan || plan.length === 0) { return; }

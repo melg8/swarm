@@ -736,7 +736,9 @@ between the snapshots, stopping itself once every window elapsed.
   idle) through the `ClearWalkPlan` call of the tick. The destination
   marker (the pulsing magenta dot) draws at `snapshot.walkDest` (the
   merchant spawn, the farm spot, the clicked point), falling back to
-  the last waypoint when the plan carries it.
+  the last waypoint when the plan carries it. The whole plan paints
+  under the self marker (the layer order of `paint`), so the route
+  never cuts the character icon in two.
   While a manual move runs, the loop publishes the walk plan into the
   tracker (`state.Bot.SetWalkPlan`: the origin, the full waypoint
   list, the follower cursor and the destination, refreshed every tick,

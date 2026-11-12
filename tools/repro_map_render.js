@@ -2283,6 +2283,30 @@ function runScenarioWalkFlow(mapFile) {
     check(results, "the destination marker stays magenta",
         destFill.length === 1, destFill.length + " marker fills");
 
+    // The layering rule: every plan element (the line, the beads and
+    // the destination marker) paints before the self marker, so the
+    // route never cuts the character icon in two. The recorded
+    // strokes and fills keep their paint order within each array.
+    const selfFill = record.fills.findIndex((fill) =>
+        fill.style === MARK.self && fill.arcs.length === 1
+            && Math.abs(fill.arcs[0][2] - 6) < 0.001
+            && Math.hypot(fill.arcs[0][0] - head.x,
+                fill.arcs[0][1] - head.y) < 1);
+    const planFill = record.fills.reduce((last, fill, i) => (
+        dotFills([fill]).length > 0
+            || (fill.style === "#ff44cc" && fill.arcs.length === 1))
+        && i > last ? i : last, -1);
+    const selfStroke = record.strokes.findIndex((stroke) =>
+        stroke.style === MARK.self);
+    const flowStroke = record.strokes.reduce((last, stroke, i) =>
+        i > last && flowStrokes([stroke]).length > 0 ? i : last, -1);
+    check(results, "the walk plan paints under the self marker",
+        selfFill >= 0 && planFill >= 0 && selfFill > planFill
+            && selfStroke >= 0 && flowStroke >= 0
+            && selfStroke > flowStroke,
+        "self fill " + selfFill + " vs plan fill " + planFill
+        + ", self stroke " + selfStroke + " vs flow " + flowStroke);
+
     // The aimed waypoint (walkIndex 0) pulses a ring in the hue of
     // its own dot: the radius starts mid swing and the same ring is at
     // another radius after the clock advances.
