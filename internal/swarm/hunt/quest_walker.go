@@ -14,49 +14,37 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// questDialogWait bounds the wait for one dialog page of a walked
-// conversation: the server answers a talk click or a bypass within
-// a few hundred milliseconds (the ScriptLink -> notifyEvent ->
-// showResult chain is synchronous), so five seconds covers a slow
-// tick and a brief stall. Past it the walker fails the step instead
-// of hanging the loop. The var (not a const) is a test seam: the
-// unit tests shorten it to keep the timeout case under a second.
+// questDialogWait bounds the wait for one dialog page of a walked conversation:
+// the server answers a talk click or a bypass within a few hundred milliseconds
+// (the ScriptLink -> notifyEvent -> showResult chain is synchronous), so five
+// seconds covers a slow tick and a brief stall. Past it the walker fails the
+// step instead of hanging the loop. The var is a test seam.
 var questDialogWait = 5 * time.Second
 
-// pace blocks the caller for one protocol pacing wait: the flood
-// protector pause between the two talk clicks, the dialog and walk
-// poll periods. The production build sleeps; the tests swap it for a
-// no-op so the synchronous drive loops do not pay the real seconds
-// of the server pacing they model (see disablePace in loop_test.go).
-// The package tests never run in parallel, the swap is race free.
+// pace blocks the caller for one protocol pacing wait: the flood protector
+// pause between the two talk clicks, the dialog and walk poll periods. The
+// production build sleeps, the tests swap it for a no-op (see disablePace in
+// loop_test.go); the package tests never run in parallel, so the swap is race
+// free.
 var pace = time.Sleep
 
-// questDialogPoll paces the new-page wait: the walker reads the
-// last dialog every tick until the page from the npc changes or
-// the wait lapses (the same period as the gatekeeper dialog poll).
+// questDialogPoll paces the new-page wait (the gatekeeper dialog poll period).
 const questDialogPoll = 250 * time.Millisecond
 
-// dialogClickPause spaces the two talk clicks: the server flood
-// protector accepts one player action per second, so the second
-// (interacting) click must not ride the first (selecting) one. The
-// var (not a const) is a test seam.
+// dialogClickPause spaces the two talk clicks: the server flood protector
+// accepts one player action per second, so the interacting click must not ride
+// the selecting one. The var is a test seam.
 var dialogClickPause = selectPeriod
 
-// dialogBypassPace is the minimum pause between two bypass sends of
-// one conversation: the deployed FloodProtectorServerBypassInterval
-// (3 game ticks of 100 ms each, 300 ms) drops a bypass that arrives
-// inside the window without any answer. The page-arrival pacing of
-// the walker alone rides under 300 ms (one round trip), so the fast
-// 3.2 s margin stays: cheap next to a dropped bypass. The var (not a
-// const) is a test seam.
+// dialogBypassPace is the minimum pause between two bypass sends of one
+// conversation: the deployed FloodProtectorServerBypassInterval (three 100 ms
+// game ticks) drops a bypass that arrives inside the window without any answer,
+// and the page wait alone rides under it. The var is a test seam.
 var dialogBypassPace = 3200 * time.Millisecond
 
-// bypassPacer spaces the bypass sends of one conversation: the
-// server drops a command that arrives inside the flood protector
-// window of the previous one, and the answer page of that previous
-// command arrives one round trip later, so pacing the page wait
-// alone can ride under the window. The zero pacer sends at once -
-// the first bypass of a conversation has no predecessor.
+// bypassPacer spaces the bypass sends of one conversation: the server drops a
+// command that arrives inside the flood protector window of the previous one,
+// and a zero pacer state sends at once (the first bypass has no predecessor).
 type bypassPacer struct {
     last time.Time
 }
@@ -72,67 +60,26 @@ func (p *bypassPacer) wait() {
     p.last = time.Now()
 }
 
-// DialogStep is one link choice of a dialog route: the walker picks
-// the link whose visible text contains LinkText and sends the
-// bypass command that link carries. The text of the quest and class
-// master pages is stable data (the datapack html), so a distinctive
-// substring - "Challenge the test", "Change profession to an
-// Elven Knight" - identifies the step's link. AnswerIsEffect marks
-// the LAST step of a route whose bypass answers with its effect
-// instead of a dialog page (the Newbie Guide support magic: the
-// server casts every level-eligible buff and sends no NpcHtmlMessage
-// - the Mobius SupportMagic handler), so the walker sends it and
-// returns without the final page wait; the caller owns the wait for
-// the effect itself (the buff landing watch of the guide stop).
+// DialogStep is one link choice of a dialog route: the walker picks the link
+// whose visible text contains LinkText and sends the bypass command that link
+// carries. AnswerIsEffect marks the last step of a route whose bypass answers
+// with its effect instead of a dialog page (the Newbie Guide support magic
+// casts every level-eligible buff and sends no NpcHtmlMessage), and the caller
+// owns the wait for the effect itself.
 type DialogStep struct {
     LinkText string
-    // AnswerIsEffect skips the final page wait after this step's
-    // bypass: the answer is the effect (the buffs, the skill
-    // casts), not an html page. Only the last step carries it - a
-    // mid-route step with the flag still waits for the next page of
-    // the next step.
+    // AnswerIsEffect skips the final page wait: the answer is the effect, not
+    // an html page, and only the last step carries the flag.
     AnswerIsEffect bool
 }
 
-// DriveDialog walks one NPC conversation end to end: the entry (the
-// paced two-click talk of talkToNpc), then for every route step the
-// new page wait (awaitNewDialogPage), the link match by text
-// (findDialogLink), the IsDialogCommand validation of the tracker
-// and the bypass send. The answer page of the last bypass is
-// awaited and applied as well, so the tracker holds the final page
-// (its links, its origin) when the call returns - the quest journal
-// push of the same answer lands in the tracker through the QuestList
-// apply path - UNLESS the last step carries AnswerIsEffect (the
-// answer is the effect, not a page: no final wait).
-//
-// Every page wait is gated on the ARRIVAL GENERATION of the dialog
-// store: the generation is captured before the entry talk, and a
-// page satisfies a wait only when it arrived past the previously
-// accepted one. A page left over from an earlier conversation of
-// the SAME npc - the recurring Newbie Guide stop meets its own
-// yesterday entry page in the store - never passes the gate, so the
-// first bypass is sent only after the fresh entry page arrived,
-// which on the server means the interact click already opened the
-// dialog and rebuilt the html action cache every bypass validates
-// against (RequestBypassToServer drops an unmatched bypass
-// silently, no answer ever comes; the issue #35 state dump pinned
-// exactly that race: the step 1 bypass logged before the fresh 401
-// byte entry page arrived). The gate also retires the byte
-// identical re-send blind spot of the old content comparison: a
-// re-sent page is a fresh arrival (the generation advanced), the
-// route proceeds through it instead of lapsing into the timeout.
-//
-// The caller keeps the character within the interaction distance of
-// the npc for the whole conversation (250 units - the server gates
-// every bypass and quest event on it, see
-// Player.processScriptEvent); the walker's clicks refresh the
-// server's last-folk memory at the entry only.
-//
-// A step whose page never arrives, whose link text is not offered,
-// or whose command fails the validation returns an error naming the
-// step - the caller decides whether to retry the conversation from
-// the entry (the server state of the quest makes the re-entry
-// idempotent: re-talking re-sends the page of the current cond).
+// DriveDialog walks one NPC conversation end to end: the entry (the paced
+// two-click talk of talkToNpc), then per route step the new page wait, the link
+// match by text, the IsDialogCommand validation and the bypass send, with the
+// final answer page applied before the return. Every wait is gated on the
+// arrival generation of the dialog store, so a stale page of the same npc never
+// passes and the first bypass follows the fresh entry page (docs/hunting.md,
+// the quest dialog walker). A failed step returns an error naming it.
 func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
     if npcObjID == 0 {
         return errors.New("dialog: no npc to talk to")
@@ -140,9 +87,8 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
     if len(steps) == 0 {
         return errors.New("dialog: the route has no steps")
     }
-    // The arrival generation the talk starts from: every page of
-    // this conversation must arrive past it (the stale page guard
-    // - see the function doc).
+    // The arrival generation the talk starts from: every page of this
+    // conversation must arrive past it.
     _, _, talkGen := l.game.LastHTMLDialogArrival()
     if err := l.talkToNpc(npcObjID); err != nil {
         return fmt.Errorf("dialog: the talk entry failed: %w", err)
@@ -178,9 +124,8 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
                 "dialog: step %d: the bypass send failed: %w",
                 i+1, err)
         }
-        // The effect answer of the last step: the bypass answered
-        // with its effect (the buffs land through the tracker), no
-        // page follows - the caller owns the effect wait.
+        // The effect answer of the last step: the bypass answered with its
+        // effect, no page follows and the caller owns the effect wait.
         if steps[i].AnswerIsEffect && i == len(steps)-1 {
             return nil
         }
@@ -194,20 +139,11 @@ func (l *Loop) DriveDialog(npcObjID int32, steps []DialogStep) error {
     return nil
 }
 
-// talkToNpc opens the dialog of an npc the character already stands
-// within the interaction distance of: the plain client talk is two
-// Action clicks (NpcClick.onAction - the first click of a target
-// the player does not hold yet only selects it, the second click of
-// the same object id is the attack analog: it walks the interact
-// branch and when the character stands outside the interaction
-// distance the server takes the INTERACT intention and pulls the
-// character to the npc along the straight line before the npc's
-// html page answers). The two clicks pace at dialogClickPause (the
-// player action flood protector accepts one action per second);
-// every click refreshes the server's last-folk memory the quest
-// events resolve their npc through. A click on an npc that is
-// already the target interacts right away, so the entry is
-// idempotent - the second click re-opens the same page.
+// talkToNpc opens the dialog of an npc the character already stands inside the
+// interaction distance of: the plain client talk is two paced Action clicks -
+// the first click of a new target only selects it, the second walks the
+// interact branch (outside the distance the server pulls the character over),
+// and a click on the npc that is already the target interacts right away.
 func (l *Loop) talkToNpc(npcObjID int32) error {
     if err := l.game.ClickObject(npcObjID); err != nil {
         return err
@@ -217,17 +153,11 @@ func (l *Loop) talkToNpc(npcObjID int32) error {
     return l.game.ClickObject(npcObjID)
 }
 
-// awaitNewDialogPage waits for a dialog page of the npc that
-// ARRIVED past the given generation: the connection layer stores
-// only the last html, and the pages of one conversation all arrive
-// from the same npc, so the arrival generation is the arrival
-// signal of the next page - a page the store already held when the
-// talk began (the yesterday page of the same npc, the blind spot
-// the old content comparison could not tell from a fresh byte
-// identical re-send) never passes the gate, while a genuine re-send
-// of a byte identical page does (the generation advanced, the
-// server answered). The generation of the accepted page returns
-// with it, so the next wait anchors on it.
+// awaitNewDialogPage waits for a dialog page of the npc that arrived past the
+// given generation: the connection layer stores only the last html, so the
+// arrival generation is the arrival signal - a page the store already held when
+// the talk began never passes, while a genuine byte identical re-send does (the
+// generation advanced). The accepted generation returns for the next anchor.
 func (l *Loop) awaitNewDialogPage(
     npcObjID int32, lastGen uint64,
 ) (string, uint64, error) {
@@ -245,13 +175,9 @@ func (l *Loop) awaitNewDialogPage(
     }
 }
 
-// applyDialogPage parses the bypass links of a dialog page and
-// feeds the tracker's open dialog section: the hunt-side wiring of
-// the dialog state of T-013 (the connection layer stores the raw
-// html of the last NpcHtmlMessage, the walker is the consumer that
-// applies it). The links land in the tracker exactly once per page,
-// before any bypass of that page is sent, so the IsDialogCommand
-// validation runs against the page the command came from. The
+// applyDialogPage parses the bypass links of a dialog page and feeds the
+// tracker open dialog section before any bypass of that page is sent, so the
+// IsDialogCommand validation runs against the page the command came from. The
 // returned links are the parsed copy the caller matches steps by.
 func (l *Loop) applyDialogPage(
     npcObjID int32, html string,
@@ -264,9 +190,7 @@ func (l *Loop) applyDialogPage(
             Text:    links[i].Text,
         })
     }
-    // ItemID stays 0: the html seam of the GameAPI carries no item
-    // id (the quest flow keeps the npc scope; an item bound dialog is
-    // a different consumer's work).
+    // ItemID stays 0: the html seam of the GameAPI carries no item id.
     l.tracker.ApplyDialog(state.DialogPageView{
         NpcObjID: npcObjID,
         ItemID:   0,
@@ -280,12 +204,10 @@ func (l *Loop) applyDialogPage(
 // not a literal, keeps the exhaustruct gate of the link struct).
 var noDialogLink fromgameserver.HTMLLink
 
-// findDialogLink returns the first link whose visible text contains
-// the wanted text: the match is case-insensitive containment, so a
-// route step names a distinctive substring of the link label ("the
-// test" of "Challenge the test") without pinning the full datapack
-// sentence. A page can offer the same text twice; the first link in
-// page order wins, matching the top-to-bottom reading of a dialog.
+// findDialogLink returns the first link whose visible text contains the wanted
+// text: the match is case-insensitive containment, so a route step names a
+// distinctive substring of the link label without pinning the full sentence.
+// The first link in page order wins, matching the top-to-bottom reading.
 func findDialogLink(
     links []fromgameserver.HTMLLink, text string,
 ) (fromgameserver.HTMLLink, bool) {

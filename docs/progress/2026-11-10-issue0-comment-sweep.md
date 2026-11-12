@@ -537,6 +537,21 @@ corner probe is a length, not a leg at all.
   lint:new`. `stagnation.go` fell from 47.6 to 28.8 percent (57
   comment lines), no block above 8 lines.
 
+### 2026-11-12 - hunt/quest_walker.go carries the current arrival gate
+
+- 16 blocks compress: the 5 s page wait and 250 ms poll, the one
+  action per second talk pace, the 3.2 s bypass pace against the three
+  tick `FloodProtectorServerBypassInterval`, the `AnswerIsEffect`
+  last-step exemption, the containment link match, the final page
+  apply order. The doc was stale here: it still described the old
+  content change arrival signal, so `docs/hunting.md` now carries the
+  arrival generation gate, the issue #35 stale page case, the
+  byte identical re-send, the paces and the INTERACT pull in the same
+  commit.
+- Verified: `task fmt`, `go build ./...`, the hunt tests, `task
+  lint:new`. `quest_walker.go` fell from 48.5 to 30.5 percent (68
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -553,7 +568,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go`,
 `hunt/learning.go` and `hunt/town_cursor_escape.go`,
 `pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
-`hunt/loop_avoid.go` and `hunt/stagnation.go` (second passes). Next: a
-fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
-`hunt/loop_state.go` entries stay untouched while their fragments are
-active); the share and the block count are re-measured at the end.
+`hunt/loop_avoid.go`, `hunt/stagnation.go` and `hunt/quest_walker.go`
+(second passes). Next: a fresh `task comment:audit --top 10` pick (the
+`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
+their fragments are active); the share and the block count are
+re-measured at the end.

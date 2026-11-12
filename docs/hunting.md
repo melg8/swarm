@@ -2143,15 +2143,37 @@ BEFORE any bypass of that page fires, so the validation runs against
 the page the command came from (the hunt-side feed of the state
 dialog section; the connection layer stores the raw html only).
 
-The arrival signal of a new page is the content change: the
-connection layer keeps only the last html, and the pages of one
-conversation all arrive from the same npc, so "the html of npc X
-differs from the last seen" is the only arrival evidence. Every quest
-page transition changes the content (the links of a page carry the
-next page's file name); the one blind spot - the server re-sending a
-byte identical page after a bypass - reads as "no answer yet" and
-lapses into the step timeout, which the caller treats as a failed
-conversation (never a silent success).
+The arrival signal of a new page is the ARRIVAL GENERATION of the
+dialog store, not the content: the connection layer keeps only the
+last html (`LastHTMLDialogArrival` also returns the arrival counter),
+the walker captures the counter before the entry talk, and a page
+satisfies a wait only when it arrived past the last accepted one. A
+page the store already held - the recurring Newbie Guide stop meeting
+its own yesterday entry page - never passes, so the first bypass
+fires only after the fresh entry page, which on the server means the
+interact click already opened the dialog and rebuilt the html action
+cache every bypass validates against (`RequestBypassToServer` drops
+an unmatched bypass silently and no answer ever comes; the issue #35
+dump logged the step 1 bypass before the fresh 401 byte entry page
+arrived). The generation also retires the byte identical re-send
+blind spot of a content comparison: a re-sent page is a fresh arrival
+(the counter advanced) and the route proceeds through it instead of
+lapsing into the timeout.
+
+The pacing of the walk (hunt/quest_walker.go): the two entry clicks
+space at the player action flood protector rate (one action per
+second, `dialogClickPause` = `selectPeriod`), the bypass sends space
+at `dialogBypassPace` (3.2 s) against the
+`FloodProtectorServerBypassInterval` window (three 100 ms game ticks,
+a bypass inside it is dropped without an answer), the page wait is
+`questDialogWait` (5 s) polled at `questDialogPoll` (250 ms), and the
+entry click outside the interaction distance makes the server pull
+the character to the npc with the INTERACT intention. The last step
+of a route may carry `DialogStep.AnswerIsEffect`: its bypass answers
+with the effect instead of a page (the Newbie Guide support magic
+casts every level-eligible buff and sends no NpcHtmlMessage), so the
+walker returns without the final page wait and the caller owns the
+effect wait.
 
 The route steps are data: []DialogStep with the link texts in
 conversation order. A step whose page never arrives, whose link text
