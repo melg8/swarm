@@ -1,4 +1,4 @@
-# The hunt loop split: files by responsibility, state by concern (status: in progress)
+# The hunt loop split: files by responsibility, state by concern (status: complete)
 
 Started 2026-11-12, branch refactor/loop-split, issue0 (owner
 instruction: refactor loop.go).
@@ -129,7 +129,22 @@ build ./...`, `task fmt` + `task fmt:check`, `go test
 ./internal/swarm/hunt/... -count=1` (97.7 s), `golangci-lint run
 ./internal/swarm/hunt/...` (0 issues).
 
+### 2026-11-12 - full verify and the live E2E
+`task verify` (build + vet + full-tree lint + the whole `go test ./...
+-count=1` + `fmt:check`) exit 0. Live E2E on the Windows host: the
+`swarm.exe` built from `d1700e12` with the usual `-ldflags` identity
+ran `-login 127.0.0.3:2106 -hunt -web "" -bots 1` for 60 s; the log
+shows the login handshake, the character selection, `Character test1
+entered the world`, the hunt activity (a kill, the loot switch, a bow
+lure and a kite step) and the graceful `Leaving the game world with
+test1` / `Bot finished` on Ctrl+Break, exit code 0. No panic and no
+error line in the run log. The Ctrl+Break was delivered with a small
+`CreateProcess(CREATE_NEW_PROCESS_GROUP)` +
+`GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, pid)` helper, because the
+MSYS `timeout -s INT` does not map to the Go os.Interrupt handler on
+this host (verified with a synthetic probe: the process kept running).
+
 ## Status
 
-Commits 1-4 done. Next: full verify (`task verify`), live E2E and the
-fragment archive.
+Complete. Commits 1-4 plus the verify/E2E record; the fragment moves to
+`docs/progress/archive/` in the final commit.
