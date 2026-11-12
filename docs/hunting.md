@@ -1479,7 +1479,11 @@ The short form:
   character still walks, paced at half a request period (the 50 unit
   intermediate arrival radius leaves that ring); the manual walk of
   the web UI and `-move` re-aims the same way every request period
-  instead of standing down while the move runs. The far click must
+  instead of standing down while the move runs, and a planned manual
+  route walks on a route sized budget (the 90 s base plus twice the
+  estimated travel - the plan length over the measured run speed -
+  capped at 30 min), so a cross-map order is not cut off halfway; the
+  direct server routed walk keeps the base window. The far click must
   stay on the drawn route: every skipped waypoint projects inside the
   click chord within the 100 unit corridor and within 100 units of
   the chord height, so a switchback, a priced water dip or a ramp the

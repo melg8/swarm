@@ -9,6 +9,7 @@ import (
     "testing"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -142,6 +143,57 @@ func TestUserMoveTimesOut(t *testing.T) {
     loop.tick()
 
     require.Equal(t, phaseEngage, loop.phase)
+}
+
+// TestUserMoveBudgetFollowsThePlannedRoute pins the route sized
+// budget: the plan length over the run speed estimates the travel of
+// a long walk, so it is not cut off at the base window in the middle
+// of the route, while a pathological plan stays bounded.
+func TestUserMoveBudgetFollowsThePlannedRoute(t *testing.T) {
+    require.Equal(t, userMoveTimeout, userMoveBudget(0))
+    long := userMoveBudget(4 * time.Minute)
+    require.Greater(t, long, 4*time.Minute+userMoveTimeout,
+        "the estimated travel time extends the base window")
+    require.Equal(t, userMoveTimeoutMax, userMoveBudget(24*time.Hour),
+        "a pathological plan stays bounded")
+
+    require.Equal(t, 2*time.Minute, manualTravel(15000, 125),
+        "the plan length over the run speed is the travel time")
+    require.Zero(t, manualTravel(0, 125))
+    require.Zero(t, manualTravel(15000, 0),
+        "an unknown length or speed keeps the base window")
+}
+
+// TestUserPlanWalksPastTheBaseWindow pins the deadline check of the
+// planned follower: an old userStart does not end a route whose own
+// budget still runs, and the expired plan deadline does.
+func TestUserPlanWalksPastTheBaseWindow(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    moveSelfTo(bot, 45000, 50000, -3500)
+    now := time.Now()
+    loop.phase = phaseUser
+    loop.userKind = state.CommandMove
+    loop.userStart = now.Add(-userMoveTimeout - time.Minute)
+    loop.userDeadline = now.Add(time.Minute)
+    loop.userWaypoints = []pathfind.Vec3{
+        {X: 45200, Y: 50000, Z: -3500},
+        {X: 45350, Y: 50000, Z: -3500},
+    }
+    loop.userWpIndex = 0
+    loop.userPathTried = true
+    loop.userMoveAt = now.Add(-walkRequestPeriod)
+
+    loop.followUserWaypoints(now, 45000, 50000, -3500)
+    require.Equal(t, phaseUser, loop.phase,
+        "the plan budget keeps the manual walk alive")
+    require.Len(t, game.walks, 1)
+
+    loop.userDeadline = now.Add(-time.Second)
+    loop.userMoveAt = now.Add(-walkRequestPeriod)
+    loop.followUserWaypoints(now, 45000, 50000, -3500)
+    require.Equal(t, phaseEngage, loop.phase,
+        "the expired plan deadline resumes the hunt")
+    require.Len(t, game.walks, 1)
 }
 
 // TestUserAttackCommandEngages pins the attack semantics: the manual

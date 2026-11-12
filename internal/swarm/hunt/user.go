@@ -27,10 +27,16 @@ const (
     // as arrived (the server stops creatures a collision radius short
     // of the destination anyway).
     userArriveRadius = 60.0
-    // userMoveTimeout bounds one manual walk: a click that never
-    // arrives (blocked, too far, interrupted) returns control to the
-    // autonomous hunt.
+    // userMoveTimeout bounds one manual walk with no planned route:
+    // the direct server routed click and the short in-town
+    // destinations return control to the autonomous hunt when the
+    // move never arrives (blocked, too far, interrupted). A planned
+    // mesh route carries its own priced budget (see userMoveBudget).
     userMoveTimeout = 90 * time.Second
+    // userMoveTimeoutMax caps the manual walk budget of a long
+    // planned route: a cross-map click is valid, an endless walk is
+    // not.
+    userMoveTimeoutMax = 30 * time.Minute
     // userPickupTimeout bounds one manual pickup, the same span the
     // autonomous looting allows for the farthest items.
     userPickupTimeout = 30 * time.Second
@@ -363,6 +369,7 @@ func (l *Loop) userMovement(cmd state.Command) {
     l.userZ = cmd.Z
     l.userTarget = cmd.ObjectID
     l.userStart = time.Now()
+    l.userDeadline = time.Time{}
     l.userMoveAt = time.Time{}
     // The new command redirects a walk that is already running: the
     // next tick re-issues the walk request at once instead of
@@ -537,6 +544,15 @@ func (l *Loop) planUserWalk(selfX int32, selfY int32, selfZ int32) {
     }
     l.userWaypoints = result.Waypoints
     l.userWpIndex = 0
+    // The route budget: the plan length over the measured run speed
+    // estimates the walk time, so a long route is not cut off at the
+    // base window in the middle (the owner repro walks 20k units).
+    speed := l.tracker.SelfRunSpeed()
+    if speed <= 0 {
+        speed = flowDefaultRunSpeed
+    }
+    l.userDeadline = time.Now().Add(
+        userMoveBudget(manualTravel(result.Length, speed)))
     // The manual plan publishes its search contract (the approach
     // radius of the answer - zero for the exact destination search,
     // the user approach radius of the fallback corridor - and no
@@ -733,7 +749,7 @@ func (l *Loop) followUserWaypoints(
 
         return
     }
-    if now.Sub(l.userStart) > userMoveTimeout {
+    if l.userMoveExpired(now) {
         l.logf("Hunt: manual walk timed out, resuming the hunt")
         l.resumeAuto()
 
@@ -783,6 +799,43 @@ func (l *Loop) followUserWaypoints(
     l.userWpIndex = l.flowAdvance(l.userWaypoints, l.userWpIndex,
         l.userFrameOffset, selfX, selfY, selfZ)
     l.clickUserWaypoint(now, selfX, selfY, selfZ)
+}
+
+// userMoveBudget resolves the time budget of a manual walk over a
+// planned route: the base window plus twice the estimated travel time
+// (the click cadence, the server corrections and the slower swim
+// segments), capped at userMoveTimeoutMax. Without a plan the base
+// window alone bounds the walk.
+func userMoveBudget(travel time.Duration) time.Duration {
+    budget := userMoveTimeout + 2*travel
+    if budget > userMoveTimeoutMax {
+        return userMoveTimeoutMax
+    }
+
+    return budget
+}
+
+// manualTravel estimates the walk time of a plan: the route length
+// over the measured run speed. A missing length or speed answers zero
+// and the budget keeps the base window.
+func manualTravel(length, speed float64) time.Duration {
+    if length <= 0 || speed <= 0 {
+        return 0
+    }
+
+    return time.Duration(length / speed * float64(time.Second))
+}
+
+// userMoveExpired reports whether the manual walk spent its budget:
+// a planned route counts from its own deadline (set in planUserWalk),
+// the direct server routed walk keeps the base window from the
+// command.
+func (l *Loop) userMoveExpired(now time.Time) bool {
+    if !l.userDeadline.IsZero() {
+        return now.After(l.userDeadline)
+    }
+
+    return now.Sub(l.userStart) > userMoveTimeout
 }
 
 // clickUserWaypoint sends the ground click toward the current manual
@@ -1178,6 +1231,7 @@ func (l *Loop) resumeAuto() {
     l.userKind = ""
     l.userTarget = 0
     l.userRedirect = false
+    l.userDeadline = time.Time{}
     l.target = 0
     l.clearBlindRecovery()
     l.lootID = 0

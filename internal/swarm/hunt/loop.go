@@ -989,16 +989,20 @@ type Loop struct {
     settled bool
     // settleHoldAt stamps the start of the settle hold: the entry
     // log line fires once, the field keeps it from repeating.
-    settleHoldAt  time.Time
-    userKind      string
-    userX         int32
-    userY         int32
-    userZ         int32
-    userPlanX     int32
-    userPlanY     int32
-    userPlanZ     int32
-    userTarget    int32
-    userStart     time.Time
+    settleHoldAt time.Time
+    userKind     string
+    userX        int32
+    userY        int32
+    userZ        int32
+    userPlanX    int32
+    userPlanY    int32
+    userPlanZ    int32
+    userTarget   int32
+    userStart    time.Time
+    // userDeadline is the priced budget deadline of the current
+    // manual mesh route (see userMoveBudget): zero for the direct
+    // server routed walk, which keeps the base window.
+    userDeadline  time.Time
     userMoveAt    time.Time
     userWaypoints []pathfind.Vec3
     userWpIndex   int
@@ -1410,6 +1414,7 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop { //nolint:funlen
         userTarget:          0,
         userRefusalVariants: 0,
         userStart:           time.Time{},
+        userDeadline:        time.Time{},
         userMoveAt:          time.Time{},
         userWaypoints:       nil,
         userWpIndex:         0,

@@ -93,12 +93,56 @@ the waypoint follower section of `docs/hunting.md`. The full hunt
 package suite passes, `go build ./...`, `task lint:new` and
 `task fmt:check` are clean.
 
-Next: the live acceptance - a bot on a long route (the owner repro)
-must run through the plan without micro-freezes; then decide whether
-`walkBlindWaypoints` (the short blind engage reposition) and the quest
-trip `followWaypoint` need the same flow.
+### 2026-11-12 - the live probe and the route sized manual budget
+
+Ran the committed build `bfe55ca7` against the live stack: bot `test1`
+(level 16, run speed 125) at `25147,51600,-3493` ordered to the repro
+point `45475,48368,-2913`. The search planned 58 waypoints / 22,346
+units, and the follower walked them continuously: 9,170 units in
+~73 s at ~125 u/s with only two standstills over the 2 s sample
+window (2.2 s and 2.8 s), so the far re-aim holds the move running
+between the clicks.
+
+The same probe exposed a separate defect: `userMoveTimeout` (90 s)
+aborted the walk in the middle of the route, and the character stood
+and then resumed the hunt far from the target. A cross-map manual
+order is valid, so the budget now follows the plan:
+`userMoveBudget` is the base window plus twice the estimated travel
+(`manualTravel`: the plan length over the measured run speed, the 120
+default before UserInfo), capped at `userMoveTimeoutMax` (30 min).
+The deadline is absolute from `planUserWalk` (`userDeadline`), reset
+on a new command and in `resumeAuto`, so the direct server routed
+walks (no plan) keep the base window. `pathfind.Result.Duration` is
+the search time, not the travel time - the estimate reads
+`Result.Length`. Pinned by `TestUserMoveBudgetFollowsThePlannedRoute`
+(including `manualTravel`) and `TestUserPlanWalksPastTheBaseWindow`.
+The owner route budgets 90 s + 2 × 179 s ≈ 7.5 min.
+
+### 2026-11-12 - the end-to-end live acceptance
+
+Re-ran the probe with the route sized budget from the working tree
+(the probe build reports the dirty tree of `bfe55ca7`): the bot
+repositioned to `45475,48368,-2913` (1,763 units), then walked the
+repro direction. The search planned 63 waypoints / 23,100 units and
+the follower arrived at exactly `25500,51095,-3297` (remaining 0) in
+161.1 s, "manual walk arrived (path done)", no timeout and no death.
+The average speed over the whole route is 143.4 u/s against the
+snapshot run speed 143.75, so the character never stopped; the ten
+2.2 s position gaps in the sample are the once per second movement
+broadcast of the server (two intervals without an update), not
+movement stops.
+
+Next: decide whether `walkBlindWaypoints` (the short blind engage
+reposition) and the quest trip `followWaypoint` need the same flow.
 
 ## Status
 
-In progress: the code, the tests and the docs land in this atomic
-round; the live route acceptance remains.
+complete: the flow landed in `bfe55ca7`, the route sized budget, the
+devlog round and this fragment land in the follow-up commit. The live
+acceptance walked the full owner route continuously and arrived.
+
+## Follow up
+
+`walkBlindWaypoints` and the quest trip `followWaypoint` keep their
+own click loops (short segments, left unchanged); the two followers
+this round fixed are the town/trip walker and the manual walk.
