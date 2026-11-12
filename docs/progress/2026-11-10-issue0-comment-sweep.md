@@ -471,6 +471,25 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `town_cursor_escape.go` fell from 44.7 to 26.6
   percent (96 comment lines), no block above 8 lines.
 
+### 2026-11-12 - pathfind/navmesh/query.go keeps the search contract
+
+- 35 blocks compress: the `FindPathApproach` radius contract, the
+  `NoNavmeshError` and partial answers, the column containment of
+  `FindNearestPoly` (the ClosestLayer z ranking against the staircase
+  drift), the water zone cuboids and the `115/50 = 2.3` swim price,
+  the `WaterZones` nil fallback, the recovery bans and their escape
+  ring, the waypoint clearance and the shortcut pass, the segmented
+  `SegmentGuard` raster, the hierarchy escalation against the raised
+  node budget of a banned query (the ~85k node diagonal against the
+  64k default), the pocket escape and the indexed tile traversal.
+- `docs/navmesh.md` gains the banned-query escalation rule (the coarse
+  chain cannot see the bans) in the same commit; the rest of the moved
+  facts already live there.
+- Verified: `task fmt`, `go build ./...`, the navmesh tests, `task
+  lint:new` (the rewrapped `RouteApproach` directive keeps its
+  `//nolint` form). `query.go` fell from 35.9 to 25.3 percent (128
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -485,7 +504,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`, `hunt/shopping.go`,
 `hunt/loop_params.go`, `acceptance/archer_kite.go`, `hunt/user.go`,
 `hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go`,
-`hunt/learning.go` and `hunt/town_cursor_escape.go`. Next: a fresh
-`task comment:audit --top 10` pick (the `proxy/game.go` and
-`hunt/loop_state.go` entries stay untouched while their fragments are
-active); the share and the block count are re-measured at the end.
+`hunt/learning.go` and `hunt/town_cursor_escape.go`, and
+`pathfind/navmesh/query.go`. Next: a fresh `task comment:audit --top 10`
+pick (the `proxy/game.go` and `hunt/loop_state.go` entries stay
+untouched while their fragments are active); the share and the block
+count are re-measured at the end.

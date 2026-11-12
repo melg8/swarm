@@ -305,7 +305,12 @@ clusters on the real mesh when the sampled crossings strand.
 - **The escalation**: the same tile queries stay flat (the within
   tile measurements answer the flat search faster and with the
   shorter corridors); a flat search that caps at maxQueryNodes
-  escalates to the hierarchy (RouteApproach).
+  escalates to the hierarchy (RouteApproach). A query whose filter
+  carries recovery bans stays flat: the coarse graph cannot see the
+  bans, its chain walks the banned ground and the refinement hops
+  strand on the ban edge, so a capped banned query reruns with a
+  raised node budget instead (the world town ban diagonal needs ~85k
+  nodes against the 64k default).
 
 The measured answers (the sandbox, the real pack):
 
