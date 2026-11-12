@@ -401,6 +401,21 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `user.go` fell from 21.7 to 19.4 percent (201
   comment lines); the tree share is re-measured with the next commit.
 
+### 2026-11-12 - hunt/loop_movement.go keeps the movement invariants
+
+- 23 blocks compress: the far-walk and patrol pacing (one segment per
+  tick, the per second pick), the road fight budget and the flight
+  hold, the `9900` unit move request limit, the plan-only return rule,
+  the remembered-spot deck resolution and the two live deck numbers
+  (the elven city at `z -2992` against the ground zone at `z -3664`),
+  the stall window and the refusal split (progressed versus same cell).
+  The round history drops (the `2026-09-11` road round, the
+  `2026-09-12 01:50`, `2026-09-14 08:42`, `2026-09-14 10:18` and
+  `2026-11-10 run-28` dumps, the owner round notes).
+- Verified: `task fmt`, `go build ./...`, the hunt tests,
+  `task lint:new`. `loop_movement.go` fell from 36.6 to 21.7 percent
+  (107 comment lines).
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -412,7 +427,8 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 `hunt/town.go`, `hunt/kite.go` and `hunt/cell_policy.go` (both second
 passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
-`hunt/quest_trip.go` and `hunt/loop_safety.go`. Next:
-`hunt/loop_movement.go` (223, 36.6 percent), `hunt/kite.go` (346, 31.1
-percent - the largest remaining file) and `hunt/cell_policy.go` (271,
-23.7 percent); the share and the block count are re-measured at the end.
+`hunt/quest_trip.go` and `hunt/loop_safety.go`, `hunt/shopping.go`,
+`hunt/loop_params.go`, `acceptance/archer_kite.go`, `hunt/user.go` and
+`hunt/loop_movement.go`. Next: `hunt/kite.go` (346, 31.1 percent - the
+largest remaining file) and `hunt/cell_policy.go` (271, 23.7 percent);
+the share and the block count are re-measured at the end.
