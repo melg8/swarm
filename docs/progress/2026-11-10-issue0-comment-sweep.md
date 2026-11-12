@@ -600,6 +600,21 @@ corner probe is a length, not a leg at all.
   lint:new`. `capsule.go` fell from 30.4 to 21.5 percent (105 comment
   lines), no block above 8 lines.
 
+### 2026-11-12 - hunt/walk_params.go keeps one line per parameter
+
+- 32 blocks compress: the whole 33 constant table to one or two lines
+  each, with every value and identifier preserved (the const pairs were
+  diffed against the previous revision). The deeper rationale (the 9900
+  unit refusal, the 30 unit collapse gate, the flow aim span, the stuck
+  ladder) already lived in `docs/hunting.md`; the missing numbers - the
+  3 s move start watchdog, the 192 unit refusal variant, the cursor
+  escape 144/5/64/2500/3/2 s set, the 16/5 short click extension, the
+  100 unit shortening floor and the 15 unit hop - moved into a new
+  walk parameter bullet of the same commit.
+- Verified: `task fmt`, `go build ./...`, the hunt tests, `task
+  lint:new`. `walk_params.go` fell from 81.8 to 69.1 percent (96
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -617,8 +632,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/learning.go` and `hunt/town_cursor_escape.go`,
 `pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
 `pathfind/navmesh/pocket.go`, `pathfind/capsule.go`, `hunt/loop_avoid.go`,
-`hunt/stagnation.go`, `hunt/quest_walker.go` and `hunt/click_frame.go`
-(second passes). Next: a fresh `task comment:audit --top 10` pick (the
-`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
-their fragments are active); the share and the block count are re-measured
-at the end.
+`hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go` and
+`hunt/walk_params.go` (second passes). Next: a fresh
+`task comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/loop_state.go` entries stay untouched while their fragments are
+active); the share and the block count are re-measured at the end.

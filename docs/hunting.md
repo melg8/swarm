@@ -1670,6 +1670,16 @@ The short form:
   mid trip or not - clears the cooldown: the village restart lands next
   to the shops and a full inventory sells right after the revival
   instead of walking to the farm spot with the junk first.
+- The walk parameter table (`hunt/walk_params.go`) pins the remaining
+  numbers: the refusal answer window 4 s, the move start watchdog 3 s
+  (the once per second movement broadcast plus the lag, under the 4 s
+  fast stuck window), the net progress margin 50 units, the varied aim
+  ladder 4 attempts with the perpendicular offset 192 units, the cursor
+  key escape at 144 units per 1 s claim with 5 follow claims of
+  patience, a 64 unit drift margin, a 2500 unit route cap, 3 attempts
+  per trip and a 2 s settle, the short click extension at 16 unit march
+  steps capped at 5 samples, the click shortening floor 100 units and
+  the hop coincidence 15 units.
 - The ActionFailed refusal channel (the 2026-09-14 10:18 dump): the
   server answers every refused MoveToLocation with the one byte
   ActionFailed (0x35), and the tracker records its arrival

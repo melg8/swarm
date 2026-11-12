@@ -8,228 +8,131 @@ import (
     "time"
 )
 
-// The walk machinery parameters: the click pacing, the waypoint
-// radii, the stuck and refusal windows and the cursor key escape.
-// The town trips, the manual walks, the quest trips, the zone
-// returns and the delevel walks all read them, so they live next
-// to the walker instead of one consumer.
+// The walk machinery parameters: the click pacing, the waypoint radii, the
+// stuck and refusal windows and the cursor key escape, shared by the town
+// trips, the manual walks, the quest trips, the zone returns and the delevel
+// walks (docs/hunting.md, the walk machinery of the town trips).
 const (
-    // walkRequestPeriod paces the ground click walks of the waypoint
-    // follower and the merchant approach.
+    // walkRequestPeriod paces the ground click walks of the waypoint follower
+    // and the merchant approach.
     walkRequestPeriod = 2 * time.Second
-    // refusalAnswerWindow bounds how long after a walk click the
-    // ActionFailed answer still counts as ITS answer: the server
-    // answers a refused request within a moment, so a refusal hours
-    // old is not the answer to the click just sent. The window
-    // covers the answer of the previous click too (a slow answer
-    // racing the next request of the walk request period).
+    // refusalAnswerWindow bounds how long after a walk click an ActionFailed
+    // still counts as its answer; it also covers a slow answer racing the next
+    // request of the period.
     refusalAnswerWindow = 4 * time.Second
-    // waypointArriveDist is the distance within which the FINAL
-    // waypoint of a walk plan counts as reached: the wide trip
-    // arrival radius (two geodata cells of slack) so a segment ends
-    // even when the server stops the character slightly short of
-    // the clicked point.
+    // waypointArriveDist is the arrival radius of the final waypoint: two
+    // geodata cells of slack, so a segment ends even when the server stops the
+    // character slightly short of the clicked point.
     waypointArriveDist = 150.0
-    // waypointPassDist is the tighter arrival radius of the
-    // INTERMEDIATE waypoints: a bridge ramp entry or a detour turn
-    // must be walked THROUGH, not merely seen from the side. The
-    // legacy wide radius here let the follower accept an entry
-    // waypoint it never reached, cut the corner and grind into the
-    // bridge railing side (the 2026-09-10 report: the plan held
-    // the smooth semicircle onto the bridge, the follower skipped
-    // it). Three geodata cells of slack.
+    // waypointPassDist is the tighter arrival radius of the intermediate
+    // waypoints: a bridge ramp entry or a detour turn must be walked through,
+    // not seen from the side (three cells of slack).
     waypointPassDist = 50.0
-    // waypointCorridor is the lateral distance from the segment
-    // towards the next waypoint within which a character counts
-    // as having PASSED the waypoint: only a character that moved
-    // past the waypoint on the route itself may skip it (a server
-    // correction, a jump), a character standing BESIDE the route
-    // - the bridge railing side - has not passed anything and
-    // walks back to the entry it missed.
+    // waypointCorridor is the lateral distance from the route within which a
+    // character counts as having passed a waypoint; a character standing beside
+    // the route has passed nothing and walks back to the entry it missed.
     waypointCorridor = 100.0
-    // maxMoveDistance splits the walk segments: the server refuses
-    // move requests with a target farther than 9900 units
-    // (MoveToLocation readImpl),
-    // and the smoothed geodata paths happily produce longer segments over
-    // the open terrain.
+    // maxMoveDistance splits the walk segments under the server refusal of move
+    // requests farther than 9900 units (MoveToLocation readImpl).
     maxMoveDistance = 1000.0
-    // returnWalkSegment caps the direct walk requests of the zone return:
-    // the server refuses move requests with a target farther than 9900
-    // units (MoveToLocation runImpl), and a village respawn, a guard
-    // post of the deleveling or a long chase easily starts farther than
-    // that from the zone center, which locked the loop into an endless
-    // stream of refused requests.
+    // returnWalkSegment caps the direct walk requests of the zone return under
+    // the same 9900 unit refusal: a village respawn or a long chase easily
+    // starts farther than that from the zone center.
     returnWalkSegment = 1000.0
     // stuckTimeout is how long the character may stand still on a segment
     // before the walker re-paths around the obstacle.
     stuckTimeout = 15 * time.Second
-    // stuckFastTimeout is the shorter timeout that applies after the
-    // first stuck skip of a trip: once the walker knows the server
-    // refuses its clicks on this segment, waiting the full 15 seconds for
-    // every subsequent waypoint just burns the trip's time budget. The
-    // shorter window keeps the recovery responsive while still letting
-    // a slow server position broadcast land before the next skip.
+    // stuckFastTimeout is the shorter window after the first stuck skip of a
+    // trip: the server already refused the clicks on this segment, so the
+    // recovery stays responsive while a slow position broadcast still lands.
     stuckFastTimeout = 4 * time.Second
-    // moveStartWindow bounds the move start watchdog: a walk click
-    // whose movement never STARTED (no server movement broadcast, no
-    // position change, no refusal answer) fast forwards the stuck
-    // recovery after this window instead of waiting the full stuck
-    // timeout - the owner rule of the 2026-09-19 round: a movement
-    // command that did not start the movement switches the recovery
-    // mode at once, the walker never stands out a whole window on a
-    // click it can already name dead. The value covers the server's
-    // once per second movement broadcast gate plus the network lag
-    // with head room, and stays under the fast stuck window so the
-    // never-started verdict always lands first.
+    // moveStartWindow bounds the move start watchdog: a click whose movement
+    // never started fast forwards the stuck recovery. The value covers the once
+    // per second movement broadcast plus the network lag and stays under the
+    // fast stuck window, so the never-started verdict lands first.
     moveStartWindow = 3 * time.Second
-    // stuckProgressUnits is the net progress margin of the stuck
-    // window: the current waypoint must come closer by this many
-    // units for the movement to count as progress. A walk covers
-    // hundreds of units over the stuck window whatever its speed,
-    // so the margin only filters the wobble (an oscillation that
-    // bounces between two tangent endpoints never improves its
-    // best distance by it).
+    // stuckProgressUnits is the net progress margin of the stuck window: the
+    // waypoint must come closer by this many units to count as progress, so the
+    // margin only filters the wobble.
     stuckProgressUnits = 50.0
-    // maxRePaths bounds the re-paths of one trip before it aborts.
-    // The budget bounds only the full segment re-plan (startWalkSegment) - the
-    // waypoint skip of walkStuck does NOT consume it. This lets the
-    // walker cycle through several waypoints looking for one the server
-    // accepts without exhausting the budget, while still bounding the
-    // expensive re-plan operations.
+    // maxRePaths bounds the full segment re-plans of one trip; the waypoint
+    // skip of walkStuck does not consume it.
     maxRePaths = 3
-    // minWalkClick is the floor length of the ground clicks the
-    // waypoint follower sends. The server's own move validation can
-    // collapse a click onto the walker (the GeoEngine.getValidLocation
-    // correction), and Creature.moveToLocation only hands such a
-    // collapsed click over to the server side pathfinder when the
-    // ORIGINAL line was longer than 30 units: the pathfinding branch
-    // gates on (originalDistance - distance) > 30, so a shorter
-    // collapse is silently canceled with ActionFailed and the
-    // character never moves - the click stays eligible for the
-    // rescue only above the floor (the 2026-09-11 11:34 village
-    // return dump: the first plan waypoint sat 22 units out, every
-    // re-click of it froze through two whole trip cycles). The floor
-    // matches waypointPassDist: an intermediate waypoint under it
-    // counts as arrived, the follower only CLICKS one when the
-    // cursor is pinned on it (no clear successor line), and the
-    // pinned click then extends past it along the plan polyline.
+    // minWalkClick is the floor length of the ground clicks: the server hands a
+    // collapsed click to its pathfinder only when the original line was longer
+    // than 30 units, so a shorter collapse is canceled with ActionFailed and
+    // the click stays eligible for the rescue only above the floor. The floor
+    // matches waypointPassDist.
     minWalkClick = 50.0
-    // flowAimFloor is the lower bound of the continuous follower's
-    // click span: the run speed of a fresh character walks this far
-    // in two request periods, so the target is never reached before
-    // the next click re-aims farther.
+    // flowAimFloor is the lower bound of the continuous follower click span:
+    // the run speed of a fresh character walks this far in two request periods.
     flowAimFloor = 300.0
-    // flowAimPeriods is the number of walk request periods the click
-    // span covers: two periods keep a full period of head room for
-    // the next click to re-aim before the character reaches the
-    // target and the server stops it.
+    // flowAimPeriods is the number of request periods the click span covers:
+    // two keep a full period of head room for the next re-aim.
     flowAimPeriods = 2.0
-    // flowProbeMax bounds the click validation probes of one flow
-    // scan: the scan runs at the click cadence (once per request
-    // period plus the corner pre-click), never per tick.
+    // flowProbeMax bounds the click validation probes of one flow scan: the
+    // scan runs at the click cadence, never per tick.
     flowProbeMax = 8
-    // flowCornerLead is the distance to the current click target at
-    // which the pre-click fires: the character is about to arrive and
-    // the server would stop it, so a farther validated target
-    // replaces the destination mid-walk. About one third of a
-    // request period of walking, so the pre-click still lands while
-    // the move runs.
+    // flowCornerLead is the distance to the current click target at which the
+    // pre-click fires: about one third of a request period of walking, so the
+    // pre-click still lands while the move runs.
     flowCornerLead = 80.0
-    // flowPreClickGap bounds the pre-click cadence: at most one
-    // pre-click per half request period, so a tight corridor cannot
-    // turn the follower into a click storm.
+    // flowPreClickGap bounds the pre-click cadence to one per half request
+    // period, so a tight corridor cannot become a click storm.
     flowPreClickGap = walkRequestPeriod / 2
-    // flowLayerTolerance bounds the vertical deviation of a skipped
-    // route point from the click chord: a deeper dip is a priced
-    // water crossing or a ramp the plan walks through on purpose,
-    // and the straight click must not cut it.
+    // flowLayerTolerance bounds the vertical deviation of a skipped route point
+    // from the click chord: a deeper dip is a priced water crossing or a ramp
+    // the plan walks through on purpose.
     flowLayerTolerance = 100.0
-    // frozenRepathLimit bounds the consecutive stuck re-paths that
-    // start from the same cell without a single cell of movement in
-    // between: the re-path re-plans from the standing position, so
-    // a re-path that itself produced no movement proves the fresh
-    // plan cannot move the character either (the refusal the
-    // offline validation cannot see). The next identical re-path
-    // would burn a full stuck window on the same freeze - the trip
-    // aborts and hands the recovery to its callers instead (the
-    // zone return escalates to the direct server routed segments at
-    // once, the shop trip arms its cooldown).
+    // frozenRepathLimit bounds the consecutive re-paths from the same cell
+    // without a single cell of movement: a fresh plan that moved nothing proves
+    // the trip cannot move the character either, and the callers own the
+    // recovery.
     frozenRepathLimit = 1
-    // refusalVariantsMax bounds the varied aim attempts one segment
-    // spends on the online refusal answer (see stuckTownWalk): the
-    // server refuses a click for its own reasons (a different build
-    // or geodata validates the same line differently), and the
-    // refusal is target specific - a shorter prefix or a sideways
-    // offset of the same waypoint often walks where the plain aim
-    // bounced. The variants are cheap (one click each, no re-plan),
-    // so a small ladder covers the common target specific refusals
-    // before the segment falls back to the re-path machinery.
+    // refusalVariantsMax bounds the varied aim attempts one segment spends on
+    // an online refusal: the refusal is target specific, so a shorter prefix
+    // or a sideways offset often walks where the plain aim bounced.
     refusalVariantsMax = 4
-    // refusalVariantStep is the sideways offset of the perpendicular
-    // refusal variants: about twelve geodata cells off the route
-    // line, far enough to bend the click raster away from the walled
-    // flank the server refused, close enough to stay on the same
-    // walkable deck the plan already verified.
+    // refusalVariantStep is the sideways offset of the perpendicular refusal
+    // variants: about twelve geodata cells off the route line, far enough to
+    // bend the click raster off the refused flank.
     refusalVariantStep = 192.0
-    // cursorEscapeStep is one claimed step of the cursor key escape:
-    // about one second of run speed, the cadence the official client
-    // streams its own movement simulation at while the player walks
-    // with the arrows - the claim pace of the escape matches the
-    // client the server already trusts.
+    // cursorEscapeStep is one claimed step of the cursor key escape: about one
+    // second of run speed, the cadence the official client streams.
     cursorEscapeStep = 144.0
-    // cursorEscapePeriod paces the claimed steps of the cursor key
-    // escape: one claim per second, the official client cadence of
-    // the ValidatePosition stream (far under every flood protector
-    // threshold of the reference server).
+    // cursorEscapePeriod paces the claimed steps at one per second, the
+    // ValidatePosition cadence of the official client.
     cursorEscapePeriod = time.Second
-    // cursorEscapeFollowClaims bounds the patience of the escape's
-    // follow probe: this many claims with no server position change
-    // prove the server ignores the stream (the keyboard movement
-    // disabled, a build without the cursor key branch of
-    // ValidatePosition), and the trip ends with the honest reason
-    // instead of grinding claims into the silence.
+    // cursorEscapeFollowClaims bounds the patience of the follow probe: this
+    // many claims without a server position change prove the server ignores the
+    // stream.
     cursorEscapeFollowClaims = 5
-    // cursorEscapeSettle bounds the wait for the position broadcasts
-    // after the last claimed step: the server answers each claim
-    // with a ValidateLocation broadcast, and the settle window lets
-    // the tracker catch up before the segment resumes its clicks.
+    // cursorEscapeSettle bounds the wait for the position broadcasts after the
+    // last claimed step.
     cursorEscapeSettle = 2 * time.Second
-    // cursorEscapeAttemptsMax bounds the cursor key escape attempts
-    // of one town trip: a pocket that keeps refusing the clicks
-    // after the escapes walks a wider problem than the escape
-    // exists for, the honest abort owns it.
+    // cursorEscapeAttemptsMax bounds the cursor key escape attempts of one town
+    // trip: a pocket that keeps refusing the clicks is a wider problem.
     cursorEscapeAttemptsMax = 3
-    // cursorEscapeFollowStep is the movement margin that proves the
-    // server follows the claims: any drift past it from the escape
-    // origin re-arms the follow patience (the character moved - the
-    // claims own it).
+    // cursorEscapeFollowStep is the drift from the escape origin that proves
+    // the server follows the claims and re-arms the follow patience.
     cursorEscapeFollowStep = 64.0
-    // cursorEscapeRouteMax caps the planned route length one escape
-    // walks: the route-following claims follow the plan polyline
-    // (see cursorEscapeRouteSteps) and the cap keeps the escape a
-    // pocket recovery - the walk along the route ends at the cap
-    // and the clicks resume from there, the escape never walks the
-    // character across the whole map on claims alone. The planless
-    // aim of the straight fallback is clamped to the same radius
-    // (see beginCursorKeyEscape): a far target can never pull a
-    // straight march out of the escape.
+    // cursorEscapeRouteMax caps the planned route length one escape walks, so
+    // the escape stays a pocket recovery; the planless aim clamps to the same
+    // radius.
     cursorEscapeRouteMax = 2500.0
     // extendMarchStep is the stride of the forward route march of
     // extendShortClickCandidates: one geodata cell.
     extendMarchStep = 16.0
-    // extendCandidateMax bounds the forward route samples the
-    // short click extension tries: the first samples past the
-    // floor, each one march step further along the route - enough
-    // to step past a single route cell that walls the chord.
+    // extendCandidateMax bounds the forward route samples the short click
+    // extension tries: enough to step past a single route cell that walls the
+    // chord.
     extendCandidateMax = 5
-    // clickShortenFloor bounds the halving of a walk click the
-    // server validation refuses: below it the refusal is local (the
-    // character stands boxed) and the follower hops or re-paths
-    // instead of crawling micro segments.
+    // clickShortenFloor bounds the halving of a refused walk click: below it
+    // the refusal is local (the character stands boxed) and the follower hops
+    // or re-paths instead of crawling micro segments.
     clickShortenFloor = 100.0
-    // hopCoincideDist is the distance under which a walked-past
-    // waypoint counts as stood on: the escape hop of a refused
-    // click targets the nearest plan bend between it and the
-    // waypoint arrival radius.
+    // hopCoincideDist is the distance under which a walked-past waypoint counts
+    // as stood on: the escape hop targets the nearest plan bend between it and
+    // the arrival radius.
     hopCoincideDist = 15.0
 )
