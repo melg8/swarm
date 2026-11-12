@@ -372,6 +372,23 @@ corner probe is a length, not a leg at all.
   `task lint:new`. The tree share reads 13.2 percent, 486 blocks,
   1,209 history markers.
 
+### 2026-11-12 - acceptance/archer_kite.go keeps the contract numbers
+
+- 30 blocks compress: the scenario keeps its numbers (the temp18
+  account slot, the 10 minute smoke window, the 90 s shutdown grace,
+  the 7-10 cell band and the 8-24 guide window, the 600 arrow quiver,
+  the 650 unit bow band plus 130 slack over the 780 ceiling, the 2.97 s
+  bow disable at pAtkSpd 337 and the 4 s shot gap, the 6 gap evidence
+  floor with the 750 permille share, the 10 percent HP floor, the one
+  kill per two minutes floor) and the round history drops (the 2026-11-09
+  796 unit sample, the #60 layer note, the "old safe-distance gate").
+- The check id block is deleted outright: the labels of
+  `archerKiteChecks` already name every check.
+- Verified: `task fmt`, `go build ./...`, the acceptance tests, `task
+  lint:new`. The tree share reads 13.2 percent, 481 blocks, 1,203
+  history markers; `archer_kite.go` fell from 28.3 to 21.0 percent
+  (162 comment lines).
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -384,6 +401,6 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`. Next:
-`acceptance/archer_kite.go` (240, 28.3 percent), `hunt/user.go` (232, 21.7
-percent) and `hunt/loop_movement.go` (223, 36.6 percent); the share and
-the block count are re-measured at the end.
+`hunt/user.go` (232, 21.7 percent), `hunt/loop_movement.go` (223, 36.6
+percent) and `hunt/kite.go` (346, 31.1 percent - the largest remaining
+file); the share and the block count are re-measured at the end.

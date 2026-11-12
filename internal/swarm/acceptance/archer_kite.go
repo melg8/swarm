@@ -20,69 +20,50 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The archer kite acceptance scenario (issue #28, the codeable
-// acceptance half of #20): a temp account launches as the archer
-// type of the fleet, wakes on a Kaboo Orc hunting cell with the bow
-// kit in the bag and farms the window under the kiting contract -
-// the fight happens at the bow radii, the retreats step when the
-// mobs close, the bot survives and the quiver never runs dry.
+// The archer kite acceptance scenario: a temp account launches as the archer
+// type of the fleet, wakes on a Kaboo Orc hunting cell with the bow kit and
+// farms the window under the kiting contract - the fight at the bow radii, the
+// retreats when the mobs close, the survival and the quiver never dry.
 
 // archerKiteScenarioID is the scenario registry id.
 const archerKiteScenarioID = "archer-kite"
 
-// archerKiteAccount is the temp account of the archer scenario:
-// the next free slot after the stuck point spread (the ladder
-// holds temp1 through temp17; temp18 keeps the parallel run all
-// collision free). The password equals the account (the Mobius
-// login auto-creates missing accounts).
+// archerKiteAccount is the temp account of the archer scenario: the next free
+// slot after the stuck point spread (temp1..temp17). The password equals the
+// account (the Mobius login auto-creates missing accounts).
 const (
     archerKiteAccount  = "temp18"
     archerKitePassword = "temp18"
 )
 
-// archerKiteDefaultMinutes is the smoke window of the scenario: the
-// kiting contract needs enough fights to observe the steps (the
-// mass 4 Kaboo cell clears in ~2 minutes per round with the
-// 15-20 s respawns pacing the re-engages), short enough to fit the
-// 2 h session dev cycle. A longer measured round sets
-// SWARM_ARCHER_KITE_MINUTES the way the soak smoke sets
-// SWARM_SOAK_MINUTES; the scenario itself is duration-agnostic.
+// archerKiteDefaultMinutes is the smoke window of the scenario: enough fights
+// to observe the steps (the mass 4 Kaboo cell clears in ~2 minutes per round
+// with 15-20 s respawns), short enough for the dev cycle. A longer measured
+// round sets SWARM_ARCHER_KITE_MINUTES.
 const archerKiteDefaultMinutes = 10
 
-// archerKiteShutdownGrace is the budget the scenario gives the
-// supervised session to unwind after the window: the logout
-// announcement, the combat stance delay and the socket flush (the
-// manager's restartWait covers the worst case on top).
+// archerKiteShutdownGrace is the budget the scenario gives the supervised
+// session to unwind after the window: the logout announcement, the combat
+// stance delay and the socket flush (the manager restartWait covers the rest).
 const archerKiteShutdownGrace = 90 * time.Second
 
-// The start ground of the archer scenario: the Kaboo Orc Grunt SW-5
-// cell (elven-hex-104) of the elven registry - the aggressive melee
-// orcs close on the archer the moment they see the bow shots, which
-// is exactly the threat the kiting contract answers; the mass 4
-// ground (a Kaboo Orc Fighter, a Spore Fungus and two Kaboo Orc
-// Grunts) keeps the fight cadence honest through the respawns. The
-// level 7 start sits inside the cell band (7-10, the ladder has no
-// reason to relocate), below the guide window (8-24: the unbuffed
-// start never walks the 26 km guide trip first) and miles away from
-// the delevel scenario's ground (the temp14 guard death cycle at
-// 43500 54560) so the parallel run all never pits two bots against
-// one cell. The Z is the geodata height of the focus (the same
-// oracle the walk planner trusts).
+// The start ground of the archer scenario: the Kaboo Orc Grunt SW-5 cell
+// (elven-hex-104) of the elven registry - the aggressive melee orcs close on
+// the archer the moment they see the bow shots, exactly the threat the kiting
+// contract answers. The level 7 start sits inside the cell band (7-10), below
+// the guide window (8-24) and far from the delevel ground (43500 54560); the Z
+// is the geodata height of the focus.
 const (
     archerKiteSpawnX = 36000
     archerKiteSpawnY = 50229
     archerKiteSpawnZ = -3456
 )
 
-// The start state of the archer: the level 7 elven fighter of the
-// vitals table, the bottom of the level 7 experience span, no
-// wallet (nothing affordable, no shopping trip arms), no skill
-// points (no lesson prefix clears the 300 sp trip gate) and the bow
-// kit in the bag - the short bow, a full quiver (600 arrows, the
-// restock target the shop strategy buys to; the floor sits at 150
-// and the smoke window cannot spend the difference) and the wooden
-// outfit of the zone return dump (the same wearable set the proven
-// reset injects).
+// The start state of the archer: the level 7 elven fighter of the vitals
+// table, the bottom of the level 7 experience span, no wallet (no shopping
+// trip arms), no skill points and the bow kit in the bag - the short bow, a
+// full quiver (600 arrows, the restock target) and the wooden outfit of the
+// zone return dump.
 const (
     archerKiteStartLevel = 7
     archerKiteStartHP    = 167
@@ -114,21 +95,16 @@ var archerKiteItems = []ResetItem{
     {ItemID: 1060, Count: 3}, // Lesser Healing Potion
 }
 
-// archerKiteTypeHook wires the hunt loop of the session to the
-// archer bot type: the same one-line wiring the config launch of
-// cmd/swarm applies to an archer slot of the fleet (the type
-// registry maps the "archer" type to the bow gear profile; the
-// profile owns the weapon preference, the quiver keeping and the
-// bow-aware fight radii of the loop).
+// archerKiteTypeHook wires the hunt loop of the session to the archer bot
+// type: the same one-line wiring the config launch applies to an archer slot
+// (the type registry maps the "archer" type to the bow gear profile).
 func archerKiteTypeHook(loop *hunt.Loop) {
     loop.SetGearProfile(gear.Archer{})
 }
 
-// archerKiteDuration reads the SWARM_ARCHER_KITE_MINUTES env and
-// returns the scenario window. A missing or invalid value falls
-// back to the smoke default; a zero or negative value also falls
-// back so an accidental empty string never produces a zero-length
-// run.
+// archerKiteDuration reads the SWARM_ARCHER_KITE_MINUTES env and returns the
+// scenario window: a missing, invalid or non-positive value falls back to the
+// smoke default, so a bad value never produces a zero-length run.
 func archerKiteDuration() time.Duration {
     minutes := archerKiteDefaultMinutes
     if raw := os.Getenv("SWARM_ARCHER_KITE_MINUTES"); raw != "" {
@@ -140,21 +116,14 @@ func archerKiteDuration() time.Duration {
     return time.Duration(minutes) * time.Minute
 }
 
-// archerKiteTimeout computes the test timeout from the window: the
-// window itself plus the startup (the character ensure, the state
-// injection, the login dial and the world entry) and the shutdown
-// grace. The manager adds its own restartWait on top, so this bound
-// only needs to cover the honest run.
+// archerKiteTimeout computes the test timeout from the window: the window
+// plus the startup (the character ensure, the state injection, the login dial
+// and the world entry) and the shutdown grace. The manager adds restartWait.
 func archerKiteTimeout() time.Duration {
     return archerKiteDuration() + 2*ensurePause + onlineWait +
         archerKiteShutdownGrace
 }
 
-// The archer kite check ids: the narrative of the contract - the
-// type armed the bow, the shots follow the bow cooldown, the
-// standing fight stays inside the bow band, the kite steps answer
-// the closing mobs, the fights resolve, the bot survives the window
-// and the quiver never runs dry.
 const (
     checkArcherKiteArmed    = "armed"
     checkArcherKiteCadence  = "cadence"
@@ -215,14 +184,10 @@ func archerKiteChecks() []Check {
 // originals are unexported in the hunt package; the values are the
 // contract the scenario observes, the comments name their source).
 const (
-    // archerKiteBowBand is the bow stall radius (hunt
-    // userBowStallRadius): a healthy standing bow fight stays
-    // inside it. The band is the drift fence of the range check,
-    // NOT a ranged-majority demand: the shot-cycle contract of the
-    // 2026-11-09 round deliberately fights at melee between the
-    // shots (the windup standstill lets the chaser close), so the
-    // range verdict only rejects a fight that ran past the stall
-    // radius.
+    // archerKiteBowBand is the bow stall radius (hunt userBowStallRadius): a
+    // healthy standing bow fight stays inside it. The band is the drift fence
+    // of the range check, not a ranged-majority demand - the shot cycle
+    // deliberately fights at melee between the shots.
     archerKiteBowBand = 650.0
     // archerKiteBandSlack widens the bow band ceiling for the same
     // broadcast lag (a sample one hop behind a running mob).
@@ -230,22 +195,17 @@ const (
     // archerKiteMinFightSamples is the evidence floor: the range
     // verdict only forms once the window observed enough fights.
     archerKiteMinFightSamples = 5
-    // archerKiteShotGap is the healthy same-fight gap between two
-    // self shot broadcasts: the C1 bow disable window on the live
-    // pAtkSpd (~2.97 s at 337) plus the tick and broadcast slack.
-    // The old safe-distance gate measured 20-30 s gaps against the
-    // same-speed chasers; the shot-cycle contract fires the next
-    // shot at the disable end whatever range the chase reached.
+    // archerKiteShotGap is the healthy same-fight gap between two self shot
+    // broadcasts: the C1 bow disable window on the live pAtkSpd (~2.97 s at
+    // 337) plus the tick and broadcast slack.
     archerKiteShotGap = 4 * time.Second
-    // archerKiteMinShotGaps is the evidence floor of the cadence
-    // verdict: a 5-minute window of a running fight measured ~35
-    // same-fight gaps, the floor keeps the verdict open on a window
-    // that barely fought.
+    // archerKiteMinShotGaps is the evidence floor of the cadence verdict: a
+    // 5-minute window of a running fight measured ~35 same-fight gaps, the
+    // floor keeps the verdict open on a window that barely fought.
     archerKiteMinShotGaps = 6
-    // archerKiteFastGapPermille is the majority share of the
-    // same-fight gaps that must sit inside archerKiteShotGap: three
-    // quarters leaves room for the first shot of a re-engage while
-    // the treadmill (20-30 s) fails every gap.
+    // archerKiteFastGapPermille is the majority share of the same-fight gaps
+    // that must sit inside archerKiteShotGap: three quarters leaves room for
+    // the first shot of a re-engage.
     archerKiteFastGapPermille = 750
     // archerKiteMinKiteSteps is the retreat evidence floor: a
     // repeated pattern, not a single blip.
@@ -256,11 +216,9 @@ const (
     archerKiteHPFloor = 10.0
 )
 
-// archerKiteMinKills is the kill floor of the window: the shot
-// cycle exists to RESOLVE fights (the safe-distance treadmill fired
-// arrows while the mob regenerated and killed nothing), so a window
-// that resolves no fight fails regardless of the movement telemetry.
-// The floor scales at one kill per two minutes, never under one.
+// archerKiteMinKills is the kill floor of the window: the shot cycle exists to
+// resolve fights, so a window that resolves no fight fails regardless of the
+// movement telemetry. The floor scales at one kill per two minutes.
 func archerKiteMinKills(window time.Duration) int {
     kills := int(window / (2 * time.Minute))
     if kills < 1 {
@@ -270,24 +228,19 @@ func archerKiteMinKills(window time.Duration) int {
     return kills
 }
 
-// The kite log line markers of the hunt loop (kite.go): the step
-// lines narrate every retreat hop - the proximity step ("kiting
-// clear") and the shot-paced rhythm step ("kiting the reload", the
-// issue #60 layer that fires at the own Attack broadcast and owns
-// the majority of the retreats since it merged) - and the hold
-// lines narrate the cornered and the surrounded standing fights.
+// The kite log line markers of the hunt loop (kite.go): the step lines narrate
+// every retreat hop (the proximity step and the shot-paced reload step) and
+// the hold lines narrate the cornered and surrounded standing fights.
 const (
     kiteStepMark = "kiting clear (step"
     kiteShotMark = "kiting the reload"
     kiteHoldMark = "holding ground and shooting"
 )
 
-// archerKiteLog wraps the test log line callback with the kite
-// telemetry counter: every hunt log line still flows to the test
-// log (and through it to the botlog run file), while the wrapper
-// counts the kite step, hold, shot-cycle retreat and kill lines the
-// session goroutine emits. The counter is mutex-guarded because the
-// monitor goroutine reads it while the session goroutine writes it.
+// archerKiteLog wraps the test log line callback with the kite telemetry
+// counter: every hunt log line still flows to the test log (and through it to
+// the botlog run file), while the wrapper counts the kite step, hold,
+// shot-cycle retreat and kill lines. The counter is mutex-guarded.
 type archerKiteLog struct {
     mu     sync.Mutex
     next   func(string)
@@ -337,10 +290,9 @@ func (l *archerKiteLog) counts() (
     return l.steps, l.holds, l.reload, l.kills
 }
 
-// archerKiteSample is one monitor observation of the live tracker:
-// the pure half of the evaluation (the fold and the verdicts run
-// without the tracker, the unit tests pin them against synthetic
-// samples).
+// archerKiteSample is one monitor observation of the live tracker: the pure
+// half of the evaluation (the fold and the verdicts run without the tracker,
+// the unit tests pin them against synthetic samples).
 type archerKiteSample struct {
     // online is the session status at the sample moment.
     online bool
@@ -354,10 +306,9 @@ type archerKiteSample struct {
     // fighting is true when the auto attack runs against a live
     // fight target (the swings are in flight).
     fighting bool
-    // walking is true when the character is in motion at the
-    // sample moment. A retreat leg legitimately opens the distance
-    // past the bow band while the chaser lags behind, so a walking
-    // sample cannot judge the standing fight radius.
+    // walking is true when the character is in motion; a retreat legitimately
+    // opens the distance past the bow band, so a walking sample cannot judge
+    // the standing fight radius.
     walking bool
     // fightDist is the distance to the fight target, -1 when the
     // sample carries no fight.
@@ -425,23 +376,16 @@ func (w archerKiteWatch) fold(s archerKiteSample) archerKiteWatch {
     }
     if s.fighting && s.fightDist >= 0 {
         w.fightSamples++
-        // Only a standing sample judges the bow band: while the
-        // character walks a retreat leg the gap to the lagging
-        // chaser grows past the band by design, and latching that
-        // distance would fail the contract on the kite's own
-        // working distance (the 2026-11-09 5-minute run measured
-        // 796 units on a 780 ceiling while every retreat step was
+        // Only a standing sample judges the bow band: a retreat opens the gap
+        // past the band by design (the 796 unit sample on the 780 ceiling was
         // healthy).
         if !s.walking && s.fightDist > w.maxFightDist {
             w.maxFightDist = s.fightDist
         }
     }
-    // The shot cadence of the fight: a fresh self Attack broadcast
-    // inside the same fight target records the gap from the previous
-    // one. A target switch starts a new chain (the walk to the next
-    // mob is not a slow shot), and the freshly killed target reads
-    // zero before the next pick lands - both break the chain, never
-    // fake a gap.
+    // The shot cadence: a fresh self Attack broadcast inside the same fight
+    // target records the gap from the previous one. A target switch or a
+    // vanished target starts a new chain, never a fake gap.
     w = w.foldShot(s)
     if s.hpPercent >= 0 && s.hpPercent < w.minHP {
         w.minHP = s.hpPercent
@@ -455,10 +399,9 @@ func (w archerKiteWatch) fold(s archerKiteSample) archerKiteWatch {
     return w
 }
 
-// foldShot latches one fresh self Attack broadcast into the cadence
-// chain of the watch: the same-fight gap counts between the previous
-// shot and the fresh one, a target switch or a vanished target starts
-// a new chain. The pure half of the shot evidence.
+// foldShot latches one fresh self Attack broadcast into the cadence chain: the
+// same-fight gap counts between the previous shot and the fresh one, a target
+// switch or a vanished target starts a new chain.
 func (w archerKiteWatch) foldShot(
     s archerKiteSample,
 ) archerKiteWatch {
@@ -501,17 +444,11 @@ type archerKiteVerdicts struct {
     quiverD  string
 }
 
-// verdicts reads the latched evidence into the check outcomes. The
-// cadence verdict only forms past its evidence floor: the majority
-// of the same-fight shot gaps must sit inside the C1 bow cooldown
-// (a treadmill window fires every 20-30 s and fails every gap). The
-// band verdict only judges STANDING fight samples and only forms on
-// its own floor - it is a drift fence, not a ranged-majority
-// demand. The retreat and kill verdicts read the log counters and
-// the scaled kill floor. The quiver verdict holds from the first
-// inventory answer: the stock never emptied. The survival verdict
-// is the conjunction of the online hold, the death flag and the HP
-// floor.
+// verdicts reads the latched evidence into the check outcomes: the cadence
+// verdict needs the majority of the same-fight shot gaps inside the C1 bow
+// cooldown, the band verdict judges standing samples only (a drift fence, not
+// a ranged-majority demand), and the retreat, kill, quiver and survival
+// verdicts read the log counters, the inventory and the death flag.
 func (w archerKiteWatch) verdicts() archerKiteVerdicts {
     floor := w.minKills
     if floor < 1 {
@@ -578,11 +515,9 @@ func (w archerKiteWatch) verdicts() archerKiteVerdicts {
     return v
 }
 
-// archerKiteReset returns the start state of the archer scenario:
-// the level 7 elven fighter with the vitals of the gain table, the
-// bottom of the level experience span, the empty wallet and skill
-// points and the bow kit in the bag, waking on the Kaboo Orc Grunt
-// SW-5 cell focus.
+// archerKiteReset returns the start state of the archer scenario: the level 7
+// elven fighter with the vitals of the gain table, the empty wallet and skill
+// points and the bow kit, waking on the Kaboo Orc Grunt SW-5 cell focus.
 func archerKiteReset(account string) characterReset {
     return characterReset{
         Account: account,
@@ -601,12 +536,9 @@ func archerKiteReset(account string) characterReset {
     }
 }
 
-// archerKiteSampleOf extracts one sample from the live tracker: the
-// session status, the death flag, the paperdoll state (the bow kind
-// of the right hand, the left hand occupancy), the fight distance
-// (the self position against the fight target position while the
-// swings run), the health percentage and the total arrow count of
-// the inventory (the worn quiver stack plus the bagged piles).
+// archerKiteSampleOf extracts one sample from the live tracker: the session
+// status, the death flag, the paperdoll state, the fight distance, the health
+// percentage and the total arrow count.
 func archerKiteSampleOf(tracker *state.Bot) archerKiteSample {
     sample := archerKiteSample{
         online:    tracker.Status() == state.StatusOnline,
@@ -651,19 +583,15 @@ func archerKiteSampleOf(tracker *state.Bot) archerKiteSample {
     return sample
 }
 
-// woodenArrowItemID is the ammo the archer scenarios count: the
-// Wooden Arrow of the elven shops (the quiver standard the gear
-// package's arrowItemID resolves on the live catalog; the id is a
-// constant of the data pack).
+// woodenArrowItemID is the ammo the archer scenarios count: the Wooden Arrow
+// of the elven shops (the quiver standard the gear package resolves on the
+// live catalog).
 const woodenArrowItemID = int32(17)
 
-// archerKiteMonitor runs the check evaluation until the deadline or
-// the context end. The monitor owns the watch (single goroutine):
-// every period it folds one tracker sample and the kite log counter
-// into it and rewrites the check list from the verdicts. Every exit
-// path first sends the accumulated watch on the buffered channel
-// (the send never blocks) so the awaiter always reads the real
-// evidence, never the zero value of a bare close.
+// archerKiteMonitor runs the check evaluation until the deadline or the
+// context end: every period it folds one tracker sample and the kite log
+// counter into the watch and rewrites the check list. Every exit path sends
+// the watch on the buffered channel first, so the awaiter reads real evidence.
 func archerKiteMonitor(
     ctx context.Context, tracker *state.Bot, test *Test,
     kiteLog *archerKiteLog, deadline time.Time,
@@ -711,14 +639,10 @@ func applyArcherKiteVerdicts(test *Test, v archerKiteVerdicts) {
     test.updateCheck(checkArcherKiteQuiver, v.quiver, v.quiverD)
 }
 
-// archerKiteScenario runs the archer acceptance vehicle: the temp
-// character resets onto the Kaboo Orc hunting cell with the bow kit
-// in the bag, the session launches as the archer type of the fleet
-// (the gear profile hook of the session runner), the auto equipment
-// dresses the kit, the quiver arms and the bot farms the window
-// under the kiting contract while the monitor folds the telemetry
-// into the checks. The final verdict is the conjunction of the
-// contract checks: a failure names the broken half.
+// archerKiteScenario runs the archer acceptance vehicle: the temp character
+// resets onto the Kaboo Orc hunting cell with the bow kit, the session launches
+// as the archer type, and the bot farms the window under the kiting contract
+// while the monitor folds the telemetry into the checks.
 func archerKiteScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(archerKiteChecks())
@@ -765,10 +689,9 @@ func archerKiteScenario(ctx context.Context, m *Manager, t *Test) error {
         sessionDone, cancelMonitor, monitorDone)
 }
 
-// archerKiteAwaitOutcome waits for the monitor verdict or the
-// context end, then tears the session down and answers with the
-// contract verdict: nil when every check holds, an error naming the
-// broken halves otherwise.
+// archerKiteAwaitOutcome waits for the monitor verdict or the context end,
+// then tears the session down and answers with the contract verdict: nil when
+// every check holds, an error naming the broken halves otherwise.
 func archerKiteAwaitOutcome(
     ctx context.Context, test *Test, cancelSession context.CancelFunc,
     sessionDone chan struct{}, cancelMonitor context.CancelFunc,
@@ -817,9 +740,8 @@ func archerKiteAwaitOutcome(
     return nil
 }
 
-// archerKiteBroken names every failed half of the archer contract in
-// the narrative order of the checks. The split keeps the scenario
-// teardown readable and the verdict mapping in one place.
+// archerKiteBroken names every failed half of the archer contract in the
+// narrative order of the checks.
 func archerKiteBroken(v archerKiteVerdicts) []string {
     var broken []string
     if !v.armed {
