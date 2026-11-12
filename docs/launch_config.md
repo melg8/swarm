@@ -161,7 +161,7 @@ composition back: `Starting swarm fleet of 6 bots (3 fighter,
 ## Where the code lives
 
 `cmd/swarm/launch_config.go` carries the format, the loader, the
-validation, the expansion and the flag fold; `cmd/swarm/main.go`
+validation, the expansion and the flag fold; `cmd/swarm/flags.go`
 registers the `-config` flag and normalizes every launch (file or
 plain flags) into one fleet plan the single bot path and the fleet
 path share. The tests in `cmd/swarm/launch_config_test.go` pin the

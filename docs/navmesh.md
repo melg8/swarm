@@ -742,7 +742,7 @@ engine answered.
   by the component bounding box (pocketMaxSide), so wide honest
   ground - sealed yards, whole islands - keeps the plain answers.
 
-The runtime wiring (cmd/swarm/main.go): the `-navmesh` flag names the
+The runtime wiring (cmd/swarm/pathfind_mode.go): the `-navmesh` flag names the
 tile directory explicitly, the empty value autodetects
 `data/navmesh` (the documented output of the build command); a
 directory without tiles keeps the plain engine navigator without a

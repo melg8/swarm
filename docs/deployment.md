@@ -207,10 +207,8 @@ full commit hash, the tree state and the build time. The state dump of
 the web UI and the first line of the bot log then tell the exact code
 state they came from. A plain `go build`/`go run` identifies itself
 too: the package path form (`go run ./cmd/swarm`) carries the VCS
-stamp Go embeds, and even a file path form (`go run
-./cmd/swarm/main.go`, no stamp - `task run:app` used to do exactly
-that) resolves the branch and the commit out of the `.git` directory
-of the working directory.
+stamp Go embeds and resolves the branch and the commit out of the
+`.git` directory of the working directory.
 
 ## Local config tweaks applied by bootstrap (both idempotent)
 
