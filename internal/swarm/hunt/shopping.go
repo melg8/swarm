@@ -16,29 +16,23 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// Shopping of the town trips: gear.PlanPurchases decides what to buy
-// (the greedy value per adena planner), the trip FREEZES that plan at
-// its start and executes it verbatim - the sell first step sells
-// exactly the pieces the frozen plan counted on, the stops distribute
-// exactly its purchases, and nothing re-plans in between. One buylist
-// goes out per transaction request (buying shares the transaction
-// flood protector with selling).
+// Shopping of the town trips: gear.PlanPurchases decides what to buy, the
+// trip freezes that plan and executes it verbatim - the sell step sells
+// exactly the pieces the plan counted on and nothing re-plans in between.
+// One buylist goes out per transaction request (docs/shopping_strategy.md).
 
 // Timing and threshold constants of the shopping.
 const (
-    // transactionPause is the shared pacing window of every buy and
-    // sell request: FloodProtectorTransactionInterval = 10 game ticks
-    // of 10 per second, plus a 250 ms margin over the decision tick.
-    // An early request is refused with a chat message and costs
-    // nothing (FloodProtectorTransactionPunishmentLimit = 0).
+    // transactionPause is the shared pacing window of every buy and sell
+    // request: 10 game ticks of 10 per second (1 s) plus a 250 ms margin;
+    // an early request is refused and costs nothing (the punishment limit
+    // is 0, docs/protocol_description.md).
     transactionPause = 1250 * time.Millisecond
     // buyPause paces the buy requests through the shared transaction
     // window (see transactionPause and transactionWindowFree).
     buyPause = transactionPause
-    // buyConfirmWait bounds the wait for the inventory update that
-    // confirms a buy request: a refused transaction answers silently,
-    // so the loop watches the inventory for the bought ids and
-    // re-requests the batch when they never show up.
+    // buyConfirmWait bounds the wait for the inventory update that confirms
+    // a buy request: a refused transaction answers silently.
     buyConfirmWait = 15 * time.Second
     // stopBuyRetries bounds the re-requests of a lost buy batch
     // before the trip gives the purchases up.
@@ -58,9 +52,8 @@ const (
     // runs: a bare-handed character retries the errand within a
     // minute instead of the ordinary five.
     weaponRunCooldown = 45 * time.Second
-    // townTaxRate is the buy tax markup of the elven village
-    // merchants (baseTax 15 percent, no castle owns their tax on a
-    // fresh server). A future region config carries its own rate.
+    // townTaxRate is the buy tax markup of the elven village merchants:
+    // baseTax 15 percent, and no castle owns their tax on a fresh server.
     townTaxRate = 0.15
     // dionTownTaxRate is the buy tax markup of the Town of Dion
     // merchants (MerchantPriceConfig.xml priceConfig id=8 baseTax=20).
@@ -143,11 +136,10 @@ func (l *Loop) shoppingPlan() []gear.Purchase {
         affordablePrefix(l.shoppingQueue()))
 }
 
-// dropForeignMerchantPurchases removes the plan lines whose merchant
-// does not trade the item: a foreign line is a planner data bug, and
-// dropping it loudly keeps the trip from burning its buy retries
-// against the silent refusal. The sell first pieces of a dropped line
-// stay unsold.
+// dropForeignMerchantPurchases removes the plan lines whose merchant does
+// not trade the item: a foreign line is a planner data bug, and the trip
+// must not burn its buy retries on the silent refusal. A dropped line's
+// sell-first pieces stay unsold.
 func (l *Loop) dropForeignMerchantPurchases(
     purchases []gear.Purchase,
 ) []gear.Purchase {
@@ -173,11 +165,9 @@ func (l *Loop) dropForeignMerchantPurchases(
     return kept
 }
 
-// shoppingQueue computes the fresh purchase queue against the current
-// gear state: the affordable plan of the next trip plus the wanted
-// tail (gear.PlanPurchaseQueue). The wallet leaves the spellbook
-// reserve of the pending lessons unspent: the trip buys the books
-// before the gear stops.
+// shoppingQueue computes the fresh purchase queue against the current gear
+// state (gear.PlanPurchaseQueue). The wallet leaves the spellbook reserve
+// of the pending lessons unspent: the trip buys the books first.
 func (l *Loop) shoppingQueue() []gear.Purchase {
     if l.equip == nil {
         return nil
@@ -215,11 +205,9 @@ func (l *Loop) pendingBookBudget() int64 {
     return total
 }
 
-// refreshShoppingCache recomputes the cached purchase queue and the
-// built widget view once per shopping plan period: the cache drives
-// both the trip trigger and the widget, and the view cache keeps the
-// per tick publish allocation free (the planning wallet is cached
-// with it).
+// refreshShoppingCache recomputes the cached purchase queue and its widget
+// view once per shopping plan period: the cache drives both the trip
+// trigger and the widget, and the view keeps the publish allocation free.
 func (l *Loop) refreshShoppingCache() {
     now := l.now()
     if !l.shoppingPlanAt.IsZero() &&
@@ -242,11 +230,10 @@ func (l *Loop) refreshShoppingCache() {
     l.publishSkillWeaponPriority()
 }
 
-// shoppingWanted reports whether the plan justifies a town trip on
-// its own: a cached plan with a total price above the trip minimum,
-// summed without allocating a prefix slice. The keep one scroll line
-// stays out of the total: a scroll-only plan never clears the
-// minimum, so a fresh bot walks no errand just for the scroll.
+// shoppingWanted reports whether the plan justifies a town trip on its own:
+// a cached plan with a total price above the trip minimum. The keep-one
+// scroll line stays out of the total, so a fresh bot walks no errand just
+// for the scroll.
 func (l *Loop) shoppingWanted() bool {
     l.refreshShoppingCache()
     if len(l.shoppingPlanCache) == 0 {
@@ -281,11 +268,9 @@ func affordablePrefix(queue []gear.Purchase) []gear.Purchase {
     return buys
 }
 
-// publishShoppingView refreshes the shopping widget every tick: the
-// cached queue while the loop hunts, the remaining trip buys while a
-// trip runs, and the cached queue again while a trip has no buys yet
-// (the plan that triggered it is what the observer wants). Sessions
-// without the shop strategy publish nothing.
+// publishShoppingView refreshes the shopping widget every tick: the cached
+// queue while the loop hunts, the remaining trip buys while a trip runs.
+// Sessions without the shop strategy publish nothing.
 func (l *Loop) publishShoppingView() {
     if !l.autonomous || !l.shoppingTripEnabled() {
         l.tracker.ClearShoppingPlan()
@@ -405,9 +390,8 @@ func (l *Loop) replacementSellingActive() bool {
     return len(l.replaceQueue) > 0 || len(l.replaceSelling) > 0
 }
 
-// stepReplacementSales runs the sell first step: every displaced
-// piece is unequipped and sold before the buys run and the auto
-// equipment wears the replacements. One step per tick; false while
+// stepReplacementSales runs the sell-first step: every displaced piece is
+// unequipped and sold before the buys run. One step per tick; false while
 // the step is busy.
 func (l *Loop) stepReplacementSales(now time.Time) bool {
     if !l.replacePlanned {
@@ -606,10 +590,8 @@ func (l *Loop) replacementTargets() []int32 {
     return targets
 }
 
-// transactionWindowFree reports whether the shared buy and sell
-// transaction window is free: every sender of the town trips paces
-// through this one gate, so a sell fired behind a buy cannot burn
-// the window.
+// transactionWindowFree reports whether the shared buy and sell transaction
+// window is free: every sender of the town trips paces through this gate.
 func (l *Loop) transactionWindowFree(now time.Time) bool {
     last := l.buyAt
     if l.sellAt.After(last) {
@@ -722,12 +704,11 @@ func (l *Loop) stopMerchantTemplates() []int32 {
     }
 }
 
-// tickStopShopping buys the purchases of the current stop: the
-// merchant must be selected and in 3D range (the server checks
-// both), one buylist per transaction request, one request per flood
-// window, and every batch re-requested up to stopBuyRetries times
-// before the stop gives it up. True when every purchase was
-// requested AND confirmed.
+// tickStopShopping buys the purchases of the current stop: the merchant must
+// be selected and in 3D range (the server checks both), one buylist per
+// transaction request and flood window, and every batch re-requested up to
+// stopBuyRetries times before the stop gives it up. True when every purchase
+// was requested and confirmed.
 //
 //nolint:cyclop,funlen,gocognit // the stop shopping decision tree
 func (l *Loop) tickStopShopping(now time.Time) bool {
@@ -738,9 +719,8 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
     if len(stop.buys) == 0 && len(l.buyRequested) == 0 {
         return true
     }
-    // The frozen plan's last responsible moment: an item the
-    // inventory already carries must not be bought again (a loot drop
-    // worn mid trip, a manual purchase).
+    // The frozen plan's last responsible moment: an item the inventory
+    // already carries must not be bought again (a loot drop, a manual buy).
     l.tripStops[0].buys = l.dropOwnedPurchases(l.tripStops[0].buys)
     stop = l.tripStops[0]
     if len(stop.buys) == 0 && len(l.buyRequested) == 0 {
@@ -777,15 +757,13 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
             return true
         }
     }
-    // The buy pacing shares the transaction window with the sells: the
-    // first buy of a stop waits out the last sell batch as well (the
-    // flood window is 1 s wide, the pause keeps the tick margin).
+    // The buy pacing shares the transaction window with the sells: the first
+    // buy of a stop waits out the last sell batch (transactionPause).
     if !l.transactionWindowFree(now) {
         return false
     }
-    // One buylist per request: the purchases of the first list id of
-    // the stop go out together, an in-flight retry re-sends its own
-    // batch.
+    // One buylist per request: the purchases of the first list id go out
+    // together, and an in-flight retry re-sends its own batch.
     batch := l.buyRequested
     remaining := make([]gear.Purchase, 0, len(stop.buys))
     var listID int32
@@ -809,9 +787,8 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
     }
     l.buyAt = now
     l.buyRequested = batch
-    // The arrival baseline of the batch: the carried units of every
-    // item id at the request moment (entries for the wearables, stacks
-    // for the stackables). A retry keeps the original baseline.
+    // The arrival baseline of the batch: the carried units of every item id
+    // at the request moment. A retry keeps the original baseline.
     if l.buyBaseline == nil {
         l.buyBaseline = make(map[int32]int32, len(batch))
     }
@@ -839,10 +816,9 @@ func (l *Loop) tickStopShopping(now time.Time) bool {
         len(l.buyRequested) == 0
 }
 
-// isStackPurchase reports whether the order buys a stackable
-// consumable: wearables carry one entry per equipped slot, the
-// stackable delivery merges into the carried stack and only raises
-// its count. Unknown types lean consumable.
+// isStackPurchase reports whether the order buys a stackable consumable:
+// wearables carry one entry per equipped slot, the stackable delivery merges
+// into the carried stack and only raises its count.
 func isStackPurchase(itemID int32) bool {
     switch npcdata.ItemType(itemID) {
     case itemTypeWeapon, itemTypeArmor, itemTypeShield:
@@ -876,11 +852,10 @@ func (l *Loop) resetBuyRequest() {
     l.buyRetries = 0
 }
 
-// dropOwnedPurchases filters the stop purchases whose item the
-// inventory already carries beyond the plan: a pair family carries
-// two copies, a single slot family blocks its second copy, and the
-// stackable orders are count aware (they drop only when the carried
-// count covers OwnedStack+Count).
+// dropOwnedPurchases filters the stop purchases whose item the inventory
+// already carries beyond the plan: a pair family carries two copies, a single
+// slot family blocks its second copy, and the stackable orders drop only when
+// the carried count covers OwnedStack+Count.
 func (l *Loop) dropOwnedPurchases(purchases []gear.Purchase) []gear.Purchase {
     items := l.tracker.InventoryItems()
     carried := make(map[int32]int, len(items))
@@ -923,11 +898,10 @@ func (l *Loop) dropOwnedPurchases(purchases []gear.Purchase) []gear.Purchase {
     return kept
 }
 
-// buysArrived reports whether every purchase of the batch shows up
-// in the inventory: the wearable orders in ENTRY units (except the
-// pair floors, which ride a carried id), the stackable orders in
-// COUNT units, both against the baseline of the request. A lost
-// baseline degrades to zero.
+// buysArrived reports whether every purchase of the batch shows up in the
+// inventory: the wearable orders in entry units (except the pair floors, which
+// ride a carried id), the stackable orders in count units, both against the
+// baseline of the request. A lost baseline degrades to zero.
 func (l *Loop) buysArrived(batch []gear.Purchase) bool {
     items := l.tracker.InventoryItems()
     carried := make(map[int32]int32, len(items))
@@ -955,14 +929,11 @@ func (l *Loop) advanceTripStop() {
     if len(l.tripStops) > 0 {
         l.tripStops = l.tripStops[1:]
     }
-    // A new stop starts with a fresh retry budget and no in-flight
-    // batch (the previous stop only advances when its batch settled).
+    // A new stop starts with a fresh retry budget and no in-flight batch.
     l.resetBuyRequest()
     l.resetLearnState()
     l.resetGuideState()
-    // A fresh stop starts with a fresh escape budget.
-    // The finished stop talked to its npc: drop the selection it
-    // left behind.
+    // The finished stop talked to its npc: drop the selection it left.
     l.clearServerSelection()
     if len(l.tripStops) == 0 {
         l.startReturnSegment()
@@ -978,24 +949,19 @@ func (l *Loop) advanceTripStop() {
     var planFailed bool
     switch {
     case stop.teach:
-        // The teacher stop walks right up to the class master: the
-        // npc search radius plans the walk to the master's own point
-        // (the walkable hall row beside it); a master cell the mesh
-        // never connects stays reached through the partial answer.
+        // The teacher stop walks right up to the class master: a master cell
+        // the mesh never connects stays reached through the partial answer.
         planFailed = !l.startWalkNpcSegment(
             townNpcPosition(stop.merchant))
     case stop.guide:
-        // The guide stop walks the same npc segment as the teacher:
-        // the plan ends on the closest walkable surface of the spawn.
+        // The guide stop walks the same npc segment as the teacher.
         planFailed = !l.startWalkNpcSegment(
             townNpcPosition(stop.merchant))
     default:
-        // The merchant stop walks the exact mesh search first (the
-        // same authority the manual walk uses): the approach ring
-        // would end the plan outside the shop, so the target is the
-        // customer stand point of the stand table - face to face with
-        // the merchant across the counter. The npc segment fallback
-        // answers a plan that resolved onto the roof deck.
+        // The merchant stop walks the exact mesh search first: the approach
+        // ring would end the plan outside the shop, so the target is the
+        // customer stand point - face to face with the merchant across the
+        // counter. The npc segment fallback answers a plan on the roof deck.
         planned := false
         if l.merchantWithinExactRange(stop.merchant) {
             var ringFallback bool
@@ -1029,10 +995,9 @@ func (l *Loop) shoppingTripEnabled() bool {
 // probe (a plain zero var: nested empty literals trip exhaustruct).
 var emptyPurchase gear.Purchase
 
-// affordableWeaponPurchase returns the first affordable weapon
-// purchase of the cached plan; the weapon outranks the rest of the
-// plan (the sell and buy share one stop, the bare-handed character
-// runs the errand alone).
+// affordableWeaponPurchase returns the first affordable weapon purchase of
+// the cached plan: the weapon outranks the rest of the plan, and the
+// bare-handed character runs the errand alone.
 func (l *Loop) affordableWeaponPurchase() (gear.Purchase, bool) {
     if !l.shoppingTripEnabled() {
         return emptyPurchase, false
@@ -1069,10 +1034,9 @@ func (l *Loop) weaponStopMerchant() (townNpc, bool) {
     return zeroTownNpc, false
 }
 
-// weaponlessRunWanted reports whether the character fights bare-handed
-// while its plan offers an affordable weapon: the target picks hold,
-// the town trip runs the weapon errand without the teach stops and an
-// aborted run retries on the short weapon cooldown.
+// weaponlessRunWanted reports whether the character fights bare-handed while
+// its plan offers an affordable weapon: the trip runs the weapon errand
+// without the teach stops, and an aborted run retries on the short cooldown.
 func (l *Loop) weaponlessRunWanted() bool {
     if l.equip == nil {
         return false
@@ -1103,11 +1067,10 @@ func (l *Loop) snapshotTripGear() {
     }
 }
 
-// gearDebtCheck arms the gear debt at the trip exits: a slot that
-// was occupied at the trip start, sits empty now and whose piece is
-// gone from the inventory sold for a replacement that never landed.
-// The debt runs the refill trip on the gear run cooldown; a piece
-// still in the bag is no debt.
+// gearDebtCheck arms the gear debt at the trip exits: a slot that was
+// occupied at the trip start, sits empty now and whose piece is gone from the
+// inventory sold for a replacement that never landed. The debt runs the refill
+// trip on the gear run cooldown; a piece still in the bag is no debt.
 func (l *Loop) gearDebtCheck() {
     current := l.tracker.PaperdollSlotObjectIDs()
     items := l.tracker.InventoryItems()

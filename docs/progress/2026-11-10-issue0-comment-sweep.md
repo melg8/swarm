@@ -338,6 +338,24 @@ corner probe is a length, not a leg at all.
   1,219 history markers; `loop_safety.go` fell from 35.2 to
   25.8 percent (152 comment lines).
 
+### 2026-11-12 - hunt/shopping.go keeps the windows, drops the narrative
+
+- 26 blocks compress: the timing facts stay (the 1250 ms transaction
+  pause over the 10 game ticks of 10 per second plus 250 ms, the 15 s
+  buy confirm wait, the 3 buy retries, the 60 s sell settle, the 5 s
+  plan period, the 100 adena trip minimum, the 45 s weapon cooldown,
+  the 15 and 20 percent town taxes, the one buylist per request), the
+  small talk drops (the "future region config" plan note, the round
+  dumps, the retold code).
+- The doc contradiction found en route: `docs/protocol_description.md`
+  claimed the transaction flood protector was "10 s by default" in two
+  places while the server source pins 10 game ticks of 10 per second
+  (1 s) with the punishment limit 0; both lines are corrected.
+- Verified: `task fmt`, `go build ./...`, the hunt tests, `task
+  lint:new`. The tree share reads 13.3 percent, 491 blocks, 1,216
+  history markers; `shopping.go` fell from 20.6 to 18.1 percent
+  (212 comment lines).
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -350,7 +368,7 @@ compressed one commit each: `town.go`, `loop.go`, `kite.go`,
 passes), `hunt/delevel.go`, the `hunt/loop_state.go` field registry (the
 share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/quest_trip.go` and `hunt/loop_safety.go`. Next:
-`hunt/shopping.go` (249 comment lines), `hunt/loop_params.go` (240, 78.2
-percent - a params registry, trim the prose not the facts),
-`acceptance/archer_kite.go` (240, 28.3 percent) and `hunt/user.go` (232,
-21.7 percent); the share and the block count are re-measured at the end.
+`hunt/loop_params.go` (240, 78.2 percent - a params registry, trim the
+prose not the facts), `acceptance/archer_kite.go` (240, 28.3 percent),
+`hunt/user.go` (232, 21.7 percent) and `hunt/loop_movement.go` (223, 36.6
+percent); the share and the block count are re-measured at the end.

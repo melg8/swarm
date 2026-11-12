@@ -394,7 +394,11 @@ to the merchant and selects it like the official client.
 | 5 | 4 | Item count |
 | 9 | 12×n | Entries: object id (4), item id (4), count (4) |
 
-The `TransactionFloodProtector` paces the requests (10 s by default).
+The `TransactionFloodProtector` paces the requests:
+`FloodProtectorTransactionInterval` is 10 game ticks of 10 per second
+(1 s), and `FloodProtectorTransactionPunishmentLimit = 0`, so a too
+early request is refused with a chat message and costs nothing
+(`dist/game/config/FloodProtector.ini`).
 
 ### UseItem (0x14)
 
@@ -429,8 +433,8 @@ distance; the server prices every entry itself (the buylist product
 price or the item reference price) with the town tax - Elven Village
 charges 15 percent over reference while no castle owns it
 (`MerchantPriceConfig.xml`), selling is always `referencePrice/2`.
-Buying and selling share the `TransactionFloodProtector` (10 s), so
-the buy and sell batches pace alike. The buylist ids are the file
+Buying and selling share the `TransactionFloodProtector` (10 game
+ticks = 1 s), so the buy and sell batches pace alike. The buylist ids are the file
 names of `data/buylists/*.xml`; the merchant of a list is the npc of
 its `<npcs>` block (joined to the packet template id through
 `stats/npcs/CT0_to_C4_ids.txt`, 30147 Unoren -> 7147 etc).
