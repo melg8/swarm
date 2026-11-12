@@ -570,6 +570,20 @@ corner probe is a length, not a leg at all.
   lint:new`. `pocket.go` fell from 41.4 to 24.5 percent (75 comment
   lines), no block above 8 lines.
 
+### 2026-11-12 - hunt/click_frame.go moves the frame facts to the doc
+
+- 4 blocks compress: the 33 line file header (the nearest height layer
+  resolution of the click, `isCompletelyBlocked`, the `getValidLocation`
+  collapse, the 872 unit deck over water gap, the 164 unit teacher hall
+  flip margin), the ground truth pair of the offset, the 864 unit rises
+  of the Gludio segment run and the `frameOffsetLimit` 500 cap with its
+  164/436/872 measurements. A new `## The server frame click transport`
+  section of `docs/hunting.md` carries the moved facts in the same
+  commit.
+- Verified: `task fmt`, `go build ./...`, the hunt tests, `task
+  lint:new`. `click_frame.go` fell from 73.7 to 48.7 percent (19
+  comment lines), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -586,8 +600,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/loop_movement.go`, `hunt/kite.go`, `hunt/cell_policy.go`,
 `hunt/learning.go` and `hunt/town_cursor_escape.go`,
 `pathfind/navmesh/query.go`, `pathfind/navmesh/hierarchy.go`,
-`pathfind/navmesh/pocket.go`, `hunt/loop_avoid.go`, `hunt/stagnation.go`
-and `hunt/quest_walker.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the `proxy/game.go` and
+`pathfind/navmesh/pocket.go`, `hunt/loop_avoid.go`, `hunt/stagnation.go`,
+`hunt/quest_walker.go` and `hunt/click_frame.go` (second passes). Next: a
+fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
 `hunt/loop_state.go` entries stay untouched while their fragments are
 active); the share and the block count are re-measured at the end.

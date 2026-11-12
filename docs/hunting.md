@@ -1952,6 +1952,41 @@ into the world and broadcasts it). The escape emulates exactly that:
   its obstacle front along it, so a mirrored heading probes behind the
   character.
 
+## The server frame click transport (hunt/click_frame.go)
+
+The Mobius C1 server resolves the destination layer of a mouse click by
+the NEAREST height to the z the request carries: `isCompletelyBlocked(target,
+targetZ)` in the packet handler and the final layer rule of `getValidLocation`
+(`previousZ != nearestToZ` collapses the destination back onto the walker,
+the distance drops below the cancellations limit and the server answers
+`ActionFailed`). The plan waypoints carry the layer heights of the bot's own
+geodata pack (`node.layer.Height`), and where the two packs disagree about
+the absolute height of a surface - the village plaza deck stacked over the
+water floor 872 units apart, the teacher hall interior whose flip margins
+shrink to 164 units - the mesh z names the wrong layer, the walk arrives on
+the standing surface, the final rule collapses the click and the character
+never moves.
+
+The transport is the bot side answer with the server kept as the source of
+truth: the one z the server itself vouches for is the character's standing z
+(every position broadcast carries it), and the mesh knows the same standing
+cell in its own frame (the plan's first waypoint IS the character's cell
+resolved on the pack). The difference of the two is the measured frame offset
+of the surface the character stands on, and adding it to every plan waypoint
+z re-anchors the plan into the server frame while keeping the mesh's own
+relative geometry - the slopes, the stairs, the 864 unit rises the quest
+walks proved the raw self z can never ride (the Gludio segment run: every
+click on the self z answered `ActionFailed`, the waypoint height walked).
+The offset is measured once per plan from the ground truth pair the character
+stands on and capped at `frameOffsetLimit` 500: a real pack vintage
+disagreement shifts a surface by tens to a few hundred units (the measured
+flip margins sit at 164 for the teacher hall interior and 436 for the plaza
+deck over the water floor), while a larger measurement is a layer snap of
+the sandwich (the 872 unit deck over water gap) and anchoring by it would
+corrupt every click of the plan. Such a measurement is discarded (the offset
+stays zero, the raw mesh z rides) and the refusal ladder of the walker owns
+the plans whose start the pack cannot resolve onto the standing layer.
+
 ## The city shopping errand (hunt/city_shopping.go)
 
 A live bot that already owns a weapon and whose wallet covers the
