@@ -1,4 +1,4 @@
-# The hunt data extraction: the generated registries into huntdata (status: in progress)
+# The hunt data extraction: the generated registries into huntdata (status: complete)
 
 Started 2026-11-13, branch main, issue0 (continuation of the
 package-wide refactor after the proxy game connection split).
@@ -88,9 +88,11 @@ layout follow. The Mobius spawn tree is absent on this host, so both
 generators were checked with `py_compile` only.
 
 Verification: `go build ./...`, `go vet`, the hunt suite (28.2 s),
-`huntaudit`, `golangci-lint` 0 issues.
+`huntaudit`, `golangci-lint` 0 issues; `task test:cover` inside the
+2.0 pp budget (hunt 84.4 to 85.7, the generated data left the
+package) and `task verify` green.
 
 ## Status
 
-In progress: the code is verified, the commit, the coverage baseline
-and the push are next.
+Complete: the package and the baseline land on `main` as `538bc33c`
+and `826cb640`, `task verify` green, the tree pushed.
