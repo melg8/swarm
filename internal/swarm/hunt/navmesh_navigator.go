@@ -4,26 +4,14 @@
 
 package hunt
 
-// The live integration of the navmesh runtime (docs/navmesh.md): the
-// route planning serves from the prebuilt tile mesh through the
-// Detour-style corridor search - the stacked deck disambiguation, the
-// C1 water zone pricing, the funnel string pulling and the recovery
-// ban walls - and the mesh is the SOLE route planner (the owner
-// directive: the served walk plan must be the mesh answer, never a
-// grid plan the funnel pass folds or a fallback route the grid engine
-// answers over its own world view). The grid engine stays the click
-// validation and local walk layer it already is (ValidateClick, the
-// sight lines, the water rasters, the deck heights) and its capsule
-// radius arms the mesh funnel clearance, but no route query of this
-// navigator ever asks the grid engine for a path.
-//
-// The partial round: when the mesh answers a closest-reachable
-// corridor (the destination unreachable under the filter) the hybrid
-// serves the mesh partial waypoints through Result.Partial - the walk
-// toward the closest reachable point instead of the bare abort at the
-// start position. A destination on ground the sheet decomposition
-// dropped answers the honest not found (the manual walk falls back to
-// the direct server routed walk, the town segments keep their recovery).
+// The live integration of the navmesh runtime (docs/navmesh.md): the route
+// planning serves from the prebuilt tile mesh through the Detour-style corridor
+// search (the stacked deck disambiguation, the C1 water zone pricing, the
+// funnel string pulling, the recovery ban walls), and the mesh is the sole
+// route planner - no route query of this navigator ever asks the grid engine
+// for a path. The grid engine stays the click validation layer (ValidateClick,
+// the sight lines, the water rasters, the deck heights), its capsule radius
+// arms the funnel clearance, and a partial corridor serves through Partial.
 
 import (
     "math"
@@ -33,15 +21,11 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// navmeshNavigator is the mesh navigator of the live integration: the
-// route planning on the mesh, the validation on the grid engine. The
-// capsule clearance of the engine (SetCapsuleClearance) governs the
-// mesh answers too: the funnel pivots pull inward from the portal
-// span ends and the shortcut pass answers to the grid capsule - one
-// radius, both surfaces. The merged chords never leave the corridor
-// geometry (the portal spans and the wall edges of the polygons the
-// corridor walks), so the grid oracle can only keep more funnel
-// waypoints, never fold the route across a wall the mesh detours.
+// navmeshNavigator is the mesh navigator: the route planning on the mesh, the
+// validation on the grid engine. The engine capsule clearance governs both
+// surfaces - the funnel pivots pull inward from the portal span ends and the
+// shortcut pass answers to the grid capsule - so the grid oracle can only keep
+// more funnel waypoints, never fold the route across a wall the mesh detours.
 type navmeshNavigator struct {
     engine    *pathfind.Engine
     mesh      *navmesh.Mesh
@@ -49,9 +33,8 @@ type navmeshNavigator struct {
     clearance float64
 }
 
-// NewNavmeshNavigator wraps a geodata engine and a navigation mesh
-// into the hunt navigator. Returning the Navigator interface is the
-// deliberate seam of the hunt package (see NewNavigator).
+// NewNavmeshNavigator wraps a geodata engine and a navigation mesh into the
+// hunt navigator (the Navigator seam of the hunt package, see NewNavigator).
 func NewNavmeshNavigator( //nolint:ireturn
     engine *pathfind.Engine, mesh *navmesh.Mesh,
 ) Navigator {
@@ -69,12 +52,9 @@ func NewNavmeshNavigator( //nolint:ireturn
     }
 }
 
-// clearedFilter arms the funnel pivot clearance of the mesh search
-// from the engine's capsule radius, the shortcut pass over the funnel
-// answer with the grid capsule as the extra wall oracle, and the C1
-// water zone pricing (the water polygons a C1 WaterZone cuboid covers
-// swim at the run/swim speed ratio of the player templates, the river
-// beds the zone data omits walk at the plain land rate).
+// clearedFilter arms the funnel pivot clearance from the engine capsule, the
+// shortcut pass with the grid capsule as the extra wall oracle, and the C1
+// water zone pricing (the river beds the zone data omits walk at land rate).
 func (n navmeshNavigator) clearedFilter(filter navmesh.Filter) navmesh.Filter {
     filter.WaypointClearance = n.clearance
     filter.Smooth = n.clearance > 0
@@ -86,9 +66,8 @@ func (n navmeshNavigator) clearedFilter(filter navmesh.Filter) navmesh.Filter {
     return filter
 }
 
-// FindPathApproach plans the walk through the mesh corridor search
-// only (the approach radius goal, the swim pricing): the mesh answer
-// is the walk plan.
+// FindPathApproach plans the walk through the mesh corridor search only (the
+// approach radius goal, the swim pricing).
 func (n navmeshNavigator) FindPathApproach(
     start, end pathfind.Vec3, approachRadius float64,
 ) (*pathfind.Result, error) {
@@ -96,12 +75,9 @@ func (n navmeshNavigator) FindPathApproach(
         n.clearedFilter(navmesh.DefaultFilter()))
 }
 
-// FindPathApproachAvoiding plans the walk around the avoid areas
-// through the mesh corridor search (the ban walls with the escape
-// ring of the own ban). The mesh partial corridors surface through
-// Result.Partial: the waypoints end at the closest reachable point
-// around the bans (the walk-what-you-can contract of the zone
-// return).
+// FindPathApproachAvoiding plans the walk around the avoid areas through the
+// mesh corridor search (the ban walls with the escape ring of the own ban). The
+// partial corridors surface through Result.Partial.
 func (n navmeshNavigator) FindPathApproachAvoiding(
     start, end pathfind.Vec3, approachRadius float64,
     avoid []pathfind.AvoidArea,
@@ -121,9 +97,8 @@ func (n navmeshNavigator) FindPath(
         n.clearedFilter(navmesh.DefaultFilter()))
 }
 
-// ClosestHeight resolves the destination deck height with the grid
-// engine: the layer resolution is the engine's own semantics (the
-// deck the server itself picks), the mesh has no equivalent contract.
+// ClosestHeight resolves the deck height with the grid engine (the deck the
+// server itself picks); the mesh has no equivalent contract.
 func (n navmeshNavigator) ClosestHeight(
     x, y float64, refZ int16,
 ) (int16, error) {
@@ -142,21 +117,19 @@ func (n navmeshNavigator) OverWater(x, y float64, refZ int16) bool {
     return n.engine.OverWater(x, y, refZ)
 }
 
-// ValidateClick mirrors the server move validation with the engine:
-// the click guard of the town walk stays on the raster the server
-// itself walks, never on the mesh surface.
+// ValidateClick mirrors the server move validation with the engine: the click
+// guard stays on the raster the server walks, never on the mesh surface.
 func (n navmeshNavigator) ValidateClick(
     from, to pathfind.Vec3,
 ) (pathfind.Vec3, bool) {
     return n.engine.ValidateClick(from, to)
 }
 
-// meshQuery runs one mesh RouteApproach under the filter and maps
-// every answer onto the Navigator contract: the full corridor found,
-// the closest-reachable partial (Found=false, Partial=true, the
-// waypoints end where the filter lets the corridor continue), the
-// bare not found, the honest error (no tile under an endpoint). No
-// answer ever consults the grid engine.
+// meshQuery runs one mesh RouteApproach under the filter and maps the answer
+// onto the Navigator contract: the full corridor, the closest-reachable
+// partial, the bare not found (a dropped destination, so the caller walks the
+// direct server route) and the honest error. No answer consults the grid
+// engine.
 func (n navmeshNavigator) meshQuery(
     start, end pathfind.Vec3, approachRadius float64,
     filter navmesh.Filter,
@@ -173,12 +146,9 @@ func (n navmeshNavigator) meshQuery(
     if route != nil && route.Partial && len(route.Waypoints) > 0 {
         waypoints, length := n.meshWaypoints(route)
         if route.PocketEscape {
-            // The stranded start answer: the mesh named the exit
-            // ground, the click validation port names the
-            // deliverable direction to walk out with (the grid is
-            // the click transport layer of this navigator - see the
-            // package comment). The mesh aim stands when nothing
-            // validates: the refusal ladder owns the honesty then.
+            // The stranded start answer: the mesh named the exit ground,
+            // the click validation port names the deliverable direction
+            // (the mesh aim stands when nothing validates).
             waypoints[0] = n.refinePocketExit(start, waypoints[0])
         }
 
@@ -196,9 +166,8 @@ func (n navmeshNavigator) meshQuery(
         Duration: time.Since(began)}, nil
 }
 
-// meshResult maps one full mesh route answer onto the pathfind result
-// of the Navigator contract, nil when the answer is not a full found
-// route.
+// meshResult maps a full mesh route answer onto the pathfind result, nil when
+// the answer is not a full found route.
 func (n navmeshNavigator) meshResult(
     route *navmesh.Route, began time.Time,
 ) *pathfind.Result {
@@ -220,11 +189,9 @@ func (n navmeshNavigator) meshResult(
     }
 }
 
-// meshWaypoints converts the funnel waypoints of a mesh route into
-// the pathfind vectors together with the walked length. The funnel
-// answer serves as the mesh search produced it: the pivot clearance
-// and the shortcut pass inside the search already own the wall
-// avoidance, no post pass folds the route across the corridor.
+// meshWaypoints converts the funnel waypoints into the pathfind vectors and the
+// walked length; the search already owns the wall avoidance, no post pass folds
+// the route across the corridor.
 func (n navmeshNavigator) meshWaypoints(
     route *navmesh.Route,
 ) ([]pathfind.Vec3, float64) {
@@ -248,35 +215,23 @@ func meshPos(v pathfind.Vec3) navmesh.Pos {
     return navmesh.Pos{X: v.X, Y: v.Y, Z: v.Z}
 }
 
-// pocketExitSweepDeg is the direction sweep of the pocket exit
-// refinement: the mesh aim first, then the circle around the standing
-// point in 30 degree steps - the strict link graph cannot know which
-// direction the permissive click transport walks out through (the
-// diagonal squeezes and the one sided wall pairs the server accepts),
-// the transport oracle answers it directly. Ordered by the angular
-// distance from the mesh aim so the mesh answer wins every tie.
+// pocketExitSweepDeg is the direction sweep of the pocket exit refinement: the
+// mesh aim first, then the circle in 30 degree steps ordered by angular
+// distance from it, because the strict link graph cannot know which direction
+// the permissive click transport walks out through.
 var pocketExitSweepDeg = [12]float64{
     0, 30, -30, 60, -60, 90, -90, 120, -120, 150, -150, 180,
 }
 
-// pocketExitAimDist is the transport distance of the pocket exit aim:
-// beyond the wide final arrival slack (waypointArriveDist) so the
-// follower serves the exit with a real click instead of "arriving"
-// without moving, and comfortably over the server rescue click floor.
+// pocketExitAimDist is the transport distance of the exit aim: past the wide
+// arrival slack (waypointArriveDist) and the server rescue click floor.
 const pocketExitAimDist = 224.0
 
-// refinePocketExit turns the mesh exit aim of a pocket escape into
-// the aim the walk clicks can actually deliver: the mesh exit ground
-// seeds the direction, the sweep rotates it around the standing point
-// and the click validation port (the same oracle every follower click
-// passes) picks the first direction whose line the server transport
-// walks. The aim height rides the grid surface (ClosestHeight) so the
-// candidate lands on real ground; a direction over a hole, a drop or
-// a wall refuses and the sweep moves on. The aim distance is the
-// transport distance regardless of the seed's - the mesh seed names
-// the ground, never the walkable distance. The mesh aim stands when
-// nothing validates - the honesty of the plan stays the mesh's, the
-// ladder owns the rest.
+// refinePocketExit turns the mesh exit aim into an aim the clicks can deliver:
+// the mesh ground seeds the direction, the sweep rotates it around the standing
+// point and the click validation port picks the first direction the server
+// transport walks. The aim height rides ClosestHeight, so a hole, a drop or a
+// wall refuses and the sweep moves on; nothing validating keeps the mesh aim.
 func (n navmeshNavigator) refinePocketExit(
     start, aim pathfind.Vec3,
 ) pathfind.Vec3 {
@@ -305,8 +260,7 @@ func (n navmeshNavigator) refinePocketExit(
     return aim
 }
 
-// avoidCircles converts the avoid areas of the Navigator contract
-// into the mesh ban disks.
+// avoidCircles converts the avoid areas into the mesh ban disks.
 func avoidCircles(avoid []pathfind.AvoidArea) []navmesh.AvoidCircle {
     if len(avoid) == 0 {
         return nil

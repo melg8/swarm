@@ -709,29 +709,22 @@ engine answered.
   FindPath run the corridor search with the approach radius goal (the
   polygon-granularity form of the grid nodeReached) and answer the
   funnel waypoints as the pathfind.Result contract of the seam.
-- **Every answer the mesh cannot serve falls back to the grid
-  engine**: a missing tile under an endpoint, ground the sheet
-  decomposition dropped, a sealed goal under the bans. The grid
-  engine stays the reachability authority - the hybrid can only ADD
-  routes (the milliseconds of the mesh corridor instead of the
-  seconds of the grid flood), never lose them.
+- **The mesh is the sole route planner** (the owner directive): no
+  route query of the navigator ever asks the grid engine for a path.
+  A destination on ground the sheet decomposition dropped answers the
+  honest not found, and the caller falls back to the direct
+  server-routed walk (the town segments keep their recovery); a
+  missing tile under an endpoint is an error, not a grid plan.
 - **The partial corridors surface through Result.Partial (the
   partial round)**: when the mesh answers a closest-reachable
-  corridor (the destination unreachable under the filter) and the
-  engine CONFIRMS it with its own clean not found, the avoiding
-  forms serve the mesh funnel waypoints with Found=false and
-  Partial set - the town segments and the quest segments walk toward the
-  closest reachable point instead of aborting at the start position
-  (the shore of a swim-only destination, the border of the sealed
-  corridor). The engine run comes FIRST on every mesh partial, so a
-  full route the mesh missed still wins, and an engine error still
-  surfaces as the honest verdict; the strict forms
-  (FindPathApproach, FindPath) never surface partials - the blind
-  engage recovery and the user walks keep their verdict semantics.
-  The production profile of an unreachable destination is unchanged
-  (the mesh milliseconds plus the one engine flood the fallback
-  already paid); trusting the mesh verdict without the engine
-  confirmation is the acceptance-switch round's headroom.
+  corridor (the destination unreachable under the filter) the
+  avoiding forms serve the mesh funnel waypoints with Found=false and
+  Partial set - the town segments and the quest segments walk toward
+  the closest reachable point instead of aborting at the start
+  position (the shore of a swim-only destination, the border of the
+  sealed corridor). The strict forms (FindPathApproach, FindPath)
+  never surface partials - the blind engage recovery and the user
+  walks keep their verdict semantics.
 - **The validation layer never leaves the grid engine**:
   ValidateClick (the click guard of every walked segment), the sight
   lines, the water rasters and the deck heights stay on the raster
@@ -810,13 +803,6 @@ neighborhood) by default.
 
 ## What is NOT wired yet
 
-The acceptance stack still installs the pure engine navigator (its
-regression scenarios pin the click validation machinery of the grid
-engine); the mesh serves the live hunt loops only. The partial round
-serves the closest-reachable waypoints through the Navigator
-contract, but the hybrid still runs the engine confirmation before
-every partial - skipping that flood (trusting the mesh verdict) is
-the acceptance-switch round once the live sessions prove the hybrid.
 The Detour-parity optimization headroom (the flat tile array, the
 per-tile poly index) stays future work until the fleet benchmark
 asks for it.

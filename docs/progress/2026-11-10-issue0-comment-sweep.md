@@ -934,6 +934,22 @@ corner probe is a length, not a leg at all.
   lint:new`. `recovery_heal.go` fell from 36.2 to 19.4 percent (25
   comment lines of 129), no block above 8 lines.
 
+### 2026-11-12 - hunt/navmesh_navigator.go and the stale fallback doc
+
+- 16 blocks compress: the 20 line integration header, the navigator
+  struct, the constructor, the filter, the four query entries, the
+  mesh mapper, the mesh waypoint and position helpers, the pocket exit
+  sweep, its distance, the refinement and the avoid conversion.
+- The live integration section of `docs/navmesh.md` was stale: it
+  still claimed the grid engine fallback and the engine confirmation
+  of every partial, while the navigator is the sole route planner.
+  The rewritten bullets say the mesh plans every route, a dropped
+  destination answers not found and the caller walks the direct server
+  route, and the partial surfaces without an engine run.
+- Verified: `task fmt`, `go build ./...`, the full hunt package, `task
+  lint:new`. `navmesh_navigator.go` fell from 32.6 to 21.5 percent (60
+  comment lines of 279), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -963,8 +979,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `pathfind/navmesh/abstract.go`, `huntaudit/audit.go`,
 `cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go`,
 `acceptance/botlog/botlog.go`, `cmd/counterprobe/detect.go` and
-`hunt/recovery_heal.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the
+`hunt/recovery_heal.go` and `hunt/navmesh_navigator.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
