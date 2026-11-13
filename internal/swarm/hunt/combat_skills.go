@@ -4,22 +4,14 @@
 
 package hunt
 
-// The combat casting of the hunt loop. A warrior treats the skills
-// as the optional extra damage on top of the auto attack: the strike
-// of the weapon in hand fires whenever its reuse window allows and
-// the mana pays (the learned skill whose <using> condition accepts
-// the equipped weapon family - Power Strike with a sword, Mortal Blow
-// with a dagger, Power Shot with a bow). A mystic attacks with magic
-// first: the learned magic attack spells fire per their reuse
-// windows, the auto attack of the staff only adds between the casts.
-// The self buffs (the auras, the timed A2 skills on the caster) cast
-// between the fights whenever the effect is missing.
-//
-// The out of mana mystic stops attacking and sits down: the mana
-// regeneration of a sitting caster is several times the standing
-// one, and a dry mage swinging the staff prolongs every fight into
-// a mana death spiral. The character stands up once the mana
-// recovered and the next fight opens with a full bar.
+// The combat casting of the hunt loop. A warrior treats the skills as the
+// optional extra damage: the strike whose <using> condition accepts the weapon
+// in hand (Power Strike with a sword, Power Shot with a bow) fires when its
+// reuse window allows and the mana pays. A mystic attacks with magic first and
+// the staff only adds between the casts; the self buffs (the timed A2 skills)
+// cast between the fights whenever their effect is missing. The out of mana
+// mystic drops the fight and sits down - the sitting regeneration is several
+// times the standing one - and stands up once the mana recovered.
 
 import (
     "time"
@@ -31,18 +23,17 @@ import (
 
 // Timing and threshold constants of the combat casting.
 const (
-    // castRetryPeriod paces the cast requests: the server answers a
-    // refused cast (the range, the mana, the reuse) with a bare
-    // ActionFailed, so the loop re-tries its picks at a human rate.
+    // castRetryPeriod paces the cast requests: the server refuses a cast
+    // (range, mana, reuse) with a bare ActionFailed, so the loop retries at a
+    // human rate.
     castRetryPeriod = 2 * time.Second
     // buffCastPeriod paces the self buff casts: a missing buff is
     // retried until its AbnormalStatusUpdate arrival flips the
     // tracker list.
     buffCastPeriod = 6 * time.Second
-    // castReuseMargin widens the locally tracked reuse windows of
-    // the casts: the server reuse clock starts at the cast start,
-    // the local one at the request, and the network jitter between
-    // them must not produce a refused cast on every tick.
+    // castReuseMargin widens the local reuse windows: the server clock starts
+    // at the cast start, the local one at the request, so the jitter between
+    // them must not refuse a cast on every tick.
     castReuseMargin = 2 * time.Second
     // manaSitPercent is the mana fill below which the out of mana
     // mystic drops the fight and sits down to regenerate.
@@ -50,32 +41,22 @@ const (
     // manaStandPercent is the mana fill the resting mystic waits for
     // before it stands up and re-engages.
     manaStandPercent = 60.0
-    // overhitFinishPercent is the target health below which the
-    // overhit-capable strike fires: the finishing blow. The server
-    // (Mobius C1, Attackable.calculateOverhitExp L1480) pays
-    // exp * min(overkill / maxHp, 0.25) when the cast of an
-    // overhit-flagged skill is the killing blow, and any non lethal
-    // hit clears the armed flag (AttackableStatus.reduceHp L40) -
-    // an early cast only burns the reuse window. The 40 percent
-    // window is the kill probability play of the low level band:
-    // one melee swing there takes 25-45 percent of the mob bar, so
-    // a bar inside the window usually holds about a strike's worth
-    // of damage - the cast lands the kill and the overkill pays the
-    // bonus. A strike weaker than the remaining bar (the level +2
-    // pulls, the early strike levels) fires inside the window,
-    // misses the kill and loses this cast's bonus - the total
-    // damage of the fight is unchanged, so the cost is the delay
-    // and the mana; the absolute damage estimate follow up (the
-    // observed swing damage vs ObjectVitals) closes that gap.
+    // overhitFinishPercent is the target health below which the overhit-capable
+    // strike fires as the finishing blow. The server (Mobius C1,
+    // Attackable.calculateOverhitExp L1480) pays exp * min(overkill/maxHp,
+    // 0.25) on a killing blow of an overhit-flagged skill, and any non lethal
+    // hit clears the armed flag (AttackableStatus.reduceHp L40), so an early
+    // cast only burns the reuse window. One melee swing takes 25-45 percent of
+    // the mob bar in the low level band, so a bar inside the window usually
+    // holds about a strike's worth of damage.
     overhitFinishPercent = 40.0
 )
 
-// maybeCastCombatSkill fires the combat skill of the running fight:
-// the warrior strike that accepts the weapon in hand, the mystic
-// attack spell. The warrior casting is the optional extra damage -
-// the auto attack keeps swinging whatever the cast does; the mystic
-// casting is the primary damage. One cast request per retry period,
-// the locally tracked reuse windows gate the picks.
+// maybeCastCombatSkill fires the combat skill of the running fight: the warrior
+// strike that accepts the weapon in hand or the mystic attack spell. The
+// warrior cast is optional extra damage (the auto attack keeps swinging), the
+// mystic cast is the primary damage. One request per retry period, gated by the
+// local reuse windows.
 func (l *Loop) maybeCastCombatSkill(now time.Time) {
     if !l.castAt.IsZero() && now.Sub(l.castAt) < castRetryPeriod {
         return
@@ -111,13 +92,10 @@ func (l *Loop) maybeCastCombatSkill(now time.Time) {
     }
 }
 
-// combatSkillCandidate reports whether one learned skill is a
-// combat cast candidate of the running fight: an active ONE target
-// skill of the class role that accepts the weapon in hand, paid by
-// the mana, outside the local reuse window and - for the overhit
-// flagged strikes - inside the finishing window of the target bar
-// (an early cast would clear the server armed flag on the first
-// non lethal damage and lose the bonus).
+// combatSkillCandidate reports whether one learned skill is a combat cast
+// candidate: an active ONE target skill of the class role that accepts the
+// weapon in hand, paid by the mana, outside the local reuse window and, for an
+// overhit flagged strike, inside the finishing window of the target bar.
 func (l *Loop) combatSkillCandidate(
     skill state.LearnedSkill,
     weapon string, hasWeapon, caster bool, now time.Time,
@@ -149,11 +127,9 @@ func (l *Loop) combatSkillCandidate(
     return true
 }
 
-// targetAboveOverhitWindow reports whether the target of the running
-// fight still stands above the finishing window of the overhit
-// strike. The server refreshes the vitals of the attacked mob, so
-// the unknown answer means the fight just opened - the bar is still
-// full in practice and the strike holds.
+// targetAboveOverhitWindow reports whether the target still stands above the
+// finishing window. An unknown health means the fight just opened (the server
+// refreshes the vitals of the attacked mob), so the strike holds.
 func (l *Loop) targetAboveOverhitWindow() bool {
     hp := l.tracker.ObjectHealthPercent(l.target)
     if hp < 0 {
@@ -163,10 +139,9 @@ func (l *Loop) targetAboveOverhitWindow() bool {
     return hp > overhitFinishPercent
 }
 
-// maybeSelfBuff casts the missing self buffs between the fights: the
-// learned timed buff skills (the auras) whose effect does not run
-// yet. It reports whether a cast went out - the caller yields the
-// tick to it.
+// maybeSelfBuff casts the missing self buffs between the fights: the learned
+// timed buff skills whose effect does not run yet. It reports whether a cast
+// went out, so the caller yields the tick.
 func (l *Loop) maybeSelfBuff(now time.Time) bool {
     if l.tracker.SelfSitting() {
         // The rest owns a sitting character; a cast would stand it
@@ -222,21 +197,19 @@ func (l *Loop) skillOnReuse(skillID int32, now time.Time) bool {
     return ok && now.Before(until)
 }
 
-// isCaster reports whether the character class attacks with magic
-// (the class tree answer - the mystic families know their attack
-// spells from level 1, the fighter families never learn one).
+// isCaster reports whether the class attacks with magic: the mystic families
+// know their attack spells from level one, the fighter families never learn
+// one.
 func (l *Loop) isCaster() bool {
     return npcdata.ClassCastsMagic(l.tracker.SelfClassID())
 }
 
-// maybePickGearProfile swaps the gear scoring profile once the class
-// of the character is known: the mystic families rank the caster
-// gear (the staves by their magical damage, the robes by the cast
-// speed) instead of the melee weapons of the default fighter
-// profile. The pick runs once per session - the class of a character
-// never changes mid run (the first class transfer of a leveled bot
-// relogs anyway) and the swap resets the cached equip scans so the
-// very first equip decision already scores through the caster lens.
+// maybePickGearProfile swaps the gear scoring profile once the class is known:
+// the mystic families rank the caster gear (the staves by magical damage, the
+// robes by cast speed) instead of the melee weapons of the fighter profile. The
+// pick runs once per session (a class transfer relogs anyway) and resets the
+// cached equip scans, so the first equip decision already scores through the
+// caster lens.
 func (l *Loop) maybePickGearProfile() {
     if l.profilePicked {
         return
@@ -274,10 +247,9 @@ func (l *Loop) mageManaDry() bool {
     return l.tracker.SelfManaPercent() < manaSitPercent
 }
 
-// mageManaLow reports whether a casting character should hold the
-// fights: the mana fill sits below the re-engage threshold but above
-// the dry one - the standing regeneration tops it up while the loop
-// waits. Non casters never wait.
+// mageManaLow reports whether a caster should hold the fights: the mana sits
+// below the re-engage threshold but above the dry one, and the standing
+// regeneration tops it up while the loop waits. Non casters never wait.
 func (l *Loop) mageManaLow() bool {
     if !l.isCaster() {
         return false
@@ -286,12 +258,11 @@ func (l *Loop) mageManaLow() bool {
     return l.tracker.SelfManaPercent() < manaStandPercent
 }
 
-// dropFightForMana drops the running fight of the out of mana
-// mystic: the attack requests stop, the sit down of the rest logic
-// breaks the auto attack server side (the breakAttack of the sit
-// path) and the mana regenerates at the sitting rate. The safety
-// nets of the loop stay armed - a hurt dry mage under attack still
-// flees, a critical one still logs out.
+// dropFightForMana drops the running fight of the out of mana mystic: the
+// attack requests stop, the sit down breaks the auto attack server side (the
+// breakAttack of the sit path) and the mana regenerates at the sitting rate.
+// The safety nets stay armed: a hurt dry mage still flees, a critical one still
+// logs out.
 func (l *Loop) dropFightForMana() {
     if l.target == 0 {
         return
@@ -303,11 +274,10 @@ func (l *Loop) dropFightForMana() {
     l.engageAt = time.Time{}
 }
 
-// publishSkillWeaponPriority feeds the weapon families of the
-// learning queue priority: the weapon in hand plus the weapon of
-// the next planned purchase (the queue puts the lessons their
-// <using> condition accepts first). The tracker no-ops on an
-// unchanged list.
+// publishSkillWeaponPriority feeds the weapon families of the learning queue:
+// the weapon in hand plus the next planned purchase, so the lessons their
+// <using> condition accepts come first. The tracker no-ops on an unchanged
+// list.
 func (l *Loop) publishSkillWeaponPriority() {
     kinds := make([]string, 0, 2)
     if weapon, ok := l.tracker.SelfWeaponKind(); ok && weapon != "" {
@@ -319,9 +289,8 @@ func (l *Loop) publishSkillWeaponPriority() {
     l.tracker.SetSkillWeaponPriority(kinds)
 }
 
-// nextWeaponKind resolves the weapon family of the next weapon
-// purchase of the cached shopping plan: the first affordable weapon
-// of the queue. The second answer is false when no weapon is
+// nextWeaponKind resolves the weapon family of the next planned purchase: the
+// first affordable weapon of the cached shopping queue, with false when none is
 // planned.
 func (l *Loop) nextWeaponKind() (string, bool) {
     for _, purchase := range l.shoppingPlanCache {

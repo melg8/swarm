@@ -1418,6 +1418,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the packets suite (all five
   packages), `golangci-lint run ./internal/swarm/packets/...` 0 issues.
 
+### 2026-11-13 - hunt/combat_skills.go keeps the casting numbers
+
+- 14 blocks compress: the file keeps the `<using>` weapon family rule
+  (Power Strike with a sword, Power Shot with a bow), the mystic magic
+  first order, the sit regeneration against the dry mage death spiral,
+  `castRetryPeriod` 2 s against the bare ActionFailed, `buffCastPeriod`
+  6 s until AbnormalStatusUpdate, `castReuseMargin` 2 s for the jitter
+  between the server and local reuse clocks, `manaSitPercent` 15 and
+  `manaStandPercent` 60, and `overhitFinishPercent` 40 with the Mobius
+  `Attackable.calculateOverhitExp` L1480 bonus `exp * min(overkill/maxHp,
+  0.25)`, the `AttackableStatus.reduceHp` L40 flag clear, the 25-45
+  percent swing band and the early cast cost (delay and mana, not the
+  fight damage).
+- 120 comment lines of 338 become 89 of 307; no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
