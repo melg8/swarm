@@ -1094,6 +1094,19 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - user.go, the manual command phase
+
+- 68 blocks compress, the file falls from 201 comment lines of 1035
+  (19.4 percent) to 169 of 1003 (16.8 percent): the pacing constants
+  keep their number and the server rule (the 600 ms confirmation gate
+  with the disabled UseItem flood protector, the 4 s re-send bound
+  against the attack-window equip deferral, the 150 unit drop reach),
+  the gate notes keep the Mobius per-packet task and the same-item
+  guard, and the manual walk keeps the redirect, the budget and the
+  cursor key escape contracts.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
