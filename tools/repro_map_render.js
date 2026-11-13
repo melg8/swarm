@@ -719,6 +719,38 @@ function runScenarioCastIcon(mapFile) {
         plateAfter.length === 0,
         "plate rects survived: " + plateAfter.length);
 
+    // The Scroll of Escape is an item skill of the bag, never a learned
+    // skill of the snapshot: the cast state carries the display icon
+    // the tracker resolved from the skill dictionary, so the plate
+    // draws the C1 client default vortex (skill0000) without the
+    // learned list - the icon-less states of the older servers still
+    // fall back to it.
+    const scroll = buildSnapshot(0, false);
+    scroll.skills = [];
+    scroll.skillStates = [{
+        skillId: 2013, icon: "skill0000", castLeftMs: 19000,
+        castTotalMs: 20000, reuseLeftMs: 0, reuseTotalMs: 0
+    }];
+    MapView.update(scroll);
+    record.rects.length = 0;
+    MapView.draw();
+    check(results, "the item skill cast resolves its own icon",
+        MapView.selfCast !== null && MapView.selfCast.skillId === 2013
+        && MapView.selfCastIconName() === "skill0000",
+        "resolved icon: '" + MapView.selfCastIconName() + "'");
+    check(results, "the item skill cast loads the vortex icon",
+        MapView.skillIconCache
+        && MapView.skillIconCache.has("skill0000"),
+        "cached icons: "
+        + (MapView.skillIconCache
+            ? Array.from(MapView.skillIconCache.keys()).join(", ")
+            : "none"));
+    check(results, "the item skill cast clears the learned fallback",
+        MapView.selfCastIconName() !== ""
+        && (MapView.lastSnap.skills || []).length === 0,
+        "learned skills: "
+        + (MapView.lastSnap.skills || []).length);
+
     return results;
 }
 

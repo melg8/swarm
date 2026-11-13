@@ -62,7 +62,7 @@ func snapshotJSONSize(s Snapshot) int {
         size += 256 * len(s.SkillPlan.Entries)
     }
     size += 160 * len(s.CombatEvents)
-    size += 80 * len(s.SkillStates)
+    size += 160 * len(s.SkillStates)
     size += 160 * len(s.HuntingZones)
     size += 320
     size += 320
@@ -812,6 +812,8 @@ func appendSkillStatesJSON(dst []byte, states []SkillStateView) []byte {
 func appendSkillStateViewJSON(dst []byte, state SkillStateView) []byte {
     dst = append(dst, `{"skillId":`...)
     dst = strconv.AppendInt(dst, int64(state.SkillID), 10)
+    dst = append(dst, `,"icon":`...)
+    dst = appendJSONString(dst, state.Icon)
     dst = append(dst, `,"castLeftMs":`...)
     dst = strconv.AppendInt(dst, state.CastLeftMs, 10)
     dst = append(dst, `,"castTotalMs":`...)

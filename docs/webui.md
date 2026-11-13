@@ -600,8 +600,13 @@ the Mobius C1
 `MagicSkillUse` (0x5A) broadcast: a self cast opens the cast window
 (the packet hit time) and the cooldown window (the packet reuse
 delay), the snapshot publishes them as `skillStates` (`SkillStateView`:
-the skill id plus the milliseconds left and the totals of both
-windows, computed at the snapshot moment). The map picks the entry
+the skill id, the display icon of the skill plus the milliseconds left
+and the totals of both windows, computed at the snapshot moment). The
+icon comes from the skill dictionary, so an item skill of the bag (the
+Scroll of Escape, never a learned skill) draws its art exactly like a
+learned one; a skill the stats carry no dedicated icon for answers the
+C1 client default `skill0000` (the blue vortex the client draws for
+the item skills). The map picks the entry
 with a live cast (`ingestSkillStates`, the fill end anchored on the
 local performance clock so it runs smoothly between the snapshots and
 never jumps backwards on a re-read). The skills widget renders the

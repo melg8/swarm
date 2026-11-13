@@ -119,8 +119,16 @@ func TestSkillStatesJSONRoundTrip(t *testing.T) {
         SkillID: 1077, SkillLevel: 3,
         HitTimeMs: 1500, ReuseDelayMs: 6000,
     })
+    // The Scroll of Escape is an item skill of the bag, never a
+    // learned skill: its state still carries the display art, so the
+    // map cast icon draws the vortex the client shows.
+    bot.ApplySkillCast(SkillCast{
+        CasterID: 100, TargetID: 100,
+        SkillID: 2013, SkillLevel: 1,
+        HitTimeMs: 20000, ReuseDelayMs: 0,
+    })
     snap := bot.Snapshot()
-    require.Len(t, snap.SkillStates, 1)
+    require.Len(t, snap.SkillStates, 2)
 
     for name, data := range map[string][]byte{
         "reflection": marshalSnapshot(t, snap),
@@ -130,15 +138,20 @@ func TestSkillStatesJSONRoundTrip(t *testing.T) {
             SkillStates []SkillStateView `json:"skillStates"`
         }
         require.NoError(t, json.Unmarshal(data, &parsed), name)
-        require.Len(t, parsed.SkillStates, 1, name)
+        require.Len(t, parsed.SkillStates, 2, name)
         state := parsed.SkillStates[0]
         require.Equal(t, int32(1077), state.SkillID, name)
+        require.Equal(t, "skill1077", state.Icon, name)
         require.Equal(t, int64(1500), state.CastTotalMs, name)
         require.Equal(t, int64(6000), state.ReuseTotalMs, name)
         require.Positive(t, state.CastLeftMs, name)
         require.LessOrEqual(t, state.CastLeftMs, int64(1500), name)
         require.Positive(t, state.ReuseLeftMs, name)
         require.LessOrEqual(t, state.ReuseLeftMs, int64(6000), name)
+        scroll := parsed.SkillStates[1]
+        require.Equal(t, int32(2013), scroll.SkillID, name)
+        require.Equal(t, "skill0000", scroll.Icon, name)
+        require.Equal(t, int64(20000), scroll.CastTotalMs, name)
     }
 }
 

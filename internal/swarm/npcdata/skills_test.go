@@ -65,6 +65,28 @@ func TestSkillDescription(t *testing.T) {
     })
 }
 
+// TestSkillInfoDefaultIcon pins the client default art of the skills
+// whose stats carry no dedicated icon: the C1 client skillgrp.txt
+// draws icon.skill0000 for every one of them (the item skills of the
+// table, the Scroll of Escape 2013 among them), so the display data
+// answers the vortex art instead of an empty name.
+func TestSkillInfoDefaultIcon(t *testing.T) {
+    info, ok := SkillInfoOf(2013)
+    require.True(t, ok)
+    require.Equal(t, "Scroll of Escape", info.Name)
+    require.Equal(t, skillDefaultIcon, info.Icon)
+    require.Equal(t, "skill0000", info.Icon)
+
+    // The skills with a dedicated art of the pack keep it.
+    info, ok = SkillInfoOf(1077) // Focus
+    require.True(t, ok)
+    require.Equal(t, "skill1077", info.Icon)
+
+    // The default never leaks past an unknown id.
+    _, ok = SkillInfoOf(unknownSkillID)
+    require.False(t, ok)
+}
+
 func TestSkillDescsCoverTheTrees(t *testing.T) {
     // Every distinct skill of every class tree must carry a
     // description: the web UI tooltip drops the block for unknown

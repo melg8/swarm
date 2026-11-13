@@ -228,11 +228,12 @@ type Snapshot struct {
     // dictionary. The web UI buffs widget renders it.
     Buffs []BuffSnapshot `json:"buffs"`
     // SkillStates carries the live cast and reuse windows of the
-    // learned skills (see ApplySkillCast): the milliseconds left of
-    // the cast and the cooldown at the snapshot moment plus the
-    // window totals. The web UI cast fills and the cooldown
-    // countdowns of the skills widget render it; the map cast icon
-    // reads the running cast from it.
+    // played character (see ApplySkillCast): the milliseconds left of
+    // the cast and the cooldown at the snapshot moment, the window
+    // totals and the display icon of the skill (the learned skills and
+    // the item skills of the bag alike). The web UI cast fills and the
+    // cooldown countdowns of the skills widget render it; the map cast
+    // icon reads the running cast from it.
     SkillStates []SkillStateView `json:"skillStates"`
     // CombatEvents carries the recent swings and damage
     // landings of the animation layer: the last

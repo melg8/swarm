@@ -4033,7 +4033,9 @@ const MapView = {
   // snapshots. A snapshot without a live cast clears the icon. The
   // server runs one cast per creature at a time; if two states ever
   // carried a live cast, the biggest remainder (the newest start)
-  // wins.
+  // wins. The state carries the display icon of the skill, so an item
+  // skill of the bag (the Scroll of Escape) draws its art exactly like
+  // a learned one.
   ingestSkillStates(snapshot) {
     const states = snapshot.skillStates || [];
     let live = null;
@@ -4055,11 +4057,13 @@ const MapView = {
       // The same cast re-read: keep the anchor (the fill never jumps
       // backwards on a re-read).
       current.totalMs = live.castTotalMs;
+      if (!current.icon && live.icon) { current.icon = live.icon; }
 
       return;
     }
     this.selfCast = {
       skillId: live.skillId,
+      icon: live.icon || "",
       totalMs: live.castTotalMs,
       endsAt
     };
@@ -4091,9 +4095,14 @@ const MapView = {
   },
 
   // selfCastIconName resolves the icon file name of the running
-  // cast from the learned skill list of the last snapshot.
+  // cast: the icon the skill state carries (the tracker resolves it
+  // from the skill dictionary for the learned and the item skills
+  // alike), else the learned skill list of the last snapshot for the
+  // states of an older server.
   selfCastIconName() {
-    if (!this.selfCast || !this.lastSnap) { return ""; }
+    if (!this.selfCast) { return ""; }
+    if (this.selfCast.icon) { return this.selfCast.icon; }
+    if (!this.lastSnap) { return ""; }
     const id = this.selfCast.skillId;
     for (const skill of this.lastSnap.skills || []) {
       if (skill.skillId === id) { return skill.icon || ""; }

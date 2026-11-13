@@ -5,10 +5,11 @@
 package npcdata
 
 // SkillInfo is the static display data of one skill: the resolved
-// name, the icon file of the pack (empty when the pack carries no
-// icon for the skill - the web UI falls back to a glyph), the
-// passive flag (the C1 operateType P of the skill stats) and the
-// warrior priority category. Generated into skill_trees.go.
+// name, the icon file of the pack (the generated table stays empty
+// when the skill stats carry no dedicated art - SkillInfoOf answers
+// the client default then), the passive flag (the C1 operateType P of
+// the skill stats) and the warrior priority category. Generated into
+// skill_trees.go.
 type SkillInfo struct {
     Name     string
     Icon     string
@@ -142,12 +143,22 @@ func ClassCastsMagic(classID int32) bool {
     return false
 }
 
-// SkillInfoOf returns the static display data of a skill id. The
-// second answer is false when the id is unknown to the generated
-// dictionary (a skill the server granted but the C1 stats do not
-// carry).
+// skillDefaultIcon is the C1 client default skill art: the client
+// skillgrp.txt names icon.skill0000 for every skill its stats carry no
+// dedicated icon for - the item skills of the table, Scroll of Escape
+// 2013 among them.
+const skillDefaultIcon = "skill0000"
+
+// SkillInfoOf returns the static display data of a skill id. A skill
+// whose stats carry no dedicated icon answers the client default art,
+// the vortex the C1 client draws for it. The second answer is false
+// when the id is unknown to the generated dictionary (a skill the
+// server granted but the C1 stats do not carry).
 func SkillInfoOf(id int32) (SkillInfo, bool) {
     info, ok := skillInfos[id]
+    if ok && info.Icon == "" {
+        info.Icon = skillDefaultIcon
+    }
 
     return info, ok
 }

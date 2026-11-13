@@ -7,6 +7,8 @@ package state
 import (
     "sort"
     "time"
+
+    "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
 // SkillCast is one skill cast broadcast of the server (the Mobius C1
@@ -40,13 +42,17 @@ type skillCastWindow struct {
 // played character in the snapshot: the milliseconds left of each
 // window at the snapshot moment plus the window totals. A window that
 // already elapsed reads zero; a skill with both windows elapsed drops
-// out of the section entirely.
+// out of the section entirely. Icon is the display art of the skill,
+// so the map cast icon draws the casting skill whatever its source -
+// a learned skill or an item skill of the bag like the Scroll of
+// Escape (never a learned skill).
 type SkillStateView struct {
-    SkillID      int32 `json:"skillId"`
-    CastLeftMs   int64 `json:"castLeftMs"`
-    CastTotalMs  int64 `json:"castTotalMs"`
-    ReuseLeftMs  int64 `json:"reuseLeftMs"`
-    ReuseTotalMs int64 `json:"reuseTotalMs"`
+    SkillID      int32  `json:"skillId"`
+    Icon         string `json:"icon"`
+    CastLeftMs   int64  `json:"castLeftMs"`
+    CastTotalMs  int64  `json:"castTotalMs"`
+    ReuseLeftMs  int64  `json:"reuseLeftMs"`
+    ReuseTotalMs int64  `json:"reuseTotalMs"`
 }
 
 // ApplySkillCast records the skill cast broadcast of the played
@@ -93,6 +99,16 @@ func (b *Bot) pruneSkillCastsLocked(now time.Time) {
     }
 }
 
+// SkillStates returns the live cast and reuse windows of the played
+// character: the same rows the snapshot carries, sorted by skill id.
+// The acceptance scenario watches the Scroll of Escape cast here.
+func (b *Bot) SkillStates() []SkillStateView {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.skillStateViewsLocked(b.now())
+}
+
 // skillStateViewsLocked builds the skillStates section of the
 // snapshot: the live windows sorted by skill id (the deterministic
 // wire order), the elapsed windows read zero and the skills with both
@@ -108,13 +124,18 @@ func (b *Bot) skillStateViewsLocked(now time.Time) []SkillStateView {
         if castLeft <= 0 && reuseLeft <= 0 {
             continue
         }
-        views = append(views, SkillStateView{
+        view := SkillStateView{
             SkillID:      id,
+            Icon:         "",
             CastLeftMs:   castLeft.Milliseconds(),
             CastTotalMs:  window.castTotal.Milliseconds(),
             ReuseLeftMs:  reuseLeft.Milliseconds(),
             ReuseTotalMs: window.reuseTotal.Milliseconds(),
-        })
+        }
+        if info, ok := npcdata.SkillInfoOf(id); ok {
+            view.Icon = info.Icon
+        }
+        views = append(views, view)
     }
     sort.Slice(views, func(i, j int) bool {
         return views[i].SkillID < views[j].SkillID
