@@ -6,10 +6,9 @@ package fromgameserver
 
 import "strings"
 
-// htmlLinkCap bounds the plausible link count of a dialog page: the
-// longest quest and teleport pages carry a few dozen links, so 128
-// is far past every honest page while a pathological page cannot
-// grow the result without end.
+// htmlLinkCap bounds the plausible link count of a dialog page: the longest
+// quest and teleport pages carry a few dozen links, so 128 is far past every
+// honest page while a pathological page cannot grow the result without end.
 const htmlLinkCap = 128
 
 // HTMLLink is one dialog action of a server html page: the bypass
@@ -22,13 +21,12 @@ type HTMLLink struct {
     Text    string
 }
 
-// ParseHTMLLinks extracts the bypass links of a server dialog page,
-// mirroring HtmlUtil.buildHtmlBypassCache: the attribute values
-// starting with "bypass " match case-insensitively on the lowercased
-// html (the original casing stays in the result), the command runs to
-// the closing quote, the optional "-h " prefix strips and the command
-// trims. The link text is the content between the anchor tag end and
-// the next tag; a page without links or with an unterminated action
+// ParseHTMLLinks extracts the bypass links of a server dialog page, mirroring
+// HtmlUtil.buildHtmlBypassCache: the attribute values starting with "bypass "
+// match case-insensitively on the lowercased html (the original casing stays in
+// the result), the command runs to the closing quote, the optional "-h " prefix
+// strips and the command trims. The link text is the content between the anchor
+// tag end and the next tag; a page without links or with an unterminated action
 // attribute yields nil.
 func ParseHTMLLinks(html string) []HTMLLink {
     if html == "" {
@@ -69,9 +67,8 @@ func ParseHTMLLinks(html string) []HTMLLink {
     return links
 }
 
-// anchorText returns the visible text of the anchor whose action
-// attribute ends at quoteEnd: the content between the tag closing
-// bracket and the next tag.
+// anchorText returns the visible text of the anchor whose action attribute ends
+// at quoteEnd: the content between the tag closing bracket and the next tag.
 func anchorText(html string, quoteEnd int) string {
     tagEnd := strings.IndexByte(html[quoteEnd:], '>')
     if tagEnd == -1 {

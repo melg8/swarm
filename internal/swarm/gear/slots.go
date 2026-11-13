@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package gear scores equipment and plans equips and purchases. The
-// slot model mirrors the paperdoll of the Mobius server, the scoring
-// profiles rank items per combat class (a melee fighter now, mages
-// later) and the planners turn the inventory and the shop catalogs
-// into concrete use item and buy item actions.
+// Package gear scores equipment and plans equips and purchases. The slot model
+// mirrors the paperdoll of the Mobius server, the scoring profiles rank items
+// per combat class (a melee fighter now, mages later) and the planners turn the
+// inventory and the shop catalogs into concrete use item and buy item actions.
 package gear
 
 import (
@@ -74,9 +73,8 @@ func (s Slot) String() string {
 const slotInvalid Slot = -1
 
 // Body part mask names of the C1 item stats: the values the generated
-// GearStats.BodyPart field spells for the hand and family slots (the
-// pair families are "either-or" masks the server data writes as one
-// string).
+// GearStats.BodyPart field spells for the hand and family slots (the pair
+// families are "either-or" masks the server data writes as one string).
 const (
     partLhand    = "lhand"
     partLrhand   = "lrhand"
@@ -181,10 +179,9 @@ const (
     CategoryJewel
 )
 
-// CategoryOf resolves the gear family of the item from its stats:
-// weapons carry a weapon type, shields sit in the left hand, jewels
-// on the ear, finger and neck bodyparts and everything else
-// equippable is armor.
+// CategoryOf resolves the gear family of the item from its stats: weapons carry
+// a weapon type, shields sit in the left hand, jewels on the ear, finger and
+// neck bodyparts and everything else equippable is armor.
 func CategoryOf(stats npcdata.GearStats) Category {
     switch {
     case stats.WeaponType != "" &&
@@ -257,9 +254,8 @@ func (e Equipment) itemByID(objectID int32) (state.InventoryItem, bool) {
     }, false
 }
 
-// Paperdoll returns the equipped item and its score of every slot
-// (an empty ScoredItem when the slot is empty or its item carries no
-// gear stats).
+// Paperdoll returns the equipped item and its score of every slot (an empty
+// ScoredItem when the slot is empty or its item carries no gear stats).
 func (e Equipment) Paperdoll(profile Profile) [slotCount]ScoredItem {
     var paperdoll [slotCount]ScoredItem
     for slot, objectID := range e.Slots {

@@ -23,17 +23,15 @@ const (
     // adopts the packet origin within the thousand unit window, latches the
     // cursor key flag and syncs every later ValidatePosition claim into the
     // world without a click validation. A cell whose geodata seals the mouse
-    // click answers only this stream (docs/hunting.md, the cursor key
-    // escape).
+    // click answers only this stream (docs/hunting.md, the cursor key escape).
     MoveModeCursorKeys int32 = 0
 )
 
 // MoveToLocationRequestPacket walks the character to a world point like a
 // ground click of the official client (the hunt loop runs toward a drop with
-// it).
-// Wire format (MoveToLocation.readImpl): [opcode 0x01][targetX: 4]
-// [targetY: 4][targetZ: 4][originX: 4][originY: 4][originZ: 4]
-// [movementMode: 4].
+// it). Wire format (MoveToLocation.readImpl): [opcode 0x01][targetX: 4]
+// [targetY: 4][targetZ: 4][originX: 4][originY: 4][originZ: 4] [movementMode:
+// 4].
 type MoveToLocationRequestPacket struct {
     TargetX int32
     TargetY int32

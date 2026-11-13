@@ -17,18 +17,16 @@ import (
 // is the exact polygon with the patrol square inscribed; the hunt rotates over
 // the adjacency graph paced by respawn ripeness (cell_policy.go).
 
-// CellVertex is one vertex of the convex cell polygon (world
-// coordinates, counter-clockwise; the generator normalizes the
-// orientation).
+// CellVertex is one vertex of the convex cell polygon (world coordinates,
+// counter-clockwise; the generator normalizes the orientation).
 type CellVertex struct {
     X int32
     Y int32
 }
 
-// CellMob describes one mob species of a hunting cell: the expected
-// population share of the ground (the territory sample points the
-// nearest-seed assignment gave the cell) and the respawn window of
-// the species from the spawn data.
+// CellMob describes one mob species of a hunting cell: the expected population
+// share of the ground (the territory sample points the nearest-seed assignment
+// gave the cell) and the respawn window of the species from the spawn data.
 type CellMob struct {
     // TemplateID is the npc template id of the spawn data (the
     // Mobius CT0 xml id, see npcdata.NPCWireTemplateID).
@@ -40,9 +38,8 @@ type CellMob struct {
     // Count is the expected spawned population of the species
     // inside the cell ground.
     Count int32
-    // RespawnMin and RespawnMax bound the respawn delay of the
-    // species in seconds (the server schedules death + rnd of the
-    // window).
+    // RespawnMin and RespawnMax bound the respawn delay of the species in
+    // seconds (the server schedules death + rnd of the window).
     RespawnMin int32
     RespawnMax int32
 }
@@ -68,9 +65,8 @@ type Cell struct {
     // square inscribed in the cell polygon at the focus, capped so
     // the whole cell stays visible from any point of the square.
     PatrolHalf int32
-    // RespawnMin and RespawnMax are the dominant respawn window of
-    // the ground in seconds (the count weighted midpoint of the
-    // species windows).
+    // RespawnMin and RespawnMax are the dominant respawn window of the ground
+    // in seconds (the count weighted midpoint of the species windows).
     RespawnMin int32
     RespawnMax int32
     // Mass is the expected total population of the ground (the

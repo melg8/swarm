@@ -39,8 +39,7 @@ type MagicSkillUsePacket struct {
     TargetZ    int32
 }
 
-// NewMagicSkillUsePacket creates a zero valued packet ready for
-// parsing.
+// NewMagicSkillUsePacket creates a zero valued packet ready for parsing.
 func NewMagicSkillUsePacket() *MagicSkillUsePacket {
     return &MagicSkillUsePacket{
         CasterID:   0,

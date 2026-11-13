@@ -175,9 +175,8 @@ func weaponAnchor(virtual [slotCount]ScoredItem) int64 {
     return npcdata.ItemPrice(weapon.Item.ItemID)
 }
 
-// floorSlotEmpty reports whether the jewel bodypart still has an
-// empty slot to fill: the floor only fills, it never replaces a worn
-// jewel.
+// floorSlotEmpty reports whether the jewel bodypart still has an empty slot to
+// fill: the floor only fills, it never replaces a worn jewel.
 func floorSlotEmpty(virtual [slotCount]ScoredItem, bodyPart string) bool {
     slots := SlotsForBodyPart(bodyPart)
     if len(slots) == 0 {

@@ -22,8 +22,7 @@ type ChangeMoveTypePacket struct {
     TypeRun int32
 }
 
-// NewChangeMoveTypePacket creates a zero valued (walk) move type
-// request.
+// NewChangeMoveTypePacket creates a zero valued (walk) move type request.
 func NewChangeMoveTypePacket() *ChangeMoveTypePacket {
     return &ChangeMoveTypePacket{TypeRun: 0}
 }

@@ -185,8 +185,7 @@ func (Archer) WeaponPoints(stats npcdata.GearStats) int32 {
     return stats.PAtk
 }
 
-// scoreStats dispatches the profile scoring on the gear family of the
-// stats.
+// scoreStats dispatches the profile scoring on the gear family of the stats.
 func scoreStats(profile Profile, stats npcdata.GearStats) float64 {
     switch CategoryOf(stats) {
     case CategoryWeapon:

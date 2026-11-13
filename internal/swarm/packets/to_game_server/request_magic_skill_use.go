@@ -12,14 +12,13 @@ import (
 
 const requestMagicSkillUsePacketID = 0x2F
 
-// RequestMagicSkillUsePacket casts a learned active skill: a strike
-// at the selected target, a self buff or a heal. The server resolves
-// the skill level through the known skill list and walks the cast
-// flow (range check, mana cost, reuse delay) itself; the answers are
-// the MagicSkillUse broadcast with the setup cast bar and the
-// ActionFailed refusals the re-requests retry. A ctrl cast forces the
-// attackable flag and a shift cast keeps the current target; the bot
-// sends neither. Wire: [opcode 0x2F][magicId: 4][ctrl: 4][shift: 1].
+// RequestMagicSkillUsePacket casts a learned active skill: a strike at the
+// selected target, a self buff or a heal. The server resolves the skill level
+// through the known skill list and walks the cast flow (range check, mana cost,
+// reuse delay) itself; the answers are the MagicSkillUse broadcast with the
+// setup cast bar and the ActionFailed refusals the re-requests retry. A ctrl
+// cast forces the attackable flag and a shift cast keeps the current target;
+// the bot sends neither. Wire: [opcode 0x2F][magicId: 4][ctrl: 4][shift: 1].
 type RequestMagicSkillUsePacket struct {
     SkillID int32
     Ctrl    bool

@@ -63,12 +63,11 @@ func SelfHealSkill(id int32) bool {
     return selfHealSkills[id]
 }
 
-// selfHealInitialConsume holds the per level mpInitialConsume of
-// the self heal skills (the mana the server burns before the cast
-// resolves, on top of mpConsume - the server gate sums both,
-// Creature.java L2049: getMpConsume + getMpInitialConsume, so the
-// bot gate must too). The tables are hand copied from
-// the C1 stats: 01200-01299.xml (Self Heal, one level), and the
+// selfHealInitialConsume holds the per level mpInitialConsume of the self heal
+// skills (the mana the server burns before the cast resolves, on top of
+// mpConsume - the server gate sums both, Creature.java L2049: getMpConsume +
+// getMpInitialConsume, so the bot gate must too). The tables are hand copied
+// from the C1 stats: 01200-01299.xml (Self Heal, one level), and the
 // #mpInitialConsume tables of Divine Heal and Elemental Heal in
 // 00000-00099.xml. An id outside the map answers 0.
 var selfHealInitialConsume = map[int32][]int32{
@@ -80,12 +79,11 @@ var selfHealInitialConsume = map[int32][]int32{
     1216: {2},
 }
 
-// SelfHealInitialConsumeOf returns the initial mana consume of one
-// level of a self heal skill (the tables clamp to their last entry
-// like MPCostOf does, an unknown id answers 0). The generated cast
-// tables carry mpConsume only - folding the initial consume in is
-// the generator follow up, this hand table covers the three skills
-// the recovery gates until then.
+// SelfHealInitialConsumeOf returns the initial mana consume of one level of a
+// self heal skill (the tables clamp to their last entry like MPCostOf does, an
+// unknown id answers 0). The generated cast tables carry mpConsume only -
+// folding the initial consume in is the generator follow up, this hand table
+// covers the three skills the recovery gates until then.
 func SelfHealInitialConsumeOf(id, level int32) int32 {
     table, ok := selfHealInitialConsume[id]
     if !ok || len(table) == 0 {

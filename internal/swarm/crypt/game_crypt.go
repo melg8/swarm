@@ -50,14 +50,13 @@ func (gc *GameCrypt) Enabled() bool {
     return gc.enabled
 }
 
-// Encrypt transforms outbound payload bytes in place: the running XOR
-// chain out[i] = data[i] ^ key[i&7] ^ out[i-1]. A byte loop would cost
-// ~1M iterations per second on the 100 bot fleet (100 bytes per packet,
-// 100 packets per second per bot), so the loop walks 8 byte chunks: one
-// uint64 key load, a three step shift-and-XOR prefix scan (8, 16, 32
-// bit shifts) for the chunk's running XOR, and the previous chain value
-// broadcast through a multiply by 0x0101010101010101. The 1 to 7 byte
-// tail falls back to the byte loop.
+// Encrypt transforms outbound payload bytes in place: the running XOR chain
+// out[i] = data[i] ^ key[i&7] ^ out[i-1]. A byte loop would cost ~1M iterations
+// per second on the 100 bot fleet (100 bytes per packet, 100 packets per second
+// per bot), so the loop walks 8 byte chunks: one uint64 key load, a three step
+// shift-and-XOR prefix scan (8, 16, 32 bit shifts) for the chunk's running XOR,
+// and the previous chain value broadcast through a multiply by
+// 0x0101010101010101. The 1 to 7 byte tail falls back to the byte loop.
 func (gc *GameCrypt) Encrypt(data []byte) {
     if !gc.enabled || len(data) == 0 {
         return
@@ -80,9 +79,8 @@ func (gc *GameCrypt) Encrypt(data []byte) {
         x ^= x << 16
         x ^= x << 32
 
-        // The chain value from the previous chunk XORs into every
-        // byte (it flows through the chain), so broadcast it and
-        // XOR once.
+        // The chain value from the previous chunk XORs into every byte (it
+        // flows through the chain), so broadcast it and XOR once.
         x ^= uint64(prev) * bitsBroadcast
 
         binary.LittleEndian.PutUint64(data[i:], x)
@@ -100,14 +98,12 @@ func (gc *GameCrypt) Encrypt(data []byte) {
     gc.advanceOffset(&gc.outKey, n)
 }
 
-// Decrypt transforms inbound payload bytes in place.
-//
-// The decrypt chain uses the ENCRYPTED (input) bytes as the chain value,
-// not the output: out[i] = enc[i] ^ key[i&7] ^ enc[i-1]. This is simpler
-// than encrypt: XOR the chunk with the key, then XOR each byte with the
-// previous ENCRYPTED byte (which is just the original input shifted by 8
-// bits within the register). The chain value from the previous chunk goes
-// into byte 0 through an OR with the shifted register.
+// Decrypt transforms inbound payload bytes in place. The decrypt chain uses the
+// ENCRYPTED (input) bytes as the chain value, not the output: out[i] = enc[i] ^
+// key[i&7] ^ enc[i-1]. This is simpler than encrypt: XOR the chunk with the
+// key, then XOR each byte with the previous ENCRYPTED byte (which is just the
+// original input shifted by 8 bits within the register). The chain value from
+// the previous chunk goes into byte 0 through an OR with the shifted register.
 func (gc *GameCrypt) Decrypt(data []byte) {
     if !gc.enabled || len(data) == 0 {
         return
@@ -124,10 +120,9 @@ func (gc *GameCrypt) Decrypt(data []byte) {
         enc := binary.LittleEndian.Uint64(data[i:])
         x := enc ^ key
 
-        // Each output byte XORs with the previous ENCRYPTED byte.
-        // Shifting enc left by 8 bits puts enc[i-1] at byte i's
-        // position; byte 0 gets 0, which we replace with the chain
-        // value from the previous chunk.
+        // Each output byte XORs with the previous ENCRYPTED byte. Shifting enc
+        // left by 8 bits puts enc[i-1] at byte i's position; byte 0 gets 0,
+        // which we replace with the chain value from the previous chunk.
         shifted := enc<<8 | uint64(last)
         out := x ^ shifted
 
@@ -148,10 +143,9 @@ func (gc *GameCrypt) Decrypt(data []byte) {
     gc.advanceOffset(&gc.inKey, n)
 }
 
-// bitsBroadcast is the multiplier that replicates a single byte into
-// all 8 bytes of a uint64: 0x0101010101010101. Used by the encrypt
-// SWAR path to broadcast the chain value into every byte of the
-// prefix XOR scan result.
+// bitsBroadcast is the multiplier that replicates a single byte into all 8
+// bytes of a uint64: 0x0101010101010101. Used by the encrypt SWAR path to
+// broadcast the chain value into every byte of the prefix XOR scan result.
 const bitsBroadcast uint64 = 0x0101010101010101
 
 // advanceOffset adds size to the little endian int stored at key[0..3].

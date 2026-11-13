@@ -13,13 +13,12 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// Options are the builder tunables. The defaults: the 40 unit climb of
-// the server HEIGHT_INCREASE_LIMIT, the 32 unit dedup delta of the l2j
-// duplicate noise (both-open pairs of the same surface at 16/24/32
-// unit deltas; the elven region shows none, the 22_xx column 54k pairs
-// per region) and the 4 layer island filter. The rectangle polygons
-// carry no height tunable: they merge only the cells of one exact
-// geodata height.
+// Options are the builder tunables. The defaults: the 40 unit climb of the
+// server HEIGHT_INCREASE_LIMIT, the 32 unit dedup delta of the l2j duplicate
+// noise (both-open pairs of the same surface at 16/24/32 unit deltas; the elven
+// region shows none, the 22_xx column 54k pairs per region) and the 4 layer
+// island filter. The rectangle polygons carry no height tunable: they merge
+// only the cells of one exact geodata height.
 type Options struct {
     Climb          int32
     DedupDelta     int32
@@ -60,20 +59,18 @@ type BuildStats struct {
     BuildTime        time.Duration
 }
 
-// RegionBuild is the phase A result of one region: the tile with the
-// polygons, the internal links and the spatial index (no external
-// links yet), plus the border strips the phase B stitching pairs
-// against the neighbours.
+// RegionBuild is the phase A result of one region: the tile with the polygons,
+// the internal links and the spatial index (no external links yet), plus the
+// border strips the phase B stitching pairs against the neighbours.
 type RegionBuild struct {
     Tile   *navmesh.Tile
     Strips borderStrips
     Stats  BuildStats
 }
 
-// BuildRegion runs the offline build of one region: the parse and
-// dedup, the sheet decomposition, the maximal same-height rectangle
-// polygons, the internal links with the NSWE portal spans and the
-// bounding volume tree.
+// BuildRegion runs the offline build of one region: the parse and dedup, the
+// sheet decomposition, the maximal same-height rectangle polygons, the internal
+// links with the NSWE portal spans and the bounding volume tree.
 func BuildRegion(
     data []byte, col, row int16, opts Options,
 ) (*RegionBuild, error) {

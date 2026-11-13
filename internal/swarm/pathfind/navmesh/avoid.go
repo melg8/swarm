@@ -36,18 +36,16 @@ const (
     // the start stay passable at the multiplier, the own ground
     // beyond keeps its wall (the sealed goal contract).
     avoidEscapeRadius = 256.0
-    // avoidGrazedMultiplier prices the steps onto a foreign banned
-    // polygon whose own portal segment stays clear of the circle: the
-    // rectangle granularity of the wall test grazes the merged mesh
-    // strips far beyond the circle, the crossing pays the squared
-    // escape price instead of the wall (the foreign ban wins the
-    // price race against the own escape ring, the world ford stays
-    // swimmable).
+    // avoidGrazedMultiplier prices the steps onto a foreign banned polygon
+    // whose own portal segment stays clear of the circle: the rectangle
+    // granularity of the wall test grazes the merged mesh strips far beyond the
+    // circle, the crossing pays the squared escape price instead of the wall
+    // (the foreign ban wins the price race against the own escape ring, the
+    // world ford stays swimmable).
     avoidGrazedMultiplier = avoidEscapeMultiplier * avoidEscapeMultiplier
 )
 
-// avoidState classifies one polygon against the avoid circles of a
-// search.
+// avoidState classifies one polygon against the avoid circles of a search.
 type avoidState uint8
 
 const (
@@ -56,10 +54,9 @@ const (
     avoidEscape                   // own ban near the start: priced
 )
 
-// avoidCtx is the per-search avoid context, derived once from the
-// filter circles and the raw start position: the escape index of the
-// ban holding the start (the way-out rule) and the start itself for
-// the escape ring test.
+// avoidCtx is the per-search avoid context, derived once from the filter
+// circles and the raw start position: the escape index of the ban holding the
+// start (the way-out rule) and the start itself for the escape ring test.
 type avoidCtx struct {
     areas     []AvoidCircle
     escapeIdx int
@@ -67,10 +64,9 @@ type avoidCtx struct {
     active    bool
 }
 
-// newAvoidCtx derives the avoid context. The escape index is the
-// first circle containing the start position - the walker standing
-// inside a ban must be able to plan its way OUT of it, exactly like
-// the grid startAvoidIndex rule.
+// newAvoidCtx derives the avoid context. The escape index is the first circle
+// containing the start position - the walker standing inside a ban must be able
+// to plan its way OUT of it, exactly like the grid startAvoidIndex rule.
 func newAvoidCtx(areas []AvoidCircle, start Pos) avoidCtx {
     ctx := avoidCtx{
         areas:     areas,
@@ -180,13 +176,12 @@ func (a avoidCtx) foreignTouched(tile *Tile, poly *Poly) bool {
     return false
 }
 
-// portalBanned reports whether the walkable portal segment crosses a
-// foreign ban circle (the closest point of the segment to the center
-// inside the radius). The polygon rectangle test of state walls the
-// merged mesh strips far beyond the circle - a river strip whose rect
-// grazes the town ban sealed the ford 15k units downstream - so the
-// step through a cleared portal stays legal and the segment is the
-// honest granularity of the ban.
+// portalBanned reports whether the walkable portal segment crosses a foreign
+// ban circle (the closest point of the segment to the center inside the
+// radius). The polygon rectangle test of state walls the merged mesh strips far
+// beyond the circle - a river strip whose rect grazes the town ban sealed the
+// ford 15k units downstream - so the step through a cleared portal stays legal
+// and the segment is the honest granularity of the ban.
 func (a avoidCtx) portalBanned(ax, ay, bx, by float64) bool {
     if !a.active {
         return false

@@ -18,7 +18,6 @@ import (
 var ErrNotEnoughBytes = errors.New("not enough bytes to read")
 
 // Reader is a little endian binary reader over a fixed byte slice.
-//
 // It stores a direct slice header and an offset instead of wrapping
 // bytes.Reader: the direct form keeps one bounds check against len(data) and
 // lets the integer readers call encoding/binary.LittleEndian directly, which

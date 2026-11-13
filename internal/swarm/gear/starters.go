@@ -11,14 +11,13 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// starterSet lists the item ids of the newbie kits the server never
-// takes back: the Mobius item xml flags them is_sellable=false and
-// is_dropable=false, so no shop buys them and the ground refuses them -
-// the destroy request is the only way they leave the character. The
-// elven fighter starts with the Dagger (item 10) and the Squire's set;
-// a piece the paperdoll no longer needs is dead weight (the shirt
-// weighs 3300, the dagger 1160), so the hunt loop destroys it through
-// ReplacedStarterItems once a better piece is worn.
+// starterSet lists the item ids of the newbie kits the server never takes back:
+// the Mobius item xml flags them is_sellable=false and is_dropable=false, so no
+// shop buys them and the ground refuses them - the destroy request is the only
+// way they leave the character. The elven fighter starts with the Dagger (item
+// 10) and the Squire's set; a piece the paperdoll no longer needs is dead
+// weight (the shirt weighs 3300, the dagger 1160), so the hunt loop destroys it
+// through ReplacedStarterItems once a better piece is worn.
 var starterSet = map[int32]bool{
     10:   true, // Dagger (the elven fighter's starter weapon)
     1146: true, // Squire's Shirt
@@ -26,11 +25,10 @@ var starterSet = map[int32]bool{
     2369: true, // Squire's Sword
 }
 
-// IsStarterItem reports whether the item id belongs to the newbie kit
-// the shops refuse to buy and the ground refuses to take: the planner
-// must never count its sell value and the junk flows must never offer
-// it - the destroy request is its only way out (see
-// ReplacedStarterItems).
+// IsStarterItem reports whether the item id belongs to the newbie kit the shops
+// refuse to buy and the ground refuses to take: the planner must never count
+// its sell value and the junk flows must never offer it - the destroy request
+// is its only way out (see ReplacedStarterItems).
 func IsStarterItem(itemID int32) bool {
     return starterSet[itemID]
 }
@@ -46,14 +44,13 @@ type StarterDrop struct {
     Reason string
 }
 
-// ReplacedStarterItems returns the unequipped starter kit items whose
-// paperdoll slot a replacement already occupies with an equal or
-// better profile score: the equip planner would never pick them again
-// (a swap needs a strictly better candidate), so they are dead weight
-// the shops refuse to buy and the ground refuses to take. An empty
-// slot keeps its starter item - the auto equipment still wears it -
-// and a starter item with no replacement in sight is never returned.
-// The order is deterministic (object ids ascending).
+// ReplacedStarterItems returns the unequipped starter kit items whose paperdoll
+// slot a replacement already occupies with an equal or better profile score:
+// the equip planner would never pick them again (a swap needs a strictly better
+// candidate), so they are dead weight the shops refuse to buy and the ground
+// refuses to take. An empty slot keeps its starter item - the auto equipment
+// still wears it - and a starter item with no replacement in sight is never
+// returned. The order is deterministic (object ids ascending).
 func ReplacedStarterItems(
     profile Profile, equipment Equipment,
 ) []StarterDrop {
@@ -96,11 +93,10 @@ func ReplacedStarterItems(
     return replaced
 }
 
-// starterReplacement resolves the paperdoll entry a starter item of
-// the bodypart competes with: the chest and right hand items their own
-// slot, the legs item the legs slot unless a one-piece armor occupies
-// the chest (the one-piece blocks the legs slot and displaces the
-// starter pants with itself).
+// starterReplacement resolves the paperdoll entry a starter item of the
+// bodypart competes with: the chest and right hand items their own slot, the
+// legs item the legs slot unless a one-piece armor occupies the chest (the
+// one-piece blocks the legs slot and displaces the starter pants with itself).
 func starterReplacement(
     paperdoll [slotCount]ScoredItem, stats npcdata.GearStats,
 ) ScoredItem {

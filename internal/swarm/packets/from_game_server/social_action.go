@@ -12,16 +12,14 @@ import (
 
 const SocialActionPacketID = 0x3D
 
-// SocialActionLevelUp is the social action id the server broadcasts
-// when any character reaches a new level (SocialAction.LEVEL_UP). The
-// remaining ids are the idle animations of npcs and the client social
-// commands of players.
+// SocialActionLevelUp is the social action id the server broadcasts when any
+// character reaches a new level (SocialAction.LEVEL_UP). The remaining ids are
+// the idle animations of npcs and the client social commands of players.
 const SocialActionLevelUp = 15
 
-// SocialActionPacket announces that a creature around the character
-// plays a social animation (an idle gesture of an npc, a player emote
-// or the level up animation).
-// Wire format (see SocialAction.writeImpl): [opcode 0x3D]
+// SocialActionPacket announces that a creature around the character plays a
+// social animation (an idle gesture of an npc, a player emote or the level up
+// animation). Wire format (see SocialAction.writeImpl): [opcode 0x3D]
 // [objectId: 4][actionId: 4].
 type SocialActionPacket struct {
     ObjectID int32

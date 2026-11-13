@@ -2,13 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package prototype is the research prototype of the Detour runtime
-// query engine in pure Go: it parses the navigation mesh tile the
-// research/recast C++ converter exports from the l2j geodata and
-// answers nearest polygon and path queries over it. It is the Go
-// feasibility half of the feature/new-pathfind research round
-// (docs/recast_pathfinding.md): the build pipeline stays offline,
-// the runtime is this package.
+// Package prototype is the research prototype of the Detour runtime query
+// engine in pure Go: it parses the navigation mesh tile the research/recast C++
+// converter exports from the l2j geodata and answers nearest polygon and path
+// queries over it. It is the Go feasibility half of the feature/new-pathfind
+// research round (docs/recast_pathfinding.md): the build pipeline stays
+// offline, the runtime is this package.
 package prototype
 
 import (
@@ -246,10 +245,9 @@ func parseBVTree(data []byte, offset *int, count int) ([]BVNode, error) {
     return tree, nil
 }
 
-// buildAdjacency converts the Detour nei fields into neighbor polygon
-// indices per edge: a nei value of zero is a border edge, anything
-// else is the neighbor index plus one. External link flags are absent
-// in a single tile mesh.
+// buildAdjacency converts the Detour nei fields into neighbor polygon indices
+// per edge: a nei value of zero is a border edge, anything else is the neighbor
+// index plus one. External link flags are absent in a single tile mesh.
 func buildAdjacency(polys []Poly) [][]int16 {
     adjacency := make([][]int16, len(polys))
     for i := range polys {

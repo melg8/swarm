@@ -2582,6 +2582,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
   `golangci-lint run` on the package 0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the comment wrapping reflow of the path and packet layers
+
+- The same packing over the pathfind, packets, crypt, npcdata, huntdata
+  and gear packages: 66 files, 151 comment lines fewer by the audit
+  count.
+- `npcdata/skill_effects.go` (15), `pathfind/navmesh/mesh.go` (9) and
+  `npcdata/skills.go` (7) carry the largest single savings; the packet
+  files give one or two lines each and keep their wire layouts, which
+  the packer leaves untouched by rule.
+- Verified: `task fmt`, `go build ./...`, the pathfind (cached),
+  navbuild (36.7 s), navmesh (42.8 s), prototype (0.4 s), packets
+  (0.4 s), crypt (0.4 s), npcdata (0.5 s) and gear (0.3 s) suites,
+  `golangci-lint run` on the six paths 0 issues, `task fmt:check`
+  clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

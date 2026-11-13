@@ -12,10 +12,9 @@ import (
 
 const authLoginPacketID = 0x08
 
-// AuthLogin authenticates the game connection with the session keys
-// received from the login server.
-// Wire format: [opcode 0x08][login: str][playOkID2: 4][playOkID1: 4]
-// [loginOkID1: 4][loginOkID2: 4].
+// AuthLogin authenticates the game connection with the session keys received
+// from the login server. Wire format: [opcode 0x08][login: str][playOkID2:
+// 4][playOkID1: 4] [loginOkID1: 4][loginOkID2: 4].
 type AuthLogin struct {
     Login      string
     PlayOkID1  int32

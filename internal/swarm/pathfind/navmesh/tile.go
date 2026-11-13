@@ -183,8 +183,7 @@ func TileOf(ref PolyRef) (col, row int16) {
     return int16(uint16(ref >> 48)), int16(uint16(ref >> 32))
 }
 
-// PolyOf returns the polygon index of a reference (-1 for the null
-// reference).
+// PolyOf returns the polygon index of a reference (-1 for the null reference).
 func PolyOf(ref PolyRef) int32 {
     if ref == 0 {
         return -1

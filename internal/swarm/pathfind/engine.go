@@ -32,9 +32,8 @@ const DefaultCacheCapacity = 4
 // long real world paths stay two orders of magnitude below it.
 const MaxSearchExpansions = 1000000
 
-// ErrMissingCell reports that a requested start or target position has
-// no geodata underneath (outside the shipped regions or no geodata
-// directory).
+// ErrMissingCell reports that a requested start or target position has no
+// geodata underneath (outside the shipped regions or no geodata directory).
 var ErrMissingCell = errors.New("cell has no geodata")
 
 // Stats is the engine state summary for diagnostics and the web UI.

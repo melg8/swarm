@@ -15,10 +15,9 @@ type layerSpec struct {
     nswe uint8
 }
 
-// encodeCellWord packs a layer into the l2j cell word: the height in
-// bits 4..15 (the decode is int16(word&0xFFF0)>>1, so the height must
-// be a multiple of 8 - the l2j granularity), the NSWE walls in the
-// low four bits.
+// encodeCellWord packs a layer into the l2j cell word: the height in bits 4..15
+// (the decode is int16(word&0xFFF0)>>1, so the height must be a multiple of 8 -
+// the l2j granularity), the NSWE walls in the low four bits.
 func encodeCellWord(layer layerSpec) uint16 {
     if layer.h%8 != 0 {
         panic("the synthetic l2j height must be a multiple of 8")
@@ -27,11 +26,10 @@ func encodeCellWord(layer layerSpec) uint16 {
     return ((uint16(layer.h) << 1) & 0xFFF0) | uint16(layer.nswe)
 }
 
-// writeRegionFile serializes a synthetic region: the grid answers the
-// layer stack of every cell (nil answers a fully blocked void layer).
-// The writer picks the cheapest block kind per block: flat for
-// uniform open cells, complex for single layer cells, multilayer
-// otherwise.
+// writeRegionFile serializes a synthetic region: the grid answers the layer
+// stack of every cell (nil answers a fully blocked void layer). The writer
+// picks the cheapest block kind per block: flat for uniform open cells, complex
+// for single layer cells, multilayer otherwise.
 func writeRegionFile(t *testing.T,
     grid func(cx, cy int) []layerSpec,
 ) []byte {
@@ -62,9 +60,8 @@ func appendBlock(t *testing.T, buffer []byte, bx, by int,
             }
             stacks[lx*8+ly] = stack
             if len(stack) == 0 {
-                // The true void cell (zero layers): it forces the
-                // multilayer block kind, the body writes the zero
-                // layer count for it.
+                // The true void cell (zero layers): it forces the multilayer
+                // block kind, the body writes the zero layer count for it.
                 uniform = false
 
                 continue
@@ -115,14 +112,13 @@ func appendCellWord(buffer []byte, layer layerSpec) []byte {
     return append(buffer, word[:]...)
 }
 
-// miniWorld is the synthetic floating village of the builder tests: a
-// dry mainland plateau at -3504, a six step shore ramp descending 40
-// per row to -3744, the water floor at -3784 (below the C1 water level
-// -3780) and a floating deck at -3504 over the water with no
-// connection. The shore wall closes the first ten cells of the ramp
-// edge, so the only dry crossing into the ramp sits at x 10..20 (the
-// NSWE portal span case). Heights are multiples of 8, the l2j
-// granularity.
+// miniWorld is the synthetic floating village of the builder tests: a dry
+// mainland plateau at -3504, a six step shore ramp descending 40 per row to
+// -3744, the water floor at -3784 (below the C1 water level -3780) and a
+// floating deck at -3504 over the water with no connection. The shore wall
+// closes the first ten cells of the ramp edge, so the only dry crossing into
+// the ramp sits at x 10..20 (the NSWE portal span case). Heights are multiples
+// of 8, the l2j granularity.
 func miniWorld(t *testing.T) []byte {
     t.Helper()
     rampHeights := []int16{-3544, -3584, -3624, -3664, -3704, -3744}

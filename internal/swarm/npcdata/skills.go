@@ -4,12 +4,11 @@
 
 package npcdata
 
-// SkillInfo is the static display data of one skill: the resolved
-// name, the icon file of the pack (the generated table stays empty
-// when the skill stats carry no dedicated art - SkillInfoOf answers
-// the client default then), the passive flag (the C1 operateType P of
-// the skill stats) and the warrior priority category. Generated into
-// skill_trees.go.
+// SkillInfo is the static display data of one skill: the resolved name, the
+// icon file of the pack (the generated table stays empty when the skill stats
+// carry no dedicated art - SkillInfoOf answers the client default then), the
+// passive flag (the C1 operateType P of the skill stats) and the warrior
+// priority category. Generated into skill_trees.go.
 type SkillInfo struct {
     Name     string
     Icon     string
@@ -33,10 +32,9 @@ type SkillDesc struct {
 // the effect stats of the Mobius C1 skill definitions (a pAtk stat or
 // a physical strike is attack power, pDef/sDef/rShld is defense).
 const (
-    // SkillCategoryAttack marks skills that raise the physical weapon
-    // attack power: the weapon masteries, the attack auras and the
-    // physical strikes (Power Strike, Power Shot, Mortal Blow and the
-    // later class attacks).
+    // SkillCategoryAttack marks skills that raise the physical weapon attack
+    // power: the weapon masteries, the attack auras and the physical strikes
+    // (Power Strike, Power Shot, Mortal Blow and the later class attacks).
     SkillCategoryAttack = 0
     // SkillCategoryDefense marks skills that raise the defense: the
     // armor masteries, the defense auras, the shield skills.
@@ -46,13 +44,12 @@ const (
     SkillCategoryOther = 2
 )
 
-// SkillLearn is one learnable (skillId, level) pair of a class skill
-// tree: the character level the pair unlocks at, the SP cost of the
-// lesson, the autoGet flag (the pairs the server grants on its own
-// - Lucky, Expertise - never enter the learning queue) and the
-// skill book item id the lesson consumes (0 - no book needed; only
-// specific levels demand one, the Defence Aura level 1 wants its
-// spellbook while levels 2+ do not). Generated into skill_trees.go.
+// SkillLearn is one learnable (skillId, level) pair of a class skill tree: the
+// character level the pair unlocks at, the SP cost of the lesson, the autoGet
+// flag (the pairs the server grants on its own - Lucky, Expertise - never enter
+// the learning queue) and the skill book item id the lesson consumes (0 - no
+// book needed; only specific levels demand one, the Defence Aura level 1 wants
+// its spellbook while levels 2+ do not). Generated into skill_trees.go.
 type SkillLearn struct {
     SkillID  int32
     Level    int32
@@ -118,11 +115,10 @@ func AllClassTeachers() map[int32][]TeacherNPC {
     return skillTeachers
 }
 
-// ClassCastsMagic reports whether a class is a caster: its skill
-// tree grants a magic attack skill on its own (the mystic starting
-// classes know Wind Strike from level 1, the fighter classes never
-// see one). The gear profile and the combat casting of the hunt
-// loop key on it.
+// ClassCastsMagic reports whether a class is a caster: its skill tree grants a
+// magic attack skill on its own (the mystic starting classes know Wind Strike
+// from level 1, the fighter classes never see one). The gear profile and the
+// combat casting of the hunt loop key on it.
 func ClassCastsMagic(classID int32) bool {
     tree, ok := SkillTree(classID)
     if !ok {
@@ -143,10 +139,9 @@ func ClassCastsMagic(classID int32) bool {
     return false
 }
 
-// skillDefaultIcon is the C1 client default skill art: the client
-// skillgrp.txt names icon.skill0000 for every skill its stats carry no
-// dedicated icon for - the item skills of the table, Scroll of Escape
-// 2013 among them.
+// skillDefaultIcon is the C1 client default skill art: the client skillgrp.txt
+// names icon.skill0000 for every skill its stats carry no dedicated icon for -
+// the item skills of the table, Scroll of Escape 2013 among them.
 const skillDefaultIcon = "skill0000"
 
 // SkillInfoOf returns the static display data of a skill id. A skill
@@ -163,13 +158,12 @@ func SkillInfoOf(id int32) (SkillInfo, bool) {
     return info, ok
 }
 
-// SkillDescription returns the tooltip text of one level of a skill:
-// the run that covers the level (the runs walk the level comments of
-// the Mobius C1 skill stats, so the exact level answers - the power
-// numbers of a strike match the level being learned). A level below
-// the first run or beyond the last one clamps to the nearest run, an
-// unknown skill answers empty (the web UI drops the description
-// block instead of guessing).
+// SkillDescription returns the tooltip text of one level of a skill: the run
+// that covers the level (the runs walk the level comments of the Mobius C1
+// skill stats, so the exact level answers - the power numbers of a strike match
+// the level being learned). A level below the first run or beyond the last one
+// clamps to the nearest run, an unknown skill answers empty (the web UI drops
+// the description block instead of guessing).
 func SkillDescription(id, level int32) string {
     runs := skillDescs[id]
     if len(runs) == 0 {
@@ -186,10 +180,9 @@ func SkillDescription(id, level int32) string {
     return text
 }
 
-// SkillTree returns the complete skill tree of a class id (the class
-// entries merged with the parent chain, sorted by the unlock level).
-// The second answer is false when the class is unknown to the
-// generated dictionary.
+// SkillTree returns the complete skill tree of a class id (the class entries
+// merged with the parent chain, sorted by the unlock level). The second answer
+// is false when the class is unknown to the generated dictionary.
 func SkillTree(classID int32) ([]SkillLearn, bool) {
     tree, ok := skillTrees[classID]
 

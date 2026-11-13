@@ -18,10 +18,9 @@ const AbnormalStatusUpdatePacketID = 0x97
 // the parse buffer towards gigabytes.
 const abnormalBuffCap = 64
 
-// BuffEntry is one active effect of the packet: the skill id (the
-// display id of the C1 skills is the skill id itself), its level and
-// the remaining seconds (a large value - 2147483647 - marks the
-// effects the server never times out).
+// BuffEntry is one active effect of the packet: the skill id (the display id of
+// the C1 skills is the skill id itself), its level and the remaining seconds (a
+// large value - 2147483647 - marks the effects the server never times out).
 type BuffEntry struct {
     SkillID int32
     Level   int32

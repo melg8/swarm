@@ -161,10 +161,9 @@ func parseCharacterCondition(reader *packet.Reader, info *CharacterInfo) error {
     return nil
 }
 
-// parseCharacterProgression reads the vitals, level and appearance fields.
-// The karma and the deprecated zero block are skipped, the paperdoll
-// tables are parsed (the selection screen renders the equipment from
-// them).
+// parseCharacterProgression reads the vitals, level and appearance fields. The
+// karma and the deprecated zero block are skipped, the paperdoll tables are
+// parsed (the selection screen renders the equipment from them).
 func parseCharacterProgression(
     reader *packet.Reader, info *CharacterInfo,
 ) error {

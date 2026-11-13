@@ -29,10 +29,9 @@ func decodeTileZstd(raw []byte) ([]byte, error) {
     return decodeZstdFrame(raw)
 }
 
-// decodeZstdFrame unwraps one zstd frame of any pack file - the
-// tiles and the abstract sidecars share the wrapping (the sidecar
-// compression round of issue #11); the pooled decoders keep the
-// decode tables warm across the loads.
+// decodeZstdFrame unwraps one zstd frame of any pack file - the tiles and the
+// abstract sidecars share the wrapping (the sidecar compression round of issue
+// #11); the pooled decoders keep the decode tables warm across the loads.
 func decodeZstdFrame(raw []byte) ([]byte, error) {
     reader := tileZstdDecoders.Get().(*zstd.Decoder)
     defer tileZstdDecoders.Put(reader)

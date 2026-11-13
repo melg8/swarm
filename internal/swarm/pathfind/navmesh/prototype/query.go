@@ -17,8 +17,7 @@ type Query struct {
     areaCost [64]float32
 }
 
-// NewQuery creates a query engine over a tile with every area cost
-// set to one.
+// NewQuery creates a query engine over a tile with every area cost set to one.
 func NewQuery(tile *Tile) *Query {
     query := &Query{tile: tile, areaCost: [64]float32{}}
     for i := range query.areaCost {
@@ -39,12 +38,11 @@ func (q *Query) SetAreaCost(area int, cost float32) {
 // export (x, height, world y).
 type Point [3]float64
 
-// FindNearestPoly returns the polygon of the tile whose surface is
-// the closest to the query point together with the closest surface
-// point, exactly the dtNavMeshQuery::findNearestPoly semantics that
-// disambiguate stacked layers by the 3D distance: a point under the
-// bridge binds to the water polygon, the same x/y at deck height to
-// the bridge deck polygon.
+// FindNearestPoly returns the polygon of the tile whose surface is the closest
+// to the query point together with the closest surface point, exactly the
+// dtNavMeshQuery::findNearestPoly semantics that disambiguate stacked layers by
+// the 3D distance: a point under the bridge binds to the water polygon, the
+// same x/y at deck height to the bridge deck polygon.
 func (q *Query) FindNearestPoly(point Point) (int, Point, bool) {
     const halfExtentXZ = 32
     const halfExtentY = 600
@@ -144,10 +142,9 @@ func quantOverlap(aMin, aMax, bMin, bMax [3]uint16) bool {
     return true
 }
 
-// closestPointOnPoly projects a point onto the polygon surface: when
-// the point lies inside the polygon footprint the answer is the
-// footprint position with the interpolated surface height, otherwise
-// the closest point of the boundary.
+// closestPointOnPoly projects a point onto the polygon surface: when the point
+// lies inside the polygon footprint the answer is the footprint position with
+// the interpolated surface height, otherwise the closest point of the boundary.
 func (q *Query) closestPointOnPoly(poly int, point Point) Point {
     p := &q.tile.Polys[poly]
     verts := q.tile.Verts
@@ -237,9 +234,8 @@ func (q *Query) polyHeight(p *Poly, vx, vy, vz func(int) float64,
     return sum / float64(p.VertCount)
 }
 
-// PathNode is one A* node: the polygon, the entry position Detour
-// uses (the shared edge midpoint), the parent polygon and the
-// bookkeeping.
+// PathNode is one A* node: the polygon, the entry position Detour uses (the
+// shared edge midpoint), the parent polygon and the bookkeeping.
 type PathNode struct {
     Poly    int
     Parent  int
@@ -249,12 +245,11 @@ type PathNode struct {
     Settled bool
 }
 
-// FindPath searches the polygon corridor from startPoly to endPoly
-// with the A* of dtNavMeshQuery::findPath: the node position is the
-// shared edge midpoint, the step cost is the averaged area cost of
-// the two polygons times the traveled distance and the heuristic is
-// the straight 3D distance to the end point. The answer is nil when
-// the target is unreachable.
+// FindPath searches the polygon corridor from startPoly to endPoly with the A*
+// of dtNavMeshQuery::findPath: the node position is the shared edge midpoint,
+// the step cost is the averaged area cost of the two polygons times the
+// traveled distance and the heuristic is the straight 3D distance to the end
+// point. The answer is nil when the target is unreachable.
 func (q *Query) FindPath(startPoly, endPoly int, start, end Point) []int {
     if startPoly == endPoly {
         return []int{startPoly}

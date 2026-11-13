@@ -98,9 +98,8 @@ func (e *Engine) validLocation(
         prevX, prevY, prevZ = curX, curY, curZ
     }
     if prevZ != nearestTo {
-        // The final layer rule: the line arrived on a different layer
-        // than the target z names - the server collapses the click
-        // back onto the walker.
+        // The final layer rule: the line arrived on a different layer than the
+        // target z names - the server collapses the click back onto the walker.
         return clickWorldOf(from.X, from.Y, nearestFrom)
     }
 

@@ -20,11 +20,10 @@ const (
     RestartTypeVillage int32 = 0
 )
 
-// RequestRestartPointPacket revives a dead character at the chosen
-// restart point, exactly like the death dialog of the official client.
-// The server accepts it only while the character is dead.
-// Wire format (see RequestRestartPoint.readImpl): [opcode 0x6D]
-// [pointType: 4].
+// RequestRestartPointPacket revives a dead character at the chosen restart
+// point, exactly like the death dialog of the official client. The server
+// accepts it only while the character is dead. Wire format (see
+// RequestRestartPoint.readImpl): [opcode 0x6D] [pointType: 4].
 type RequestRestartPointPacket struct {
     PointType int32
 }

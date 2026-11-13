@@ -7,9 +7,8 @@ package huntdata
 // RegionElven is the region key of the elven lands zone registry.
 const RegionElven = "elven"
 
-// RegionDion is the region key of the Dion 20-25 band (the survey
-// grounds of docs/band_20_25_survey.md and the zones_dion.go
-// registry).
+// RegionDion is the region key of the Dion 20-25 band (the survey grounds of
+// docs/band_20_25_survey.md and the zones_dion.go registry).
 const RegionDion = "dion"
 
 // regionElven and regionDion are the unqualified keys the generated

@@ -23,12 +23,11 @@ const (
 // moveTypeRun marks a running creature in ChangeMoveType.
 const moveTypeRun = 1
 
-// BeginRotationPacket announces that an object started turning in place.
-// The server also sends it together with StopRotation when a standing
-// player becomes visible, because CharInfo carries no heading (see
-// Player.sendInfo of the Mobius server).
-// Wire format (see StartRotation.writeImpl): [opcode 0x77][objectId: 4]
-// [heading: 4][side: 4][speed: 4].
+// BeginRotationPacket announces that an object started turning in place. The
+// server also sends it together with StopRotation when a standing player
+// becomes visible, because CharInfo carries no heading (see Player.sendInfo of
+// the Mobius server). Wire format (see StartRotation.writeImpl): [opcode
+// 0x77][objectId: 4] [heading: 4][side: 4][speed: 4].
 type BeginRotationPacket struct {
     ObjectID int32
     Heading  int32
@@ -132,8 +131,7 @@ type TeleportToLocationPacket struct {
     Heading  int32
 }
 
-// NewTeleportToLocationPacket creates a zero valued packet ready for
-// parsing.
+// NewTeleportToLocationPacket creates a zero valued packet ready for parsing.
 func NewTeleportToLocationPacket() *TeleportToLocationPacket {
     return &TeleportToLocationPacket{
         ObjectID: 0,

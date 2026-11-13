@@ -24,13 +24,12 @@ type AbstractStats struct {
     Bytes   int64
 }
 
-// WriteAbstractSidecars serializes the cluster graph of every tile
-// into the X_Y.ab sidecars (the persistent coarse layer,
-// docs/fastpath_research.md section 2). The pass runs after the tile
-// build and records the tile file stat it was built against, so the
-// runtime rejects a sidecar whose tile changed. One worker per in
-// flight region (Workers caps the pool, 0 answers every core); the log
-// callback reports one line per region, and a tile that fails to
+// WriteAbstractSidecars serializes the cluster graph of every tile into the
+// X_Y.ab sidecars (the persistent coarse layer, docs/fastpath_research.md
+// section 2). The pass runs after the tile build and records the tile file stat
+// it was built against, so the runtime rejects a sidecar whose tile changed.
+// One worker per in flight region (Workers caps the pool, 0 answers every
+// core); the log callback reports one line per region, and a tile that fails to
 // decode counts failed and lets the pack finish.
 func WriteAbstractSidecars(outDir string, keys []navmesh.RegionKey,
     workers int, log func(format string, args ...any),
@@ -128,12 +127,11 @@ func writeAbstractSidecar(outDir string, key navmesh.RegionKey,
     if err != nil {
         return 0, fmt.Errorf("encode the abstract: %w", err)
     }
-    // The sidecar rides the same zstd wrapping as its tile: the
-    // abstract edge records (64 wire bytes each) are mostly zero and
-    // repeated fields, the plain sidecars of the 164 region pack
-    // carried 405.9 MB where the frame needs 72.6 MB (issue #11). The
-    // loader unwraps the frame on the magic word, the plain sidecars
-    // of the older packs keep loading.
+    // The sidecar rides the same zstd wrapping as its tile: the abstract edge
+    // records (64 wire bytes each) are mostly zero and repeated fields, the
+    // plain sidecars of the 164 region pack carried 405.9 MB where the frame
+    // needs 72.6 MB (issue #11). The loader unwraps the frame on the magic
+    // word, the plain sidecars of the older packs keep loading.
     compressed, err := encodeZstd(encoded)
     if err != nil {
         return 0, fmt.Errorf("compress the abstract: %w", err)

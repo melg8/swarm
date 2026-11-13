@@ -10,9 +10,8 @@ import (
 
 const enterWorldPacketID = 0x03
 
-// EnterWorld is sent after character selection to spawn the character in
-// the game world.
-// Wire format: [opcode 0x03].
+// EnterWorld is sent after character selection to spawn the character in the
+// game world. Wire format: [opcode 0x03].
 type EnterWorld struct{}
 
 func (p *EnterWorld) ToBytes(writer *packet.Writer) error {
@@ -33,8 +32,7 @@ func (p *RequestNetPing) ToBytes(writer *packet.Writer) error {
 
 const logoutPacketID = 0x09
 
-// Logout gracefully leaves the game world.
-// Wire format: [opcode 0x09].
+// Logout gracefully leaves the game world. Wire format: [opcode 0x09].
 type Logout struct{}
 
 func (p *Logout) ToBytes(writer *packet.Writer) error {

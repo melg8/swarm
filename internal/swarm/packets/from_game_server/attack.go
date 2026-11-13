@@ -29,14 +29,12 @@ type AttackHit struct {
     Flags    int8
 }
 
-// AttackPacket announces one creature attacking another. The attacker
-// position and the target position make chasing mobs trackable without
-// MoveToLocation broadcasts.
-// Wire format (see Attack.writeImpl): [opcode 0x06][attackerId: 4]
-// [first hit: targetId: 4][damage: 4][flags: 1]
-// [attackerX: 4][attackerY: 4][attackerZ: 4][hitsLeft: 2]
-// [remaining hits: targetId: 4][damage: 4][flags: 1 each]
-// [targetX: 4][targetY: 4][targetZ: 4].
+// AttackPacket announces one creature attacking another. The attacker position
+// and the target position make chasing mobs trackable without MoveToLocation
+// broadcasts. Wire format (see Attack.writeImpl): [opcode 0x06][attackerId: 4]
+// [first hit: targetId: 4][damage: 4][flags: 1] [attackerX: 4][attackerY:
+// 4][attackerZ: 4][hitsLeft: 2] [remaining hits: targetId: 4][damage: 4][flags:
+// 1 each] [targetX: 4][targetY: 4][targetZ: 4].
 type AttackPacket struct {
     AttackerID int32
     X          int32
@@ -133,9 +131,8 @@ func readAttackHit(reader *packet.Reader, p *AttackPacket) error {
     return nil
 }
 
-// AutoAttackStartPacket announces that a creature started auto attacking.
-// Wire format (see AutoAttackStart.writeImpl): [opcode 0x3B]
-// [objectId: 4].
+// AutoAttackStartPacket announces that a creature started auto attacking. Wire
+// format (see AutoAttackStart.writeImpl): [opcode 0x3B] [objectId: 4].
 type AutoAttackStartPacket struct {
     ObjectID int32
 }
@@ -159,9 +156,8 @@ func ParseAutoAttackStartPacket(p *AutoAttackStartPacket, data []byte) error {
     return nil
 }
 
-// AutoAttackStopPacket announces that a creature stopped auto attacking.
-// Wire format (see AutoAttackStop.writeImpl): [opcode 0x3C]
-// [objectId: 4].
+// AutoAttackStopPacket announces that a creature stopped auto attacking. Wire
+// format (see AutoAttackStop.writeImpl): [opcode 0x3C] [objectId: 4].
 type AutoAttackStopPacket struct {
     ObjectID int32
 }

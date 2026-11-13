@@ -10,12 +10,11 @@ import (
 
 const ActionFailedPacketID = 0x35
 
-// ActionFailedPacket is the one byte server answer to a refused
-// request: a flood protector rejection, a click on a non interactable
-// object, an action while casting or overloaded and so on. It carries
-// no fields and no feedback about which request failed; the bot logs
-// the occurrence and keeps driving its own retry logic.
-// Wire format (see ActionFailed.writeImpl): [opcode 0x35].
+// ActionFailedPacket is the one byte server answer to a refused request: a
+// flood protector rejection, a click on a non interactable object, an action
+// while casting or overloaded and so on. It carries no fields and no feedback
+// about which request failed; the bot logs the occurrence and keeps driving its
+// own retry logic. Wire format (see ActionFailed.writeImpl): [opcode 0x35].
 type ActionFailedPacket struct{}
 
 // NewActionFailedPacket creates a zero valued packet ready for parsing.

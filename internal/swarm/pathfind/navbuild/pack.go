@@ -34,13 +34,12 @@ type PackStats struct {
     TileBytes int64
 }
 
-// BuildPack builds every requested region into a tile of the output
-// directory and stitches the region borders. Phase A builds one region,
-// writes its tile and retains only the border strips (a few dozen
-// kilobytes per region); phase B re-decodes the tiles whose neighbours
-// exist and appends the external links, so the memory stays flat. A
-// newer tile skips its region unless force is set. The log callback
-// reports one line per region. The phases run in a worker pool
+// BuildPack builds every requested region into a tile of the output directory
+// and stitches the region borders. Phase A builds one region, writes its tile
+// and retains only the border strips (a few dozen kilobytes per region); phase
+// B re-decodes the tiles whose neighbours exist and appends the external links,
+// so the memory stays flat. A newer tile skips its region unless force is set.
+// The log callback reports one line per region. The phases run in a worker pool
 // (opts.Workers, NumCPU when <= 0), file disjoint and lock free.
 func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
     opts Options, force bool, log func(format string, args ...any),
@@ -64,12 +63,11 @@ func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
         return stats, err
     }
 
-    // The phase B stitches every requested region whose tile file
-    // exists: the strips come from the in-pass builds or, for the
-    // tiles of earlier passes, from the sidecar files (the chunked
-    // pack builds stitch their cross chunk borders on the final full
-    // pass). The stitch dedupes against the links the tile already
-    // carries, so the repeated passes add nothing.
+    // The phase B stitches every requested region whose tile file exists: the
+    // strips come from the in-pass builds or, for the tiles of earlier passes,
+    // from the sidecar files (the chunked pack builds stitch their cross chunk
+    // borders on the final full pass). The stitch dedupes against the links the
+    // tile already carries, so the repeated passes add nothing.
     order := make([]navmesh.RegionKey, 0, len(keys))
     for _, key := range keys {
         if _, ok := strips[key]; ok {
@@ -188,12 +186,11 @@ func runPool(ctx context.Context, keys []navmesh.RegionKey,
     return firstErr
 }
 
-// buildPackPhaseA builds every requested region, writes the tiles
-// and retains the border strips for the phase B stitching. The region
-// builds run through the worker pool (one region in flight per
-// worker); the strips map mutates under the log mutex and freezes
-// once the phase answers. The counters accumulate atomically; the
-// answer is the strips map.
+// buildPackPhaseA builds every requested region, writes the tiles and retains
+// the border strips for the phase B stitching. The region builds run through
+// the worker pool (one region in flight per worker); the strips map mutates
+// under the log mutex and freezes once the phase answers. The counters
+// accumulate atomically; the answer is the strips map.
 //
 //nolint:funlen // the pack phase walks the tiles in order
 func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
@@ -240,10 +237,9 @@ func buildPackPhaseA(keys []navmesh.RegionKey, geodataDir, outDir string,
 
                 return nil
             }
-            // The strips copy breaks the reference to the RegionBuild
-            // - addressing the field of the build would pin the whole
-            // tile (hundreds of megabytes per dense region) for the
-            // phase B.
+            // The strips copy breaks the reference to the RegionBuild -
+            // addressing the field of the build would pin the whole tile
+            // (hundreds of megabytes per dense region) for the phase B.
             own := build.Strips
             if err := writeStripsSidecar(outDir, key, own); err != nil {
                 cancel()
@@ -338,10 +334,9 @@ func stitchPackPhaseB(order []navmesh.RegionKey, outDir string,
         })
 }
 
-// buildPackRegion builds one region and writes its tile unless the
-// tile is already fresh (a nil build answers the skip; the fresh
-// tile of the legacy wire upgrades in place, the upgrade report
-// rides beside the nil build).
+// buildPackRegion builds one region and writes its tile unless the tile is
+// already fresh (a nil build answers the skip; the fresh tile of the legacy
+// wire upgrades in place, the upgrade report rides beside the nil build).
 func buildPackRegion(geodataDir, outDir string, key navmesh.RegionKey,
     opts Options, force bool,
 ) (*RegionBuild, tileUpgrade, error) {

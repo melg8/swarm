@@ -22,13 +22,12 @@ const (
     maxLayersPerCell = 125
 )
 
-// Region is one parsed X_Y.l2j geodata region: 2048x2048 cells, each
-// holding one or more walkable layers. The cells are stored in file
-// order: span index = block*64 + cell where block = (localX/8)*256 +
-// localY/8 and cell = (localX%8)*8 + localY%8, the Mobius
-// Region.getBlock/ComplexBlock indexing. Every span packs a refs
-// offset (low 24 bits) and a layer count (high 8); the refs slice is
-// deduplicated for single layer cells, holding only the distinct
+// Region is one parsed X_Y.l2j geodata region: 2048x2048 cells, each holding
+// one or more walkable layers. The cells are stored in file order: span index =
+// block*64 + cell where block = (localX/8)*256 + localY/8 and cell =
+// (localX%8)*8 + localY%8, the Mobius Region.getBlock/ComplexBlock indexing.
+// Every span packs a refs offset (low 24 bits) and a layer count (high 8); the
+// refs slice is deduplicated for single layer cells, holding only the distinct
 // layers plus the multilayer stacks.
 type Region struct {
     col, row int16
@@ -39,11 +38,10 @@ type Region struct {
     pool     *layerPool
 }
 
-// parseRegion parses the raw bytes of one region file. The format has no
-// header (the Mobius C1 GeoEngine reads the blocks straight away, little
-// endian) and must be consumed exactly: 65536 blocks, a flat block is
-// 1+2 bytes, a complex block 1+128 bytes and a multilayer block
-// 1 + 64*(1 + 2*layers) bytes.
+// parseRegion parses the raw bytes of one region file. The format has no header
+// (the Mobius C1 GeoEngine reads the blocks straight away, little endian) and
+// must be consumed exactly: 65536 blocks, a flat block is 1+2 bytes, a complex
+// block 1+128 bytes and a multilayer block 1 + 64*(1 + 2*layers) bytes.
 func parseRegion(data []byte, key RegionKey, pool *layerPool) (*Region, error) {
     region := &Region{
         col:      key.Col,

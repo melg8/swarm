@@ -53,13 +53,12 @@ func decodeZstd(raw []byte) ([]byte, error) {
     return data, err
 }
 
-// encodeZstd wraps the bytes into one zstd frame. The best
-// compression level: the decode cost the cold queries pay does not
-// move with the encode level (a zstd property), so the ratio is free
-// at runtime and only the pack build time pays it - the measured
-// headroom over the old default level was 12.6% of the tile pack and
-// 82% of the plain abstract sidecars (issue #11: the default level
-// left 111 MB on the tiles, the unwrapped sidecars carried 333 MB of
+// encodeZstd wraps the bytes into one zstd frame. The best compression level:
+// the decode cost the cold queries pay does not move with the encode level (a
+// zstd property), so the ratio is free at runtime and only the pack build time
+// pays it - the measured headroom over the old default level was 12.6% of the
+// tile pack and 82% of the plain abstract sidecars (issue #11: the default
+// level left 111 MB on the tiles, the unwrapped sidecars carried 333 MB of
 // compressible zero fields).
 var zstdEncoder, zstdEncoderErr = zstd.NewWriter(nil,
     zstd.WithEncoderConcurrency(1),
@@ -81,10 +80,9 @@ func encodeZstd(data []byte) ([]byte, error) {
     return zstdEncoder.EncodeAll(data, nil), nil
 }
 
-// maybeDecompressTile undoes the compression wrapping of a tile file
-// when a known magic word is present (the raw tile bytes otherwise).
-// The zstd frames are the current format, the gzip frames the legacy
-// packs carry.
+// maybeDecompressTile undoes the compression wrapping of a tile file when a
+// known magic word is present (the raw tile bytes otherwise). The zstd frames
+// are the current format, the gzip frames the legacy packs carry.
 func maybeDecompressTile(raw []byte) ([]byte, bool, error) {
     if isZstd(raw) {
         data, err := decodeZstd(raw)
@@ -125,11 +123,10 @@ func maybeCompressTile(data []byte, compress bool) ([]byte, error) {
     return encodeZstd(data)
 }
 
-// CompressTileDir compresses every plain tile file of the directory
-// in place (the runtime detects the magic word and decompresses on
-// load). The dense exact square tiles shrink to roughly half; the
-// already compressed files (zstd or the legacy gzip) are skipped, so
-// the pass is idempotent.
+// CompressTileDir compresses every plain tile file of the directory in place
+// (the runtime detects the magic word and decompresses on load). The dense
+// exact square tiles shrink to roughly half; the already compressed files (zstd
+// or the legacy gzip) are skipped, so the pass is idempotent.
 func CompressTileDir(outDir string) (CompressStats, error) {
     stats := CompressStats{Count: 0, Bytes: 0}
     entries, err := os.ReadDir(outDir)

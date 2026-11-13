@@ -46,9 +46,8 @@ func (m *Mesh) corridorRegion(corridor []PolyRef, filter Filter,
         frontier = append(frontier, entry{ref, 0})
     }
     for len(frontier) > 0 {
-        // The linear minimum pops the cheapest frontier entry (the
-        // frontier of one region growth stays small, the heap is
-        // not worth the code).
+        // The linear minimum pops the cheapest frontier entry (the frontier of
+        // one region growth stays small, the heap is not worth the code).
         best := 0
         for i := 1; i < len(frontier); i++ {
             if frontier[i].acc < frontier[best].acc {
@@ -215,12 +214,11 @@ func (m *Mesh) regionCross(tile *Tile, poly *Poly, side uint8,
     return 0
 }
 
-// shortenCorridorWaypoints folds the funnel waypoints into the longest
-// chords the corridor region allows: a chord must walk the region
-// (regionChord) and keep the clearance from the walls it visits - the
-// armed guard answers the walls instead of the mesh spans. The answer holds
-// the first, the last and every pivot no safe chord skips, so it never adds
-// a turn.
+// shortenCorridorWaypoints folds the funnel waypoints into the longest chords
+// the corridor region allows: a chord must walk the region (regionChord) and
+// keep the clearance from the walls it visits - the armed guard answers the
+// walls instead of the mesh spans. The answer holds the first, the last and
+// every pivot no safe chord skips, so it never adds a turn.
 func (m *Mesh) shortenCorridorWaypoints(corridor []PolyRef,
     wps []funnelWp, filter Filter,
 ) []Pos {
@@ -261,10 +259,9 @@ func (m *Mesh) shortenCorridorWaypoints(corridor []PolyRef,
     return merged
 }
 
-// chordWalksRegion answers whether the straight chord walks the region
-// safely: the region chord crosses only open spans, and the walls keep the
-// clearance - the armed guard answers the whole chord instead of the mesh
-// wall spans.
+// chordWalksRegion answers whether the straight chord walks the region safely:
+// the region chord crosses only open spans, and the walls keep the clearance -
+// the armed guard answers the whole chord instead of the mesh wall spans.
 func (m *Mesh) chordWalksRegion(corridor []PolyRef, from, to funnelWp,
     region map[PolyRef]struct{}, walls map[PolyRef]*[4][]wallSpan,
     visited *[]PolyRef, filter Filter,

@@ -18,17 +18,15 @@ const (
     TargetUnselectedPacketID = 0x3A
 )
 
-// MyTargetSelectedPacket tells the client which object it now targets.
-// The server sends it whenever the own target changes, for example after
-// an AttackRequest that first selects the target.
-// Wire format (see MyTargetSelected.writeImpl): [opcode 0xBF]
-// [objectId: 4][color: 2].
+// MyTargetSelectedPacket tells the client which object it now targets. The
+// server sends it whenever the own target changes, for example after an
+// AttackRequest that first selects the target. Wire format (see
+// MyTargetSelected.writeImpl): [opcode 0xBF] [objectId: 4][color: 2].
 type MyTargetSelectedPacket struct {
     ObjectID int32
 }
 
-// NewMyTargetSelectedPacket creates a zero valued packet ready for
-// parsing.
+// NewMyTargetSelectedPacket creates a zero valued packet ready for parsing.
 func NewMyTargetSelectedPacket() *MyTargetSelectedPacket {
     return &MyTargetSelectedPacket{ObjectID: 0}
 }
@@ -52,9 +50,8 @@ func ParseMyTargetSelectedPacket(p *MyTargetSelectedPacket, data []byte) error {
 }
 
 // TargetSelectedPacket announces that another visible player targeted an
-// object.
-// Wire format (see TargetSelected.writeImpl): [opcode 0x39][objectId: 4]
-// [targetId: 4][x: 4][y: 4][z: 4][unknown: 4].
+// object. Wire format (see TargetSelected.writeImpl): [opcode 0x39][objectId:
+// 4] [targetId: 4][x: 4][y: 4][z: 4][unknown: 4].
 type TargetSelectedPacket struct {
     ObjectID int32
     TargetID int32
@@ -93,16 +90,14 @@ func ParseTargetSelectedPacket(p *TargetSelectedPacket, data []byte) error {
     return nil
 }
 
-// TargetUnselectedPacket announces that a visible player dropped its
-// target.
-// Wire format (see TargetUnselected.writeImpl): [opcode 0x3A]
-// [objectId: 4][x: 4][y: 4][z: 4][unknown: 4].
+// TargetUnselectedPacket announces that a visible player dropped its target.
+// Wire format (see TargetUnselected.writeImpl): [opcode 0x3A] [objectId: 4][x:
+// 4][y: 4][z: 4][unknown: 4].
 type TargetUnselectedPacket struct {
     ObjectID int32
 }
 
-// NewTargetUnselectedPacket creates a zero valued packet ready for
-// parsing.
+// NewTargetUnselectedPacket creates a zero valued packet ready for parsing.
 func NewTargetUnselectedPacket() *TargetUnselectedPacket {
     return &TargetUnselectedPacket{ObjectID: 0}
 }

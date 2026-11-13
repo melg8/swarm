@@ -13,11 +13,10 @@ import (
 
 const attackRequestPacketID = 0x0A
 
-// AttackRequestPacket asks the game server to attack a target. The
-// server moves the character to the target and starts the auto attack
-// when the target is reachable.
-// Wire format (see AttackRequest.readImpl): [opcode 0x0A][objectId: 4]
-// [originX: 4][originY: 4][originZ: 4][shift: 1].
+// AttackRequestPacket asks the game server to attack a target. The server moves
+// the character to the target and starts the auto attack when the target is
+// reachable. Wire format (see AttackRequest.readImpl): [opcode 0x0A][objectId:
+// 4] [originX: 4][originY: 4][originZ: 4][shift: 1].
 type AttackRequestPacket struct {
     TargetID int32
     X        int32

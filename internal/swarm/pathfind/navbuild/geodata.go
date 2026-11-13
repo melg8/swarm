@@ -33,11 +33,10 @@ type cellLayer struct {
     nswe uint8
 }
 
-// regionLayers is the flat layer store of one region: per cell a
-// contiguous slice of the layer pool, and per layer instance the
-// owning cell index (the flood fill of the sheet decomposition walks
-// both directions). The cell index is x-major
-// (cx*regionCellsSide + cy).
+// regionLayers is the flat layer store of one region: per cell a contiguous
+// slice of the layer pool, and per layer instance the owning cell index (the
+// flood fill of the sheet decomposition walks both directions). The cell index
+// is x-major (cx*regionCellsSide + cy).
 type regionLayers struct {
     col, row    int16
     cellOff     []uint32

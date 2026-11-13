@@ -42,10 +42,9 @@ const tileFileExt = ".nm"
 // re-scanning the decoded tile.
 const abstractFileExt = ".ab"
 
-// Mesh loads navigation mesh tiles lazily from a directory and
-// answers the navigation queries over them. It is safe for concurrent
-// use: the tiles are immutable after decode and the query state is
-// pooled per call.
+// Mesh loads navigation mesh tiles lazily from a directory and answers the
+// navigation queries over them. It is safe for concurrent use: the tiles are
+// immutable after decode and the query state is pooled per call.
 type Mesh struct {
     dir      string
     capacity int
@@ -100,9 +99,8 @@ type RegionKey struct {
     Col, Row int16
 }
 
-// ErrTileAbsent reports a region without a tile file: the link
-// resolution treats it as a wall, the callers that need a tile check
-// it with errors.Is.
+// ErrTileAbsent reports a region without a tile file: the link resolution
+// treats it as a wall, the callers that need a tile check it with errors.Is.
 var ErrTileAbsent = errors.New("navmesh tile absent")
 
 // NewMesh creates a mesh over a tile directory. The directory is
@@ -157,10 +155,9 @@ func (m *Mesh) SetCacheCapacity(capacity int) {
     m.mu.Unlock()
 }
 
-// SetAbstractCapacity overrides the abstract (cluster graph) cache
-// bound (a value of zero or less keeps every abstract of the pack
-// resident - the whole map diagnostic arithmetic, a memory hazard on
-// the dense packs).
+// SetAbstractCapacity overrides the abstract (cluster graph) cache bound (a
+// value of zero or less keeps every abstract of the pack resident - the whole
+// map diagnostic arithmetic, a memory hazard on the dense packs).
 func (m *Mesh) SetAbstractCapacity(capacity int) {
     m.abstractMu.Lock()
     m.abstractCapacity = capacity
@@ -235,12 +232,11 @@ func (m *Mesh) scanFiles() {
     }
 }
 
-// Tile returns the loaded tile of a region, loading it on demand. A
-// missing tile file is a cached miss (not an error): the link
-// resolution treats it as a wall. The decode runs outside the mesh
-// lock behind a per key singleflight: the concurrent callers of one
-// region share one decode, the different regions decode in parallel
-// (the prefetch pool of the cold route).
+// Tile returns the loaded tile of a region, loading it on demand. A missing
+// tile file is a cached miss (not an error): the link resolution treats it as a
+// wall. The decode runs outside the mesh lock behind a per key singleflight:
+// the concurrent callers of one region share one decode, the different regions
+// decode in parallel (the prefetch pool of the cold route).
 func (m *Mesh) Tile(key RegionKey) (*Tile, error) {
     m.mu.Lock()
     if entry, ok := m.tiles[key]; ok {
@@ -308,11 +304,9 @@ func (m *Mesh) decodeTileEntry(key RegionKey) *tileEntry {
 
         return entry
     }
-    // The tile file may be compressed (the navmesh-build
-    // -compress output): the magic word decides - the zstd
-    // frame is the current format, the gzip frame the
-    // legacy packs carry, both decode to the same tile
-    // bytes.
+    // The tile file may be compressed (the navmesh-build -compress output): the
+    // magic word decides - the zstd frame is the current format, the gzip frame
+    // the legacy packs carry, both decode to the same tile bytes.
     if len(data) >= 4 && data[0] == 0x28 && data[1] == 0xB5 &&
         data[2] == 0x2F && data[3] == 0xFD {
         raw, zsErr := decodeTileZstd(data)
@@ -371,12 +365,11 @@ func (m *Mesh) prefetchAhead(key RegionKey) {
     go func() { _, _ = m.Tile(key) }()
 }
 
-// PrefetchTiles loads the requested tiles into the cache with a
-// bounded parallel decode pool. The cold route answer uses it twice:
-// the endpoint tiles before the nearest poly resolution and the
-// coarse chain regions before the hop refinement - the sequential
-// hop stall decodes become one parallel load (the per key
-// singleflight keeps the duplicate callers free).
+// PrefetchTiles loads the requested tiles into the cache with a bounded
+// parallel decode pool. The cold route answer uses it twice: the endpoint tiles
+// before the nearest poly resolution and the coarse chain regions before the
+// hop refinement - the sequential hop stall decodes become one parallel load
+// (the per key singleflight keeps the duplicate callers free).
 func (m *Mesh) PrefetchTiles(keys []RegionKey) {
     workers := runtime.NumCPU()
     if workers > maxPrefetchWorkers {
@@ -405,10 +398,9 @@ func (m *Mesh) PrefetchTiles(keys []RegionKey) {
     wg.Wait()
 }
 
-// PrefetchAbstracts loads the region cluster graphs into the abstract
-// cache with a bounded parallel pool (the coarse search loads them
-// lazily per settled node; the line corridor prefetch serves the
-// common frontier from the cache).
+// PrefetchAbstracts loads the region cluster graphs into the abstract cache
+// with a bounded parallel pool (the coarse search loads them lazily per settled
+// node; the line corridor prefetch serves the common frontier from the cache).
 func (m *Mesh) PrefetchAbstracts(keys []RegionKey) {
     workers := runtime.NumCPU()
     if workers > maxPrefetchWorkers {
@@ -458,9 +450,8 @@ func (m *Mesh) touch(entry *tileEntry) {
     }
 }
 
-// tileOfRef returns the loaded tile holding a reference (loading it
-// on demand). A missing or failed tile answers nil: the caller treats
-// the link as a wall.
+// tileOfRef returns the loaded tile holding a reference (loading it on demand).
+// A missing or failed tile answers nil: the caller treats the link as a wall.
 func (m *Mesh) tileOfRef(ref PolyRef) *Tile {
     col, row := TileOf(ref)
     tile, err := m.Tile(RegionKey{Col: col, Row: row})

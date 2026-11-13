@@ -20,14 +20,13 @@ type BuyItemEntry struct {
     Count  int32
 }
 
-// RequestBuyItemPacket buys items from a shop buylist: the server requires
-// the merchant of the list as the selected target within the 250 unit
-// interaction distance, answers with InventoryUpdate, an ItemList, a
-// StatusUpdate and the spent adena message, and shares the transaction flood
-// protector with selling, so both pace alike (docs/protocol_description.md).
-// Wire format: [opcode 0x1F][listId: 4][count: 4] then count entries of
-// [itemId: 4][count: 4]; more than 10000 entries are refused
-// (PlayerConfig.MAX_ITEM_IN_PACKET).
+// RequestBuyItemPacket buys items from a shop buylist: the server requires the
+// merchant of the list as the selected target within the 250 unit interaction
+// distance, answers with InventoryUpdate, an ItemList, a StatusUpdate and the
+// spent adena message, and shares the transaction flood protector with selling,
+// so both pace alike (docs/protocol_description.md). Wire format: [opcode
+// 0x1F][listId: 4][count: 4] then count entries of [itemId: 4][count: 4]; more
+// than 10000 entries are refused (PlayerConfig.MAX_ITEM_IN_PACKET).
 type RequestBuyItemPacket struct {
     ListID int32
     Items  []BuyItemEntry

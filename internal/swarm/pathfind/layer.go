@@ -47,22 +47,20 @@ func (l Layer) IsCompletelyOpen() bool { return l.NSWE == nsweAll }
 // pathfinder must never plan a step onto such a cell.
 func (l Layer) IsCompletelyBlocked() bool { return l.NSWE == 0 }
 
-// layerPool interns layers so identical (height, walls) pairs are stored
-// once per engine and cells reference them by a small id. Real regions
-// contain only a few thousand distinct layers, so this cuts the memory
-// of the parsed data several fold (the original uses the same trick in
-// its LayerFactory). The pool is shared by every region of the engine:
-// parsing a region interns under the engine lock while searches of the
-// already loaded regions read through get without it, so the pool
-// guards itself.
+// layerPool interns layers so identical (height, walls) pairs are stored once
+// per engine and cells reference them by a small id. Real regions contain only
+// a few thousand distinct layers, so this cuts the memory of the parsed data
+// several fold (the original uses the same trick in its LayerFactory). The pool
+// is shared by every region of the engine: parsing a region interns under the
+// engine lock while searches of the already loaded regions read through get
+// without it, so the pool guards itself.
 type layerPool struct {
     mu     sync.RWMutex
     ids    map[layerKey]uint16
     layers []Layer
-    // table is the fixed size lookup array of get: the intern writes
-    // the slot once under the lock, the readers index it lock free
-    // (the ids are stable, the entries are immutable after the
-    // publish, see get).
+    // table is the fixed size lookup array of get: the intern writes the slot
+    // once under the lock, the readers index it lock free (the ids are stable,
+    // the entries are immutable after the publish, see get).
     table [poolLayerCapacity]Layer
 }
 

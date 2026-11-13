@@ -4,14 +4,13 @@
 
 package navmesh
 
-// The C1 world water zone cuboids, generated from the L2J Mobius
-// Harbingers of War dist (dist/game/data/zones/water.xml) the
-// server runs. The server switches the movement to the swim
-// speeds inside these cuboids only (the CreatureStat.getMoveSpeed
-// water branch reads the ZoneId.WATER flag the WaterZone onEnter
-// sets, the ZoneCuboid.isInsideZone tests the feet position
-// against the box and the z range) - a water body the zone data
-// omits walks at the plain land rate, however deep its bed is.
+// The C1 world water zone cuboids, generated from the L2J Mobius Harbingers of
+// War dist (dist/game/data/zones/water.xml) the server runs. The server
+// switches the movement to the swim speeds inside these cuboids only (the
+// CreatureStat.getMoveSpeed water branch reads the ZoneId.WATER flag the
+// WaterZone onEnter sets, the ZoneCuboid.isInsideZone tests the feet position
+// against the box and the z range) - a water body the zone data omits walks at
+// the plain land rate, however deep its bed is.
 
 var c1WaterZones = []WaterZone{
     {MinX: -294912, MaxX: -262144, MinY: 163839, MaxY: 196607, MinZ: -4779, MaxZ: -3779},  // 11_23_water1
@@ -447,10 +446,9 @@ var c1WaterZones = []WaterZone{
     {MinX: 169216, MaxX: 170688, MinY: -17920, MaxY: -17280, MinZ: -5568, MaxZ: -4991},    // 25_17_water2
 }
 
-// C1WaterZones returns the water zone cuboids of the C1 world
-// (the table above): the swim pricing filter arms of the
-// webserver route. The returned slice is shared, the callers
-// must not mutate it.
+// C1WaterZones returns the water zone cuboids of the C1 world (the table
+// above): the swim pricing filter arms of the webserver route. The returned
+// slice is shared, the callers must not mutate it.
 func C1WaterZones() []WaterZone {
     return c1WaterZones
 }

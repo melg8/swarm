@@ -170,11 +170,10 @@ func enumerateArmorSet(
     return best
 }
 
-// capArmorFrontiers trims the family frontiers when their cross product
-// would explode past enumerateArmorSetCap: every frontier keeps its top
-// options by gain (the frontier order is cost ascending and the gain ascends
-// with it). The real catalogs never reach the cap; the guard serves a future
-// mega catalog.
+// capArmorFrontiers trims the family frontiers when their cross product would
+// explode past enumerateArmorSetCap: every frontier keeps its top options by
+// gain (the frontier order is cost ascending and the gain ascends with it). The
+// real catalogs never reach the cap; the guard serves a future mega catalog.
 func capArmorFrontiers(options [][]armorOption) [][]armorOption {
     product := 1
     for _, frontier := range options {

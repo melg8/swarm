@@ -4,14 +4,13 @@
 
 package navbuild
 
-// The fake cell repair: the C1 pack carries whole areas with no
-// recorded data - the l2j uninitialized filler of one layer at height
-// 0 with every wall open (the east halves of the column 17 regions,
-// the whole 17_23). The filler builds into a floating plateau 3.8k
-// units above the sea floor and strands the town segments. The repair
-// walks it from the real land and water borders by multi source BFS,
-// blends each fake cell from the two nearest source heights by their
-// distances, and the polish pass pulls the over climb steps together.
+// The fake cell repair: the C1 pack carries whole areas with no recorded data -
+// the l2j uninitialized filler of one layer at height 0 with every wall open
+// (the east halves of the column 17 regions, the whole 17_23). The filler
+// builds into a floating plateau 3.8k units above the sea floor and strands the
+// town segments. The repair walks it from the real land and water borders by
+// multi source BFS, blends each fake cell from the two nearest source heights
+// by their distances, and the polish pass pulls the over climb steps together.
 
 // fakeLayer reports the l2j uninitialized filler cell: exactly one
 // layer, height 0, every wall open. The pattern holds 99.97 percent
@@ -27,10 +26,9 @@ func fakeLayer(rl *regionLayers, idx int) bool {
     return layer.h == 0 && layer.nswe == 0x0F
 }
 
-// repairFakeCells replaces the filler cells with the synthesized
-// surface of the nearest real neighbours (the class doc carries the
-// rule). The pass mutates the layer pool in place and answers the
-// filled cell count.
+// repairFakeCells replaces the filler cells with the synthesized surface of the
+// nearest real neighbours (the class doc carries the rule). The pass mutates
+// the layer pool in place and answers the filled cell count.
 //
 //nolint:cyclop,gocognit,funlen,maintidx // one repair walk per stack
 func repairFakeCells(rl *regionLayers, climb int32) int {
@@ -48,12 +46,11 @@ func repairFakeCells(rl *regionLayers, climb int32) int {
         return 0
     }
 
-    // The two multi source BFS passes: the land sources (the real
-    // cells above the water level) and the water sources (the real
-    // cells at or below it). Every fake cell records the distance and
-    // the seed height of the closest source of each class; the seed
-    // order is the cell index order, the queue is FIFO - the fill is
-    // deterministic.
+    // The two multi source BFS passes: the land sources (the real cells above
+    // the water level) and the water sources (the real cells at or below it).
+    // Every fake cell records the distance and the seed height of the closest
+    // source of each class; the seed order is the cell index order, the queue
+    // is FIFO - the fill is deterministic.
     type reach struct {
         dist int32
         h    int16
@@ -125,13 +122,12 @@ func repairFakeCells(rl *regionLayers, climb int32) int {
         filledCount++
     }
 
-    // The polish: the pair pull over the filled cells away from the
-    // real anchors - when two filled cells disagree by more than the
-    // climb increase, both move halfway together unless either is an
-    // anchor (a filled cell with a real neighbour keeps the boundary
-    // height the blend gave it). The walk needs the increase rule
-    // only; the pass repeats while the over climb pairs remain (the
-    // fixed cap keeps the pass bounded; the residual cliffs report
+    // The polish: the pair pull over the filled cells away from the real
+    // anchors - when two filled cells disagree by more than the climb increase,
+    // both move halfway together unless either is an anchor (a filled cell with
+    // a real neighbour keeps the boundary height the blend gave it). The walk
+    // needs the increase rule only; the pass repeats while the over climb pairs
+    // remain (the fixed cap keeps the pass bounded; the residual cliffs report
     // through the build stats).
     filled := make([]bool, cells)
     anchored := make([]bool, cells)

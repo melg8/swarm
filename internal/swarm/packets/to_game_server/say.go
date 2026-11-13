@@ -27,14 +27,13 @@ const (
     SayMaxTextRunes   = 105
 )
 
-// Say is the Say2 client packet: one chat message of the character.
-// The server broadcasts it through the channel handler and answers an
-// unknown channel with a disconnect (Say2.runImpl), an empty text with
-// a disconnect too, so the bot validates both before sending.
-// Wire format (see Say2.readImpl): [opcode 0x38][text: null-terminated
-// UTF-16LE][channel: 4] plus [target: null-terminated UTF-16LE] for
-// the whisper channel only.
-// Reference: org/l2jmobius/gameserver/network/clientpackets/Say2.java.
+// Say is the Say2 client packet: one chat message of the character. The server
+// broadcasts it through the channel handler and answers an unknown channel with
+// a disconnect (Say2.runImpl), an empty text with a disconnect too, so the bot
+// validates both before sending. Wire format (see Say2.readImpl): [opcode
+// 0x38][text: null-terminated UTF-16LE][channel: 4] plus [target:
+// null-terminated UTF-16LE] for the whisper channel only. Reference:
+// org/l2jmobius/gameserver/network/clientpackets/Say2.java.
 type Say struct {
     Text    string
     Channel int32

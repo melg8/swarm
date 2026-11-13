@@ -213,10 +213,9 @@ func ParseDeleteObjectPacket(p *DeleteObjectPacket, data []byte) error {
     return nil
 }
 
-// DropItemPacket announces an item dropped on the ground.
-// Wire format (see DropItem.writeImpl): [opcode 0x16][dropperId: 4]
-// [objectId: 4][displayId: 4][x: 4][y: 4][z: 4][stackable: 4][count: 4]
-// [unknown: 4].
+// DropItemPacket announces an item dropped on the ground. Wire format (see
+// DropItem.writeImpl): [opcode 0x16][dropperId: 4] [objectId: 4][displayId:
+// 4][x: 4][y: 4][z: 4][stackable: 4][count: 4] [unknown: 4].
 type DropItemPacket struct {
     ObjectID   int32
     TemplateID int32

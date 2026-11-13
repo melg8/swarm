@@ -43,10 +43,9 @@ func slotBlocked(
     return false
 }
 
-// applyToVirtual equips the entry on the virtual paperdoll with the
-// same family effects the server applies: a one-piece empties the
-// legs, a two hand weapon the left hand, a shield a two hand weapon
-// and the legs a one-piece chest.
+// applyToVirtual equips the entry on the virtual paperdoll with the same family
+// effects the server applies: a one-piece empties the legs, a two hand weapon
+// the left hand, a shield a two hand weapon and the legs a one-piece chest.
 func applyToVirtual(virtual *[slotCount]ScoredItem, entry ScoredItem) {
     stats := entry.Stats
     slots := SlotsForBodyPart(stats.BodyPart)
@@ -102,10 +101,9 @@ func pairSlot(virtual [slotCount]ScoredItem, slots []Slot) Slot {
     return first
 }
 
-// SimulateInventory applies every free inventory upgrade to a copy of
-// the paperdoll: the purchases plan against the paperdoll the auto
-// equipment will reach anyway, so nothing gets bought that the
-// inventory already carries.
+// SimulateInventory applies every free inventory upgrade to a copy of the
+// paperdoll: the purchases plan against the paperdoll the auto equipment will
+// reach anyway, so nothing gets bought that the inventory already carries.
 func SimulateInventory(
     profile Profile, equipment Equipment,
 ) [slotCount]ScoredItem {
@@ -204,9 +202,8 @@ func displacedValue(equipment Equipment, slots []Slot) (int64, []int32) {
             continue
         }
         if starterSet[item.ItemID] {
-            // The shops refuse the newbie kit: no credit,
-            // no sell-first step - the destroy flow of the
-            // replaced starters owns these items.
+            // The shops refuse the newbie kit: no credit, no sell-first step -
+            // the destroy flow of the replaced starters owns these items.
             continue
         }
         credit += npcdata.ItemPrice(item.ItemID) / 2
@@ -216,11 +213,10 @@ func displacedValue(equipment Equipment, slots []Slot) (int64, []int32) {
     return credit, ids
 }
 
-// DisplacedByItem prices the equipped pieces a purchase of the item
-// replaces: the paperdoll occupants of the item's bodypart slots at
-// their sell value (see displacedValue). A fixed purchase plan (the
-// city shopping errand) derives the same SellFirst credit the planner
-// reads from its virtual paperdoll.
+// DisplacedByItem prices the equipped pieces a purchase of the item replaces:
+// the paperdoll occupants of the item's bodypart slots at their sell value (see
+// displacedValue). A fixed purchase plan (the city shopping errand) derives the
+// same SellFirst credit the planner reads from its virtual paperdoll.
 func DisplacedByItem(equipment Equipment, itemID int32) (int64, []int32) {
     stats, ok := npcdata.ItemGearStats(itemID)
     if !ok {

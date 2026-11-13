@@ -19,8 +19,7 @@ type PlayOkPacket struct {
     PlayOkID2 int32
 }
 
-// NewPlayOkPacket creates a zero valued play ok packet ready for
-// parsing.
+// NewPlayOkPacket creates a zero valued play ok packet ready for parsing.
 func NewPlayOkPacket() *PlayOkPacket {
     return &PlayOkPacket{PlayOkID1: 0, PlayOkID2: 0}
 }

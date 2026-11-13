@@ -19,8 +19,7 @@ type LoginFailPacket struct {
     Reason int32
 }
 
-// NewLoginFailPacket creates a zero valued login fail packet ready
-// for parsing.
+// NewLoginFailPacket creates a zero valued login fail packet ready for parsing.
 func NewLoginFailPacket() *LoginFailPacket {
     return &LoginFailPacket{Reason: 0}
 }

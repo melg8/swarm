@@ -26,9 +26,8 @@ type tileUpgrade struct {
     // upgraded answers whether the file was rewritten (false keeps
     // the current shape or reports the err below).
     upgraded bool
-    // fromBytes and toBytes are the file sizes before and after the
-    // rewrite (fromBytes probes every tile, toBytes fills on a
-    // rewrite only).
+    // fromBytes and toBytes are the file sizes before and after the rewrite
+    // (fromBytes probes every tile, toBytes fills on a rewrite only).
     fromBytes int64
     toBytes   int64
     // err carries the failure of a kept tile (the corrupt or the

@@ -47,11 +47,10 @@ type InventoryItem struct {
     Change   int16
 }
 
-// ItemListPacket carries the whole inventory. The server sends it on
-// world entry and on explicit requests.
-// Wire format (see ItemList.writeImpl): [opcode 0x27][showWindow: 2]
-// [count: 2][items...] with one 28 byte entry per item (see
-// AbstractItemPacket.writeItem).
+// ItemListPacket carries the whole inventory. The server sends it on world
+// entry and on explicit requests. Wire format (see ItemList.writeImpl): [opcode
+// 0x27][showWindow: 2] [count: 2][items...] with one 28 byte entry per item
+// (see AbstractItemPacket.writeItem).
 type ItemListPacket struct {
     ShowWindow bool
     Items      []InventoryItem
@@ -109,11 +108,10 @@ func parseItemListEntries(
     return dst
 }
 
-// InventoryUpdatePacket carries inventory changes: added, modified and
-// removed items.
-// Wire format (see AbstractInventoryUpdate.writeItems): [opcode 0x37]
-// [count: 2][entries...] with a 2 byte change code before every item
-// entry: 1 add, 2 modify, 3 remove.
+// InventoryUpdatePacket carries inventory changes: added, modified and removed
+// items. Wire format (see AbstractInventoryUpdate.writeItems): [opcode 0x37]
+// [count: 2][entries...] with a 2 byte change code before every item entry: 1
+// add, 2 modify, 3 remove.
 type InventoryUpdatePacket struct {
     Items []InventoryItem
 }

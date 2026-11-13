@@ -32,14 +32,13 @@ const (
     npcInfoEquipmentTail = 8
 )
 
-// NpcInfoPacket describes one npc around the character.
-// Wire format (see AbstractNpcInfo.writeImpl): [opcode 0x22]
-// [objectId: 4][templateId: 4][isAttackable: 4][x: 4][y: 4][z: 4]
-// [heading: 4][unknown: 4][mAtkSpd: 4][pAtkSpd: 4][runSpd: 4][walkSpd: 4]
-// [swim/fly speeds: 32][moveMultiplier: 8][attackSpeedMultiplier: 8]
-// [collisionRadius: 8][collisionHeight: 8][rhand: 4][chest: 4][lhand: 4]
-// [nameAbove: 1][running: 1][inCombat: 1][alikeDead: 1][summoned: 1]
-// [name: str][title: str].
+// NpcInfoPacket describes one npc around the character. Wire format (see
+// AbstractNpcInfo.writeImpl): [opcode 0x22] [objectId: 4][templateId:
+// 4][isAttackable: 4][x: 4][y: 4][z: 4] [heading: 4][unknown: 4][mAtkSpd:
+// 4][pAtkSpd: 4][runSpd: 4][walkSpd: 4] [swim/fly speeds: 32][moveMultiplier:
+// 8][attackSpeedMultiplier: 8] [collisionRadius: 8][collisionHeight: 8][rhand:
+// 4][chest: 4][lhand: 4] [nameAbove: 1][running: 1][inCombat: 1][alikeDead:
+// 1][summoned: 1] [name: str][title: str].
 type NpcInfoPacket struct {
     ObjectID        int32
     TemplateID      int32
@@ -85,9 +84,8 @@ func NewNpcInfoPacket() *NpcInfoPacket {
     }
 }
 
-// ParseNpcInfoPacket reads the packet from payload bytes.
-// Linear wire-format field dispatch; splitting hurts the protocol
-// readability.
+// ParseNpcInfoPacket reads the packet from payload bytes. Linear wire-format
+// field dispatch; splitting hurts the protocol readability.
 func ParseNpcInfoPacket(p *NpcInfoPacket, data []byte) error { //nolint:cyclop
     reader := packet.NewReader(data)
 

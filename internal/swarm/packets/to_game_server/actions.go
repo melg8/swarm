@@ -16,13 +16,12 @@ const (
     requestItemListPacketID    = 0x0F
 )
 
-// ActionRequestPacket clicks a world object: a simple click on a ground
-// item makes the server walk the character to it and pick it up, a click
-// on a creature selects it as the target. The origin coordinates are the
-// client side position of the character.
-// Wire format (see Action.readImpl): [opcode 0x04][objectId: 4]
-// [originX: 4][originY: 4][originZ: 4][actionId: 1] with actionId 0 for
-// a simple click and 1 for a shift click.
+// ActionRequestPacket clicks a world object: a simple click on a ground item
+// makes the server walk the character to it and pick it up, a click on a
+// creature selects it as the target. The origin coordinates are the client side
+// position of the character. Wire format (see Action.readImpl): [opcode
+// 0x04][objectId: 4] [originX: 4][originY: 4][originZ: 4][actionId: 1] with
+// actionId 0 for a simple click and 1 for a shift click.
 type ActionRequestPacket struct {
     ObjectID int32
     X        int32
@@ -66,11 +65,9 @@ func (p *ActionRequestPacket) ToBytes(writer *packet.Writer) error {
     return nil
 }
 
-// RequestDestroyItem destroys inventory items to free slots or weight,
-// used by the hunt loop to keep the inventory of a long living bot
-// working.
-// Wire format (see RequestDestroyItem.readImpl): [opcode 0x59]
-// [objectId: 4][count: 4].
+// RequestDestroyItem destroys inventory items to free slots or weight, used by
+// the hunt loop to keep the inventory of a long living bot working. Wire format
+// (see RequestDestroyItem.readImpl): [opcode 0x59] [objectId: 4][count: 4].
 type RequestDestroyItem struct {
     ObjectID int32
     Count    int32

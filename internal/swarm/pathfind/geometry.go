@@ -117,9 +117,8 @@ func floorDiv(v, d int32) int32 {
     return q
 }
 
-// floorMod is the floored integer remainder, always in [0, d). The
-// divisor stays a parameter so the tests can exercise the modulo
-// semantics.
+// floorMod is the floored integer remainder, always in [0, d). The divisor
+// stays a parameter so the tests can exercise the modulo semantics.
 func floorMod(v, d int32) int32 { //nolint:unparam // see above
     return v - floorDiv(v, d)*d
 }

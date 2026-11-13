@@ -30,8 +30,7 @@ const (
     // basic mDef outfit), only after a real weapon is worn: a starter weapon
     // keeps the slots empty until the milestone lands.
     phaseFloor
-    // phaseShield upgrades the shield with the leftover budget of the
-    // trip.
+    // phaseShield upgrades the shield with the leftover budget of the trip.
     phaseShield
 )
 

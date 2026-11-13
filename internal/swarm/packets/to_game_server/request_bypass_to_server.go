@@ -14,10 +14,9 @@ const requestBypassToServerPacketID = 0x21
 
 // RequestBypassToServer routes a html dialog bypass command to the server (the
 // gatekeeper teleport flow): the client sends the bypass string the
-// NpcHtmlMessage button carried, and the server runs the matching
-// BypassHandler or the npc onBypass feedback. The bot sends
-// "npc_<objId>_Chat" for the next page and "npc_<objId>_teleport <list>
-// <index>" to pay the fee and teleport.
+// NpcHtmlMessage button carried, and the server runs the matching BypassHandler
+// or the npc onBypass feedback. The bot sends "npc_<objId>_Chat" for the next
+// page and "npc_<objId>_teleport <list> <index>" to pay the fee and teleport.
 // Wire format: [opcode 0x21][command: null-terminated UTF-16LE]
 // (RequestBypassToServer.readImpl).
 type RequestBypassToServer struct {

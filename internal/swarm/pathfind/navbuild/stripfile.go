@@ -13,14 +13,13 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// The border strip sidecar: the phase A build persists the border
-// strips of every region next to its tile (X_Y.nsb). The phase B
-// stitching pairs strips of neighbouring regions, and the sidecar
-// keeps that possible across the chunked passes of the 165 region
-// pack: a tile built in an earlier pass contributes its sidecar strip.
-// The strips describe the border cells only; appending the external
-// links never changes them, so the sidecar stays valid for the tile
-// lifetime.
+// The border strip sidecar: the phase A build persists the border strips of
+// every region next to its tile (X_Y.nsb). The phase B stitching pairs strips
+// of neighbouring regions, and the sidecar keeps that possible across the
+// chunked passes of the 165 region pack: a tile built in an earlier pass
+// contributes its sidecar strip. The strips describe the border cells only;
+// appending the external links never changes them, so the sidecar stays valid
+// for the tile lifetime.
 const (
     stripsMagic   = 0x534E5753 // 'SWNS' little endian
     stripsVersion = 1

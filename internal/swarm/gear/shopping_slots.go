@@ -4,8 +4,7 @@
 
 package gear
 
-// slotScore returns the score of the virtual slot entry (0 for an
-// empty slot).
+// slotScore returns the score of the virtual slot entry (0 for an empty slot).
 func slotScore(entry ScoredItem) float64 {
     if paperdollEmpty(entry) {
         return 0

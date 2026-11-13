@@ -31,8 +31,7 @@ type LoginOkPacket struct {
     LoginOkID2 int32
 }
 
-// NewLoginOkPacket creates a zero valued login ok packet ready for
-// parsing.
+// NewLoginOkPacket creates a zero valued login ok packet ready for parsing.
 func NewLoginOkPacket() *LoginOkPacket {
     return &LoginOkPacket{LoginOkID1: 0, LoginOkID2: 0}
 }
