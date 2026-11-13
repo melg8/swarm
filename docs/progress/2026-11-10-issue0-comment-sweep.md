@@ -2119,6 +2119,20 @@ corner probe is a length, not a leg at all.
   including `botlog`, `golangci-lint run ./internal/swarm/acceptance/...`
   0 issues.
 
+### 2026-11-13 - npcdata/npcdata.go keeps the accessor facts
+
+- 17 blocks compress: the package doc, the four npc accessors (name,
+  level, aggro range, aggression), the clan help range and its `ALL`
+  match, the wire id map (the Kaboo Orc Fighter 20471 arrives as
+  1000471), the reference price rule (the server sells at
+  `referencePrice/2`), the gear stats bodypart and tooltip fields, the
+  item type families and the two buylist lookups (the elven weapon
+  trader Unoren at 7147). The XML and AttackableAI prose already lives
+  in `docs/hunting.md` and `docs/protocol_description.md`. 86 comment
+  lines of 200 become 67 of 181 (37.0 percent), no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the npcdata suite (0.4 s),
+  `golangci-lint run ./internal/swarm/npcdata/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
