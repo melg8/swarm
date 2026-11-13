@@ -1332,7 +1332,12 @@ plumbing closes that gap:
   its engagement age, the active skip count of both skip maps, the
   no-target patience, the re-path count, the stuck watchdog age, the
   waypoints left, the trip and flee episode ages, the buy retries,
-  the stagnation stall ages `xpStallForMs` and `positionStallForMs`
+  the walk and kill ETAs (`walkEtaMs`, `killEtaMs`; zero means no
+  estimate - the loop is not walking a plan, or no confirmed fight
+  runs yet), the delevel evidence (`delevelActive` plus
+  `delevelTarget`, `delevelFromLevel` and the live
+  `delevelZoneMedian` the banner and the dump read), the stagnation
+  stall ages `xpStallForMs` and `positionStallForMs`
   - the time the experience and the exact standing cell have been
   static, the livelock watch inputs of hunt/stagnation.go - whose
   recovery escalation also drives the unsticking: the first

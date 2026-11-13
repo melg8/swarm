@@ -1007,6 +1007,18 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `tile.go` fell from 20.2 to 14.3 percent (132
   comment lines of 926), no block above 8 lines.
 
+### 2026-11-13 - state/diagnostics.go keeps only the field reference
+
+- 53 blocks compress: the header, the two struct field registries (the
+  Diagnostics fields and the 21 HuntDiagnostics fields), the object
+  tally, the errand, the packet window, the two action recorders and
+  the locked helpers. The removed field prose lives in the
+  `## Snapshot encoding` section of `docs/webui.md`, which gains the
+  walk and kill ETA fields and the three delevel fields.
+- Verified: `task fmt`, `go build ./...`, the state and webserver
+  packages, `task lint:new`. `diagnostics.go` fell from 42.1 to 19.2
+  percent (56 comment lines of 291), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -1037,9 +1049,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go`,
 `acceptance/botlog/botlog.go`, `cmd/counterprobe/detect.go` and
 `hunt/recovery_heal.go`, `hunt/navmesh_navigator.go`, `hunt/equip.go`
-`from_game_server/user_info.go`, `pathfind/search.go` and
-`pathfind/navmesh/tile.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the
+`from_game_server/user_info.go`, `pathfind/search.go`,
+`pathfind/navmesh/tile.go` and `state/diagnostics.go` (second passes).
+Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
