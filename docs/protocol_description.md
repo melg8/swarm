@@ -265,7 +265,9 @@ to sit while moving, casting or attacking (`RequestActionUse.runImpl` case 0,
 The ground click movement request of the official client: the server walks
 the character to the target point (`MoveToLocation.runImpl`). Mode 1 is the
 mouse click; keyboard mode (0) is ignored unless keyboard movement is
-enabled on the server (the reference default). The hunt loop walks to a
+enabled on the server (the reference default). The hunt loop starts the
+approach of a fresh pick with it (the forced attack request needs the
+player action flood window, the movement does not), walks to a
 drop with it before clicking the item, and the cursor key escape of a
 click-refusing cell arms the keyboard mode: the mode 0 branch of
 `MoveToLocation.runImpl` adopts the packet origin within the thousand unit

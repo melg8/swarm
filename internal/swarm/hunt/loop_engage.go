@@ -296,6 +296,7 @@ func (l *Loop) pickTarget(now time.Time, manaHeld bool) bool {
     // The covered pick answers with the ranged lure when the hunter owns the
     // tool (lure.go).
     l.maybeBeginLure(now)
+    l.approachPick(now, pick)
 
     return false
 }

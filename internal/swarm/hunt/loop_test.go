@@ -575,6 +575,80 @@ func TestLoopWalksToTheNextTargetRightAfterLoot(t *testing.T) {
         "the walk keeps the line to the mob")
 }
 
+// TestLoopWalksToThePickedTargetOnThePickTick pins the movement start of a
+// fresh pick: the server chase only starts with the repeated forced attack,
+// a flood window after the selection, so the first walk click must go out on
+// the pick tick itself and stop at the swing contact.
+func TestLoopWalksToThePickedTargetOnThePickTick(t *testing.T) {
+    clock := newFakeClock()
+    bot := newTestBot()
+    // The next mob sits 1000 units east: inside the 1500 engage radius,
+    // outside the 40 unit swing contact.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 11, TemplateID: 1000002, Attackable: true,
+        X: 46000, Y: 50000, Name: "Keltir",
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    clock.install(loop)
+    loop.SetHuntingZone(45000, 50000, 2500)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
+
+    // The kill of the previous mob leaves one drop next to the character.
+    spawnMob(bot)
+    bot.ApplySpawnItem(state.ItemInfo{
+        ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
+    })
+    bot.ApplyStatusUpdate(7, []state.Attribute{
+        {ID: state.AttrCurHP, Value: 0},
+    })
+    bot.ApplySelfTarget(7)
+    loop.target = 7
+
+    loop.tick()
+    require.Equal(t, phaseLoot, loop.phase)
+    require.Equal(t, []int32{9}, game.pickups)
+
+    // The server confirms the pickup and the loot phase ends.
+    bot.ApplyItemPickup(state.ItemPickup{ObjectID: 9, PlayerID: 100})
+    clock.Advance(tickPeriod)
+    loop.tick()
+    require.Equal(t, phaseEngage, loop.phase)
+
+    // The pick tick selects the next mob and walks toward it at once:
+    // the click stops at the swing contact, not on the mob.
+    clock.Advance(tickPeriod)
+    loop.tick()
+    require.Equal(t, int32(11), loop.target)
+    require.NotEmpty(t, game.walks,
+        "the approach walk goes out with the pick, not a flood window later")
+    walk := game.walks[len(game.walks)-1]
+    require.Equal(t, int32(45960), walk[0],
+        "the click stops 40 units short of the mob")
+    require.Equal(t, int32(50000), walk[1])
+}
+
+// TestLoopWalksToANearPickedTarget pins the approach of a pick inside the
+// engage radius: the mob sits outside the swing contact, so the pick tick
+// must start the walk - the server chase only starts at the forced attack a
+// flood window later.
+func TestLoopWalksToANearPickedTarget(t *testing.T) {
+    bot := newTestBot()
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 11, TemplateID: 1000002, Attackable: true,
+        X: 45100, Y: 50000, Name: "Keltir",
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetHuntingZone(45000, 50000, 2500)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+
+    loop.tick()
+    require.Equal(t, int32(11), loop.target)
+    require.Equal(t, [][3]int32{{45060, 50000, -3500}}, game.walks,
+        "a near pick walks to the swing contact on the pick tick")
+}
+
 // TestLoopApproachesTheRangedKillAndLoots pins the ranged-kill loot
 // order: a mob shot down from a distance drops at its corpse - the
 // corpse sits far from the character and the drop broadcast can
@@ -1325,10 +1399,11 @@ func TestLoopKeepsStandingWhenTheFarMobEntersTheEngageRadius(t *testing.T) {
     loop.lastActionAt = time.Now().Add(-time.Minute)
 
     loop.tick()
-    require.Empty(t, game.walks,
-        "no far target walk while a valid target sits inside the radius")
     require.Equal(t, []int32{9}, game.forces,
         "the engage picks the target directly")
+    // The pick starts its own approach click, stopped at the swing contact;
+    // the far target walk (a full 1000 unit segment to 46000) never fires.
+    require.Equal(t, [][3]int32{{45960, 50000, -3500}}, game.walks)
 }
 
 // TestArcherAvoidsInitiatingOnTheBowMob pins the archer fence of the

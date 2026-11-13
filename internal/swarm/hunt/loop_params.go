@@ -86,6 +86,10 @@ const (
     // inside it the forced attack starts the swings, outside it the chase
     // closes the distance first.
     userEngageRadius = 150.0
+    // pickApproachStopRadius is the melee stop of the fresh-pick approach
+    // click: the click only starts the walk, the server chase closes the
+    // last stretch to the swing contact (it settles near 15 units).
+    pickApproachStopRadius = 40.0
     // userBowEngageRadius is the approach distance of an attack command for a
     // bow user: the Mobius bow attack range is the weapon range (~500 units),
     // so the forced request starts the shot long before the melee distance.

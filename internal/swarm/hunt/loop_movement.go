@@ -66,6 +66,32 @@ func (l *Loop) walkToFarTarget(now time.Time) bool {
     return true
 }
 
+// approachPick starts the walk toward a fresh pick at once: the server chase
+// only starts with the repeated forced attack, a flood window after the
+// selection, so the handover from a corpse would stand the character for that
+// second. MoveToLocation is outside the flood window; the click stops at the
+// approach stop of the weapon so a bow keeps its range.
+func (l *Loop) approachPick(now time.Time, pick state.AttackTarget) {
+    if l.lureArmed() || now.Before(l.combatAvoidUntil) {
+        return
+    }
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return
+    }
+    dist := math.Hypot(float64(pick.X-selfX), float64(pick.Y-selfY))
+    stop := l.pickApproachStopFor()
+    if dist <= stop {
+        return
+    }
+    moveX, moveY, _ := walkClickSegment(selfX, selfY, selfZ,
+        float64(pick.X), float64(pick.Y), float64(selfZ),
+        math.Min(returnWalkSegment, dist-stop))
+    if err := l.game.WalkTo(int32(moveX), int32(moveY), selfZ); err != nil {
+        l.logf("Hunt: approach walk failed: %v", err)
+    }
+}
+
 // logNoPickableTargets logs the targetless diagnostic: the nearest mobs around
 // the character, their positions and the reasons the target search rejects
 // them (a social clan pack, the level ceiling, the zone square, the skip list).

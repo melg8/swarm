@@ -787,6 +787,16 @@ func (l *Loop) engageRadiusFor() float64 {
     return userEngageRadius
 }
 
+// pickApproachStopFor is where the fresh-pick approach click ends: a bow
+// keeps its weapon range, melee walks up to the swing contact.
+func (l *Loop) pickApproachStopFor() float64 {
+    if l.bowEquipped() {
+        return userBowEngageRadius
+    }
+
+    return pickApproachStopRadius
+}
+
 // stallRadiusFor picks the chase stall boundary by the weapon: a bow fight
 // shooting inside the weapon range is progress, not a stalled chase.
 func (l *Loop) stallRadiusFor() float64 {

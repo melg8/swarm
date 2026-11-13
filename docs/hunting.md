@@ -297,6 +297,13 @@ already unwinding, and the relogin inherited none of the cleanup).
   valid mob anywhere the patrol walks toward the zone center, and only
   a hunter already central waits for the respawn (the rotation fires on
   a fully empty square).
+- A fresh pick starts its walk on the selection tick: the server chase
+  only begins with the repeated forced attack, one flood window after
+  the first request, so `approachPick` sends one `MoveToLocation` click
+  toward the mob at once, stopped at the approach stop of the weapon
+  (40 melee swing contact, 450 bow range) so a ranged profile keeps its
+  range. `MoveToLocation` sits outside the player action flood window,
+  so the attack pacing is untouched.
 - A flee that never shakes the chase ends the session too: one escape
   episode older than `fleeLogoutAfter` (20 s) logs the character out
   (a recovered health or a fresh fight clears the episode) - the
