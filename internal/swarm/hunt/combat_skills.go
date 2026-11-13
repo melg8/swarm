@@ -27,9 +27,8 @@ const (
     // (range, mana, reuse) with a bare ActionFailed, so the loop retries at a
     // human rate.
     castRetryPeriod = 2 * time.Second
-    // buffCastPeriod paces the self buff casts: a missing buff is
-    // retried until its AbnormalStatusUpdate arrival flips the
-    // tracker list.
+    // buffCastPeriod paces the self buff casts: a missing buff is retried until
+    // its AbnormalStatusUpdate arrival flips the tracker list.
     buffCastPeriod = 6 * time.Second
     // castReuseMargin widens the local reuse windows: the server clock starts
     // at the cast start, the local one at the request, so the jitter between
@@ -226,10 +225,9 @@ func (l *Loop) maybePickGearProfile() {
     }
     l.SetGearProfile(gear.MysticFighter{})
     if l.equip != nil {
-        // The scans cached against the fighter profile must
-        // re-run: the upgrade scan version gates them on the
-        // inventory mutations, the profile swap is invisible
-        // to it.
+        // The scans cached against the fighter profile must re-run: the upgrade
+        // scan version gates them on the inventory mutations, the profile swap
+        // is invisible to it.
         l.equip.equipScanVersion = 0
         l.equip.equipScanNone = false
     }

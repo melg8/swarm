@@ -29,8 +29,7 @@ const (
     // userMoveTimeoutMax caps the budget of a long planned route: a cross-map
     // click is valid, an endless walk is not.
     userMoveTimeoutMax = 30 * time.Minute
-    // userPickupTimeout bounds one manual pickup (the autonomous looting
-    // span).
+    // userPickupTimeout bounds one manual pickup (the autonomous looting span).
     userPickupTimeout = 30 * time.Second
     // userAttackTimeout bounds a manual attack that never starts the fight.
     userAttackTimeout = 30 * time.Second
@@ -889,8 +888,7 @@ func (l *Loop) tickUserAttack(now time.Time) {
     }
     l.userMoveAt = now
     if l.tracker.SelfTargetID() != l.userTarget {
-        // The first request selects the target (and starts the
-        // server chase).
+        // The first request selects the target (and starts the server chase).
         if err := l.game.AttackTarget(l.userTarget); err != nil {
             l.logf("Hunt: manual attack failed: %v", err)
         }

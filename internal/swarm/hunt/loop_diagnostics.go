@@ -21,34 +21,31 @@ import (
 // divides the remaining plan length by the run speed, the kill ETA
 // divides the observed damage rate into the remaining health.
 const (
-    // walkEtaDefaultSpeed is the fallback run speed of the walk ETA
-    // in world units per second: a character whose speeds the server
-    // never sent still gets an estimate (the plain monster default
-    // of the state package).
+    // walkEtaDefaultSpeed is the fallback run speed of the walk ETA in world
+    // units per second: a character whose speeds the server never sent still
+    // gets an estimate (the plain monster default of the state package).
     walkEtaDefaultSpeed = 120.0
     // killEtaMinElapsed is the fight age below which the damage rate
     // estimate is noise: one swing either way flips it.
     killEtaMinElapsed = 2 * time.Second
 )
 
-// logf reports a hunt loop decision on the console logger and the bot
-// tracker: the message becomes an event log entry of the state dump
-// (the live report carries the decision history next to the world
-// data) and the last action of the hunt diagnostics view. The event
-// log entry arrives through the logger mirror of the wiring
-// (huntEventLogger, sessionLogger); NoteLastAction only sets the last
-// action, so the decision lands in the ring once.
+// logf reports a hunt loop decision on the console logger and the bot tracker:
+// the message becomes an event log entry of the state dump (the live report
+// carries the decision history next to the world data) and the last action of
+// the hunt diagnostics view. The event log entry arrives through the logger
+// mirror of the wiring (huntEventLogger, sessionLogger); NoteLastAction only
+// sets the last action, so the decision lands in the ring once.
 func (l *Loop) logf(format string, args ...any) {
     message := fmt.Sprintf(format, args...)
     l.logger.Print(message)
     l.tracker.NoteLastAction(message)
 }
 
-// diagnostics snapshots the loop internals for the diagnostics
-// section of the state dump: the current target, the skip lists, the
-// walk and trip progress and the safety episodes, with their ages
-// relative to now. The tick defer publishes the values on every
-// decision of the state machine.
+// diagnostics snapshots the loop internals for the diagnostics section of the
+// state dump: the current target, the skip lists, the walk and trip progress
+// and the safety episodes, with their ages relative to now. The tick defer
+// publishes the values on every decision of the state machine.
 func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
     report := state.HuntDiagnostics{
         TargetID:       l.target,
@@ -61,10 +58,9 @@ func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
         TripForMs:      0,
         FleeForMs:      state.AgeMs(since(now, l.fleeSince)),
         BuyRetries:     l.buyRetries,
-        // The stagnation stalls read the watch baselines directly: a
-        // zero stamp (offline gap, manual session, fresh session)
-        // reports a zero age, so the dump never shows a stall the
-        // watch itself does not count.
+        // The stagnation stalls read the watch baselines directly: a zero stamp
+        // (offline gap, manual session, fresh session) reports a zero age, so
+        // the dump never shows a stall the watch itself does not count.
         XpStallForMs:       state.AgeMs(since(now, l.stagXPAt)),
         PositionStallForMs: state.AgeMs(since(now, l.stagPosAt)),
         // The last action and the publication age belong to the
@@ -103,10 +99,9 @@ func (l *Loop) diagnostics(now time.Time) state.HuntDiagnostics {
     return report
 }
 
-// walkPhase reports whether the loop follows a planned geodata walk
-// right now: the phases whose diagnostics carry the stuck watchdog
-// age (the sell stop stands still by design, the hunt phases have no
-// planned path).
+// walkPhase reports whether the loop follows a planned geodata walk right now:
+// the phases whose diagnostics carry the stuck watchdog age (the sell stop
+// stands still by design, the hunt phases have no planned path).
 func (l *Loop) walkPhase() bool {
     switch l.phase {
     case phaseTownWalk, phaseTownReturn, phaseDelevel:
@@ -128,10 +123,9 @@ func since(now time.Time, at time.Time) time.Duration {
     return now.Sub(at)
 }
 
-// activeSkipCount counts the targets the searches currently skip:
-// an inflated count is stuck evidence (the refused forced attacks of
-// a stale server side selection, the timed out pickups of protected
-// drops).
+// activeSkipCount counts the targets the searches currently skip: an inflated
+// count is stuck evidence (the refused forced attacks of a stale server side
+// selection, the timed out pickups of protected drops).
 func (l *Loop) activeSkipCount(now time.Time) int {
     count := 0
     for _, until := range l.targetSkip {
@@ -218,12 +212,11 @@ func (l *Loop) walkRemainingDistance(selfX, selfY float64) float64 {
     }
 }
 
-// walkPlanDistance sums the straight 2D legs of a walk plan: the
-// character through the remaining waypoints into the destination.
-// An unarmed destination (the zero sentinel the trip resets restore)
-// contributes no leg, so a plan walked to its end measures zero. The
-// cursor clamps into the slice bounds - the transient reset races
-// are a diagnostics input, never a walk decision.
+// walkPlanDistance sums the straight 2D legs of a walk plan: the character
+// through the remaining waypoints into the destination. An unarmed destination
+// (the zero sentinel the trip resets restore) contributes no leg, so a plan
+// walked to its end measures zero. The cursor clamps into the slice bounds -
+// the transient reset races are a diagnostics input, never a walk decision.
 func walkPlanDistance(
     selfX, selfY float64, waypoints []pathfind.Vec3, index int,
     dest pathfind.Vec3,
@@ -241,13 +234,12 @@ func walkPlanDistance(
     return total
 }
 
-// killEtaSeconds estimates the time until the current fight target
-// dies: the damage the fight has done so far over its age is the
-// rate, the remaining health over the rate the estimate. Zero when
-// the fight is not confirmed running (the stamped start keyed by the
-// target), the fight is too fresh for a stable rate (one swing
-// either way flips it below killEtaMinElapsed), the target healed
-// back above its start health or the vitals are unknown.
+// killEtaSeconds estimates the time until the current fight target dies: the
+// damage the fight has done so far over its age is the rate, the remaining
+// health over the rate the estimate. Zero when the fight is not confirmed
+// running (the stamped start keyed by the target), the fight is too fresh for a
+// stable rate (one swing either way flips it below killEtaMinElapsed), the
+// target healed back above its start health or the vitals are unknown.
 func (l *Loop) killEtaSeconds(now time.Time) float64 {
     if l.target == 0 || l.fightStartFor != l.target ||
         l.fightStartAt.IsZero() {
@@ -273,10 +265,9 @@ func (l *Loop) killEtaSeconds(now time.Time) float64 {
     return curHp / rate
 }
 
-// etaMs floors an estimated duration to whole seconds reported as
-// milliseconds: the resolution of the ETA fields (the same flooring
-// the age fields of the state package use). A sub second or negative
-// estimate reports zero.
+// etaMs floors an estimated duration to whole seconds reported as milliseconds:
+// the resolution of the ETA fields (the same flooring the age fields of the
+// state package use). A sub second or negative estimate reports zero.
 func etaMs(seconds float64) int64 {
     if seconds <= 0 {
         return 0

@@ -19,8 +19,7 @@ type CellVertex = huntdata.CellVertex
 // CellMob is one mob species of a hunting cell (huntdata).
 type CellMob = huntdata.CellMob
 
-// Cell is one hunting ground of the Voronoi partition registry
-// (huntdata).
+// Cell is one hunting ground of the Voronoi partition registry (huntdata).
 type Cell = huntdata.Cell
 
 // CellLeash returns the convex polygon leash of the cell (the exact
@@ -35,17 +34,15 @@ func ElvenHuntingCells() []Cell {
     return huntdata.ElvenHuntingCells()
 }
 
-// cellDistance measures the focus distance between a cell and a
-// world position.
+// cellDistance measures the focus distance between a cell and a world position.
 func cellDistance(cell Cell, x int32, y int32) float64 {
     return math.Hypot(float64(cell.FocusX-x), float64(cell.FocusY-y))
 }
 
-// cellWindowMass returns the expected population of the cell inside
-// the white-green window [max(1, level-5), level]: the mobs a few
-// levels below the character drop full loot without any exp or
-// adena penalty and die in a few swings - the gold optimum the
-// picker scores.
+// cellWindowMass returns the expected population of the cell inside the
+// white-green window [max(1, level-5), level]: the mobs a few levels below the
+// character drop full loot without any exp or adena penalty and die in a few
+// swings - the gold optimum the picker scores.
 func cellWindowMass(cell Cell, level int32) float64 {
     low := level - 5
     if low < 1 {
@@ -62,12 +59,11 @@ func cellWindowMass(cell Cell, level int32) float64 {
     return mass
 }
 
-// cellEligible reports whether the character can productively hunt
-// the cell at the given level: the ground holds at least one species
-// inside the wide window [max(1, level-8), level+2] (mob level + 8
-// is the full adena edge, level + 2 the hard engage ceiling). A cell
-// outside the window wastes the character's time - too low pays no
-// adena, too high kills it.
+// cellEligible reports whether the character can productively hunt the cell at
+// the given level: the ground holds at least one species inside the wide window
+// [max(1, level-8), level+2] (mob level + 8 is the full adena edge, level + 2
+// the hard engage ceiling). A cell outside the window wastes the character's
+// time - too low pays no adena, too high kills it.
 func cellEligible(cell Cell, level int32) bool {
     low := level - 8
     if low < 1 {
@@ -123,12 +119,11 @@ func cellMedianLevel(cell Cell) int32 {
     return censusRows[len(censusRows)-1].level
 }
 
-// cellDelevelSafe reports whether holding the cell at the given
-// level keeps the character under the delevel trigger: the cell
-// window (level-8) admits grounds whose median sits 7+ levels below
-// the character, and the deleveling answers such ground with the
-// guard deaths - the picker must not commit the character to ground
-// it immediately delevels it for. A cell without a computable median
+// cellDelevelSafe reports whether holding the cell at the given level keeps the
+// character under the delevel trigger: the cell window (level-8) admits grounds
+// whose median sits 7+ levels below the character, and the deleveling answers
+// such ground with the guard deaths - the picker must not commit the character
+// to ground it immediately delevels it for. A cell without a computable median
 // keeps the plain window judgement.
 func cellDelevelSafe(cell Cell, level int32) bool {
     median := cellMedianLevel(cell)
@@ -139,11 +134,10 @@ func cellDelevelSafe(cell Cell, level int32) bool {
     return level-median < delevelTriggerDiff
 }
 
-// cellLevelDistance returns the smallest mob level distance between
-// the cell ground and the character level: the fallback ranking of
-// the picker when no cell passes the window (a character above or
-// below every window still hunts the closest ground instead of
-// standing idle).
+// cellLevelDistance returns the smallest mob level distance between the cell
+// ground and the character level: the fallback ranking of the picker when no
+// cell passes the window (a character above or below every window still hunts
+// the closest ground instead of standing idle).
 func cellLevelDistance(cell Cell, level int32) int32 {
     best := int32(1 << 30)
     for index := range cell.Mobs {
@@ -180,14 +174,13 @@ func cellAggroMass(cell Cell) float64 {
     return mass
 }
 
-// cellMobPriorities builds the window biased engage priority map of
-// a cell: the white-green preference subrange [level-4, level-1]
-// reads as the strongest bias (those mobs die in a few swings and
-// pay full loot), the rest of the window [level-5, level] a weaker
-// one, the wide window tail [level-8, level+2] the weakest. The
-// priorities translate the template ids onto their wire keys (the
-// NpcInfo packets identify the same npc by the display id plus
-// offset), so the bias actually matches the scan template ids.
+// cellMobPriorities builds the window biased engage priority map of a cell: the
+// white-green preference subrange [level-4, level-1] reads as the strongest
+// bias (those mobs die in a few swings and pay full loot), the rest of the
+// window [level-5, level] a weaker one, the wide window tail [level-8, level+2]
+// the weakest. The priorities translate the template ids onto their wire keys
+// (the NpcInfo packets identify the same npc by the display id plus offset), so
+// the bias actually matches the scan template ids.
 func cellMobPriorities(cell Cell, level int32) map[int32]int32 {
     var priorities map[int32]int32
     for index := range cell.Mobs {

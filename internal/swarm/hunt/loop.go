@@ -17,10 +17,9 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// Loop is the hunt state machine of one bot session. The fields live in
-// the embedded per-concern blocks declared in loop_state.go; a block is
-// promoted, so the methods of the package read l.target, not
-// l.combatState.target.
+// Loop is the hunt state machine of one bot session. The fields live in the
+// embedded per-concern blocks declared in loop_state.go; a block is promoted,
+// so the methods of the package read l.target, not l.combatState.target.
 type Loop struct {
     game       GameAPI
     tracker    *state.Bot
@@ -72,18 +71,16 @@ func NewLoop(game GameAPI, tracker *state.Bot) *Loop {
     return loop
 }
 
-// SetNavigator installs the geodata path finder behind the town trips.
-// Without a navigator the trips never trigger and the loop hunts as
-// before.
+// SetNavigator installs the geodata path finder behind the town trips. Without
+// a navigator the trips never trigger and the loop hunts as before.
 func (l *Loop) SetNavigator(navigator Navigator) {
     l.navigator = navigator
 }
 
-// SetLogger replaces the log target of the loop. The default is
-// log.Default; the deployment wires a logger that mirrors the hunt
-// decision lines into the bot tracker event log (they then show up
-// in the web UI log tab and the state dump - the debugging material
-// of the live sessions).
+// SetLogger replaces the log target of the loop. The default is log.Default;
+// the deployment wires a logger that mirrors the hunt decision lines into the
+// bot tracker event log (they then show up in the web UI log tab and the state
+// dump - the debugging material of the live sessions).
 func (l *Loop) SetLogger(logger *log.Logger) {
     if logger == nil {
         return
@@ -91,11 +88,10 @@ func (l *Loop) SetLogger(logger *log.Logger) {
     l.logger = logger
 }
 
-// SetJournal installs the session journal of the loop: the kill,
-// death, trip and zone events of the structured session trail land in
-// it. A nil journal (the default, and the -session-dir "" mode) turns
-// every journal call into a no-op, so the tests and the acceptance
-// scenarios run unchanged.
+// SetJournal installs the session journal of the loop: the kill, death, trip
+// and zone events of the structured session trail land in it. A nil journal
+// (the default, and the -session-dir "" mode) turns every journal call into a
+// no-op, so the tests and the acceptance scenarios run unchanged.
 func (l *Loop) SetJournal(journal *session.Journal) {
     l.journal = journal
 }
@@ -112,11 +108,10 @@ func (l *Loop) SetGearProfile(profile gear.Profile) {
     l.equip.profile = profile
 }
 
-// SetAutonomy toggles the autonomous hunting of the loop: a manual only
-// session (the bot started without -hunt) keeps the loop in the idle
-// phase and only executes the manual commands of the web UI (move,
-// attack, pickup, useItem, drop, destroy), including the village
-// restart after a death.
+// SetAutonomy toggles the autonomous hunting of the loop: a manual only session
+// (the bot started without -hunt) keeps the loop in the idle phase and only
+// executes the manual commands of the web UI (move, attack, pickup, useItem,
+// drop, destroy), including the village restart after a death.
 func (l *Loop) SetAutonomy(autonomous bool) {
     l.autonomous = autonomous
     if !autonomous {

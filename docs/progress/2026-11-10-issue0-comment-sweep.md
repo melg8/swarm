@@ -2572,6 +2572,16 @@ corner probe is a length, not a leg at all.
   (0.5 s), proxy (6.9 s) and webserver (8.1 s) suites, `golangci-lint
   run` on the four paths 0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the comment wrapping reflow of the hunt layer
+
+- The same paragraph packing over the hunt package: 39 files, 112
+  comment lines fewer, no fact or paragraph break lost.
+- The comment blocks of `loop_state.go` (12), `game_api.go` (9) and
+  `loop_diagnostics.go` (9) carry most of the reduction; the rest is
+  one or two lines per file.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
+  `golangci-lint run` on the package 0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

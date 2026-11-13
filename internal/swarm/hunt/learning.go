@@ -346,8 +346,7 @@ func shopTaxPercent(shop gear.Shop) int32 {
 // bookReason marks the spellbook purchases in the trip stop buys.
 const bookReason = "spellbook"
 
-// teachStop reports whether the current trip stop teaches the
-// lessons.
+// teachStop reports whether the current trip stop teaches the lessons.
 func (l *Loop) teachStop() bool {
     return len(l.tripStops) > 0 && l.tripStops[0].teach
 }

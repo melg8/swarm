@@ -3,10 +3,9 @@
 // SPDX-License-Identifier: MIT
 
 // The shared click and cursor core of the walkers: every walk of the hunt
-// package (the town trips, the manual walks, the quest trips, the zone
-// returns, the delevel walks and the fight approaches) clips its ground click
-// onto one server move request and advances its plan cursor by the same
-// geometry.
+// package (the town trips, the manual walks, the quest trips, the zone returns,
+// the delevel walks and the fight approaches) clips its ground click onto one
+// server move request and advances its plan cursor by the same geometry.
 package hunt
 
 import (

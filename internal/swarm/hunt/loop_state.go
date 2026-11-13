@@ -140,9 +140,8 @@ type travelState struct {
     skipArmed bool
     skipX     int32
     skipY     int32
-    // moveStartAt/X/Y are the move start watchdog (noteMoveStart): a
-    // click that leaves the character on the baseline cell names the
-    // transport dead.
+    // moveStartAt/X/Y are the move start watchdog (noteMoveStart): a click that
+    // leaves the character on the baseline cell names the transport dead.
     moveStartAt time.Time
     moveStartX  int32
     moveStartY  int32
@@ -207,8 +206,7 @@ type townState struct {
     merchantDeckUntil time.Time
     // merchantPull paces the attack analog pull ladder of the deck wait.
     merchantPull time.Time
-    // merchantPulled holds the object id the post selection pull fired
-    // for.
+    // merchantPulled holds the object id the post selection pull fired for.
     merchantPulled int32
     sold           map[int32]bool
     tripStart      time.Time
@@ -236,12 +234,10 @@ type shopState struct {
     buyRetries        int
     shoppingPlanAt    time.Time
     shoppingPlanCache []gear.Purchase
-    // shoppingPlanAdena is the adena the cached queue was planned
-    // against.
+    // shoppingPlanAdena is the adena the cached queue was planned against.
     shoppingPlanAdena int64
-    // shoppingViewCache is the built view of shoppingPlanCache:
-    // rebuilding it per tick was 44 percent of the fleet heap
-    // allocations.
+    // shoppingViewCache is the built view of shoppingPlanCache: rebuilding it
+    // per tick was 44 percent of the fleet heap allocations.
     shoppingViewCache state.ShoppingPlanView
     // replace* is the sell first step of the replacement purchases: the
     // object ids to unequip, the sale batch and the pacing flags.
@@ -254,8 +250,7 @@ type shopState struct {
     replaceWaitAt    time.Time
     replaceTried     int
     // tripGearStart snapshots the paperdoll object and item ids the trip
-    // started with: a slot left empty whose piece is gone arms the gear
-    // debt.
+    // started with: a slot left empty whose piece is gone arms the gear debt.
     tripGearStart    [state.PaperdollSlots]int32
     tripGearStartIDs [state.PaperdollSlots]int32
     // gearDebt holds the paperdoll slot indexes the trip stranded with
@@ -280,9 +275,8 @@ type learnState struct {
     learnRetries     int
     learnAt          time.Time
     learnRevision    uint64
-    // guide* is the Newbie Guide support magic (guide_buffs.go): the
-    // found npc, the approach window and the refusal cooldown that
-    // outlives the trip.
+    // guide* is the Newbie Guide support magic (guide_buffs.go): the found npc,
+    // the approach window and the refusal cooldown that outlives the trip.
     guideID        int32
     guidePick      time.Time
     guideAt        time.Time
@@ -342,8 +336,7 @@ type groundState struct {
 // safetyState is the defensive layer: the flee episode, the escape
 // watchdogs, the pile up run and the post relogin settle.
 type safetyState struct {
-    // fleeAt paces the escape walk requests, independent of the engage
-    // pacing.
+    // fleeAt paces the escape walk requests, independent of the engage pacing.
     fleeAt time.Time
     // fleeSince is the start of the running flee episode: past
     // fleeLogoutAfter the session logs out to reset the aggro.
@@ -352,9 +345,8 @@ type safetyState struct {
     // window that fails to widen the gap ends the session early.
     fleeGapAt time.Time
     fleeGap   float64
-    // escapeAnchorAt/X/Y are the no-progress watchdog: a window that
-    // covers less than escapeNoProgressDistance names a dead escape and
-    // logs out.
+    // escapeAnchorAt/X/Y are the no-progress watchdog: a window that covers
+    // less than escapeNoProgressDistance names a dead escape and logs out.
     escapeAnchorAt time.Time
     escapeAnchorX  int32
     escapeAnchorY  int32
@@ -381,12 +373,10 @@ type safetyState struct {
     settleHoldAt time.Time
 }
 
-// diagState is the diagnostics: the stagnation watch and the paced log
-// gates.
+// diagState is the diagnostics: the stagnation watch and the paced log gates.
 type diagState struct {
-    // noTargetSince starts the patrol patience of an empty search;
-    // noPickLogAt and weaponWaitLogAt pace the two hold logs (zero logs
-    // at once).
+    // noTargetSince starts the patrol patience of an empty search; noPickLogAt
+    // and weaponWaitLogAt pace the two hold logs (zero logs at once).
     noTargetSince   time.Time
     noPickLogAt     time.Time
     weaponWaitLogAt time.Time
@@ -405,8 +395,7 @@ type diagState struct {
     stagHardAt   time.Time
 }
 
-// userState is the manual web UI command: the walk plan and its
-// follower state.
+// userState is the manual web UI command: the walk plan and its follower state.
 type userState struct {
     userKind   string
     userX      int32
@@ -510,9 +499,8 @@ type kiteState struct {
     kiteReclicks     int
     // kiteWalkDead latches the dead-endpoint verdict of the walk.
     kiteWalkDead bool
-    // kiteBearings is the scratch of the retreat direction: a train
-    // wider than the array keeps its farthest members out of the gap
-    // geometry.
+    // kiteBearings is the scratch of the retreat direction: a train wider than
+    // the array keeps its farthest members out of the gap geometry.
     kiteBearings [kiteMaxTrainMembers]float64
     // kite is the tunable block of the kite fight: DefaultKiteParams,
     // overridden per bot spec (SetKiteParams).

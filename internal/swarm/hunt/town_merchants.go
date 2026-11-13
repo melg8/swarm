@@ -21,8 +21,7 @@ type townNpc struct {
     Z          int32
 }
 
-// zeroTownNpc is the not-found sentinel of the merchant and guard
-// searches.
+// zeroTownNpc is the not-found sentinel of the merchant and guard searches.
 var zeroTownNpc = townNpc{TemplateID: 0, Name: "", X: 0, Y: 0, Z: 0}
 
 // townMerchants are the shop merchants of the elven village, the default set of

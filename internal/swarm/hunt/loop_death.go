@@ -86,10 +86,9 @@ func (l *Loop) recoverFromDeath() {
         // otherwise the revived character walks to the farm spot with
         // the full bag first and returns to sell later.
         l.tripEndedAt = time.Time{}
-        // The death counts against the active zone: past the limit
-        // the band ladder regresses onto easier grounds (the
-        // deleveling branch above never counts, its deaths are the
-        // point of the phase).
+        // The death counts against the active zone: past the limit the band
+        // ladder regresses onto easier grounds (the deleveling branch above
+        // never counts, its deaths are the point of the phase).
         l.noteZoneDeath()
     }
     l.logf("Hunt: character died, restarting at the nearest village")

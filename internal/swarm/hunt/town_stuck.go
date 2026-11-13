@@ -72,10 +72,9 @@ func (l *Loop) sendVariedAim(
     return false
 }
 
-// refusalVariantTarget computes the varied click target of one variant
-// on the capped click geometry: variant 0 halves it, 1 quarters it, 2
-// and 3 bend the half click sideways. It returns nil when the click is
-// too short to vary.
+// refusalVariantTarget computes the varied click target of one variant on the
+// capped click geometry: variant 0 halves it, 1 quarters it, 2 and 3 bend the
+// half click sideways. It returns nil when the click is too short to vary.
 func refusalVariantTarget(
     wp pathfind.Vec3, from pathfind.Vec3, index int,
 ) *[3]float64 {
@@ -122,10 +121,9 @@ func (l *Loop) noteMoveStart(
         }
         l.moveStartAt = l.moveAt.Add(moveStartWindow)
         l.moveStartX, l.moveStartY = selfX, selfY
-        // Fall through: the arming tick may already sit past the
-        // deadline (the click went out a tick before the watchdog
-        // first saw it) - the fire below must not wait another
-        // window for a verdict it can already name.
+        // Fall through: the arming tick may already sit past the deadline (the
+        // click went out a tick before the watchdog first saw it) - the fire
+        // below must not wait another window for a verdict it can already name.
     }
     if selfX != l.moveStartX || selfY != l.moveStartY ||
         l.tracker.SelfWalking() {
@@ -143,11 +141,10 @@ func (l *Loop) noteMoveStart(
     return true
 }
 
-// walkStuck tracks the movement progress and re-paths once the
-// character stands still or wobbles without net progress toward the
-// waypoint (a pure movement reset misses the tangent flip-flop). The
-// first stuck of a trip waits stuckTimeout (15 s), the later ones the
-// shorter stuckFastTimeout (4 s).
+// walkStuck tracks the movement progress and re-paths once the character stands
+// still or wobbles without net progress toward the waypoint (a pure movement
+// reset misses the tangent flip-flop). The first stuck of a trip waits
+// stuckTimeout (15 s), the later ones the shorter stuckFastTimeout (4 s).
 func (l *Loop) walkStuck(now time.Time, selfX int32, selfY int32) bool {
     forced := l.forceStuck
     l.forceStuck = false
@@ -210,10 +207,9 @@ func (l *Loop) stuckProgressed(selfX int32, selfY int32) bool {
     return waypointCloser || l.stuckDestinationProgressed(selfX, selfY)
 }
 
-// stuckDestinationProgressed reports whether the segment destination
-// came measurably closer while the character stays inside the route
-// corridor: an off-route hop that merely points destination-ward is no
-// progress.
+// stuckDestinationProgressed reports whether the segment destination came
+// measurably closer while the character stays inside the route corridor: an
+// off-route hop that merely points destination-ward is no progress.
 func (l *Loop) stuckDestinationProgressed(selfX int32, selfY int32) bool {
     if !l.stuckOnRouteCorridor(selfX, selfY) {
         return false
@@ -284,10 +280,9 @@ func (l *Loop) currentWaypoint() (pathfind.Vec3, bool) {
 //
 //nolint:funlen // the town walk repeats the stuck checks per segment
 func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
-    // The online refusal answer separates a server side refusal from a
-    // corridor freeze, and the refusal is target specific: the varied
-    // aim runs before the waypoint skip, and the latch arms the pocket
-    // gate below.
+    // The online refusal answer separates a server side refusal from a corridor
+    // freeze, and the refusal is target specific: the varied aim runs before
+    // the waypoint skip, and the latch arms the pocket gate below.
     if l.refusalEvidence() {
         if !l.segmentRefused {
             l.segmentRefused = true
@@ -408,10 +403,9 @@ func (l *Loop) noteSkipStand(selfX int32, selfY int32) {
     l.skipX, l.skipY = selfX, selfY
 }
 
-// noteRepathCell records the cell a re-path plans from and reports
-// whether the previous one started from the same cell without
-// movement: the deterministic planner would re-plan the identical
-// route.
+// noteRepathCell records the cell a re-path plans from and reports whether the
+// previous one started from the same cell without movement: the deterministic
+// planner would re-plan the identical route.
 func (l *Loop) noteRepathCell(selfX int32, selfY int32) bool {
     frozen := selfX == l.repathX && selfY == l.repathY
     if frozen {
@@ -434,11 +428,10 @@ func (l *Loop) abortFrozenTrip(reason string) {
     l.abortTownTrip(reason)
 }
 
-// escalateFrozenSegment arms the cursor key escape of a frozen town
-// walk segment: the claimed ValidatePosition stream walks the
-// character ALONG THE PLANNED ROUTE (a click-refusing ground answers
-// no mouse click). It reports whether the escape took over the
-// recovery.
+// escalateFrozenSegment arms the cursor key escape of a frozen town walk
+// segment: the claimed ValidatePosition stream walks the character ALONG THE
+// PLANNED ROUTE (a click-refusing ground answers no mouse click). It reports
+// whether the escape took over the recovery.
 func (l *Loop) escalateFrozenSegment() bool {
     if l.navigator == nil {
         return false
@@ -475,9 +468,8 @@ func (l *Loop) nextClearWaypoint(selfX, selfY, selfZ int32) int {
     return l.wpIndex
 }
 
-// stuckSelfZ returns the current character z on demand: the stuck
-// tracker carries only x and y, and 0 lets the planner resolve the
-// standing layer.
+// stuckSelfZ returns the current character z on demand: the stuck tracker
+// carries only x and y, and 0 lets the planner resolve the standing layer.
 func (l *Loop) stuckSelfZ() int32 {
     _, _, z, ok := l.tracker.SelfPosition()
     if !ok {

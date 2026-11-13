@@ -95,12 +95,11 @@ func (l *Loop) tickTownSell() {
                 "%.0f%% weight), distributing the trip plan",
                 stats.Slots, stats.WeightPercent)
             l.planShoppingStops()
-            // The learning stops close the trip: the books and the teacher
-            // ride behind the gear stops, so one town visit buys everything
-            // (the one town visit rule; planLearnStops merges a matching book
-            // stop into the gear stop of its merchant). The weapon stop ran
-            // first, so an abort on the teacher never strands a bare-handed
-            // character.
+            // The learning stops close the trip: the books and the teacher ride
+            // behind the gear stops, so one town visit buys everything (the one
+            // town visit rule; planLearnStops merges a matching book stop into
+            // the gear stop of its merchant). The weapon stop ran first, so an
+            // abort on the teacher never strands a bare-handed character.
             l.planLearnStops()
             // The Newbie Guide support magic closes the trip behind the
             // lessons (guide_buffs.go); a refused character keeps the later

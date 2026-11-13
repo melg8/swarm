@@ -104,10 +104,9 @@ func (l *Loop) recoverBlindEngage(now time.Time) {
         return
     }
     if now.Sub(l.losAt) > blindWalkBudget {
-        // The reposition walk missed its budget: the route was
-        // blocked, the walk stalled or the vantage point did not
-        // clear the sight line. Switch the target instead of
-        // re-arming the same blind engage.
+        // The reposition walk missed its budget: the route was blocked, the
+        // walk stalled or the vantage point did not clear the sight line.
+        // Switch the target instead of re-arming the same blind engage.
         l.switchBlindTarget(now)
 
         return

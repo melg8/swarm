@@ -35,9 +35,8 @@ func (l *Loop) settleAfterLogin(now time.Time) bool {
         return false
     }
     if _, _, _, ok := l.tracker.SelfPosition(); !ok {
-        // The self spawn packet has not arrived yet: the settle
-        // holds without deciding - every scan below needs the
-        // position.
+        // The self spawn packet has not arrived yet: the settle holds without
+        // deciding - every scan below needs the position.
         return true
     }
     startedAt := l.tracker.SessionStartedAt()
@@ -61,9 +60,8 @@ func (l *Loop) settleAfterLogin(now time.Time) bool {
             // the spot instead of burning the one shot settle on it.
             return true
         }
-        // The ground is loaded and clear: no aggressive mob reaches
-        // the character, the protection has nothing to protect
-        // against.
+        // The ground is loaded and clear: no aggressive mob reaches the
+        // character, the protection has nothing to protect against.
         l.endSettle("no aggressive mob in reach")
 
         return false
@@ -147,10 +145,9 @@ func (l *Loop) settleSitPending(now time.Time) bool {
         now.Sub(l.restActionAt) < restRetryPeriod
 }
 
-// settleHolding reports whether the hold is active: the pile up gate
-// suppresses the panic run while it holds, since the protection strips the
-// hate before any broadcast and a phantom pair must not arm the irreversible
-// run.
+// settleHolding reports whether the hold is active: the pile up gate suppresses
+// the panic run while it holds, since the protection strips the hate before any
+// broadcast and a phantom pair must not arm the irreversible run.
 func (l *Loop) settleHolding() bool {
     return l.spawnSettle && !l.settled
 }
@@ -198,10 +195,9 @@ func (l *Loop) maybeBeginFirstStrike(now time.Time) bool {
     l.target = strike.ObjectID
     l.engageAt = now
     l.clearBlindRecovery()
-    // The strike keeps the engage discipline: an attacker above the
-    // level ceiling is not engaged (the protection burn would buy a
-    // death risk), the dry mystic does not spend the cast it cannot
-    // answer with.
+    // The strike keeps the engage discipline: an attacker above the level
+    // ceiling is not engaged (the protection burn would buy a death risk), the
+    // dry mystic does not spend the cast it cannot answer with.
     if !l.attackerEngageable(strike.ObjectID) || l.mageManaLow() {
         l.target = 0
         l.engageAt = time.Time{}

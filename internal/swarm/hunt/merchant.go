@@ -34,8 +34,7 @@ const (
     WaresArmor MerchantWares = 1 << 1
     // WaresJewel covers the earrings, the rings and the necklaces.
     WaresJewel MerchantWares = 1 << 2
-    // WaresMagic covers the spellbooks (the magic goods of the jewel
-    // trader).
+    // WaresMagic covers the spellbooks (the magic goods of the jewel trader).
     WaresMagic MerchantWares = 1 << 3
     // WaresConsumable covers the arrows, the potions, the scrolls and
     // the rest of the grocer stock.
@@ -62,8 +61,7 @@ const (
 // trip planning asks for it per frozen plan line.
 var merchantWaresCache sync.Map
 
-// String renders the wares set for the log lines ("weapons",
-// "armor, jewels").
+// String renders the wares set for the log lines ("weapons", "armor, jewels").
 func (w MerchantWares) String() string {
     if w == WaresNone {
         return "nothing"
@@ -106,13 +104,12 @@ func merchantWares(templateID int32) MerchantWares {
     return wares
 }
 
-// itemWares classifies one catalog item into its goods family: the
-// equippables split by their gear stats (the shields trade at the
-// armor shop with the armor pieces, the jewels sit on the pair and
-// the neck bodyparts - the arrows carry a left hand bodypart too and
-// must not read as shields, the item type gate catches them first),
-// the magic goods carry the display name prefixes and the rest of
-// the stock belongs to the grocer.
+// itemWares classifies one catalog item into its goods family: the equippables
+// split by their gear stats (the shields trade at the armor shop with the armor
+// pieces, the jewels sit on the pair and the neck bodyparts - the arrows carry
+// a left hand bodypart too and must not read as shields, the item type gate
+// catches them first), the magic goods carry the display name prefixes and the
+// rest of the stock belongs to the grocer.
 func itemWares(itemID int32) MerchantWares {
     stats, hasStats := npcdata.ItemGearStats(itemID)
     if !hasStats || stats.Type != itemTypeArmor {
@@ -135,10 +132,9 @@ func itemWares(itemID int32) MerchantWares {
     return WaresArmor
 }
 
-// merchantSellsItem reports whether one of the merchant's buylists
-// carries the item: the exact check the buy enforcement rides (the
-// family classification above is the human knowledge, the lists are
-// the authority).
+// merchantSellsItem reports whether one of the merchant's buylists carries the
+// item: the exact check the buy enforcement rides (the family classification
+// above is the human knowledge, the lists are the authority).
 func merchantSellsItem(templateID int32, itemID int32) bool {
     for _, listID := range npcdata.BuyListsOfNPC(templateID) {
         for _, product := range npcdata.ItemsOfBuyList(listID) {

@@ -6,10 +6,9 @@ package hunt
 
 import "time"
 
-// now returns the time source of the decision logic of the loop: the
-// injected clock or the system clock of a zero value. The ticker of
-// Run stays on the system clock: it paces the loop, it is not a
-// decision input.
+// now returns the time source of the decision logic of the loop: the injected
+// clock or the system clock of a zero value. The ticker of Run stays on the
+// system clock: it paces the loop, it is not a decision input.
 func (l *Loop) now() time.Time {
     if l.nowFn != nil {
         return l.nowFn()

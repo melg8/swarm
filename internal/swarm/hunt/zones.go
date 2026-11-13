@@ -25,8 +25,7 @@ import (
 // ZoneMob is one mob species of a hunting zone (huntdata).
 type ZoneMob = huntdata.ZoneMob
 
-// HuntingZone is one hunting ground of the generated registry
-// (huntdata).
+// HuntingZone is one hunting ground of the generated registry (huntdata).
 type HuntingZone = huntdata.HuntingZone
 
 // regionElven is the region key of the elven lands zone registry.

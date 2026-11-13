@@ -487,14 +487,13 @@ func (l *Loop) requestAttack(now time.Time) {
     l.lastActionAt = now
 }
 
-// losingFight reports whether the fight turned into a death risk: the
-// character fell under the escape threshold, a bow-wielding add joined, or a
-// running fight dropped below the re-engage health while the target keeps a
-// clear lead. The percent-gap rule needs the confirmed fight, since the
-// untouched bar of an unswung target fled winnable mobs, and a nearly finished
-// target does not count - the kill is one swing away. The bow add is the
-// exception: it outranges the straight retreat, so the reload tails are free
-// damage.
+// losingFight reports whether the fight turned into a death risk: the character
+// fell under the escape threshold, a bow-wielding add joined, or a running
+// fight dropped below the re-engage health while the target keeps a clear lead.
+// The percent-gap rule needs the confirmed fight, since the untouched bar of an
+// unswung target fled winnable mobs, and a nearly finished target does not
+// count - the kill is one swing away. The bow add is the exception: it
+// outranges the straight retreat, so the reload tails are free damage.
 func (l *Loop) losingFight() bool {
     selfHP := l.tracker.SelfHealthPercent()
     targetHP := l.tracker.ObjectHealthPercent(l.target)

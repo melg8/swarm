@@ -62,9 +62,8 @@ func (l *Loop) rest() {
         // The ready self heal replaced the sit down this window.
         return
     case l.restStandToHeal(now, hp):
-        // Sitting and the heal is ready: stand up to cast, the
-        // transition below runs with the heal reason, the cast
-        // itself fires on the next window.
+        // Sitting and the heal is ready: stand up to cast, the transition below
+        // runs with the heal reason, the cast itself fires on the next window.
         standToHeal = true
     case l.restSittingHeld(hp):
         // The sit is confirmed and the regeneration is running -
@@ -75,9 +74,8 @@ func (l *Loop) rest() {
     case hp < sitDownHealthPercent:
         wantSit = true
     case l.mageManaDry():
-        // The caster ran its mana dry: sitting regenerates several
-        // times faster than standing, the fights resume at the stand
-        // threshold.
+        // The caster ran its mana dry: sitting regenerates several times faster
+        // than standing, the fights resume at the stand threshold.
         wantSit = true
     default:
         l.logf("Hunt: resting, HP %.0f%% below %.0f%%",
@@ -140,10 +138,9 @@ func (l *Loop) restToggleTo(
 // the 2.5 s StandUpTask window, where every move bounces off ActionFailed.
 func (l *Loop) standUpGuarded(now time.Time) bool {
     if !l.tracker.SelfSitting() {
-        // Standing already: a stand transition of this guard went
-        // out recently - hold the caller through the server side
-        // stand window, then consume the transition so it never
-        // lingers into the rest logic.
+        // Standing already: a stand transition of this guard went out recently
+        // - hold the caller through the server side stand window, then consume
+        // the transition so it never lingers into the rest logic.
         if !l.restActionAt.IsZero() && !l.restActionSit {
             if now.Sub(l.restActionAt) < standSettlePeriod {
                 return false

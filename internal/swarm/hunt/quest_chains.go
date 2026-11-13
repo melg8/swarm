@@ -45,9 +45,8 @@ type QuestKill struct {
     GroundY int32
 }
 
-// QuestStage is one cond step of the chain: what the bot does while
-// the quest journal reports Cond (the tracker QuestCond of the
-// quest id).
+// QuestStage is one cond step of the chain: what the bot does while the quest
+// journal reports Cond (the tracker QuestCond of the quest id).
 type QuestStage struct {
     Cond int32
     // TalkNpc is the npc the stage talks to, the zero value of a pure kill
@@ -92,8 +91,7 @@ type QuestChain struct {
     Script   string
     Title    string
     MinLevel int32
-    // ClassID is the starting class the script gates on (18,
-    // ELVEN_FIGHTER).
+    // ClassID is the starting class the script gates on (18, ELVEN_FIGHTER).
     ClassID int32
     Start   QuestNpc
     // Accept is the dialog route from the start npc's first page
@@ -113,9 +111,8 @@ type QuestChain struct {
 // route from the static page to the change link.
 type ClassChange struct {
     Npc QuestNpc
-    // TargetClass is the resulting class id (19 Elven Knight, 22
-    // Elven Scout) - the SelfClassID flip the M2 acceptance
-    // checks.
+    // TargetClass is the resulting class id (19 Elven Knight, 22 Elven Scout) -
+    // the SelfClassID flip the M2 acceptance checks.
     TargetClass int32
     // ProofItem is the quest proof the master takes (all copies).
     ProofItem int32

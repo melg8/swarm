@@ -8,24 +8,21 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
-// Navigator plans walkable paths through the world geodata. The
-// pathfind engine is wrapped into one through NewNavigator; tests fake
-// the interface.
+// Navigator plans walkable paths through the world geodata. The pathfind engine
+// is wrapped into one through NewNavigator; tests fake the interface.
 type Navigator interface {
-    // FindPathApproach plans a walk that must end within the
-    // approach radius (3D) of the target point: the merchant stops
-    // use the interaction distance, the exact target is preferred
-    // whenever it is reachable.
+    // FindPathApproach plans a walk that must end within the approach radius
+    // (3D) of the target point: the merchant stops use the interaction
+    // distance, the exact target is preferred whenever it is reachable.
     FindPathApproach(start, end pathfind.Vec3, approachRadius float64) (
         *pathfind.Result, error,
     )
-    // FindPathApproachAvoiding plans the walk around the given avoid
-    // areas: the composition layer's avoid seam (the mesh ban walls
-    // with the escape ring of the own ban). The hunt loop's frozen
-    // corridor bans were its historical consumer - the plaza round of
-    // 2026-09-20 removed them (the rectangle granularity sealed whole
-    // mesh sheets), the mesh level capability stays for the library
-    // contract.
+    // FindPathApproachAvoiding plans the walk around the given avoid areas: the
+    // composition layer's avoid seam (the mesh ban walls with the escape ring
+    // of the own ban). The hunt loop's frozen corridor bans were its historical
+    // consumer - the plaza round of 2026-09-20 removed them (the rectangle
+    // granularity sealed whole mesh sheets), the mesh level capability stays
+    // for the library contract.
     FindPathApproachAvoiding(
         start, end pathfind.Vec3, approachRadius float64,
         avoid []pathfind.AvoidArea,
@@ -42,17 +39,15 @@ type Navigator interface {
     // line between two world positions: the blind engage recovery uses
     // it to find a standing point that sees the obstructed target.
     LineOfSight(start, end pathfind.Vec3) (bool, error)
-    // OverWater reports whether the walkable surface under the world
-    // position lies below the C1 water level: the character stands
-    // over a lake or sea bed (swimming or floating on it). The frame
-    // measurement arms on it - a swimming character measures no
-    // vintage shift (see click_frame.go).
+    // OverWater reports whether the walkable surface under the world position
+    // lies below the C1 water level: the character stands over a lake or sea
+    // bed (swimming or floating on it). The frame measurement arms on it - a
+    // swimming character measures no vintage shift (see click_frame.go).
     OverWater(x, y float64, refZ int16) bool
-    // ValidateClick mirrors the server-side validation of a
-    // mouse-mode move request: it answers the destination the
-    // server would actually walk to and whether the click runs at
-    // all. A refused click (the geodata correction collapses the
-    // target onto the walker) never moves the character - the
+    // ValidateClick mirrors the server-side validation of a mouse-mode move
+    // request: it answers the destination the server would actually walk to and
+    // whether the click runs at all. A refused click (the geodata correction
+    // collapses the target onto the walker) never moves the character - the
     // follower reacts to it instead of sending it.
     ValidateClick(from, to pathfind.Vec3) (pathfind.Vec3, bool)
 }

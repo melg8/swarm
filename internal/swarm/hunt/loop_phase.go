@@ -21,8 +21,7 @@ const (
     phaseTownWalk phase = "townWalk"
     // phaseTownSell sells the inventory junk at the shop merchant.
     phaseTownSell phase = "townSell"
-    // phaseTownReturn follows the geodata waypoints back to the farm
-    // spot.
+    // phaseTownReturn follows the geodata waypoints back to the farm spot.
     phaseTownReturn phase = "townReturn"
     // phaseDelevel dies at the town guards to lose the excess levels.
     phaseDelevel phase = "delevel"
@@ -33,10 +32,9 @@ const (
     // for a walk, an attack or a pickup) until it completes, then the
     // autonomous hunting resumes.
     phaseUser phase = "user"
-    // phaseIdle waits for the next manual command of the web UI: the
-    // manual only mode of a session started without -hunt never leaves
-    // this phase, the loop exists purely to turn the queued commands
-    // into world actions.
+    // phaseIdle waits for the next manual command of the web UI: the manual
+    // only mode of a session started without -hunt never leaves this phase, the
+    // loop exists purely to turn the queued commands into world actions.
     phaseIdle phase = "idle"
 )
 
@@ -44,11 +42,10 @@ const (
 func (l *Loop) Run(ctx context.Context) {
     ticker := time.NewTicker(tickPeriod)
     defer ticker.Stop()
-    // The fleet claim of the hunted spot dies with this goroutine: a
-    // session end (the emergency logout of the safety layer, a server
-    // restart, a lost connection) unwinds the whole loop together
-    // with its spotHunter, and the claim must not outlive it (see
-    // spotHunter.releaseClaim).
+    // The fleet claim of the hunted spot dies with this goroutine: a session
+    // end (the emergency logout of the safety layer, a server restart, a lost
+    // connection) unwinds the whole loop together with its spotHunter, and the
+    // claim must not outlive it (see spotHunter.releaseClaim).
     defer l.releaseCellClaim()
     // The emergency logout spots of the previous sessions count against
     // their zones from the first tick: the regression counters of this
@@ -62,10 +59,9 @@ func (l *Loop) Run(ctx context.Context) {
         case <-ticker.C:
             started := l.now()
             l.tickContext(ctx)
-            // The tick duration feeds the statistics view
-            // of the web UI: the loop cadence health of a
-            // loaded process (NoteHuntTick averages and
-            // bounds the window max, see state metrics).
+            // The tick duration feeds the statistics view of the web UI: the
+            // loop cadence health of a loaded process (NoteHuntTick averages
+            // and bounds the window max, see state metrics).
             l.tracker.NoteHuntTick(l.now().Sub(started))
         }
     }
@@ -119,10 +115,9 @@ func (l *Loop) publishTickState() {
     l.observeStagnation(now)
 }
 
-// tickDeathOrSafety answers the death and the defensive layer: the
-// village restart of a dead character, the critical health logout, the
-// armed pile up run and the fresh social pile up. It reports true when
-// the tick was consumed.
+// tickDeathOrSafety answers the death and the defensive layer: the village
+// restart of a dead character, the critical health logout, the armed pile up
+// run and the fresh social pile up. It reports true when the tick was consumed.
 func (l *Loop) tickDeathOrSafety() bool {
     if l.tracker.SelfDead() {
         l.recoverFromDeath()
@@ -147,12 +142,11 @@ func (l *Loop) tickDeathOrSafety() bool {
     return l.tickPileUp(l.now())
 }
 
-// tickPileUp answers a social pile up: several mobs already hold the
-// character as their target. A healthy character whose attackers sit
-// inside the engage ceiling tanks the pack down, everything else starts
-// the pile up run; a standing kite that turned unwinnable drops the
-// fight for the straight flight. It reports true when the tick was
-// consumed.
+// tickPileUp answers a social pile up: several mobs already hold the character
+// as their target. A healthy character whose attackers sit inside the engage
+// ceiling tanks the pack down, everything else starts the pile up run; a
+// standing kite that turned unwinnable drops the fight for the straight flight.
+// It reports true when the tick was consumed.
 func (l *Loop) tickPileUp(now time.Time) bool {
     if l.tracker.SelfAttackerCount() < panicLogoutAttackers ||
         l.pileUpWinnable() || l.settleHolding() {
@@ -241,14 +235,13 @@ func (l *Loop) tickHunt() {
     }
 }
 
-// handleTownTrip drives the town trip start and the running trip
-// tick, and reports true when the tick was consumed by a town trip so
-// the caller skips the engage and loot logic. The walk plan publishes
-// here too: while the trip walks to or from the merchant the remaining
-// geodata waypoints publish for the map. A real fight still holds the
-// start (the loot needs the answer), but a merely held engage target
-// drops: the trip owns the target register from the start (see
-// dropAttackTarget).
+// handleTownTrip drives the town trip start and the running trip tick, and
+// reports true when the tick was consumed by a town trip so the caller skips
+// the engage and loot logic. The walk plan publishes here too: while the trip
+// walks to or from the merchant the remaining geodata waypoints publish for the
+// map. A real fight still holds the start (the loot needs the answer), but a
+// merely held engage target drops: the trip owns the target register from the
+// start (see dropAttackTarget).
 func (l *Loop) handleTownTrip() bool {
     if l.tripActive() {
         l.tickTownTrip()

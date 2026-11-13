@@ -77,11 +77,10 @@ func ParseGatekeeperHTML(html string) []BypassButton {
     return buttons
 }
 
-// extractBypassCommand pulls the bypass command out of an
-// <a action="bypass [(-h )<command>"> tag. The client strips the
-// "bypass -h " or "bypass " prefix before sending, so the returned
-// command is the raw string the bot sends (for example
-// "npc_30146_teleport NORMAL 0"). Returns ok=false when the tag carries
+// extractBypassCommand pulls the bypass command out of an <a action="bypass
+// [(-h )<command>"> tag. The client strips the "bypass -h " or "bypass " prefix
+// before sending, so the returned command is the raw string the bot sends (for
+// example "npc_30146_teleport NORMAL 0"). Returns ok=false when the tag carries
 // no bypass action.
 func extractBypassCommand(tag string) (string, bool) {
     action := extractAttribute(tag, "action")
@@ -178,9 +177,8 @@ func classifyBypass(command, label string) BypassButton {
     return button
 }
 
-// defaultTeleportList is the list name the server uses when the
-// showTeleports button omits it (TeleportType.NORMAL, see
-// Teleporter.onBypassFeedback).
+// defaultTeleportList is the list name the server uses when the showTeleports
+// button omits it (TeleportType.NORMAL, see Teleporter.onBypassFeedback).
 const defaultTeleportList = "NORMAL"
 
 // maxNpcObjID bounds the npc object id parse: the server ids are

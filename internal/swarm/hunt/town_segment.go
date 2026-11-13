@@ -152,12 +152,11 @@ func (l *Loop) startWalkSegmentSearch(dest pathfind.Vec3) bool {
     }
     if !result.Found {
         // The partial round (docs/navmesh.md): both engines agree the
-        // destination is unreachable under the filter, and the mesh
-        // funnel still holds the walkable corridor toward it - the
-        // segment walks the closest reachable point instead of aborting
-        // at the start position, so the trip continues from wherever
-        // the ground ends (the shore of a swim-only destination, the
-        // border of the sealed corridor).
+        // destination is unreachable under the filter, and the mesh funnel
+        // still holds the walkable corridor toward it - the segment walks the
+        // closest reachable point instead of aborting at the start position, so
+        // the trip continues from wherever the ground ends (the shore of a
+        // swim-only destination, the border of the sealed corridor).
         l.logf("Hunt: no route to %d %d, walking the closest "+
             "reachable point", int(dest.X), int(dest.Y))
     }
@@ -213,11 +212,10 @@ func (l *Loop) planNpcSegment(dest pathfind.Vec3) bool {
     if result.Found {
         last := result.Waypoints[len(result.Waypoints)-1]
         if dz := math.Abs(last.Z - dest.Z); dz > exactSegmentDeckTolerance {
-            // The plan resolved onto a foreign deck: the roof over
-            // the shop. Walking it would click the roof the server
-            // resolves onto the character (the 2026-09-11 teleport
-            // geometry) - the npc rung refuses, the wide rung stops
-            // on the surrounding deck instead.
+            // The plan resolved onto a foreign deck: the roof over the shop.
+            // Walking it would click the roof the server resolves onto the
+            // character (the 2026-09-11 teleport geometry) - the npc rung
+            // refuses, the wide rung stops on the surrounding deck instead.
             l.logf("Hunt: npc route to %d %d lands %.0f units off "+
                 "the npc deck, refusing the plan",
                 int(dest.X), int(dest.Y), dz)
@@ -290,10 +288,9 @@ func (l *Loop) startWalkExactSegment(dest pathfind.Vec3) (bool, bool) {
         return false, false
     }
     if !result.Found && !result.Partial {
-        // The manual walk contract (planUserWalk): a bare not found
-        // with no corridor means the destination ground the mesh does
-        // not reach at all - the ring goal of the same mesh answers
-        // the same nothing.
+        // The manual walk contract (planUserWalk): a bare not found with no
+        // corridor means the destination ground the mesh does not reach at all
+        // - the ring goal of the same mesh answers the same nothing.
         l.logf("Hunt: no exact route to %d %d, no corridor",
             int(dest.X), int(dest.Y))
 
@@ -313,10 +310,9 @@ func (l *Loop) startWalkExactSegment(dest pathfind.Vec3) (bool, bool) {
         return false, true
     }
     if !result.Found {
-        // The partial corridor of the exact search IS the answer the
-        // merchant stop wants: the destination sits on the counter
-        // row the mesh never walks onto, the funnel ends at the
-        // customer cell in front of it.
+        // The partial corridor of the exact search IS the answer the merchant
+        // stop wants: the destination sits on the counter row the mesh never
+        // walks onto, the funnel ends at the customer cell in front of it.
         l.logf("Hunt: exact route to %d %d ends at the closest "+
             "walkable cell (the counter row)", int(dest.X), int(dest.Y))
     }

@@ -91,8 +91,7 @@ type cellHunter struct {
     enteredAt time.Time
     // level is the character level the window state was built at.
     level int32
-    // priority is the engage map of the current cell (mirrored into the
-    // loop).
+    // priority is the engage map of the current cell (mirrored into the loop).
     priority map[int32]int32
     // kills is the respawn overlay: the recent kills with their predicted
     // respawn times.

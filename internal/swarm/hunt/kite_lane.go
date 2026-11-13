@@ -280,8 +280,7 @@ func (l *Loop) kiteTerrainLane(
 // rounding and the raw candidate rays: a lane may run perpendicular to the
 // away-ray but never fold back toward the train. A click the server collapses
 // onto the walker is no lane, while a partial result (the last legal cell) is a
-// running click whose validated point serves as the endpoint
-// (docs/hunting.md).
+// running click whose validated point serves as the endpoint (docs/hunting.md).
 
 func (l *Loop) kiteLaneResolve(
     selfX, selfY, selfZ, endX, endY int32,

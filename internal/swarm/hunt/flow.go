@@ -87,13 +87,12 @@ func flowOnRoute(
     return true
 }
 
-// flowAdvance moves the waypoint cursor onto the farthest route waypoint
-// the click transport delivers from the standing cell: the scan bounds the
-// arc by flowAim and probes the farthest candidates first. A jump lands only
-// on a validated line, and the skip bookkeeping denies a repeat jump from a
-// cell the character never left (the dead click transport, see
-// skipMoveFresh). It returns the cursor to use, the input index when no
-// farther target validates.
+// flowAdvance moves the waypoint cursor onto the farthest route waypoint the
+// click transport delivers from the standing cell: the scan bounds the arc by
+// flowAim and probes the farthest candidates first. A jump lands only on a
+// validated line, and the skip bookkeeping denies a repeat jump from a cell the
+// character never left (the dead click transport, see skipMoveFresh). It
+// returns the cursor to use, the input index when no farther target validates.
 func (l *Loop) flowAdvance(
     waypoints []pathfind.Vec3, index int, frameOffset float64,
     selfX, selfY, selfZ int32,

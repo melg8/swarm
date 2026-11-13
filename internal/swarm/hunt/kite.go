@@ -655,9 +655,8 @@ func (l *Loop) kiteClickWalk(now time.Time) bool {
         return false
     }
     if l.kiteClickFor != l.target || l.target == 0 {
-        // The fight moved on: the schedule served the shot that armed it.
-        // Only the hold the arming set dies here; a walk in flight keeps its
-        // window.
+        // The fight moved on: the schedule served the shot that armed it. Only
+        // the hold the arming set dies here; a walk in flight keeps its window.
         l.kiteClickDrop()
 
         return false

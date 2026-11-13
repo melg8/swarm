@@ -10,12 +10,11 @@ import (
     "time"
 )
 
-// gatekeeperDialogWait bounds the wait for the server NpcHTMLMessage
-// reply to a bypass command: the server answers within a few hundred
-// milliseconds, so five seconds covers a slow tick or a brief network
-// stall. Past it the step fails instead of hanging the loop. The var
-// (not a const) is a test seam: the unit tests shorten it to keep the
-// timeout case under a second.
+// gatekeeperDialogWait bounds the wait for the server NpcHTMLMessage reply to a
+// bypass command: the server answers within a few hundred milliseconds, so five
+// seconds covers a slow tick or a brief network stall. Past it the step fails
+// instead of hanging the loop. The var (not a const) is a test seam: the unit
+// tests shorten it to keep the timeout case under a second.
 var gatekeeperDialogWait = 5 * time.Second
 
 // gatekeeperPollPeriod paces the html arrival wait until the npc object id
@@ -62,11 +61,10 @@ func (l *Loop) openTeleportDialog(npcObjID int32) error {
     return l.game.SendBypass(command)
 }
 
-// awaitDialog waits for the server NpcHTMLMessage reply from the
-// teleporter npc. The step reads LastHTMLDialog until the npc object id
-// matches (the server replaces the dialog with the teleport list) or
-// the wait lapses. A zero npcObjID on the first read means no dialog
-// arrived yet - the wait continues.
+// awaitDialog waits for the server NpcHTMLMessage reply from the teleporter
+// npc. The step reads LastHTMLDialog until the npc object id matches (the
+// server replaces the dialog with the teleport list) or the wait lapses. A zero
+// npcObjID on the first read means no dialog arrived yet - the wait continues.
 func (l *Loop) awaitDialog(npcObjID int32) (string, error) {
     deadline := l.now().Add(gatekeeperDialogWait)
     for {

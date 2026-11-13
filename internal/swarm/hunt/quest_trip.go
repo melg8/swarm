@@ -711,9 +711,8 @@ func (l *Loop) transferGeometry(npcObjID int32) string {
         math.Hypot(dx, dy), math.Sqrt(dx*dx+dy*dy+dz*dz))
 }
 
-// awaitTransferPage waits for a dialog page past minGen that carries the
-// wanted button; the generation gate keeps an older page from satisfying
-// the wait.
+// awaitTransferPage waits for a dialog page past minGen that carries the wanted
+// button; the generation gate keeps an older page from satisfying the wait.
 func (l *Loop) awaitTransferPage(
     npcObjID int32, destLabel string, minGen uint64, wait time.Duration,
 ) ([]BypassButton, uint64, error) {
@@ -845,9 +844,8 @@ func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
         stage.Kill.GroundX, stage.Kill.GroundY, selfZ, questWalkTimeout)
 }
 
-// farmQuestStage runs a kill stage: the walk to the ground and the engage
-// loop until the journal counters fill; a dead ground rests for the
-// respawn.
+// farmQuestStage runs a kill stage: the walk to the ground and the engage loop
+// until the journal counters fill; a dead ground rests for the respawn.
 //
 //nolint:cyclop,gocognit // the hunt and quest checks read side by side
 func (l *Loop) farmQuestStage(

@@ -17,19 +17,17 @@ import (
 // per second). The map draws the mesh edges and highlights exactly one
 // element, the cell the bot holds or walks to; the rest stays outline-only.
 
-// cellLiveStateFarming marks the live record of a bot working its
-// ground (inside the polygon), cellLiveStateMoving the record of a
-// bot walking to its ground (outside it - the return segment or the
-// fresh rotation).
+// cellLiveStateFarming marks the live record of a bot working its ground
+// (inside the polygon), cellLiveStateMoving the record of a bot walking to its
+// ground (outside it - the return segment or the fresh rotation).
 const (
     cellLiveStateFarming = "farming"
     cellLiveStateMoving  = "moving"
 )
 
-// publishMesh installs the static registry payload of the tracker
-// exactly once per hunter (the mesh is the same for every bot of
-// the process; a relogin republishes the identical version and the
-// tracker keeps its cache).
+// publishMesh installs the static registry payload of the tracker exactly once
+// per hunter (the mesh is the same for every bot of the process; a relogin
+// republishes the identical version and the tracker keeps its cache).
 func (h *cellHunter) publishMesh(l *Loop) {
     if h.meshPublished || l.tracker == nil {
         return

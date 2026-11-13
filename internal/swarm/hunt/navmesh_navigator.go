@@ -88,8 +88,7 @@ func (n navmeshNavigator) FindPathApproachAvoiding(
     return n.meshQuery(start, end, approachRadius, filter)
 }
 
-// FindPath plans the exact destination walk through the mesh corridor
-// search.
+// FindPath plans the exact destination walk through the mesh corridor search.
 func (n navmeshNavigator) FindPath(
     start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {

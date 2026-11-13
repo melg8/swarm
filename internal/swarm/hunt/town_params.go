@@ -16,11 +16,10 @@ const (
     tripWeightPercent = 50.0
     // sellBatchSize is the maximum item count of one sell request.
     sellBatchSize = 25
-    // sellPause paces the sell requests through the shared
-    // transaction window of the server flood protector (see
-    // transactionPause in shopping.go for the server research: the
-    // window is 1 s wide, refusals cost nothing, the 11 second
-    // margin of the early rounds made the junk selling crawl).
+    // sellPause paces the sell requests through the shared transaction window
+    // of the server flood protector (see transactionPause in shopping.go for
+    // the server research: the window is 1 s wide, refusals cost nothing, the
+    // 11 second margin of the early rounds made the junk selling crawl).
     sellPause = transactionPause
     // tripAbortEscalateAfter is the abort streak the trip cooldown
     // tolerates before it starts doubling: two identical aborts can
@@ -32,13 +31,12 @@ const (
     // merchantApproachDist is the distance the seller stands from the
     // merchant: below the 250 units interaction distance of the server.
     merchantApproachDist = 200.0
-    // npcInteractionDist is the server INTERACTION_DISTANCE of 250:
-    // the talk click and the transactions succeed within this 3D
-    // distance. The approach walk aims the offset ring at 150 units 2D,
-    // and a small z gap (the trainer hall floor is 40 units above the
-    // deck) keeps dist3D above the approach gate (200) but within this
-    // gate, so the talk click fires from the ring instead of waiting
-    // for a gate the z gap keeps unreachable.
+    // npcInteractionDist is the server INTERACTION_DISTANCE of 250: the talk
+    // click and the transactions succeed within this 3D distance. The approach
+    // walk aims the offset ring at 150 units 2D, and a small z gap (the trainer
+    // hall floor is 40 units above the deck) keeps dist3D above the approach
+    // gate (200) but within this gate, so the talk click fires from the ring
+    // instead of waiting for a gate the z gap keeps unreachable.
     npcInteractionDist = 250.0
     // npcApproachRadius is the geodata search radius of every npc
     // destination walk (the merchant, teacher and delevel guard stops):
@@ -54,9 +52,8 @@ const (
     // walk home ends wherever the ball around the spot catches the
     // route, the hunt tick corrects the rest on the spot.
     tripApproachRadius = 200.0
-    // merchantFindRadius is the radius around the character within
-    // which the spawned merchant npc is looked up once the shop point
-    // is reached.
+    // merchantFindRadius is the radius around the character within which the
+    // spawned merchant npc is looked up once the shop point is reached.
     merchantFindRadius = 2000.0
     // merchantWaitTimeout bounds the wait for the merchant NpcInfo
     // before the sale starts without a selected merchant.
@@ -93,11 +90,10 @@ const (
     // deck plan is discarded for the ring fallback instead of walked.
     exactSegmentDeckTolerance = 96.0
     // exactSegmentMaxDistance bounds how far from the merchant the exact
-    // segment may plan: it serves the final approach (the customer cell
-    // across the counter), while the priced ring search owns the long
-    // haul. An exact search at a far unreachable destination
-    // degenerates into an exhaustive exploration of the whole mesh
-    // component, so the gate keeps its partial exhaustion local and
-    // bounded.
+    // segment may plan: it serves the final approach (the customer cell across
+    // the counter), while the priced ring search owns the long haul. An exact
+    // search at a far unreachable destination degenerates into an exhaustive
+    // exploration of the whole mesh component, so the gate keeps its partial
+    // exhaustion local and bounded.
     exactSegmentMaxDistance = 2000.0
 )
