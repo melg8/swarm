@@ -294,6 +294,13 @@ debugging connectivity issues:
   connection closes, `LoginClient` removes the login client and the
   flood protection entry in its `finally` block, so simply retrying
   works. Restarting the login server also clears it instantly.
+- **A hunt bot on a `temp*` account is invisible to the web probe.**
+  The acceptance manager registers every `temp1`..`temp26` account in
+  the shared bot registry, so a second registration under the same id
+  is shadowed and `GET /api/bots/<bot>/state` answers the offline
+  acceptance record (zeros, `status: offline`) while the bot is
+  hunting. Live probes use a dedicated account (`probe1`, `probe2`);
+  the `test*` fleet accounts carry no acceptance record.
 - **SIGTERM on the game server is slow.** The JVM shutdown hook saves
   the whole world and can hold port 7777 open for tens of seconds,
   which looks like "already running". Wait for the process to disappear
