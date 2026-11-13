@@ -1230,6 +1230,16 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - hunt/guide_buffs.go keeps the gate rules only
+
+- 22 blocks compress: the header keeps the 8-24 level band, the wire
+  template 7599 with the 1000000 offset, the two dialog links and the
+  refusal cooldown. The table comments keep the 1200 second durations,
+  the 16..19 Life Cubic summon bound and the slot collision guard
+  against the own auras. 135 comment lines of 420 become 80 of 365.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

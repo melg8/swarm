@@ -4,23 +4,14 @@
 
 package hunt
 
-// The Newbie Guide support magic of the town trips: a character in
-// the 8-24 level band may receive the beneficial magic of the village
-// guide for free - one walk to the spawn (the guide of the elven
-// village, spawn id 30599, wire display template 7599 - the display
-// ids carry the 1000000 wire offset like the merchants) and the two
-// link clicks of the dialog: the entry page offers the link into the
-// SupportMagic.htm page and that page offers the link that applies
-// every level-eligible buff at once. Each landing buff triggers an
-// AbnormalStatusUpdate the tracker already parses into SetBuffs.
-// The server gate refuses below level 8 and above level 24 and the
-// non-newbie accounts (the refusal answers as html, never as buffs)
-// - when the expected buffs do not land, the stop arms a cooldown
-// and moves on, the trip never retries the refusal in a loop.
-// The 16..19 band additionally grants the Life Cubic (skill 67): the
-// cubic is a summoned effect rather than an abnormal buff, so the
-// buff table below leaves it out and the delevel floor of
-// delevel.go reads its lower bound.
+// The Newbie Guide support magic of the town trips: a character in the 8-24
+// level band receives the beneficial magic of the village guide for free - one
+// walk to the spawn (the elven village guide, spawn id 30599, wire template
+// 7599 with the 1000000 display offset) and two link clicks (the entry page
+// into SupportMagic.htm, then the apply link). Each landed buff triggers an
+// AbnormalStatusUpdate the tracker parses into SetBuffs. The gate refuses
+// below level 8, above 24 and the non-newbie accounts, so a refusal arms a
+// cooldown instead of retrying.
 
 import (
     "math"
@@ -29,29 +20,24 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// The support magic constants: the wire template of the guide npc,
-// the level band the server gate accepts, the cooldown the refusal
-// arms and the wait for the buffs to trail in after the bypass.
-// guideBuffWait is a var (not a const) so the unit tests shorten
-// the buff landing wait like the dialog seams (quest_walker_test).
+// The support magic constants: the wire template of the guide npc, the level
+// band the gate accepts and the refusal cooldown. guideBuffWait is a var so the
+// tests shorten the buff landing wait like the dialog seams.
 const (
     guideTemplateID     = int32(7599)
     guideMinLevel       = int32(8)
     guideMaxLevel       = int32(24)
     guideRefuseCooldown = 10 * time.Minute
-    // guideCubicLevelMin is the lower bound of the Life Cubic
-    // (skill 67) window of the support magic gate (16..19, the
-    // SupportMagic.java band): the cubic rides a summon, never an
-    // AbnormalStatusUpdate, so the buff table below stays without
-    // it and the delevel floor reads this bound instead.
+    // guideCubicLevelMin is the lower bound of the Life Cubic (skill 67)
+    // window (16..19, the SupportMagic.java band): the cubic rides a summon,
+    // never an AbnormalStatusUpdate, so the delevel floor reads this bound.
     guideCubicLevelMin = int32(16)
 )
 
 var guideBuffWait = 3 * time.Second
 
-// guideBranch names the class branch a support magic skill rides:
-// the Wind Walk and Shield auras answer both classes, the rest of
-// the table answers one branch of the server gate.
+// guideBranch names the class branch a skill rides: both classes or one
+// branch of the gate.
 type guideBranch uint8
 
 const (
@@ -60,9 +46,7 @@ const (
     guideMageBranch
 )
 
-// guideBuff is one support magic skill of the Newbie Guide: the
-// level window the server grants it in and the class branch it
-// rides (the windows and the branches of the deployed gate).
+// guideBuff is one support magic skill: its grant window and class branch.
 type guideBuff struct {
     SkillID  int32
     MinLevel int32
@@ -70,11 +54,9 @@ type guideBuff struct {
     Branch   guideBranch
 }
 
-// guideBuffSkills are the support magic skills the guide grants
-// (the abnormal buffs of the server gate; the Life Cubic of the
-// 16..19 window is a summoned effect, see guideCubicLevelMin, and
-// never shows up as a buff). Durations are 1200 seconds, far above
-// the learned auras.
+// guideBuffSkills are the granted abnormal buffs (the Life Cubic is a summon,
+// see guideCubicLevelMin). Durations are 1200 seconds, far above the learned
+// auras.
 var guideBuffSkills = []guideBuff{
     // The auras of both class branches.
     {SkillID: 1204, MinLevel: 8, MaxLevel: 24, Branch: guideBothClasses},
@@ -91,19 +73,17 @@ var guideBuffSkills = []guideBuff{
     {SkillID: 1059, MinLevel: 15, MaxLevel: 20, Branch: guideMageBranch},
 }
 
-// selfBuffSlots maps the self castable aura skills of the bot to the
-// abnormal type slot their effect fills (the verified abnormalTypes
-// of the deployed skill data).
+// selfBuffSlots maps the self castable auras to the abnormal slot they fill
+// (the verified abnormalTypes of the deployed skill data).
 var selfBuffSlots = map[int32]string{
     72: "MD_UP", 77: "PA_UP", 86: "DMG_SHIELD", 91: "PD_UP",
     99: "ATTACK_SPEED_UP_BOW",
 }
 
-// guideBuffSlots maps the support magic skills to the abnormal type
-// slot their effect fills: the collision guard reads it against
-// selfBuffSlots - the bot never casts its weaker aura into a slot a
-// fresh 1200 second guide buff holds, and never seeks a guide buff
-// into a slot its own aura holds.
+// guideBuffSlots maps the support magic to the abnormal slot it fills. The
+// collision guard reads it against selfBuffSlots: the bot never casts its
+// weaker aura into a fresh 1200 second guide buff slot, nor seeks a guide
+// buff into a slot its own aura holds.
 var guideBuffSlots = map[int32]string{
     1204: "SPEED_UP", 1040: "PD_UP", 1045: "MAX_HP_UP",
     1048: "MAX_MP_UP", 1068: "PA_UP", 1085: "CASTING_TIME_DOWN",
@@ -111,24 +91,19 @@ var guideBuffSlots = map[int32]string{
     1086: "ATTACK_TIME_DOWN", 1059: "MA_UP",
 }
 
-// guideWireTemplates are the packet template ids of the Newbie Guide
-// (the display id offset of the wire, see npcdata.NPCDisplayOffset).
+// guideWireTemplates are the packet template ids of the guide.
 var guideWireTemplates = []int32{guideTemplateID + npcdata.NPCDisplayOffset}
 
-// guideStopNpc is the Newbie Guide of the elven village the guide
-// stop walks to (the spawn position of the Mobius spawn data).
+// guideStopNpc is the elven village guide (the Mobius spawn position).
 var guideStopNpc = townNpc{
     TemplateID: guideTemplateID, Name: "Newbie Guide",
     X: 45475, Y: 48359, Z: -3056,
 }
 
-// guideForRegion returns the Newbie Guide npc of the hunting region:
-// the elven village guide serves the elven region (the default when
-// the loop carries no region yet), the regions without a mapped
-// guide answer none - a stop planned for a foreign region would walk
-// the Dion trips back to the elven village across the whole map. The
-// allowlist shape keeps the future regions honest: a new region
-// stays guide-less until its guide spawn is mapped here.
+// guideForRegion returns the guide of the hunting region: the elven village
+// guide serves the elven region (and the empty one), the rest answer none,
+// because a stop planned for a foreign region would walk the Dion trips back
+// across the map. A new region stays guide-less until its spawn is mapped.
 func guideForRegion(region string) (townNpc, bool) {
     switch region {
     case regionElven, "":
@@ -165,12 +140,9 @@ func expectedGuideBuffs(level int32, mage bool) []int32 {
     return expected
 }
 
-// guideWanted reports whether the Newbie Guide stop is worth
-// planning: the level band of the support magic, no refusal cooldown
-// running and at least one eligible skill missing from the active
-// buffs. A slot an active self buff fills is not worth seeking
-// either - the guide cast would replace the fresh own aura, the bot
-// keeps what it already holds.
+// guideWanted reports whether the stop is worth planning: the level band
+// holds, no refusal cooldown runs and at least one eligible skill is missing.
+// A slot an active self buff fills is not worth seeking either.
 func (l *Loop) guideWanted() bool {
     level := l.tracker.SelfLevel()
     if level < guideMinLevel || level > guideMaxLevel {
@@ -190,9 +162,8 @@ func (l *Loop) guideWanted() bool {
     return false
 }
 
-// guideSlotCovered reports whether the abnormal slot of the support
-// magic skill holds an active self buff already: the guide aura
-// would overwrite the fresh own buff, so the bot does not seek it.
+// guideSlotCovered reports whether an active self buff fills the slot: the
+// guide aura would overwrite the fresh own buff.
 func (l *Loop) guideSlotCovered(skillID int32) bool {
     slot, ok := guideBuffSlots[skillID]
     if !ok {
@@ -207,10 +178,8 @@ func (l *Loop) guideSlotCovered(skillID int32) bool {
     return false
 }
 
-// selfBuffSuperseded reports whether an active guide support magic
-// buff fills the abnormal slot the self skill would cast into: the
-// 1200 second guide aura outlasts the own one by far, the cast would
-// drop the stronger effect for the weaker duplicate.
+// selfBuffSuperseded reports whether an active guide buff fills the slot the
+// self skill would cast into: the 1200 second aura outlasts the own one.
 func (l *Loop) selfBuffSuperseded(skillID int32) bool {
     slot, ok := selfBuffSlots[skillID]
     if !ok {
@@ -225,28 +194,21 @@ func (l *Loop) selfBuffSuperseded(skillID int32) bool {
     return false
 }
 
-// guideRunWanted reports whether the support magic of the Newbie
-// Guide is worth a dedicated town trip right now: the hunting region
-// carries a guide and the stop is wanted (the level band holds, no
-// refusal cooldown runs, at least one eligible buff is missing). It
-// mirrors weaponlessRunWanted as the second trip reason that may
-// start outside the hunting zone: the village revive of a death
-// lands next to the guide, and walking home through the aggressive
-// packs unbuffed wastes the death the character just paid for - the
-// buffs come first, the return segment of the trip walks home armed
-// with them.
+// guideRunWanted reports whether the support magic is worth a dedicated town
+// trip: the region carries a guide and the stop is wanted. It is the second
+// trip reason that may start outside the hunting zone - the village revive of
+// a death lands next to the guide, and walking home through the aggressive
+// packs unbuffed wastes the death, so the buffs come first.
 func (l *Loop) guideRunWanted() bool {
     _, ok := guideForRegion(l.zoneRegion)
 
     return ok && l.guideWanted()
 }
 
-// planGuideStop appends the Newbie Guide stop of the running trip:
-// the support magic rides BEHIND the learning stops (the sell phase
-// calls this after planLearnStops), so one town visit sells, buys,
-// learns and picks up the guide buffs on the way home. The stop
-// plans once per trip - the appended stop never duplicates - and
-// only when the hunting region carries a guide.
+// planGuideStop appends the guide stop behind the learning stops (the sell
+// phase calls it after planLearnStops), so one town visit sells, buys, learns
+// and picks up the buffs. The stop plans once per trip and only when the
+// region carries a guide.
 func (l *Loop) planGuideStop() {
     guide, ok := guideForRegion(l.zoneRegion)
     if !ok || !l.guideWanted() {
@@ -268,11 +230,10 @@ func (l *Loop) planGuideStop() {
         "the support magic")
 }
 
-// handleGuideStop approaches the Newbie Guide npc and receives the
-// support magic through the dialog links. It reports false while the
-// character still walks toward the guide or waits for one to appear,
-// true when the stop is done (the buffs landed, the refusal armed
-// the cooldown or the guide never showed up).
+// handleGuideStop approaches the guide and receives the support magic through
+// the dialog links. Reports false while the character walks or waits for a
+// guide, true when the stop is done (the buffs landed, the refusal armed the
+// cooldown or the guide never showed up).
 func (l *Loop) handleGuideStop(now time.Time) bool {
     if l.guideID < 0 {
         return true
@@ -297,11 +258,8 @@ func (l *Loop) handleGuideStop(now time.Time) bool {
         return false
     }
     l.guideID = -1
-    // The no-show arms the refusal cooldown too: a spawn absent from
-    // the tracker would otherwise end the trip normally (the abort
-    // escalation never sees it) and the next guide run would walk
-    // the same empty square every short cooldown - the loop bound of
-    // the refused gate applies to the invisible one as well.
+    // The no-show arms the refusal cooldown too: otherwise the trip would end
+    // normally and the next run would walk the same empty square.
     l.armGuideRefusal("the Newbie Guide never showed up")
     l.logger.Printf("Hunt: guide: the Newbie Guide never showed up, " +
         "skipping it")
@@ -309,13 +267,10 @@ func (l *Loop) handleGuideStop(now time.Time) bool {
     return true
 }
 
-// approachGuide walks the character right up to the guide and
-// receives the support magic once the interaction distance is met.
-// The walk targets the npc approach point (npcApproachPoint offsets
-// toward the walker, so the chained clicks close the last stretch);
-// the window bounds the whole approach - the guide stands in the
-// open village square, so the plain ring walk of the teacher stop
-// needs no deck pull machinery.
+// approachGuide walks the character up to the guide and receives the support
+// magic at the interaction distance. The walk targets the npc approach point,
+// so the chained clicks close the last stretch; the walk window bounds the
+// approach. The open square needs no deck pull machinery.
 func (l *Loop) approachGuide(now time.Time) bool {
     x, y, z, ok := l.tracker.ObjectPosition(l.guideID)
     if !ok {
@@ -350,17 +305,11 @@ func (l *Loop) approachGuide(now time.Time) bool {
     return false
 }
 
-// receiveGuideMagic drives the support magic dialog of the guide:
-// the entry page links into the SupportMagic.htm page and that page
-// links the apply command - the server answers the apply bypass
-// with every level-eligible buff (each one an AbnormalStatusUpdate
-// the tracker applies) and with NO dialog page of its own (the
-// Mobius SupportMagic handler casts and returns, it sends html only
-// on the refusal paths), so the route's last step carries
-// AnswerIsEffect and this stop owns the outcome: the buff watch
-// waits for the expected skills, and when nothing lands the refusal
-// cooldown arms and the trip moves on - the refusal pages of the
-// gate never answer with buffs, the stop never retries them.
+// receiveGuideMagic drives the support magic dialog: the entry page links into
+// SupportMagic.htm, which links the apply command. The server answers the apply
+// bypass with every level-eligible buff and no page of its own (the Mobius
+// handler casts and returns, sending html only on the refusal paths), so the
+// last step carries AnswerIsEffect and this stop owns the outcome.
 func (l *Loop) receiveGuideMagic() bool {
     if err := l.DriveDialog(l.guideID, []DialogStep{
         {LinkText: "Receive help from beneficial magic."},
@@ -385,10 +334,8 @@ func (l *Loop) receiveGuideMagic() bool {
     return true
 }
 
-// armGuideRefusal arms the refusal cooldown of the failed support
-// magic: the gate refused the character (the level or the account
-// html) or the dialog died - the trip moves on and the later trips
-// stay away until the cooldown lapses.
+// armGuideRefusal arms the refusal cooldown: the gate refused the character or
+// the dialog died, so the later trips stay away until it lapses.
 func (l *Loop) armGuideRefusal(reason string) {
     l.guideRefusedAt = l.now().Add(guideRefuseCooldown)
     l.logger.Printf("Hunt: guide: %s, cooldown for %s", reason,
@@ -408,10 +355,8 @@ func (l *Loop) guideBuffLanded() bool {
     return false
 }
 
-// resetGuideState drops the per stop guide state: a fresh trip
-// re-finds its guide, an aborted trip leaves no half-driven dialog
-// behind. The refusal cooldown survives - it gates the wanted check
-// across the trips.
+// resetGuideState drops the per stop guide state, so an aborted trip leaves no
+// half-driven dialog. The refusal cooldown survives across the trips.
 func (l *Loop) resetGuideState() {
     l.guideID = 0
     l.guidePick = time.Time{}
