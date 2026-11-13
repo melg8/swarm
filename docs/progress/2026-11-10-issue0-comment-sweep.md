@@ -923,6 +923,17 @@ corner probe is a length, not a leg at all.
   tests), `task lint:new`. `detect.go` fell from 28.6 to 14.8 percent
   (13 comment lines of 88), no block above 8 lines.
 
+### 2026-11-12 - hunt/recovery_heal.go leans on the self heal doc bullet
+
+- 8 blocks compress: the 20 line flow header, the flight margin, the
+  skill pick, the in-flight check and the two rest branches. No docs
+  change: the self heal recovery bullet of `docs/hunting.md` already
+  carries the server refusals, the mana gate and the spawn protection
+  interaction.
+- Verified: `task fmt`, `go build ./...`, the full hunt package, `task
+  lint:new`. `recovery_heal.go` fell from 36.2 to 19.4 percent (25
+  comment lines of 129), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -951,8 +962,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `acceptance/delevel.go`, `pathfind/navbuild/sheet.go`,
 `pathfind/navmesh/abstract.go`, `huntaudit/audit.go`,
 `cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go`,
-`acceptance/botlog/botlog.go` and `cmd/counterprobe/detect.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
+`acceptance/botlog/botlog.go`, `cmd/counterprobe/detect.go` and
+`hunt/recovery_heal.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
