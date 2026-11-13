@@ -29,7 +29,6 @@ const (
     loginReadTimeout = 30 * time.Second
 )
 
-// AuthResult contains everything needed to connect to the game server.
 type AuthResult struct {
     Account    string
     LoginOkID1 int32
@@ -45,7 +44,6 @@ type AuthResult struct {
     RsaPublicKey []byte
 }
 
-// LoginClient drives the login server flow of the Mobius protocol.
 type LoginClient struct {
     conn      net.Conn
     crypt     *crypt.LoginCrypt
@@ -57,7 +55,6 @@ type LoginClient struct {
     rsaKey    []byte
 }
 
-// NewLoginClient wraps an established login server connection.
 func NewLoginClient(conn net.Conn) *LoginClient {
     return &LoginClient{
         conn:      conn,
@@ -78,7 +75,6 @@ func (lc *LoginClient) armReadDeadline() error {
     return lc.conn.SetReadDeadline(time.Now().Add(loginReadTimeout))
 }
 
-// readPacket reads and decrypts the next login server packet.
 func (lc *LoginClient) readPacket() ([]byte, error) {
     if err := lc.armReadDeadline(); err != nil {
         return nil, fmt.Errorf(
@@ -128,7 +124,6 @@ func (lc *LoginClient) readInitPacket() (*fromauthserver.InitPacket, error) {
     return initPacket, nil
 }
 
-// sendPacket serializes, seals and sends a login server packet.
 func (lc *LoginClient) sendPacket(data crypt.Serializable) error {
     wire, err := lc.crypt.SealPacket(lc.writeBuf, data)
     if err != nil {
@@ -143,7 +138,6 @@ func (lc *LoginClient) sendPacket(data crypt.Serializable) error {
     return nil
 }
 
-// readAuthedPacket reads a packet and treats login fail as an error.
 func (lc *LoginClient) readAuthedPacket() ([]byte, error) {
     content, err := lc.readPacket()
     if err != nil {

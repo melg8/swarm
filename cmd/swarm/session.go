@@ -56,7 +56,6 @@ const (
 //nolint:exhaustruct_v5 // net.Dialer carries deprecated fields
 var swarmDialer = &net.Dialer{Timeout: connectTimeout}
 
-// connectLoginServer establishes the login server connection.
 func connectLoginServer(address string) (net.Conn, error) {
     conn, err := swarmDialer.Dial("tcp", address)
     if err != nil {
@@ -313,7 +312,6 @@ func explicitAccount() bool {
     return set
 }
 
-// huntEventMirror writes hunt log lines into the bot event log.
 type huntEventMirror struct {
     tracker *state.Bot
 }

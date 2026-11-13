@@ -28,7 +28,6 @@ type Sampler struct {
     lastLevel int32
 }
 
-// NewSampler builds the sampler of one bot.
 func NewSampler(
     bot string, tracker *state.Bot, journal *Journal,
 ) *Sampler {

@@ -206,7 +206,6 @@ func (gc *GameClient) awaitCharacterCreation(
     return gc.handleCharCreatePacket(name, payload)
 }
 
-// handleCharCreatePacket dispatches a single packet of the creation flow.
 func (gc *GameClient) handleCharCreatePacket(
     name string, payload []byte,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
@@ -228,7 +227,6 @@ func (gc *GameClient) handleCharCreatePacket(
     return false, nil, nil
 }
 
-// handleCharCreateFail converts a creation failure packet into an error.
 func (gc *GameClient) handleCharCreateFail(
     payload []byte,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
@@ -242,7 +240,6 @@ func (gc *GameClient) handleCharCreateFail(
         "character creation failed: %s", fail.ReasonText())
 }
 
-// handleUpdatedCharList checks the updated character list for the name.
 func (gc *GameClient) handleUpdatedCharList(
     name string, payload []byte,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
@@ -260,7 +257,6 @@ func (gc *GameClient) handleUpdatedCharList(
         "created character missing in the updated list")
 }
 
-// EnterWorld selects the character slot and requests world entry.
 func (gc *GameClient) EnterWorld(slot int32) error {
     // The selection is retransmitted when the server drops it
     // silently (see the charSelectWait constants): the wait is
@@ -356,7 +352,6 @@ func (gc *GameClient) awaitCharSelected(
     }
 }
 
-// trackerApplySelection feeds the selected character state to the tracker.
 func (gc *GameClient) trackerApplySelection(
     selected *fromgameserver.CharSelectedPacket,
 ) {

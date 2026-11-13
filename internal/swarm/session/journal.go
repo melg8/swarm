@@ -124,7 +124,6 @@ func createJournalFile(dir string) (*os.File, string, error) {
     return nil, "", os.ErrExist
 }
 
-// install sets up the buffered writing stack over an opened file.
 func (j *Journal) install(file *os.File) {
     j.file = file
     j.counter.inner = file
@@ -281,7 +280,6 @@ func (j *Journal) rotate() {
     j.install(next)
 }
 
-// segmentPath builds the numbered file name of a rotated segment.
 func (j *Journal) segmentPath(seq int) string {
     base := filepath.Base(j.path)
     ext := filepath.Ext(base)
@@ -290,7 +288,6 @@ func (j *Journal) segmentPath(seq int) string {
     return filepath.Join(j.dir, stem+"."+itoa(int64(seq))+ext)
 }
 
-// closeFile flushes and closes the active segment.
 func (j *Journal) closeFile() {
     if err := j.writer.Flush(); err != nil && j.logger != nil {
         j.logger.Printf("Error session journal flush: %v", err)
@@ -325,7 +322,6 @@ func (j *Journal) Story(bot string, message string, at time.Time) {
     j.send(r)
 }
 
-// Sample records one periodic character state read.
 func (j *Journal) Sample(bot string, s Sample) {
     r := newRecord(bot, kindSample, time.Now())
     r.Lv = s.Level
@@ -338,7 +334,6 @@ func (j *Journal) Sample(bot string, s Sample) {
     j.send(r)
 }
 
-// Level records a level up of the character.
 func (j *Journal) Level(bot string, level int32, exp int64) {
     r := newRecord(bot, kindLevel, time.Now())
     r.Lv = level
@@ -363,7 +358,6 @@ func (j *Journal) Kill(
     j.send(r)
 }
 
-// Death records one character death at the given level and position.
 func (j *Journal) Death(bot string, level int32, x int32, y int32) {
     r := newRecord(bot, kindDeath, time.Now())
     r.Lv = level
@@ -372,14 +366,12 @@ func (j *Journal) Death(bot string, level int32, x int32, y int32) {
     j.send(r)
 }
 
-// TripStart brackets the beginning of a town trip with its reason.
 func (j *Journal) TripStart(bot string, reason string) {
     r := newRecord(bot, kindTripStart, time.Now())
     r.R = reason
     j.send(r)
 }
 
-// TripEnd closes a town trip bracket with its reason and duration.
 func (j *Journal) TripEnd(bot string, reason string, dur time.Duration) {
     r := newRecord(bot, kindTripEnd, time.Now())
     r.R = reason
@@ -387,7 +379,6 @@ func (j *Journal) TripEnd(bot string, reason string, dur time.Duration) {
     j.send(r)
 }
 
-// Buy records one buy request batch with its item list and adena cost.
 func (j *Journal) Buy(bot string, items string, count int, cost int64) {
     r := newRecord(bot, kindBuy, time.Now())
     r.Items = items
@@ -396,14 +387,12 @@ func (j *Journal) Buy(bot string, items string, count int, cost int64) {
     j.send(r)
 }
 
-// Sell records one sell batch with its item count.
 func (j *Journal) Sell(bot string, count int) {
     r := newRecord(bot, kindSell, time.Now())
     r.N = int32(count)
     j.send(r)
 }
 
-// Zone records a hunting zone switch with the reason.
 func (j *Journal) Zone(bot string, name string, reason string) {
     r := newRecord(bot, kindZone, time.Now())
     r.Mob = name
@@ -426,14 +415,12 @@ func (j *Journal) Stall(
     j.send(r)
 }
 
-// Repath records one stuck-and-replanned walk segment.
 func (j *Journal) Repath(bot string, attempt int) {
     r := newRecord(bot, kindRepath, time.Now())
     r.N = int32(attempt)
     j.send(r)
 }
 
-// Connect records a session lifecycle mark of the supervisor.
 func (j *Journal) Connect(bot string, stage string, detail string) {
     r := newRecord(bot, kindConnect, time.Now())
     r.R = stage
@@ -441,7 +428,6 @@ func (j *Journal) Connect(bot string, stage string, detail string) {
     j.send(r)
 }
 
-// Lost records a lost session of the supervisor with the reason.
 func (j *Journal) Lost(bot string, reason string) {
     r := newRecord(bot, kindLost, time.Now())
     r.R = reason
@@ -459,7 +445,6 @@ func (j *Journal) Logout(bot string, reason string, cooldown time.Duration) {
     j.send(r)
 }
 
-// Shutdown records the graceful process shutdown.
 func (j *Journal) Shutdown(reason string) {
     r := newRecord("", kindShutdown, time.Now())
     r.R = reason
@@ -508,7 +493,6 @@ type countingWriter struct {
     written int64
 }
 
-// Write implements io.Writer.
 func (c *countingWriter) Write(p []byte) (int, error) {
     n, err := c.inner.Write(p)
     c.written += int64(n)

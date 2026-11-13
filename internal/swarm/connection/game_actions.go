@@ -32,7 +32,6 @@ func (gc *GameClient) AttackTarget(objectID int32) error {
     return nil
 }
 
-// sendAttackRequest serializes and sends one AttackRequest packet.
 func (gc *GameClient) sendAttackRequest(
     targetID int32, x int32, y int32, z int32,
 ) error {

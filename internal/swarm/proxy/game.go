@@ -141,7 +141,6 @@ const outboundQueueSize = 512
 // without a stalled feed or a reconnect.
 const botSwitchPollPeriod = 250 * time.Millisecond
 
-// handleGameConn runs the game server emulation for one client.
 func (s *Server) handleGameConn(conn net.Conn) {
     id := s.nextConnID()
     gc := &gameConn{
@@ -326,7 +325,6 @@ func (gc *gameConn) markUserLogout() {
     gc.userLogout = true
 }
 
-// clientLoggedOut reports whether the client asked for the logout.
 func (gc *gameConn) clientLoggedOut() bool {
     gc.mu.Lock()
     defer gc.mu.Unlock()
@@ -343,14 +341,12 @@ func (gc *gameConn) setRelayLive(live bool) {
     gc.relayLive = live
 }
 
-// setState transitions the client state machine of the connection.
 func (gc *gameConn) setState(state gameState) {
     gc.mu.Lock()
     defer gc.mu.Unlock()
     gc.state = state
 }
 
-// currentState snapshots the client state machine of the connection.
 func (gc *gameConn) currentState() gameState {
     gc.mu.Lock()
     defer gc.mu.Unlock()

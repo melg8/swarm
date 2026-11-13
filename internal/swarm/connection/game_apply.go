@@ -17,7 +17,6 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// applyUserInfo parses UserInfo and updates the character state.
 func (gc *GameClient) applyUserInfo(payload []byte) {
     err := fromgameserver.ParseUserInfoPacket(&gc.userInfo, payload)
     if err != nil {
@@ -62,7 +61,6 @@ func (gc *GameClient) applyUserInfo(payload []byte) {
         gc.userInfo.CurrentLoad)
 }
 
-// applyNpcInfo parses NpcInfo and upserts the npc object.
 func (gc *GameClient) applyNpcInfo(payload []byte) {
     if err := fromgameserver.ParseNpcInfoPacket(&gc.npcInfo,
         payload); err != nil {
@@ -97,7 +95,6 @@ func (gc *GameClient) applyNpcInfo(payload []byte) {
         gc.npcInfo.Heading)
 }
 
-// applyCharInfo parses CharInfo and upserts the player object.
 func (gc *GameClient) applyCharInfo(payload []byte) {
     err := fromgameserver.ParseCharInfoPacket(&gc.charInfo, payload)
     if err != nil {
@@ -131,7 +128,6 @@ func (gc *GameClient) applyCharInfo(payload []byte) {
         gc.charInfo.RunSpeed)
 }
 
-// applyDropItem parses DropItem and upserts the ground item object.
 func (gc *GameClient) applyDropItem(payload []byte) {
     err := fromgameserver.ParseDropItemPacket(&gc.dropItem, payload)
     if err != nil {
@@ -153,7 +149,6 @@ func (gc *GameClient) applyDropItem(payload []byte) {
     }
 }
 
-// applyDeleteObject parses DeleteObject and removes the object.
 func (gc *GameClient) applyDeleteObject(payload []byte) {
     err := fromgameserver.ParseDeleteObjectPacket(&gc.deleted, payload)
     if err != nil {
@@ -166,7 +161,6 @@ func (gc *GameClient) applyDeleteObject(payload []byte) {
     }
 }
 
-// applyMoveToLocation parses MoveToLocation and updates the movement.
 func (gc *GameClient) applyMoveToLocation(payload []byte) {
     err := fromgameserver.ParseMoveToLocationPacket(&gc.moveTo, payload)
     if err != nil {
@@ -188,7 +182,6 @@ func (gc *GameClient) applyMoveToLocation(payload []byte) {
     }
 }
 
-// applyStopMove parses StopMove and updates the object placement.
 func (gc *GameClient) applyStopMove(payload []byte) {
     err := fromgameserver.ParseStopMovePacket(&gc.stopMove, payload)
     if err != nil {
@@ -209,7 +202,6 @@ func (gc *GameClient) applyStopMove(payload []byte) {
     }
 }
 
-// applyValidateLocation parses ValidateLocation and updates the placement.
 func (gc *GameClient) applyValidateLocation(payload []byte) {
     if err := fromgameserver.ParseValidateLocationPacket(
         &gc.validateLoc, payload); err != nil {
@@ -248,7 +240,6 @@ func (gc *GameClient) placementHeading(
     return heading
 }
 
-// applyStatusUpdate parses StatusUpdate and applies the vitals changes.
 func (gc *GameClient) applyStatusUpdate(payload []byte) {
     if err := fromgameserver.ParseStatusUpdatePacket(
         &gc.statusUpd, payload); err != nil {
@@ -282,7 +273,6 @@ func (gc *GameClient) applySetupGauge(payload []byte) {
     }
 }
 
-// applyAttack parses Attack and updates the combat state.
 func (gc *GameClient) applyAttack(payload []byte) {
     if err := fromgameserver.ParseAttackPacket(&gc.attack,
         payload); err != nil {
@@ -317,7 +307,6 @@ func (gc *GameClient) applyAttack(payload []byte) {
     }
 }
 
-// applyAutoAttackStart parses AutoAttackStart and marks combat.
 func (gc *GameClient) applyAutoAttackStart(payload []byte) {
     if err := fromgameserver.ParseAutoAttackStartPacket(
         &gc.attackStart, payload); err != nil {
@@ -330,7 +319,6 @@ func (gc *GameClient) applyAutoAttackStart(payload []byte) {
     }
 }
 
-// applyAutoAttackStop parses AutoAttackStop and clears combat.
 func (gc *GameClient) applyAutoAttackStop(payload []byte) {
     if err := fromgameserver.ParseAutoAttackStopPacket(
         &gc.attackStop, payload); err != nil {
@@ -343,7 +331,6 @@ func (gc *GameClient) applyAutoAttackStop(payload []byte) {
     }
 }
 
-// applyMoveToPawn parses MoveToPawn and updates the chasing object.
 func (gc *GameClient) applyMoveToPawn(payload []byte) {
     if err := fromgameserver.ParseMoveToPawnPacket(
         &gc.moveToPawn, payload); err != nil {
@@ -390,7 +377,6 @@ func (gc *GameClient) applySpawnItem(payload []byte) {
     }
 }
 
-// applyGetItem parses GetItem and removes the picked up ground item.
 func (gc *GameClient) applyGetItem(payload []byte) {
     if err := fromgameserver.ParseGetItemPacket(&gc.getItem,
         payload); err != nil {
@@ -410,7 +396,6 @@ func (gc *GameClient) applyGetItem(payload []byte) {
     }
 }
 
-// applyBeginRotation parses BeginRotation and turns the object.
 func (gc *GameClient) applyBeginRotation(payload []byte) {
     if err := fromgameserver.ParseBeginRotationPacket(
         &gc.beginRotation, payload); err != nil {
@@ -426,7 +411,6 @@ func (gc *GameClient) applyBeginRotation(payload []byte) {
     }
 }
 
-// applyStopRotation parses StopRotation and turns the object.
 func (gc *GameClient) applyStopRotation(payload []byte) {
     if err := fromgameserver.ParseStopRotationPacket(
         &gc.stopRotation, payload); err != nil {
@@ -442,7 +426,6 @@ func (gc *GameClient) applyStopRotation(payload []byte) {
     }
 }
 
-// applyChangeMoveType parses ChangeMoveType and updates the run state.
 func (gc *GameClient) applyChangeMoveType(payload []byte) {
     if err := fromgameserver.ParseChangeMoveTypePacket(
         &gc.changeMoveType, payload); err != nil {
@@ -458,7 +441,6 @@ func (gc *GameClient) applyChangeMoveType(payload []byte) {
     }
 }
 
-// applyChangeWaitType parses ChangeWaitType and tracks the sit state.
 func (gc *GameClient) applyChangeWaitType(payload []byte) {
     if err := fromgameserver.ParseChangeWaitTypePacket(
         &gc.changeWait, payload); err != nil {
@@ -474,7 +456,6 @@ func (gc *GameClient) applyChangeWaitType(payload []byte) {
     }
 }
 
-// applyTeleport parses TeleportToLocation and snaps the object.
 func (gc *GameClient) applyTeleport(payload []byte) {
     if err := fromgameserver.ParseTeleportToLocationPacket(
         &gc.teleport, payload); err != nil {
@@ -546,7 +527,6 @@ func (gc *GameClient) applyTargetUnselected(payload []byte) {
     }
 }
 
-// applyItemList parses ItemList and replaces the tracked inventory.
 func (gc *GameClient) applyItemList(payload []byte) {
     err := fromgameserver.ParseItemListPacket(
         &gc.itemList, payload)
@@ -679,7 +659,6 @@ func (gc *GameClient) applyAbnormalStatusUpdate(payload []byte) {
     }
 }
 
-// applyInventoryUpdate parses InventoryUpdate and applies the changes.
 func (gc *GameClient) applyInventoryUpdate(payload []byte) {
     if err := fromgameserver.ParseInventoryUpdatePacket(
         &gc.invUpdate, payload); err != nil {

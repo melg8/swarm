@@ -64,7 +64,6 @@ var holdPollPeriod = 250 * time.Millisecond
 // production code (mutable package knobs read from goroutines).
 var holdKnobsMu sync.Mutex
 
-// holdTimings snapshots the hold tunables under the knob mutex.
 func holdTimings() (timeout time.Duration, poll time.Duration) {
     holdKnobsMu.Lock()
     defer holdKnobsMu.Unlock()

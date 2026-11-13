@@ -90,7 +90,6 @@ func nearestDay(clock time.Time, base time.Time) time.Time {
     return best
 }
 
-// absDuration returns the absolute value of a duration.
 func absDuration(d time.Duration) time.Duration {
     if d < 0 {
         return -d
@@ -99,7 +98,6 @@ func absDuration(d time.Duration) time.Duration {
     return d
 }
 
-// queryMatcher holds the compiled filters of one run.
 type queryMatcher struct {
     events map[string]bool
     match  *regexp.Regexp
@@ -157,7 +155,6 @@ func (m *queryMatcher) anchor(first record) error {
     return nil
 }
 
-// matchRecord reports whether the record passes every filter.
 func (m *queryMatcher) matchRecord(r record) bool {
     if m.filter.Bot != "" && r.B != m.filter.Bot {
         return false
@@ -179,7 +176,6 @@ func (m *queryMatcher) matchRecord(r record) bool {
     return true
 }
 
-// queryStats carries the run summary printed after the records.
 type queryStats struct {
     scanned int
     matched int
@@ -211,7 +207,6 @@ func RunQuery(path string, filter QueryFilter, out io.Writer) error {
     return nil
 }
 
-// queryRun is the streaming state of one RunQuery pass.
 type queryRun struct {
     matcher *queryMatcher
     out     io.Writer
@@ -225,7 +220,6 @@ type queryRun struct {
     limitHit    bool
 }
 
-// visit folds one scanned record.
 func (r *queryRun) visit(rec record) error {
     r.stats.scanned++
     if r.limitHit {
@@ -259,7 +253,6 @@ func (r *queryRun) visit(rec record) error {
     return nil
 }
 
-// trimBefore drops the records that fell out of the context window.
 func (r *queryRun) trimBefore(now int64) {
     if r.matcher.filter.Context <= 0 {
         return
@@ -274,7 +267,6 @@ func (r *queryRun) trimBefore(now int64) {
     }
 }
 
-// flushBefore prints the buffered preamble of a match.
 func (r *queryRun) flushBefore(matchAt int64) {
     cut := matchAt - int64(r.matcher.filter.Context.Seconds())
     for _, rec := range r.before {

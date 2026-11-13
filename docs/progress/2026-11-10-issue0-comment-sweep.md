@@ -2685,6 +2685,20 @@ corner probe is a length, not a leg at all.
   botlog (0.6 s) suites, `golangci-lint run` on the two paths 0 issues,
   `task fmt:check` clean.
 
+### 2026-11-13 - the restating session, proxy and connection docs
+
+- The same rule over the journal, the report writers, the recorder, the
+  relay and the dispatch table: the `push*`/`apply*`/`write*`/`send*`
+  one-liners restate their own signature and go. The docs that carry a
+  wire or lifecycle fact (the unencrypted Init packet, the pooled
+  payload buffer, the poison-once subscriber) stay.
+- 26 files, 159 comment lines fewer; the audit reads 16 657 of 170 192
+  (9.8 percent).
+- Verified: `task fmt`, `go build ./...`, the session (0.5 s), proxy
+  (6.9 s), connection (10.7 s) and cmd/swarm (0.1 s) suites,
+  `golangci-lint run` on the four paths 0 issues, `task fmt:check`
+  clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

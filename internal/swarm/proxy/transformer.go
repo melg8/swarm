@@ -24,12 +24,10 @@ type Transformer interface {
 // transits unchanged in both directions.
 type PassthroughTransformer struct{}
 
-// ServerToClient passes the payload through unchanged.
 func (PassthroughTransformer) ServerToClient(payload []byte) ([]byte, bool) {
     return payload, true
 }
 
-// ClientToServer passes the payload through unchanged.
 func (PassthroughTransformer) ClientToServer(payload []byte) ([]byte, bool) {
     return payload, true
 }

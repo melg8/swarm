@@ -67,7 +67,6 @@ func writeReportLive(b *strings.Builder, live *LiveView) {
         live.Status, live.Phase, live.X, live.Y)
 }
 
-// writeReportJourney writes the level curve and the experience pace.
 func writeReportJourney(b *strings.Builder, a *botAgg) {
     b.WriteString("== character journey ==\n")
     if len(a.levels) == 0 {
@@ -95,7 +94,6 @@ func writeReportJourney(b *strings.Builder, a *botAgg) {
     b.WriteString("\n")
 }
 
-// writeReportXPBuckets writes the hourly experience and adena deltas.
 func writeReportXPBuckets(b *strings.Builder, a *botAgg) {
     keys := hourKeys(a.hours)
     fmt.Fprintf(b, "  hour | level | xp gain | adena | kills | deaths\n")
@@ -158,7 +156,6 @@ func writeReportCombat(b *strings.Builder, a *botAgg) {
     b.WriteString("\n")
 }
 
-// writeReportDuration writes the fight duration statistics.
 func writeReportDuration(b *strings.Builder, a *botAgg) {
     p50, p90, p99 := percentiles(a.durHist, a.kills)
     fmt.Fprintf(b, "  fight duration: median %.1fs, p90 %.1fs, p99 %.1fs\n",
@@ -173,7 +170,6 @@ func writeReportDuration(b *strings.Builder, a *botAgg) {
     }
 }
 
-// writeReportMobs writes the per-mob aggregates sorted by kill count.
 func writeReportMobs(b *strings.Builder, a *botAgg) {
     names := make([]string, 0, len(a.mobs))
     for name := range a.mobs {
@@ -199,7 +195,6 @@ func writeReportMobs(b *strings.Builder, a *botAgg) {
     }
 }
 
-// writeReportDeaths writes the death list with the positions.
 func writeReportDeaths(b *strings.Builder, a *botAgg) {
     b.WriteString("== deaths ==\n")
     if len(a.deaths) == 0 {
@@ -217,7 +212,6 @@ func writeReportDeaths(b *strings.Builder, a *botAgg) {
     b.WriteString("\n")
 }
 
-// writeReportDowntime writes the trip and offline time attribution.
 func writeReportDowntime(b *strings.Builder, a *botAgg) {
     b.WriteString("== downtime ==\n")
     hours := timeSpanHours(a.first, a.last)
@@ -245,7 +239,6 @@ func writeReportDowntime(b *strings.Builder, a *botAgg) {
     b.WriteString("\n")
 }
 
-// writePhaseShare writes the sampled phase share of the window.
 func writePhaseShare(b *strings.Builder, a *botAgg, hours float64) {
     hunt, town, other := 0.0, 0.0, 0.0
     for _, bucket := range a.hours {
@@ -304,7 +297,6 @@ func writeReportStory(b *strings.Builder, a *botAgg) {
     b.WriteString("\n")
 }
 
-// hourKeys returns the sorted hour bucket keys.
 func hourKeys(hours map[int32]*hourBucket) []int32 {
     keys := make([]int32, 0, len(hours))
     for key := range hours {
@@ -350,17 +342,14 @@ func timeSpanHours(from int64, to int64) float64 {
     return float64(to-from) / 3600
 }
 
-// utc renders a unix second as RFC3339 UTC.
 func utc(t int64) string {
     return time.Unix(t, 0).UTC().Format(time.RFC3339)
 }
 
-// hhmm renders a unix second as HH:MM UTC.
 func hhmm(t int64) string {
     return time.Unix(t, 0).UTC().Format("15:04")
 }
 
-// durText renders a duration in seconds as a compact h/m/s string.
 func durText(sec float64) string {
     if sec < 0 {
         sec = 0
@@ -392,7 +381,6 @@ func groupDigits(v int64) string {
     return strings.Join(parts, " ")
 }
 
-// signPrefix renders the sign of a delta for the report lines.
 func signPrefix(v int64) string {
     if v < 0 {
         return "-"
@@ -401,7 +389,6 @@ func signPrefix(v int64) string {
     return "+"
 }
 
-// abs64 returns the absolute value of an int64.
 func abs64(v int64) int64 {
     if v < 0 {
         return -v

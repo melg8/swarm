@@ -41,7 +41,6 @@ const (
 // of a repeated line (object ids, coordinates, counters).
 var digitRun = regexp.MustCompile(`[0-9]+`)
 
-// patternStat accumulates one repeated story line shape.
 type patternStat struct {
     sample string
     count  int
@@ -49,14 +48,12 @@ type patternStat struct {
     last   int64
 }
 
-// reasonStat accumulates one repeated trip end reason.
 type reasonStat struct {
     count int
     first int64
     last  int64
 }
 
-// mobAnomaly summarizes the fights against one mob species.
 type mobAnomaly struct {
     name   string
     kills  int
@@ -70,7 +67,6 @@ type logoutCluster struct {
     count int
 }
 
-// anomalyBot is the streaming collector of one bot.
 type anomalyBot struct {
     id       string
     first    int64
@@ -96,7 +92,6 @@ type anomalyBot struct {
     storyMinutes map[int64]int
 }
 
-// newAnomalyBot builds the empty collector.
 func newAnomalyBot(id string) *anomalyBot {
     return &anomalyBot{
         id:           id,
@@ -150,7 +145,6 @@ func RunAnomalies(path string, out io.Writer) error {
     return nil
 }
 
-// visit folds one record into the scan.
 func (s *anomalyScan) visit(r record) error {
     s.total++
     if s.first == 0 {
@@ -179,7 +173,6 @@ func (s *anomalyScan) visit(r record) error {
     return nil
 }
 
-// apply folds one record of one bot.
 func (a *anomalyBot) apply(r record) {
     switch r.E {
     case kindStory:
@@ -235,7 +228,6 @@ func (a *anomalyBot) applyStory(r record) {
     stat.last = r.T
 }
 
-// applyKill folds one kill into the outlier and per-mob views.
 func (a *anomalyBot) applyKill(r record) {
     mob := a.mobs[r.Mob]
     if mob == nil {
@@ -253,7 +245,6 @@ func (a *anomalyBot) applyKill(r record) {
     }
 }
 
-// applyTripEnd folds one finished trip.
 func (a *anomalyBot) applyTripEnd(r record) {
     a.trips++
     stat := a.tripReasons[r.R]
@@ -279,7 +270,6 @@ func (a *anomalyBot) applyLost(r record) {
     }
 }
 
-// applySample folds one sample for the offline gap detection.
 func (a *anomalyBot) applySample(r record) {
     if a.lastSample != 0 && r.T-a.lastSample >= gapReportSec {
         gap := r.T - a.lastSample
@@ -289,7 +279,6 @@ func (a *anomalyBot) applySample(r record) {
     a.lastSample = r.T
 }
 
-// clusters splits the logout moments into bursts separated by gaps.
 func (a *anomalyBot) clusters() []logoutCluster {
     var clusters []logoutCluster
     for _, at := range a.logoutAt {
@@ -306,7 +295,6 @@ func (a *anomalyBot) clusters() []logoutCluster {
     return clusters
 }
 
-// medianLifetime returns the median session lifetime in seconds.
 func (a *anomalyBot) medianLifetime() int64 {
     if len(a.lifetimes) == 0 {
         return 0
@@ -317,7 +305,6 @@ func (a *anomalyBot) medianLifetime() int64 {
     return live[len(live)/2]
 }
 
-// churnCount returns the sessions shorter than the churn threshold.
 func (a *anomalyBot) churnCount() int {
     churn := 0
     for _, life := range a.lifetimes {
@@ -342,7 +329,6 @@ func (a *anomalyBot) mutedCount() int {
     return muted
 }
 
-// deathBursts returns the windows that hold a death streak.
 func (a *anomalyBot) deathBursts() []logoutCluster {
     var bursts []logoutCluster
     left := 0
@@ -368,7 +354,6 @@ func (a *anomalyBot) deathBursts() []logoutCluster {
     return bursts
 }
 
-// topPatterns returns the repeated decision shapes ranked by count.
 func (a *anomalyBot) topPatterns() []*patternStat {
     var stats []*patternStat
     for _, stat := range a.patterns {
@@ -399,7 +384,6 @@ func (a *anomalyBot) slowMobs() []*mobAnomaly {
     return mobs
 }
 
-// tripLoop is one repeated town trip end reason.
 type tripLoop struct {
     reason string
     stat   *reasonStat
@@ -455,7 +439,6 @@ type finding struct {
     drill    string
 }
 
-// anomalyRender renders the scan into the ranked plain text report.
 type anomalyRender struct {
     scan *anomalyScan
     path string
@@ -488,7 +471,6 @@ func (r *anomalyRender) write() {
     }
 }
 
-// collect builds every finding the scan supports.
 func (r *anomalyRender) collect() []finding {
     findings := make([]finding, 0, 16)
     for _, bot := range r.scan.order {

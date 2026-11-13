@@ -180,12 +180,10 @@ func lastSelfMovementSeq(entries []RecorderEntry, selfID int32) int64 {
     return last
 }
 
-// putInt32 writes a little endian int32 into the payload at offset.
 func putInt32(payload []byte, offset int, value int32) {
     binary.LittleEndian.PutUint32(payload[offset:], uint32(value))
 }
 
-// putFloat64 writes a little endian float64 into the payload at offset.
 func putFloat64(payload []byte, offset int, value float64) {
     binary.LittleEndian.PutUint64(payload[offset:], math.Float64bits(value))
 }

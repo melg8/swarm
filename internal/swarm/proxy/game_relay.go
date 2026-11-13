@@ -339,7 +339,6 @@ func (gc *gameConn) relayToClient(payload []byte) bool {
     }
 }
 
-// sendToClient queues one synthesized packet for the sender.
 func (gc *gameConn) sendToClient(payload []byte) error {
     select {
     case gc.outCh <- payload:

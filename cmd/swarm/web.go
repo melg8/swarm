@@ -58,7 +58,6 @@ func startWebInterface(
     return server
 }
 
-// shutdownWebInterface gracefully stops the web server.
 func shutdownWebInterface(server *webserver.Server) {
     if server == nil {
         return

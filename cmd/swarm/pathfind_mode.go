@@ -70,7 +70,6 @@ type navmeshShowFlag struct {
     enabled bool
 }
 
-// String renders the flag state for the -help listing.
 func (f *navmeshShowFlag) String() string {
     if !f.enabled {
         return "false"
@@ -269,7 +268,6 @@ func intersectTiles(mesh *navmesh.Mesh, requested []navmesh.RegionKey,
     return found
 }
 
-// detectGeodataDir picks the first candidate directory that exists.
 func detectGeodataDir() string {
     for _, candidate := range defaultGeodataCandidates {
         if info, err := os.Stat(candidate); err == nil && info.IsDir() {

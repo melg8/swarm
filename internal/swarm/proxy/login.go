@@ -63,7 +63,6 @@ const (
 // loginOpGGAuth is the opcode of the GGAuth server answer.
 const loginOpGGAuth = 0x0B
 
-// handleLoginConn runs the login server emulation for one client.
 func (s *Server) handleLoginConn(conn net.Conn) {
     id := s.nextConnID()
     lc := &loginConn{
@@ -89,7 +88,6 @@ func (s *Server) handleLoginConn(conn net.Conn) {
     }
 }
 
-// run drives the packet exchange until the client disconnects.
 func (lc *loginConn) run() error {
     if err := lc.sendInit(); err != nil {
         return fmt.Errorf("failed to send init: %w", err)
@@ -155,7 +153,6 @@ func (lc *loginConn) sendInit() error {
     return nil
 }
 
-// handlePacket dispatches one decrypted login packet of the client.
 func (lc *loginConn) handlePacket(content []byte) error {
     opcode := content[0]
     switch lc.state {
@@ -291,7 +288,6 @@ func (lc *loginConn) handleGGAuth(content []byte) error {
     return nil
 }
 
-// sendPacket serializes, seals and sends a login server packet.
 func (lc *loginConn) sendPacket(p crypt.Serializable) error {
     writer := packet.NewWriter()
     if err := p.ToBytes(writer); err != nil {
@@ -301,7 +297,6 @@ func (lc *loginConn) sendPacket(p crypt.Serializable) error {
     return lc.sendSealed(writer.Bytes())
 }
 
-// sendSealed seals raw content bytes and sends them.
 func (lc *loginConn) sendSealed(content []byte) error {
     wire, err := lc.crypt.Seal(lc.writeBuf, content)
     if err != nil {

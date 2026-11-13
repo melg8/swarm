@@ -113,7 +113,6 @@ func scanJournal(path string, visit func(record) error) error {
     return nil
 }
 
-// hasGzipExt reports whether the file name carries the gzip suffix.
 func hasGzipExt(path string) bool {
     return len(path) > 3 && path[len(path)-3:] == ".gz"
 }
@@ -158,7 +157,6 @@ func parseJournalWindow(
     return parsed, nil
 }
 
-// resolveWindow parses both bounds of a window against the anchor date.
 func resolveWindow(
     fromArg string, toArg string, base time.Time,
 ) ([2]time.Time, error) {
@@ -194,7 +192,6 @@ func insideWindow(t int64, from time.Time, to time.Time) bool {
     return true
 }
 
-// fold applies one record to the parsed aggregates.
 func (j *JournalFile) fold(r record) {
     switch r.E {
     case kindBuild:

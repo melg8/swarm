@@ -93,7 +93,6 @@ type botAgg struct {
     lastSample int64
 }
 
-// storyLine is one entry of the recent story ring.
 type storyLine struct {
     t   int64
     msg string
@@ -111,7 +110,6 @@ type sampleState struct {
     seen bool
 }
 
-// hourBucket aggregates one clock hour of samples and events.
 type hourBucket struct {
     kills   int
     deaths  int
@@ -127,13 +125,11 @@ type hourBucket struct {
     at      int64
 }
 
-// levelMark is one level up.
 type levelMark struct {
     t  int64
     lv int32
 }
 
-// deathMark is one character death.
 type deathMark struct {
     t  int64
     lv int32
@@ -149,7 +145,6 @@ type fightMark struct {
     dur float64
 }
 
-// mobStat accumulates the fights against one mob species.
 type mobStat struct {
     name    string
     count   int
@@ -166,7 +161,6 @@ type tripMark struct {
     dur    float64
 }
 
-// buyMark is one purchase batch.
 type buyMark struct {
     t     int64
     items string
@@ -174,7 +168,6 @@ type buyMark struct {
     cost  int64
 }
 
-// stallMark is one stagnation event.
 type stallMark struct {
     t   int64
     sec float64
@@ -196,7 +189,6 @@ type gapMark struct {
     sec float64
 }
 
-// newBotAgg builds the empty aggregate of one bot.
 func newBotAgg(id string) *botAgg {
     return &botAgg{
         id:            id,
@@ -377,7 +369,6 @@ func (a *botAgg) bucketOf(t int64) *hourBucket {
     return bucket
 }
 
-// bucketFirst seeds the first bucket of the trail.
 func (a *botAgg) bucketFirst(s *sampleState) {
     bucket := a.bucketOf(s.t)
     bucket.xpFirst = s.xp
@@ -498,7 +489,6 @@ func (a *botAgg) applyKill(r record) {
     }
 }
 
-// pushDeath records one death into the capped list and the bucket.
 func (a *botAgg) pushDeath(r record) {
     a.deaths = appendCapped(a.deaths,
         deathMark{t: r.T, lv: r.Lv, x: r.X, y: r.Y}, maxDeaths)
@@ -515,12 +505,10 @@ func (a *botAgg) pushLevel(r record) {
         levelMark{t: r.T, lv: r.Lv}, maxLevelMarks)
 }
 
-// openTrip remembers the running trip bracket.
 func (a *botAgg) openTrip(r record) {
     a.tripOpen = &tripMark{t: r.T, reason: r.R, dur: 0}
 }
 
-// closeTrip folds the finished trip into the counters.
 func (a *botAgg) closeTrip(r record) {
     if a.tripOpen == nil {
         return
@@ -539,14 +527,12 @@ func (a *botAgg) closeTrip(r record) {
     a.tripOpen = nil
 }
 
-// pushBuy records one purchase batch.
 func (a *botAgg) pushBuy(r record) {
     a.buys = appendCapped(a.buys, buyMark{
         t: r.T, items: r.Items, count: int(r.N), cost: r.Cost,
     }, maxBuys)
 }
 
-// pushStall records one stagnation event into the matching list.
 func (a *botAgg) pushStall(r record) {
     mark := stallMark{t: r.T, sec: r.Dur, x: r.X, y: r.Y}
     if r.R == "xp" {
@@ -557,7 +543,6 @@ func (a *botAgg) pushStall(r record) {
     a.posStalls = appendCapped(a.posStalls, mark, maxStalls)
 }
 
-// appendCapped appends to a slice keeping the newest limit entries.
 func appendCapped[T any](dst []T, entry T, limit int) []T {
     if len(dst) < limit {
         return append(dst, entry)

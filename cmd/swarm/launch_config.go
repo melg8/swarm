@@ -273,7 +273,6 @@ func (lc launchConfig) expand() []botPlan {
     return plans
 }
 
-// totalBots sums the composition counts.
 func (lc launchConfig) totalBots() int {
     total := 0
     for _, spec := range lc.Bots {

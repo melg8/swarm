@@ -63,7 +63,6 @@ func startProxy(cfg config) *proxy.Server {
     return server
 }
 
-// splitAddresses splits a comma separated flag value.
 func splitAddresses(value string) []string {
     addresses := strings.Split(value, ",")
     cleaned := make([]string, 0, len(addresses))
@@ -77,7 +76,6 @@ func splitAddresses(value string) []string {
     return cleaned
 }
 
-// shutdownProxy stops the client proxy.
 func shutdownProxy(server *proxy.Server) {
     if server == nil {
         return

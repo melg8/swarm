@@ -47,7 +47,6 @@ func DefaultLoginAddresses() []string {
     }
 }
 
-// DefaultGameAddresses is the game listener set of the default configuration.
 func DefaultGameAddresses() []string {
     return []string{DefaultGameAddress, GameFallbackAddress}
 }
@@ -95,7 +94,6 @@ type botSession struct {
     tracker  *state.Bot
 }
 
-// Option configures a proxy Server.
 type Option func(*Server)
 
 // WithLoginAddresses overrides the login listen addresses: the first entry is
@@ -116,7 +114,6 @@ func WithTransformer(t Transformer) Option {
     return func(s *Server) { s.transformer = t }
 }
 
-// NewServer creates the proxy bound to the default addresses.
 func NewServer(logger *log.Logger, opts ...Option) *Server {
     server := &Server{
         loginAddrs:     DefaultLoginAddresses(),
@@ -333,7 +330,6 @@ func (s *Server) sessionByID(id string) *botSession {
     return nil
 }
 
-// ClientCount returns the number of connected game clients.
 func (s *Server) ClientCount() int {
     return int(s.clients.Load())
 }
@@ -353,7 +349,6 @@ func (s *Server) gamePort() int32 {
     return gameProxyPort
 }
 
-// nextConnID numbers client connections for the log.
 func (s *Server) nextConnID() int64 {
     return s.connSeq.Add(1)
 }
@@ -415,7 +410,6 @@ func (s *Server) GameAddrs() []string {
     return s.boundGameAddrs()
 }
 
-// boundLoginAddrs lists the successfully bound login listener addresses.
 func (s *Server) boundLoginAddrs() []string {
     addrs := make([]string, 0, len(s.loginListeners))
     for _, listener := range s.loginListeners {
@@ -425,7 +419,6 @@ func (s *Server) boundLoginAddrs() []string {
     return addrs
 }
 
-// boundGameAddrs lists the successfully bound game listener addresses.
 func (s *Server) boundGameAddrs() []string {
     addrs := make([]string, 0, len(s.gameListeners))
     for _, listener := range s.gameListeners {
@@ -435,7 +428,6 @@ func (s *Server) boundGameAddrs() []string {
     return addrs
 }
 
-// Serve accepts and serves connections until the server is shut down.
 func (s *Server) Serve() error {
     <-s.done
 
@@ -530,17 +522,14 @@ func (s *Server) logBindHint(login bool, addr string) {
         addr)
 }
 
-// serveLoginListener accepts login server connections.
 func (s *Server) serveLoginListener(listener net.Listener) {
     s.serve(listener, s.handleLoginConn)
 }
 
-// serveGameListener accepts game server connections.
 func (s *Server) serveGameListener(listener net.Listener) {
     s.serve(listener, s.handleGameConn)
 }
 
-// Shutdown stops the proxy and closes the listeners.
 func (s *Server) Shutdown(_ context.Context) error {
     s.stopOnce.Do(func() { close(s.done) })
     for _, listener := range append(s.loginListeners, s.gameListeners...) {

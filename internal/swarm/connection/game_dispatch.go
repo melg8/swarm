@@ -42,7 +42,6 @@ func (gc *GameClient) handleServerPacket(payload []byte) {
     handler(gc, payload)
 }
 
-// packetHandler handles one inbound packet payload of the session.
 type packetHandler func(gc *GameClient, payload []byte)
 
 // packetRoutes is the declarative dispatch table of the session: one
@@ -131,7 +130,6 @@ func (gc *GameClient) handleLeaveWorld([]byte) {
     gc.logger.Println("Server confirmed leave world")
 }
 
-// handleServerClose logs the server shutdown notification.
 func (gc *GameClient) handleServerClose([]byte) {
     gc.logger.Println("Server is closing the connection")
 }
@@ -201,7 +199,6 @@ func (gc *GameClient) applyCreatureSay(payload []byte) {
     }
 }
 
-// applySocialAction parses SocialAction and forwards it to the tracker.
 func (gc *GameClient) applySocialAction(payload []byte) {
     if err := fromgameserver.ParseSocialActionPacket(
         &gc.socialAction, payload); err != nil {

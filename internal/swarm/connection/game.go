@@ -72,7 +72,6 @@ const (
     serverCloseID = 0x36
 )
 
-// GameSessionParams carries the login session keys for the game server.
 type GameSessionParams struct {
     Account    string
     LoginOkID1 int32
@@ -81,7 +80,6 @@ type GameSessionParams struct {
     PlayOkID2  int32
 }
 
-// CharacterParams describes the character the bot wants to play.
 type CharacterParams struct {
     Name      string
     Race      int32
@@ -92,7 +90,6 @@ type CharacterParams struct {
     Face      int32
 }
 
-// GameClient drives a game server session of the Mobius C1 protocol.
 type GameClient struct {
     conn           net.Conn
     crypt          *crypt.GameCrypt
@@ -272,7 +269,6 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
     return client, nil
 }
 
-// SetLogger overrides the default logger of the client.
 func (gc *GameClient) SetLogger(logger *log.Logger) {
     gc.logger = logger
 }
@@ -339,7 +335,6 @@ func (gc *GameClient) SendRaw(payload []byte) error {
     return nil
 }
 
-// PacketCount returns the number of packets received so far.
 func (gc *GameClient) PacketCount() int {
     return int(gc.packetCount.Load())
 }
@@ -405,7 +400,6 @@ func (gc *GameClient) readPacket(buf []byte) ([]byte, error) {
     return payload, nil
 }
 
-// gamePacket couples a received payload with its pooled buffer.
 type gamePacket struct {
     buf     *gameBuffer
     payload []byte
@@ -560,7 +554,6 @@ func (gc *GameClient) disconnect(announce bool) {
     _ = gc.conn.Close()
 }
 
-// drainPackets unblocks the reader goroutine and returns buffers to the pool.
 func drainPackets(packets <-chan gamePacket, readerDone <-chan struct{}) {
     for {
         select {

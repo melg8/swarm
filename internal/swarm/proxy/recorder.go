@@ -30,7 +30,6 @@ type Recorder struct {
     subscribers map[*Subscriber]struct{}
 }
 
-// RecorderEntry is one recorded packet with its sequence number.
 type RecorderEntry struct {
     seq     int64
     payload []byte
@@ -45,7 +44,6 @@ const (
     recorderMaxBytes        = 32 << 20
 )
 
-// NewRecorder creates an empty packet history.
 func NewRecorder() *Recorder {
     return &Recorder{
         mu:          sync.Mutex{},
@@ -133,7 +131,6 @@ func (r *Recorder) Closed() bool {
     return r.closed
 }
 
-// CloseSignal returns a channel closed when the recorder ends.
 func (r *Recorder) CloseSignal() <-chan struct{} {
     return r.closeSignal
 }
@@ -193,7 +190,6 @@ func (r *Recorder) Attach(afterSeq int64) ([]RecorderEntry, *Subscriber) {
     return snapshot, sub
 }
 
-// removeSubscriber drops a subscription of a detached client.
 func (r *Recorder) removeSubscriber(sub *Subscriber) {
     r.mu.Lock()
     defer r.mu.Unlock()
@@ -213,13 +209,11 @@ func (r *Recorder) Walk(fn func(seq int64, payload []byte) bool) {
     }
 }
 
-// Stats summarizes the history for logs.
 type Stats struct {
     Entries int
     Bytes   int
 }
 
-// Stats reports the current history size.
 func (r *Recorder) Stats() Stats {
     r.mu.Lock()
     defer r.mu.Unlock()
@@ -227,7 +221,6 @@ func (r *Recorder) Stats() Stats {
     return Stats{Entries: len(r.entries), Bytes: r.bytes}
 }
 
-// liveUpdate is one live packet handed to a subscriber.
 type liveUpdate struct {
     seq     int64
     payload []byte
@@ -238,7 +231,6 @@ type liveUpdate struct {
 // because skipping packets would corrupt its world view.
 const subscriberQueueSize = 1024
 
-// Subscriber receives the live packets of a recorder.
 type Subscriber struct {
     ch      chan liveUpdate
     poison  chan struct{}
