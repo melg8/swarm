@@ -12,30 +12,22 @@ import (
 
 const requestBuyItemPacketID = 0x1F
 
-// BuyItemEntry is one item of a buy request: the item template id
-// and the count to buy. The server resolves the object ids itself
-// and prices every entry from the buylist product price (the item
-// reference price when the list entry carries none) with the town
-// tax.
+// BuyItemEntry is one item of a buy request; the server resolves the object
+// ids itself and prices every entry from the buylist product price (the item
+// reference price when the list carries none) with the town tax.
 type BuyItemEntry struct {
     ItemID int32
     Count  int32
 }
 
-// RequestBuyItemPacket buys items from a shop buylist. The server
-// requires the selected target of the player to be the merchant of
-// the list within the interaction distance (250 units, see
-// RequestBuyItem.runImpl), answers with InventoryUpdate (the bought
-// items plus the adena removal), an ItemList, a StatusUpdate with
-// the new load and the system message of the spent adena. Buying
-// and selling share the transaction flood protector (10 seconds by
-// default), so buy and sell requests must be paced like the sell
-// batches.
-// Wire format (see RequestBuyItem.readImpl): [opcode 0x1F]
-// [listId: 4][count: 4] then count entries of
-// [itemId: 4][count: 4]. A size of more than 10000 items per
-// request is refused (PlayerConfig.MAX_ITEM_IN_PACKET guards the
-// executor).
+// RequestBuyItemPacket buys items from a shop buylist: the server requires
+// the merchant of the list as the selected target within the 250 unit
+// interaction distance, answers with InventoryUpdate, an ItemList, a
+// StatusUpdate and the spent adena message, and shares the transaction flood
+// protector with selling, so both pace alike (docs/protocol_description.md).
+// Wire format: [opcode 0x1F][listId: 4][count: 4] then count entries of
+// [itemId: 4][count: 4]; more than 10000 entries are refused
+// (PlayerConfig.MAX_ITEM_IN_PACKET).
 type RequestBuyItemPacket struct {
     ListID int32
     Items  []BuyItemEntry

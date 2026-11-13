@@ -19,27 +19,19 @@ const (
     // keyboard mode requests unless keyboard movement is enabled, so the
     // bot always walks in mouse mode.
     MoveModeMouse int32 = 1
-    // MoveModeCursorKeys is the movement mode the official client
-    // sends while the player walks with the arrow keys: the server
-    // arms the cursor key movement of the session
-    // (MoveToLocation.runImpl adopts the packet origin within the
-    // thousand unit window and latches the cursor key flag), and
-    // every ValidatePosition the session streams afterwards moves
-    // the character server-side without any click validation
-    // (ValidatePosition.runImpl syncs the claimed placement into the
-    // world and broadcasts it). A server whose geodata seals the
-    // standing cell answers no mouse click at all - the cursor key
-    // stream is the only movement that still walks (the 2026-09-14
-    // 15:10 report: even the official client stood frozen on the
-    // village plaza cell until the player walked it out with the
-    // arrows).
+    // MoveModeCursorKeys is the movement mode of the arrow keys: the server
+    // adopts the packet origin within the thousand unit window, latches the
+    // cursor key flag and syncs every later ValidatePosition claim into the
+    // world without a click validation. A cell whose geodata seals the mouse
+    // click answers only this stream (docs/hunting.md, the cursor key
+    // escape).
     MoveModeCursorKeys int32 = 0
 )
 
-// MoveToLocationRequestPacket asks the game server to walk the character
-// to a world point, exactly like a ground click of the official client.
-// The hunt loop uses it to run toward a drop before picking it up.
-// Wire format (see MoveToLocation.readImpl): [opcode 0x01][targetX: 4]
+// MoveToLocationRequestPacket walks the character to a world point like a
+// ground click of the official client (the hunt loop runs toward a drop with
+// it).
+// Wire format (MoveToLocation.readImpl): [opcode 0x01][targetX: 4]
 // [targetY: 4][targetZ: 4][originX: 4][originY: 4][originZ: 4]
 // [movementMode: 4].
 type MoveToLocationRequestPacket struct {

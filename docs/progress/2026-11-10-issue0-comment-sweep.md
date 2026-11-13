@@ -2304,6 +2304,24 @@ corner probe is a length, not a leg at all.
   (8.7 s) and navmesh (29.8 s) suites, `go vet ./cmd/navmesh-build/`,
   `golangci-lint run` on the four packages 0 issues.
 
+### 2026-11-13 - the buy, move and bypass docs keep the wire line
+
+- `packets/to_game_server/request_buy_item.go` keeps the buylist price
+  source with the town tax, the merchant target within 250 units, the
+  shared sell/buy flood protector and the 10000 entry packet cap; the
+  response list stays as one line. 24 of 73 become 16 of 65.
+- `packets/to_game_server/move_to_location.go` keeps the mouse mode
+  rule (keyboard requests are ignored unless keyboard movement is on)
+  and the cursor key escape pointer to `docs/hunting.md`; the wire
+  format keeps the reference class. 30 of 96 become 22 of 88.
+- `packets/to_game_server/request_bypass_to_server.go` keeps the
+  `npc_<objId>_Chat` and `npc_<objId>_teleport <list> <index>` bot
+  commands and the empty-command disconnect rule. 20 of 49 become 15
+  of 44.
+- Verified: `task fmt`, `go build ./...`, the packet suite (0.4 s),
+  `golangci-lint run ./internal/swarm/packets/...` 0 issues,
+  `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

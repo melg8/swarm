@@ -12,19 +12,14 @@ import (
 
 const requestBypassToServerPacketID = 0x21
 
-// RequestBypassToServer routes a html dialog bypass command to the
-// server (the gatekeeper teleport flow, the H-002 verification): the
-// client sends the bypass string the NpcHtmlMessage button carried,
-// the server runs the matching BypassHandler or the npc_ onBypass
-// feedback. The command shapes the bot uses:
-//
-//   - "npc_<objId>_Chat" opens the next html page of the npc.
-//   - "npc_<objId>_teleport <list> <index>" pays the fee and teleports
-//     to the destination of the teleporter list.
-//
-// Wire format: [opcode 0x21][command: null-terminated UTF-16LE].
-// Reference: org/l2jmobius/gameserver/network/clientpackets/
-// RequestBypassToServer.java (readImpl reads the single string).
+// RequestBypassToServer routes a html dialog bypass command to the server (the
+// gatekeeper teleport flow): the client sends the bypass string the
+// NpcHtmlMessage button carried, and the server runs the matching
+// BypassHandler or the npc onBypass feedback. The bot sends
+// "npc_<objId>_Chat" for the next page and "npc_<objId>_teleport <list>
+// <index>" to pay the fee and teleport.
+// Wire format: [opcode 0x21][command: null-terminated UTF-16LE]
+// (RequestBypassToServer.readImpl).
 type RequestBypassToServer struct {
     Command string
 }
