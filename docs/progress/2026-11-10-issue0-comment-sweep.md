@@ -2241,6 +2241,19 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - state/combat.go keeps the ring buffer reason
+
+- 5 blocks compress: the file keeps the feed contract (the Attack
+  swings plus the HP delta damage, the monotonic sequence the client
+  dedupes on), the append+trim arithmetic that motivated the ring (the
+  reallocation to 128 and the `[1:65]` reslice that keeps the cap) and
+  the zero allocation steady state of a hundred bots, the chronological
+  window walk and the "the Attack broadcast carries no damage value"
+  fact. A duplicated SPDX header that sat mid-file is removed. 39
+  comment lines of 160 become 26 of 146, no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
