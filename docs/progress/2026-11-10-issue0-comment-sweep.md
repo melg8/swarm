@@ -1896,6 +1896,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite,
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - cmd/swarm/flags.go keeps the flag semantics
+
+- 24 blocks compress: the file keeps the geodata and navmesh candidate
+  order and their homes, the dual pack view of `-navmesh-compare`, the
+  bare against tile-keyed `-show-navmesh`, the plan expansion (the same
+  composition from `-config` or `-bots`), the per-plan kite override
+  that switches the standing-archer baseline by config, the three
+  acceptance modes and their exit code, the derived acceptance log dir,
+  the journal post-mortem modes (report, query filters, anomalies), the
+  RFC3339 against bare 15:04 window, the hunt audit probe account and
+  the stride sampling, and the config fold-in rule (an explicit flag
+  wins over the file, a broken file refuses to launch). 96 comment
+  lines of 437 become 76 of 417.
+- Verified: `task fmt`, `go build ./...`, the cmd/swarm suite,
+  `golangci-lint run ./cmd/swarm/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

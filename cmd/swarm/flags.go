@@ -27,12 +27,11 @@ const (
     defaultProxyLogPath = "proxy.log"
 )
 
-// Candidate geodata directories, checked in order when -geodata is empty:
-// the relative server layouts first (the sandbox checkout next to the swarm
-// root keeps the server tree at l2j_mobius/L2J_Mobius_C1_HarbingersOfWar,
-// the reference Windows deployment runs the server straight from its
-// L2J_Mobius_C1_HarbingersOfWar/game folder, see AGENTS.md), then the bot
-// tree itself.
+// Candidate geodata directories, checked in order when -geodata is empty: the
+// bot tree first, then the relative server layouts (the sandbox checkout keeps
+// the server tree under l2j_mobius/L2J_Mobius_C1_HarbingersOfWar, the reference
+// Windows deployment runs it from its L2J_Mobius_C1_HarbingersOfWar/game
+// folder).
 var defaultGeodataCandidates = []string{
     filepath.Join("data", "geodata"),
     filepath.Join("..", "l2j_mobius", "L2J_Mobius_C1_HarbingersOfWar",
@@ -40,10 +39,9 @@ var defaultGeodataCandidates = []string{
     filepath.Join("L2J_Mobius_C1_HarbingersOfWar", "game", "data", "geodata"),
 }
 
-// Candidate navmesh tile directories, checked in order when -navmesh
-// is empty: the tiles are the offline output of cmd/navmesh-build and
-// live in the bot tree (data/navmesh is the documented default of the
-// build command), never in the server tree.
+// Candidate navmesh tile directories, checked in order when -navmesh is empty:
+// the tiles are the offline output of cmd/navmesh-build and live in the bot
+// tree (data/navmesh is the documented default), never in the server tree.
 var defaultNavmeshCandidates = []string{
     filepath.Join("data", "navmesh"),
 }
@@ -63,16 +61,15 @@ type config struct {
     testFightUIV1 bool
     geodataDir    string
     navmeshDir    string
-    // navmeshCompareDir is the -navmesh-compare flag: the second
-    // tile pack of the dual pack view (issue #59). The -show-navmesh
-    // viewer renders it in pane B beside the -navmesh pack of pane
-    // A, with the per tile poly diff and the compare pathfind.
+    // navmeshCompareDir is the -navmesh-compare flag: the second tile pack of
+    // the dual pack view. The -show-navmesh viewer renders it in pane B beside
+    // the -navmesh pack of pane A, with the per tile poly diff and the compare
+    // pathfind.
     navmeshCompareDir string
-    // navmeshShow is the -show-navmesh flag: the 3D mesh viewer mode
-    // over the navmesh tile directory. A bare -show-navmesh loads
-    // every tile stitched together, -show-navmesh=21_19 (comma
-    // separated col_row keys) opens the named tiles only; the route
-    // queries always run over the full directory mesh.
+    // navmeshShow is the -show-navmesh flag: the 3D mesh viewer mode. A bare
+    // flag loads every tile stitched together, -show-navmesh=21_19 (comma
+    // separated col_row keys) opens the named tiles only; the route queries
+    // always run over the full directory mesh.
     navmeshShow navmeshShowFlag
     maxPassable uint
     proxy       bool
@@ -80,90 +77,74 @@ type config struct {
     proxyGame   string
     proxyLog    string
     bots        int
-    // configPath is the -config flag: the launch configuration file
-    // driving the shared parameters and the fleet composition (see
-    // launch_config.go). Empty keeps the plain flag defaults.
+    // configPath is the -config flag: the launch configuration file driving the
+    // shared parameters and the fleet composition (see launch_config.go).
     configPath string
-    // botPlans is the expanded fleet composition (classicFleetPlan /
-    // launchConfig.expand): the account and the bot type of every
-    // fleet slot, whatever the origin of the composition (the
-    // -config file or the plain -bots count). Nil until the launch
-    // normalization fills it.
+    // botPlans is the expanded fleet composition: the account and the bot type
+    // of every slot, whatever the origin (the -config file or the plain -bots
+    // count). Nil until the launch normalization fills it.
     botPlans []botPlan
-    // botType is the type of the bot this configuration launches
-    // ("fighter" today): the fleet goroutine and the single bot path
-    // set it from their plan slot, the future per-type behaviors (the
-    // archer of issue #13) branch on it.
+    // botType is the type of the bot this configuration launches: the fleet
+    // goroutine and the single bot path set it from their plan slot, and the
+    // per-type behaviors branch on it.
     botType string
-    // kite is the per-plan kite fight override (the "kite" section
-    // of the bot spec, owner issue #29): nil keeps the shipped
-    // tuning of DefaultKiteParams, a set section overrides the
-    // named knobs for this bot whole - the standing-archer baseline
-    // and the tuned profile switch by config, not by rebuild. The
-    // fleet goroutine and the single bot path set it from their plan
-    // slot next to the bot type.
+    // kite is the per-plan kite fight override (the "kite" section of the bot
+    // spec): nil keeps the shipped DefaultKiteParams, a set section overrides
+    // the named knobs for this bot whole, so the standing-archer baseline and
+    // the tuned profile switch by config, not by rebuild. The fleet goroutine
+    // and the single bot path set it from their plan slot.
     kite *botKiteSpec
-    // acceptanceRun selects the headless acceptance test mode: the
-    // process launches no fleet bot supervisor, just the acceptance
-    // manager and the requested scenario. "list" prints the available
-    // scenario ids and exits; "all" runs every scenario in order, a
-    // specific id runs just that one. The exit code reflects the
-    // outcome (0 for a pass, 1 for a fail).
+    // acceptanceRun selects the headless acceptance test mode: no fleet
+    // supervisor, just the acceptance manager and the requested scenario.
+    // "list" prints the available ids, "all" runs every scenario in order, a
+    // specific id runs that one; the exit code is 0 on a pass.
     acceptanceRun string
     // sessionDir is the directory of the persistent session journal
     // ("logs" by default, empty disables the journal entirely).
     sessionDir string
-    // acceptanceLogDir is the directory of the per-run acceptance
-    // bot logs (the hyper-detailed trail of every scenario run: the
-    // test contract, the environment, every packet, every monitor
-    // verdict). Empty derives "<session-dir>/acceptance" (or
-    // "logs/acceptance" when the journal is off), "off" disables
-    // the run logs.
+    // acceptanceLogDir is the directory of the per-run acceptance bot logs (the
+    // trail of every run: the test contract, the environment, every packet,
+    // every monitor verdict). Empty derives "<session-dir>/acceptance", "off"
+    // disables them.
     acceptanceLogDir string
-    // sessionReport renders the compact session report of a journal
-    // file to stdout and exits (the post-mortem path: the run may be
-    // long over, the journal file carries the story).
+    // sessionReport renders the compact session report of a journal file and
+    // exits: the run may be long over, the journal file carries the story.
     sessionReport string
-    // sessionQuery streams the records of a journal file through the
-    // drill-down filters below and exits: the grep of the journal.
+    // sessionQuery streams the records of a journal file through the drill-down
+    // filters: the grep of the journal.
     sessionQuery string
-    // sessionAnomalies scans a journal file for the ranked behavior
-    // findings of a long run and exits: the "where to look" tool
-    // every deep analysis starts from.
+    // sessionAnomalies scans a journal file for the ranked behavior findings of
+    // a long run: the "where to look" tool every deep analysis starts from.
     sessionAnomalies string
-    // queryFrom and queryTo bound the record window of the query and
-    // the report: RFC3339 timestamps or bare 15:04 clocks resolved
-    // against the first record date.
+    // queryFrom and queryTo bound the window: RFC3339 timestamps or bare 15:04
+    // clocks resolved against the first record date.
     queryFrom string
     queryTo   string
-    // queryEvents restricts the query to a comma separated list of
-    // journal event kinds (kill, death, story, ...).
+    // queryEvents restricts the query to a list of journal event kinds (kill,
+    // death, story).
     queryEvents string
-    // queryMatch is a regular expression over the story text and the
-    // reason fields of the query.
+    // queryMatch is a regular expression over the story text and the reason
+    // fields.
     queryMatch string
-    // queryContext prints the records within this duration around
-    // every query match.
+    // queryContext prints the records within this duration around every match.
     queryContext time.Duration
     // queryLimit caps the printed query records.
     queryLimit int
-    // huntAudit runs the live hunting ground audit and exits: the
-    // probe character visits every cell focus of the registry and
-    // the JSON evidence file collects what it actually sees.
+    // huntAudit runs the live hunting ground audit: the probe character visits
+    // every cell focus of the registry and the JSON evidence file collects what
+    // it sees.
     huntAudit string
     // auditWait is the knownlist settle window of every audit visit.
     auditWait time.Duration
-    // auditAccount names the probe account of the audit (the password
-    // equals the account name, the character shares it).
+    // auditAccount names the probe account (the password and the character
+    // share it).
     auditAccount string
-    // auditAnchors optionally overrides the audited positions per
-    // spot id (the verification pass of the regenerated geometry).
+    // auditAnchors overrides the audited positions per spot id.
     auditAnchors string
-    // auditFilter audits only the spots whose id contains one of the
-    // comma separated substrings.
+    // auditFilter audits only the spots whose id holds one of the listed
+    // substrings.
     auditFilter string
-    // auditStride audits every Nth spot (0 or 1 audits every spot):
-    // the stratified sampling of a verification pass.
+    // auditStride audits every Nth spot (0 or 1 audits every spot).
     auditStride int
     // auditFresh drops the resume state of the audit evidence file.
     auditFresh bool
@@ -392,11 +373,10 @@ func parseFlags() config {
             "everything)")
     flag.Parse()
 
-    // The launch configuration file folds in after the flag parse:
-    // an explicitly set flag wins over the file (flag.Visit names
-    // them), an omitted file field keeps its flag default, and a
-    // broken file refuses to launch (a typo'd key silently falling
-    // back to a default is the worst failure mode a config can have).
+    // The launch configuration file folds in after the flag parse: an explicit
+    // flag wins (flag.Visit names them), an omitted field keeps its default,
+    // and a broken file refuses to launch, since a typo'd key falling back to a
+    // default is the worst config failure.
     if cfg.configPath != "" {
         lc, err := loadLaunchConfig(cfg.configPath)
         if err != nil {
@@ -411,9 +391,9 @@ func parseFlags() config {
     return cfg
 }
 
-// registerProxyFlags declares the client proxy flags. The listener
-// defaults answer the hardcoded auth port 2106 of the classic C1 exe on
-// both loopback addresses (see proxy.DefaultLoginAddresses).
+// registerProxyFlags declares the client proxy flags: the listener defaults
+// answer the hardcoded auth port 2106 of the classic C1 exe on both loopback
+// addresses.
 func registerProxyFlags(cfg *config) {
     flag.BoolVar(&cfg.proxy, "proxy", false,
         "run the MITM proxy for real C1 clients: an emulated login "+
