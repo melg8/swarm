@@ -15,53 +15,45 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The class transfer scenario (T-016, the M2 acceptance vehicle): a
-// DB-injected level 20 elven fighter at Gludio drives the Q00406
-// chain of hunt/quest_chains.go end to end through the quest trip
-// engine - the accept, the skeleton hunt of the Ruins of Agony, the
-// Bella teleport to Gludin, the Ol Mahum hunt, the Kluto talks, the
-// Richlin teleport back, the closing Sorius talk - then walks to the
-// grand master Rains and drives the class change route. The pass
-// line of M2: the tracker reports SelfClassID 19 (Elven Knight) and
-// the character selection packet of a fresh login agrees.
+// The class transfer scenario (the M2 acceptance vehicle): a DB-injected level
+// 20 elven fighter at Gludio drives the Q00406 chain of hunt/quest_chains.go
+// end to end through the quest trip engine - the accept, the skeleton hunt of
+// the Ruins of Agony, the Bella teleport to Gludin, the Ol Mahum hunt, the
+// Kluto talks, the Richlin teleport back, the closing Sorius talk - then walks
+// to the grand master Rains for the class change. The pass line: the tracker
+// reports SelfClassID 19 (Elven Knight) and the character selection packet of a
+// fresh login agrees.
 const (
     classTransferScenarioID = "class-transfer"
     classTransferAccount    = "temp9"
     classTransferPassword   = "temp9"
-    // classTransferTimeout bounds the whole run: the kill stages walk
-    // 37 000 unit segments twice each, farm 20 pieces at a 50-70 percent
-    // drop rate, two gatekeeper teleports bridge the towns and the
-    // closing chain talks pace their bypasses - an hour and a half
-    // holds the honest run with the re-plans inside.
+    // classTransferTimeout bounds the run: the kill stages walk 37 000 unit
+    // segments twice each and farm 20 pieces at a 50-70 percent drop; an hour
+    // and a half holds it.
     classTransferTimeout = 90 * time.Minute
-    // classTransferLevel is the injected level: 20 passes the
-    // Q00406 start gate (the 05 event checks level < 19) and the
-    // ElfHumanFighterChange1 class change gate (level < 20).
+    // classTransferLevel 20 passes the Q00406 start gate (level < 19) and the
+    // ElfHumanFighterChange1 gate (level < 20).
     classTransferLevel = 20
-    // classTransferClassID is the resulting first profession of the
-    // chain under test: 19, the Elven Knight.
+    // classTransferClassID is the resulting first profession: 19, the Elven
+    // Knight.
     classTransferClassID = 19
-    // classTransferReloginWait is the pause between the session
-    // teardown and the fresh login of the char list verification:
-    // the server stores the character of a closed socket within a
-    // moment, the bound covers the flush.
+    // classTransferReloginWait covers the character flush of a closed socket
+    // before the fresh login of the char list verification.
     classTransferReloginWait = 5 * time.Second
 )
 
-// The Gludio injection geometry: the character wakes on the
-// approach ring south of Master Sorius (GludioNPCs.xml: -13440
-// 122643 -3103), 150 units off his cell - inside the server
-// interaction distance without standing on the trainer hall
-// interior cell itself (the roof rule of the teacher approach).
+// The Gludio injection geometry: the character wakes 150 units south of Master
+// Sorius (GludioNPCs.xml: -13440 122643 -3103), inside the interaction distance
+// without standing on the trainer hall interior cell (the roof rule of the
+// teacher approach).
 const (
     soriusApproachX = -13440
     soriusApproachY = 122493
     soriusApproachZ = -3103
 )
 
-// questNpcTemplateOffset mirrors the NpcInfo template id space of
-// the world tracker: the hunt chain data carries the npcdata
-// display ids, the tracker stores display id + 1000000.
+// questNpcTemplateOffset mirrors the NpcInfo template id space: the chain data
+// carries the npcdata display ids, the tracker stores display id + 1000000.
 const questNpcTemplateOffset = 1000000
 
 // The condition ids of the staged checks.
@@ -78,18 +70,15 @@ const (
     checkCharListClass   = "char-list-class"
 )
 
-// questNpcFindWait bounds the wait for the quest npc to appear in
-// the world store (the spawn packets of the world entry flood in
-// within the first seconds).
+// questNpcFindWait bounds the wait for the quest npc to appear in the world
+// store.
 const questNpcFindWait = 30 * time.Second
 
-// classTransferItems is the injected starter kit of the kill stages:
-// the Falchion sword, the Kite shield, the Bone armor set and the
-// Anguish jewels - the dress the Dion shops of the 20-25 band sell
-// to a character of this level (docs/shopping_strategy.md), with
-// the healing potions of the transit fights (the C1 Lesser Healing
-// Potion is a slow heal over time with a ten second reuse, so the
-// stock carries enough rounds for the whole hunt).
+// classTransferItems is the injected kit of the kill stages: the Falchion
+// sword, the Kite shield, the Bone armor set and the Anguish jewels the Dion
+// shops of the 20-25 band sell (docs/shopping_strategy.md), plus the transit
+// healing potions (the C1 Lesser Healing Potion heals slowly with a ten second
+// reuse).
 var classTransferItems = []ResetItem{
     {ItemID: 68, Count: 1},    // Falchion
     {ItemID: 629, Count: 1},   // Kite Shield
@@ -104,10 +93,9 @@ var classTransferItems = []ResetItem{
     {ItemID: 1060, Count: 30}, // Lesser Healing Potion
 }
 
-// classTransferReset builds the start state of the class transfer
-// scenario: the level 20 elven fighter with the milestone wallet
-// (the two gatekeeper teleports cost 14 600 adena of it) and the
-// D-grade dress in the bag, standing on Sorius's approach ring.
+// classTransferReset builds the start state: the level 20 elven fighter with
+// the milestone wallet (the two gatekeeper teleports cost 14 600 adena) and the
+// D-grade dress in the bag on Sorius's approach ring.
 func classTransferReset() characterReset {
     gain := elvenFighterVitals[classTransferLevel-1]
 
@@ -192,13 +180,10 @@ func classTransferChecks() []Check {
     }
 }
 
-// classTransferScenario runs the full M2 acceptance: the injection,
-// the world entry on the Sorius approach ring, the dress-up from the
-// bag, the whole Q00406 chain through the quest trip engine (the
-// kill stages with the segment walks and the rests, the two
-// gatekeeper town hops), the Rains class change route and the double
-// class id verification (the live tracker and the character
-// selection packet of a fresh login).
+// classTransferScenario runs the full M2 acceptance: the injection, the world
+// entry on the Sorius ring, the dress-up, the Q00406 chain through the quest
+// trip engine, the Rains class change and the double class id verification (the
+// live tracker and the character selection packet of a fresh login).
 func classTransferScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(classTransferChecks())
@@ -241,11 +226,10 @@ func classTransferScenario(ctx context.Context, m *Manager, t *Test) error {
     return classTransferDrive(ctx, m, test, tracker, session)
 }
 
-// classTransferDrive runs the full quest segment of the scenario: the
-// dress-up, the chain drive of the quest trip engine (the journal
-// cond ladder with the kill stages, the rests and the two town
-// transfers), the Rains class change and the double verification,
-// ending with the graceful teardown and the metrics row.
+// classTransferDrive runs the quest segment: the dress-up, the chain drive (the
+// journal cond ladder with the kill stages and the two town transfers), the
+// Rains class change, the double verification and the graceful teardown with
+// the metrics row.
 func classTransferDrive(
     ctx context.Context, m *Manager, test *Test, tracker *state.Bot,
     session *classTransferSession,
@@ -253,16 +237,14 @@ func classTransferDrive(
     chain := hunt.ElvenKnightChain()
     start := time.Now()
 
-    // The manual hunt loop of the session (no autonomy - the elven
-    // zone machinery would drag the character home) with the
-    // geodata navigator of the manager behind the segment walks.
+    // The manual hunt loop (no autonomy: the elven zone machinery would drag
+    // the character home) with the geodata navigator behind the segment walks.
     loop := hunt.NewLoop(session.game, tracker)
     loop.SetAutonomy(false)
     loop.SetNavigator(hunt.NewNavigator(m.engine))
     loop.SetLogger(sessionLogger(tracker, test.appendLog))
 
-    // The dress-up: the injected bag holds the D-grade set, the
-    // kill stages stand on it.
+    // The dress-up: the kill stages stand on the injected D-grade set.
     if err := loop.EquipBaggedGear(); err != nil {
         return classTransferAbort(test, tracker, session, start,
             "the dress-up: "+err.Error())
@@ -279,9 +261,9 @@ func classTransferDrive(
         "object %d at (%d, %d, %d)", sorius.ObjectID, sorius.X,
         sorius.Y, sorius.Z))
 
-    // The chain drive runs the accept, the kill stages, the talks
-    // and the two gatekeeper transfers; the per-cond observer below
-    // flips the stage checks as the journal advances.
+    // The chain drive runs the accept, the kill stages, the talks and the two
+    // gatekeeper transfers; the cond observer flips the stage checks as the
+    // journal advances.
     go observeClassTransferCond(ctx, tracker, test)
 
     if err := loop.DriveQuestChain(ctx, chain); err != nil {
@@ -324,9 +306,9 @@ func classTransferDrive(
         start)
 }
 
-// driveClassChange walks to the grand master and drives the change
-// route of the dialog walker (the static villagemaster page entry,
-// the three links of the change segment).
+// driveClassChange walks to the grand master and drives the change route of the
+// dialog walker (the static villagemaster entry, the three links of the change
+// segment).
 func driveClassChange(
     loop *hunt.Loop, rains state.AttackTarget, change hunt.ClassChange,
 ) error {
@@ -338,9 +320,8 @@ func driveClassChange(
     return loop.DriveDialog(rains.ObjectID, change.Route)
 }
 
-// observeClassTransferCond watches the quest journal of the tracker
-// and flips the stage checks as the cond ladder advances (the
-// observer runs until the scenario context dies).
+// observeClassTransferCond flips the stage checks as the cond ladder advances,
+// until the scenario context dies.
 func observeClassTransferCond(
     ctx context.Context, tracker *state.Bot, test *Test,
 ) {
@@ -367,9 +348,9 @@ func observeClassTransferCond(
     }
 }
 
-// classTransferReloginVerify closes the session gracefully, logs in
-// again and reads the class id of the character selection packet:
-// the persisted class change of the server (the M2 criterion).
+// classTransferReloginVerify closes the session gracefully, logs in again and
+// reads the class id of the character selection packet: the persisted change
+// (the M2 criterion).
 func classTransferReloginVerify(
     _ context.Context, m *Manager, test *Test, tracker *state.Bot,
     session *classTransferSession, start time.Time,
@@ -432,8 +413,7 @@ func verifyCharListClassID(m *Manager) (int32, error) {
     return info.BaseClassID, nil
 }
 
-// classTransferAbort tears a failed drive down and writes the FAIL
-// metrics row of the stage.
+// classTransferAbort tears a failed drive down and writes the FAIL metrics row.
 func classTransferAbort(
     test *Test, tracker *state.Bot, session *classTransferSession,
     start time.Time, reason string,
@@ -446,8 +426,7 @@ func classTransferAbort(
     return errors.New(reason)
 }
 
-// classTransferPass writes the PASS metrics row of the full run (the
-// session itself is already down).
+// classTransferPass writes the PASS metrics row of the full run.
 func classTransferPass(
     test *Test, tracker *state.Bot, start time.Time,
 ) error {
@@ -458,12 +437,12 @@ func classTransferPass(
     return nil
 }
 
-// questCondWait bounds the journal flip watch (the QuestList push
-// follows the event immediately; the bound covers a slow tick).
+// questCondWait bounds the journal flip watch: the QuestList push follows the
+// event, the bound covers a slow tick.
 const questCondWait = 10 * time.Second
 
-// awaitSelfClassID waits until the tracker reports the wanted class
-// id of the played character (the UserInfo broadcast of the change).
+// awaitSelfClassID waits for the UserInfo broadcast that flips the class of the
+// character.
 func awaitSelfClassID(
     ctx context.Context, tracker *state.Bot, want int32,
     wait time.Duration, test *Test,
@@ -491,8 +470,7 @@ func awaitSelfClassID(
     }
 }
 
-// awaitQuestNpc waits for the quest npc to appear in the world
-// store (the spawn packets of the world entry).
+// awaitQuestNpc waits for the quest npc to appear in the world store.
 func awaitQuestNpc(
     ctx context.Context, tracker *state.Bot, npc hunt.QuestNpc,
     wait time.Duration, test *Test,
@@ -525,19 +503,16 @@ func awaitQuestNpc(
     }
 }
 
-// classTransferSession is the manual session of the scenario: the
-// game client handle the dialog walker drives, the cancel that
-// ends the receive loop and the done channel of its exit.
+// classTransferSession is the manual session: the game client handle the dialog
+// walker drives, the cancel and the done channel.
 type classTransferSession struct {
     game   *connection.GameClient
     cancel context.CancelFunc
     done   chan error
 }
 
-// startClassTransferSession opens the game session of the scenario
-// (the world entry under the scenario context) without the hunt
-// autonomy: the scenario itself drives the dialog walker through
-// the game handle.
+// startClassTransferSession opens the session without hunt autonomy: the
+// scenario itself drives the dialog walker through the game handle.
 func startClassTransferSession(
     ctx context.Context, m *Manager, tracker *state.Bot,
     logLine func(string),
@@ -577,9 +552,8 @@ func startClassTransferSession(
     return &classTransferSession{game: game, cancel: cancel, done: done}, nil
 }
 
-// writeClassTransferOutcomeMetrics appends the staged metrics row
-// of the scenario (the scenario id carries the stage context, the
-// quest gate of the stage rides the fail reason).
+// writeClassTransferOutcomeMetrics appends the metrics row; the fail reason
+// names the stage.
 func writeClassTransferOutcomeMetrics(
     test *Test, tracker *state.Bot, failed bool, elapsed time.Duration,
     reason string,
@@ -603,8 +577,7 @@ func writeClassTransferOutcomeMetrics(
     })
 }
 
-// writeClassTransferFailMetrics appends the fail row of a setup
-// failure (the numeric fields zero).
+// writeClassTransferFailMetrics appends the fail row of a setup failure.
 func writeClassTransferFailMetrics(test *Test, reason string) {
     writeSoakMetrics(test, soakMetrics{
         Date:        nowUTC(),

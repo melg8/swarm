@@ -1756,6 +1756,25 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the gear suite (0.4 s),
   `golangci-lint run ./internal/swarm/gear/...` 0 issues.
 
+### 2026-11-13 - acceptance/class_transfer.go keeps the M2 contract
+
+- 27 blocks compress: the scenario keeps the Q00406 chain order (the
+  accept, the Ruins of Agony skeleton hunt, the Bella teleport to
+  Gludin, the Ol Mahum hunt, the Kluto talks, the Richlin teleport
+  back, the Sorius talk, the Rains class change) and the pass line
+  (SelfClassID 19 and the character selection packet of a fresh login
+  agreeing), the 90 minute budget with the 37 000 unit kill stage walks
+  and the 50-70 percent drop over 20 pieces, the level 20 gates
+  (Q00406 needs < 19, ElfHumanFighterChange1 needs < 20), the Sorius
+  injection ring 150 units south of -13440 122643 -3103, the
+  `questNpcTemplateOffset` 1000000 display to template id shift, the
+  injected kit and the 14 600 adena teleport cost, the 10 second
+  Lesser Healing Potion reuse and the manual loop (the elven zone
+  machinery would walk the character home). 148 comment lines of 622
+  become 78 of 595.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
