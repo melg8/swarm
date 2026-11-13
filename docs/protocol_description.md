@@ -578,6 +578,20 @@ already known from the StopMove broadcasts of the arrival, so the tracker
 must not snap the picker to these coordinates - it teleported the marker
 across the map on every pickup.
 
+### UserInfo (0x04) wire format
+
+`[opcode 0x04][x: 4][y: 4][z: 4][vehicleId: 4][objectId: 4][name: str]`
+`[race: 4][female: 4][baseClass: 4][level: 4][exp: 4][STR: 4][DEX: 4]`
+`[CON: 4][INT: 4][WIT: 4][MEN: 4][maxHp: 4][curHp: 4][maxMp: 4][curMp: 4]`
+`[sp: 4][curLoad: 4][maxLoad: 4][weaponFlag: 4][15 paperdoll object ids]`
+`[15 paperdoll display ids][12 combat stat ints][runSpd: 4][walkSpd: 4]`
+`[swim and fly speeds: 24][moveMultiplier: 8]` followed by appearance
+fields, matching `UserInfo.writeImpl` of the Mobius C1 sources.
+
+The transmitted `runSpd` and `walkSpd` are base values: the server
+divides the real speeds by the move multiplier before writing them,
+so the effective speed is `runSpd * moveMultiplier`.
+
 ### UserInfo (0x04) paperdoll slots
 
 The inventory packets carry the template bodypart mask (an earring is

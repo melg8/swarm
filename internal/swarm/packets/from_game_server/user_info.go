@@ -12,41 +12,21 @@ import (
 
 const UserInfoPacketID = 0x04
 
-// Paperdoll slot count of the UserInfo paperdoll object id block (see
-// UserInfo.writeImpl: the server writes 15 slot ids, the last one is a
-// C1 duplicate of the right hand).
+// userInfoPaperdollSlots is the paperdoll object id block slot count (15, a C1
+// duplicate of the right hand).
 const userInfoPaperdollSlots = 15
 
-// UserInfo skipped field groups of the wire format, counted in bytes:
-// the weapon flag before the paperdoll block, the paperdoll display ids
-// and the combat stats after it, and the swim and fly speeds between
-// the walk speed and the move multiplier.
+// UserInfo skipped field groups of the wire format, counted in bytes: the
+// weapon flag, the paperdoll display ids with the combat stats, and the swim
+// and fly speeds.
 const (
     userInfoWeaponFlagSkip = 4
     userInfoStatsSkip      = 15*4 + 12*4
     userInfoSpeedTrail     = 24
 )
 
-// UserInfoPacket carries the state of the played character.
-// Wire format (see UserInfo.writeImpl): [opcode 0x04][x: 4][y: 4][z: 4]
-// [vehicleId: 4][objectId: 4][name: str][race: 4][female: 4][baseClass: 4]
-// [level: 4][exp: 4][STR: 4][DEX: 4][CON: 4][INT: 4][WIT: 4][MEN: 4]
-// [maxHp: 4][curHp: 4][maxMp: 4][curMp: 4][sp: 4][curLoad: 4][maxLoad: 4]
-// [weaponFlag: 4][15 paperdoll object ids][15 paperdoll display ids]
-// [12 combat stat ints][runSpd: 4][walkSpd: 4][swim and fly speeds: 24]
-// [moveMultiplier: 8] followed by appearance fields.
-//
-// The paperdoll object id block carries the equipped item of every slot
-// in the write order of the server: underwear, right ear, left ear,
-// neck, right finger, left finger, head, right hand, left hand, gloves,
-// chest, legs, feet, back and a C1 duplicate of the right hand (0 when
-// the slot is empty). It is the only source that tells WHICH ear or
-// finger slot an equipped jewel occupies, the inventory packets only
-// carry the bodypart mask of the item template.
-//
-// The transmitted runSpd and walkSpd are base values: the server divides
-// the real speeds by the move multiplier before writing them (see
-// UserInfo.writeImpl), so the effective speed is runSpd * moveMultiplier.
+// UserInfoPacket carries the state of the played character; the wire layout and
+// the base speed rule: docs/protocol_description.md.
 type UserInfoPacket struct {
     ObjectID           int32
     Name               string
@@ -108,9 +88,8 @@ func NewUserInfoPacket() *UserInfoPacket {
     }
 }
 
-// ParseUserInfoPacket reads the packet from payload bytes.
-// Linear wire-format field dispatch; splitting hurts the protocol
-// readability.
+// ParseUserInfoPacket reads the packet from payload bytes (the linear field
+// dispatch keeps the protocol readable).
 func ParseUserInfoPacket(p *UserInfoPacket, data []byte) error { //nolint:cyclop
     reader := packet.NewReader(data)
 
@@ -153,24 +132,21 @@ func ParseUserInfoPacket(p *UserInfoPacket, data []byte) error { //nolint:cyclop
     if err := reader.Skip(userInfoWeaponFlagSkip); err != nil {
         return fmt.Errorf("not enough bytes for user stats: %w", err)
     }
-    // The 15 paperdoll object ids tell the equipped item of every
-    // slot (the inventory packets only carry the template bodypart
-    // mask, which cannot tell the ear or finger slots apart).
+    // The 15 paperdoll object ids tell the equipped item of every slot (the
+    // inventory mask cannot tell the ear or finger slots apart).
     for index := range p.PaperdollObjectIDs {
         if p.PaperdollObjectIDs[index], err = reader.ReadInt32(); err != nil {
             return fmt.Errorf("failed to read paperdoll slot: %w", err)
         }
     }
-    // Skip the 15 paperdoll display ids and the 12 combat stat ints
-    // before the speeds.
+    // Skip the 15 paperdoll display ids and the 12 combat stat ints.
     if err := reader.Skip(userInfoStatsSkip); err != nil {
         return fmt.Errorf("not enough bytes for user stats: %w", err)
     }
     if err := readInt32Fields(reader, &p.RunSpeed, &p.WalkSpeed); err != nil {
         return fmt.Errorf("failed to read user speeds: %w", err)
     }
-    // Skip the two swim and the four fly speed ints (the fly pair is
-    // written twice by the server).
+    // Skip the two swim and the four fly speed ints (the fly pair twice).
     if err := reader.Skip(userInfoSpeedTrail); err != nil {
         return fmt.Errorf("not enough bytes for user speed trail: %w", err)
     }

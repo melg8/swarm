@@ -963,6 +963,18 @@ corner probe is a length, not a leg at all.
   gear package, `task lint:new`. `equip.go` fell from 38.5 to 24.6
   percent (82 comment lines of 333), no block above 8 lines.
 
+### 2026-11-13 - packets/from_game_server/user_info.go moves the wire layout to the doc
+
+- 7 blocks compress: the 20 line packet header, the paperdoll slot
+  count, the skipped field groups, the parser note and the three
+  inline skip notes. A new `### UserInfo (0x04) wire format` subsection
+  of `docs/protocol_description.md` carries the full field layout and
+  the base speed rule (the server divides the real speeds by the move
+  multiplier, so the effective speed is `runSpd * moveMultiplier`).
+- Verified: `task fmt`, `go build ./...`, the from_game_server
+  package, `task lint:new`. `user_info.go` fell from 23.4 to 11.9
+  percent (19 comment lines of 160), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -992,8 +1004,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `pathfind/navmesh/abstract.go`, `huntaudit/audit.go`,
 `cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go`,
 `acceptance/botlog/botlog.go`, `cmd/counterprobe/detect.go` and
-`hunt/recovery_heal.go`, `hunt/navmesh_navigator.go` and `hunt/equip.go`
-(second passes). Next: a fresh `task comment:audit --top 10` pick (the
+`hunt/recovery_heal.go`, `hunt/navmesh_navigator.go`, `hunt/equip.go`
+and `from_game_server/user_info.go` (second passes). Next: a fresh
+`task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
