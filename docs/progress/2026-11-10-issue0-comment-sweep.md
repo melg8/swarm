@@ -1482,6 +1482,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - hunt/town.go keeps the trip contract
+
+- 32 blocks compress, plus five prose trims (the abort streak, the
+  learning reason, the redundant gear debt line, the interaction handoff
+  and the default phase). The file keeps the `referencePrice/2` server
+  pricing, the 45 s weapon run against the five minute trip cooldown,
+  the 1200 s landed buff window, the `skillListWaitLimit` 10 s, the
+  SellFirst credit freeze, the exact mesh customer cell against the npc
+  segment fallback, the 2 damage fist rule, the trigger priority chain,
+  the attacker interrupt drop (no cooldown, junk and proceeds survive),
+  the nearestHalfZ destination z rule, the abort escalation base 2 and
+  the one hour cap. 161 comment lines of 573 become 131 of 543.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
