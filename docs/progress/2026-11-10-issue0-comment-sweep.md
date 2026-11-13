@@ -1119,6 +1119,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - archer_fleet.go, the audit evidence
+
+- 54 blocks compress, the file falls from 185 comment lines of 1030
+  (17.9 percent) to 147 of 992 (14.7 percent): the telemetry block
+  keeps the numbers (the 250 unit fight floor, the 1.65 s windup at
+  pAtkSpd 337, the 1500 unit drift leash, the 35 percent standing
+  ceiling, the level 7 maxima 214/82) and drops the prose around them,
+  and the fold notes keep the first-retreat-of-a-shot rule, the
+  mob-stand anchor and the evidence floors.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

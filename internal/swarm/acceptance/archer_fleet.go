@@ -20,30 +20,28 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The archer fleet acceptance scenario: five archer bots wake at five
-// cells of the elven Kaboo ground and farm a short window under the
-// kite contract; it answers which of the five behaviors the fleet does
-// not implement, per bot and for the fleet.
+// The archer fleet acceptance scenario: five archer bots wake at five cells of
+// the elven Kaboo ground and farm a short window under the kite contract; it
+// answers per bot and for the fleet which behaviors the fleet lacks.
 
 // archerFleetScenarioID is the scenario registry id.
 const archerFleetScenarioID = "archer-fleet"
 
-// archerFleetDefaultMinutes is the live window of the fleet audit: the
-// whole scenario must land under five minutes, and the measured launch
-// and teardown overhead is ~25 seconds, so three minutes ride ~3.4
-// minutes of wall clock.
+// archerFleetDefaultMinutes is the live window of the audit: the scenario must
+// land under five minutes, and the measured launch and teardown overhead is
+// ~25 s, so three minutes ride ~3.4 minutes of wall clock.
 const archerFleetDefaultMinutes = 3.0
 
 // archerFleetShutdownGrace bounds the teardown of the five sessions.
 const archerFleetShutdownGrace = 45 * time.Second
 
-// fleetOnlineBudget bounds the staggered five-slot launch: the measured
-// fifth slot lands ~13 seconds in, and the shared 90 s onlineWait
-// would push the window past the five minute ask.
+// fleetOnlineBudget bounds the staggered five-slot launch: the fifth slot lands
+// ~13 s in, and the shared 90 s onlineWait would push the window past five
+// minutes.
 const fleetOnlineBudget = 40 * time.Second
 
-// archerFleetSlotDesc is one fleet slot: the temp account and the
-// spawn cell focus the archer wakes on.
+// archerFleetSlotDesc is one fleet slot: the temp account and the spawn cell
+// focus.
 type archerFleetSlotDesc struct {
     Account string
     Cell    string
@@ -51,10 +49,9 @@ type archerFleetSlotDesc struct {
     Y       int32
 }
 
-// archerFleetSlots is the five-cell spread of the fleet: the mass 3+
-// Kaboo Orc cells of the south-west elven ground, far enough apart
-// that five hunt loops never share a mob pool, close enough to share
-// one terrain sheet (the spawn Z oracle stays honest).
+// archerFleetSlots is the five-cell spread: the mass 3+ Kaboo Orc cells of the
+// south-west elven ground, far enough apart that the loops never share a mob
+// pool, close enough to share one terrain sheet (the spawn Z oracle).
 var archerFleetSlots = []archerFleetSlotDesc{
     {Account: "temp20", Cell: "elven-hex-104", X: 36000, Y: 50229},
     {Account: "temp21", Cell: "elven-hex-106", X: 36000, Y: 51962},
@@ -63,16 +60,14 @@ var archerFleetSlots = []archerFleetSlotDesc{
     {Account: "temp24", Cell: "elven-hex-087", X: 37500, Y: 49363},
 }
 
-// archerFleetPassword answers the temp account password (the account
-// equals the password, the Mobius login auto-creates missing ones).
+// archerFleetPassword answers the temp account password (the account equals the
+// password, the Mobius login auto-creates missing ones).
 func archerFleetPassword(account string) string {
     return account
 }
 
-// The fleet telemetry thresholds mirror the kite constants and the
-// server bow cycle: the fight distance floor, the retreat lag ceiling,
-// the re-shot distance floor with the gap ceiling fallback, the drift
-// leash and the evidence floors.
+// The fleet telemetry thresholds mirror the kite constants and the server bow
+// cycle (docs/kite_timing_findings.md).
 const (
     fleetFightDistFloor  = 250.0
     fleetRetreatLagCeil  = 2200 * time.Millisecond
@@ -85,18 +80,16 @@ const (
     fleetTurnAngle       = 40.0
     fleetMinTurns        = 2
     fleetSamplePeriod    = 250 * time.Millisecond
-    // fleetWindupWindow mirrors the kite's accepted-move boundary (the
-    // measured windup end plus the safety lead, ~1.65 s at pAtkSpd 337,
-    // docs/kite_timing_findings.md): the one allowed standing.
+    // fleetWindupWindow mirrors the accepted-move boundary (the measured
+    // windup end plus the lead, ~1.65 s at pAtkSpd 337): the one allowed
+    // standing.
     fleetWindupWindow = 1650 * time.Millisecond
-    // fleetStandShareCeil bounds the avoidable standing share of a
-    // fight: the healthy rhythm books near zero, a standing fight
-    // (the hold, the recovery pause) reads above the ceiling.
+    // fleetStandShareCeil bounds the avoidable standing share of a fight: the
+    // healthy rhythm books near zero, a standing fight reads above it.
     fleetStandShareCeil = 0.35
 )
 
-// The fleet check ids: one per audited kite behavior plus the online
-// gate - the matrix the scenario prints names the missing ones.
+// The fleet check ids: one per audited kite behavior plus the online gate.
 const (
     checkFleetMaxRange = "max-range"
     checkFleetShoots   = "shoots"
@@ -146,8 +139,8 @@ func archerFleetChecks() []Check {
     }
 }
 
-// archerFleetDuration reads the SWARM_ARCHER_FLEET_MINUTES env and
-// returns the fleet window.
+// archerFleetDuration reads the SWARM_ARCHER_FLEET_MINUTES env and returns the
+// fleet window.
 func archerFleetDuration() time.Duration {
     minutes := archerFleetDefaultMinutes
     if raw := os.Getenv("SWARM_ARCHER_FLEET_MINUTES"); raw != "" {
@@ -160,28 +153,25 @@ func archerFleetDuration() time.Duration {
     return time.Duration(minutes * float64(time.Minute))
 }
 
-// archerFleetTimeout computes the scenario timeout: the window plus
-// the startup and the teardown, kept under the five minute ask (the
-// three minute window rides the fleet's own measured launch budget -
-// the shared 90 s online wait belongs to the single-bot scenarios).
+// archerFleetTimeout computes the scenario timeout: the window plus startup and
+// teardown, under the five minute ask (the fleet rides fleetOnlineBudget, not
+// the shared 90 s onlineWait of the single-bot scenarios).
 func archerFleetTimeout() time.Duration {
     return archerFleetDuration() + 2*ensurePause +
         fleetOnlineBudget + archerFleetShutdownGrace
 }
 
-// The fleet vitals: the server recomputes the level 7 elven fighter
-// maxima at login (214 HP / 82 MP whatever the reset row says), and a
-// lower curHp lands as a wounded start that spends the window
-// recovering instead of fighting.
+// The fleet vitals: the server recomputes the level 7 elven fighter maxima at
+// login (214 HP / 82 MP whatever the reset row says), and a lower curHp lands
+// as a wounded start that spends the window recovering.
 const (
     fleetLevel7MaxHP = 214
     fleetLevel7MaxMP = 82
 )
 
-// archerFleetReset returns the start state of one fleet slot: the
-// proven archer kit of the archer scenario woken on the slot focus
-// at the full level 7 vitals (the single-bot archer scenario keeps
-// its own gain-table start).
+// archerFleetReset returns the start state of one slot: the archer kit woken on
+// the slot focus at the full level 7 vitals (the single-bot scenario keeps its
+// own gain-table start).
 func archerFleetReset(slot archerFleetSlotDesc, z int32,
 ) characterReset {
     reset := archerKiteReset(slot.Account)
@@ -194,10 +184,10 @@ func archerFleetReset(slot archerFleetSlotDesc, z int32,
     return reset
 }
 
-// fleetSpawnZ answers the walkable height of a spawn focus through
-// the geodata click oracle: a short approach click onto the focus
-// snaps to the layer the server would walk. A missing engine or an
-// out-of-band answer falls back to the proven archer cell height.
+// fleetSpawnZ answers the walkable height of a spawn focus through the geodata
+// click oracle: an approach click onto the focus snaps to the layer the server
+// would walk. A missing engine or out-of-band answer falls back to
+// archerKiteSpawnZ.
 func fleetSpawnZ(engine *pathfind.Engine, x, y int32) int32 {
     if engine != nil {
         from := pathfind.Vec3{
@@ -213,9 +203,8 @@ func fleetSpawnZ(engine *pathfind.Engine, x, y int32) int32 {
     return archerKiteSpawnZ
 }
 
-// fleetSample is one observation of one fleet bot: the 250 ms monitor
-// tick latches the movement state, the last own shot stamp, the
-// position, the fight target and its ground position, and the health.
+// fleetSample is one observation: the movement state, the last own shot stamp,
+// the position, the fight target ground position and the health.
 type fleetSample struct {
     at        time.Time
     walking   bool
@@ -230,35 +219,32 @@ type fleetSample struct {
     hpPct     float64
 }
 
-// fleetWatch folds one bot's samples into the behavior evidence: the
-// shots, the retreat lags and re-shot gaps, the fight distances, the
-// per-fight drift and the retreat corners. Only the first away-walk of
-// a shot counts as a retreat.
+// fleetWatch folds one bot's samples into the behavior evidence: the shots, the
+// retreat lags and re-shot gaps, the fight distances, the per-fight drift and
+// the retreat corners. Only the first away-walk of a shot counts.
 type fleetWatch struct {
     shots       int
     retreatLags []time.Duration
     reshotGaps  []time.Duration
     reshotDists []float64
     fightDists  []float64
-    // The per-fight curve attribution: the drift anchor is the target's
-    // stand at the fight start, and only fights with a confirmed
-    // retreat feed the leash.
+    // The curve attribution: the drift anchor is the target's stand at the
+    // fight start, and only fights with a confirmed retreat feed the leash.
     fightTarget   int32
     fightAnchorX  int32
     fightAnchorY  int32
     fightMaxDrift float64
     fightRetreats int
     fightDrifts   []float64
-    // The always-run motion book: every fighting sample books into
-    // exactly one bucket - walking, the forced windup, or the avoidable
-    // standing.
+    // The always-run book: every fighting sample lands in one bucket -
+    // walking, the forced windup or the avoidable standing.
     fightMoving   int
     fightWindup   int
     fightStanding int
     fightSamplesN int
-    // The corner evidence of the curve: the signed angle between two
-    // consecutive confirmed retreats of one fight - a straight runaway
-    // repeats its heading, the circle bends every corner one way.
+    // The corner evidence: the signed angle between consecutive confirmed
+    // retreats of one fight - a straight runaway repeats its heading, the
+    // circle bends every corner one way.
     lastRetreatVecX  float64
     lastRetreatVecY  float64
     lastRetreatFight int32
@@ -269,9 +255,9 @@ type fleetWatch struct {
     lastShot    time.Time
     walkStarted time.Time
     walkEndedAt time.Time
-    // the pending retreat candidate of the running walk: armed at
-    // the walk start (the lag from the last shot), confirmed or
-    // dropped at the walk end by the away-direction check.
+    // The pending retreat candidate of the running walk: armed at the walk
+    // start with the lag from the last shot, settled at the walk end by the
+    // away-direction check.
     pendingLag     time.Duration
     havePendingLag bool
     walkFighting   bool
@@ -282,10 +268,9 @@ type fleetWatch struct {
     walkTargetX    int32
     walkTargetY    int32
     walkShotAt     time.Time
-    // lastRetreatShotAt names the shot whose first confirmed retreat is
-    // already booked: the continuation walks of one shot cycle pair to
-    // the SAME shot, and only the first measures how fast the archer
-    // answers a shot.
+    // lastRetreatShotAt names the shot whose first confirmed retreat is booked:
+    // the continuation walks of one cycle pair to the same shot, and only the
+    // first measures the answer speed.
     lastRetreatShotAt time.Time
 }
 
@@ -294,10 +279,8 @@ func newFleetWatch() fleetWatch {
     return fleetWatch{}
 }
 
-// foldMotion books one fighting sample into the always-run
-// buckets (see the struct fields): walking, the server-forced
-// windup standing (inside fleetWindupWindow of the own shot), or
-// the AVOIDABLE standing the runsVerdict bounds.
+// foldMotion books one fighting sample: walking, the server-forced windup
+// (inside fleetWindupWindow of the own shot) or the avoidable standing.
 func (w fleetWatch) foldMotion(s fleetSample) fleetWatch {
     w.fightSamplesN++
     switch {
@@ -313,9 +296,8 @@ func (w fleetWatch) foldMotion(s fleetSample) fleetWatch {
     return w
 }
 
-// reshotDist answers the fight distance a re-shot sample carries, -1
-// when it held no known range: a missing distance must never read as a
-// passed floor, so the verdict falls back to the gap ceiling.
+// reshotDist answers the fight distance of a re-shot sample, -1 without a known
+// range: a missing distance must never read as a passed floor.
 func reshotDist(s fleetSample) float64 {
     if s.fighting && s.fightDist >= 0 {
         return s.fightDist
@@ -324,9 +306,9 @@ func reshotDist(s fleetSample) float64 {
     return -1
 }
 
-// foldWalkEnd settles the walk candidate: the away-direction verdict
-// gates the pending retreat metrics, the first confirmed retreat of its
-// shot books the lag, and the walk state clears.
+// foldWalkEnd settles the walk candidate: the away-direction verdict gates the
+// pending retreat metrics, the first confirmed retreat of its shot books the
+// lag, and the walk state clears.
 func (w fleetWatch) foldWalkEnd(s fleetSample) fleetWatch {
     if w.walkFighting && w.haveWalkFrom && s.hasPos {
         dx := float64(s.x - w.walkFromX)
@@ -336,18 +318,16 @@ func (w fleetWatch) foldWalkEnd(s fleetSample) fleetWatch {
         if dx*awayX+dy*awayY > 0 {
             if w.havePendingLag &&
                 w.walkShotAt != w.lastRetreatShotAt {
-                // The first confirmed retreat of its owning shot
-                // (the continuation walks of the same cycle pair
-                // to the same shot and never re-feed the median
-                // - see lastRetreatShotAt).
+                // The first confirmed retreat of its shot: the continuation
+                // walks of the cycle pair to it and never re-feed the
+                // median (lastRetreatShotAt).
                 w.retreatLags = append(w.retreatLags, w.pendingLag)
                 w.lastRetreatShotAt = w.walkShotAt
             }
             if !s.shotAt.IsZero() && !w.walkShotAt.IsZero() &&
                 s.shotAt != w.walkShotAt {
-                // The re-shot itself ended the walk: the gap is ~zero
-                // and the settling sample's fight distance is the range
-                // the re-shot landed at.
+                // The re-shot itself ended the walk: the gap is zero and the
+                // settling sample carries the range the re-shot landed at.
                 w.reshotGaps = append(w.reshotGaps, 0)
                 w.reshotDists = append(w.reshotDists, reshotDist(s))
             } else {
@@ -365,9 +345,9 @@ func (w fleetWatch) foldWalkEnd(s fleetSample) fleetWatch {
     return w
 }
 
-// foldWalkStart arms the walk candidate: a live fight arms the lag,
-// and the walk end confirms the away direction - a chase-stall walk
-// starts in a live fight too.
+// foldWalkStart arms the walk candidate: a live fight arms the lag, and the
+// walk end confirms the away direction (a chase-stall walk starts in a fight
+// too).
 func (w fleetWatch) foldWalkStart(s fleetSample) fleetWatch {
     w.walkStarted = s.at
     w.walkFighting = s.fighting
@@ -384,9 +364,8 @@ func (w fleetWatch) foldWalkStart(s fleetSample) fleetWatch {
     return w
 }
 
-// foldShot latches a fresh own shot: the shot counts, and a walk that
-// ended before it books the re-shot gap with the distance it landed
-// at.
+// foldShot latches a fresh own shot: the shot counts, and a walk that ended
+// before it books the re-shot gap with the distance it landed at.
 func (w fleetWatch) foldShot(s fleetSample) fleetWatch {
     w.shots++
     w.lastShot = s.shotAt
@@ -410,8 +389,7 @@ func (w fleetWatch) fold(s fleetSample) fleetWatch {
         w = w.foldWalkStart(s)
     }
     if !s.walking && !w.walkStarted.IsZero() {
-        // The walk ended: the away-direction verdict settles the
-        // candidate (see foldWalkEnd).
+        // The walk ended: foldWalkEnd settles the candidate.
         w = w.foldWalkEnd(s)
     }
     if s.fighting && s.fightDist >= 0 {
@@ -427,9 +405,8 @@ func (w fleetWatch) fold(s fleetSample) fleetWatch {
     return w
 }
 
-// foldRetreat books one confirmed retreat: the walk's fight gains its
-// retreat count, and its unit displacement extends that fight's corner
-// chain (the signed turn between consecutive retreats).
+// foldRetreat books one confirmed retreat: the walk's fight gains its retreat
+// count and its unit displacement extends the fight's corner chain.
 func (w fleetWatch) foldRetreat(dx, dy float64) fleetWatch {
     if w.walkTargetID != 0 {
         if w.walkTargetID == w.fightTarget {
@@ -440,9 +417,8 @@ func (w fleetWatch) foldRetreat(dx, dy float64) fleetWatch {
             unitX, unitY := dx/length, dy/length
             if w.haveLastRetreat &&
                 w.lastRetreatFight == w.walkTargetID {
-                // The signed rotation from the previous retreat
-                // heading to this one: positive bends
-                // counterclockwise, negative clockwise.
+                // The signed rotation from the previous heading: positive
+                // bends counterclockwise, negative clockwise.
                 dot := unitX*w.lastRetreatVecX +
                     unitY*w.lastRetreatVecY
                 cross := w.lastRetreatVecX*unitY -
@@ -463,10 +439,10 @@ func (w fleetWatch) foldRetreat(dx, dy float64) fleetWatch {
     return w
 }
 
-// foldFight tracks the per-fight drift: the first fighting sample of a
-// target anchors on the MOB'S STAND (the farm point, not the spawn),
-// and a fight switch closes the track. Fights without a retreat carry
-// no curve evidence.
+// foldFight tracks the per-fight drift: the first fighting sample of a target
+// anchors on the mob's stand (the farm point, not the spawn), and a fight
+// switch closes the track. Fights without a retreat carry no curve
+// evidence.
 func (w fleetWatch) foldFight(s fleetSample) fleetWatch {
     if w.fightTarget == 0 || s.targetID != w.fightTarget {
         w = w.closeFight()
@@ -487,8 +463,8 @@ func (w fleetWatch) foldFight(s fleetSample) fleetWatch {
     return w
 }
 
-// closeFight records the tracked fight's max drift when the kite
-// retreated in it (the leash measures fights, not the whole window).
+// closeFight records the max drift of a fight the kite retreated in (the leash
+// measures fights, not the window).
 func (w fleetWatch) closeFight() fleetWatch {
     if w.fightTarget != 0 && w.fightRetreats > 0 {
         w.fightDrifts = append(w.fightDrifts, w.fightMaxDrift)
@@ -500,8 +476,7 @@ func (w fleetWatch) closeFight() fleetWatch {
     return w
 }
 
-// kiteFightDrifts answers the drifts of every kited fight, the
-// closed ones plus the fight still open at the window's end.
+// kiteFightDrifts answers the drifts of every kited fight, closed and open.
 func (w fleetWatch) kiteFightDrifts() []float64 {
     drifts := append([]float64{}, w.fightDrifts...)
     if w.fightTarget != 0 && w.fightRetreats > 0 {
@@ -511,10 +486,9 @@ func (w fleetWatch) kiteFightDrifts() []float64 {
     return drifts
 }
 
-// curveCorners answers the big corners that agree on one turn side:
-// the curving retreat bends every corner the same way, so the
-// majority side carries the evidence (a wall-bounce zigzag racks
-// both sides and stays evidence).
+// curveCorners answers the big corners of one turn side: the curving retreat
+// bends every corner the same way, so the majority side carries the evidence
+// (a wall-bounce zigzag racks both sides).
 func (w fleetWatch) curveCorners() int {
     if w.cornersCW > w.cornersCCW {
         return w.cornersCW
@@ -549,9 +523,8 @@ func medianFloat(values []float64) float64 {
     return sorted[len(sorted)/2]
 }
 
-// fleetVerdicts is the per-behavior outcome of one bot: the verdict,
-// its detail and whether the evidence floor engaged (an unarmed floor
-// is "no evidence", not a fail).
+// fleetVerdicts is the per-behavior outcome: the verdict, its detail and
+// whether the evidence floor engaged (an unarmed floor is "no evidence").
 type fleetVerdicts struct {
     maxRange  bool
     maxRangeD string
@@ -573,17 +546,15 @@ type fleetVerdicts struct {
     runsE     bool
 }
 
-// runsVerdict reads the motion book into the always-run outcome: the
-// avoidable standing share of the fight samples, everything outside
-// the forced windup of the own shot. The healthy rhythm books near
-// zero, the ceiling tolerates the honest edges.
+// runsVerdict reads the motion book into the always-run outcome: the avoidable
+// standing share of the fight samples, everything outside the forced windup.
 func (w fleetWatch) runsVerdict() (ok bool, detail string,
     evidenced bool,
 ) {
     if w.fightSamplesN < fleetMinFightSamples ||
         w.shots < fleetMinShots {
-        // The evidence floor rides the shooting evidence too: a slot
-        // that never shot never fought a kite fight.
+        // The floor rides the shooting evidence: a slot that never shot never
+        // fought a kite fight.
         return false, fmt.Sprintf("%d fight samples, %d shots "+
             "observed", w.fightSamplesN, w.shots), false
     }
@@ -596,10 +567,9 @@ func (w fleetWatch) runsVerdict() (ok bool, detail string,
             100*w.fightWindup/w.fightSamplesN), true
 }
 
-// curveVerdict reads the drifts and corners into the curving-retreat
-// outcome: the per-fight drift from the mob's stand (the cell rotation
-// never reaches it) and the same-side polyline corners between the
-// consecutive confirmed retreats.
+// curveVerdict reads the drifts and corners into the curving-retreat outcome:
+// the per-fight drift from the mob's stand (the cell rotation never reaches
+// it) and the same-side corners between the consecutive retreats.
 func (w fleetWatch) curveVerdict() (ok bool, detail string,
     evidenced bool,
 ) {
@@ -622,10 +592,9 @@ func (w fleetWatch) curveVerdict() (ok bool, detail string,
         median, len(drifts), corners), true
 }
 
-// reshotVerdict folds the quick-reshot behavior: the redesigned kite
-// runs long race legs before the single re-shot, so the verdict reads
-// the DISTANCE the re-shot lands at, not the walk-end gap. The gap
-// ceiling is the fallback when no distance was seen.
+// reshotVerdict folds the quick-reshot behavior: the kite runs long race legs
+// before the single re-shot, so the verdict reads the distance the re-shot
+// lands at. The gap ceiling is the fallback when no distance was seen.
 func (w fleetWatch) reshotVerdict(v *fleetVerdicts) {
     v.reshotE = true
     medianGap := medianDuration(w.reshotGaps)
@@ -652,9 +621,8 @@ func (w fleetWatch) reshotVerdict(v *fleetVerdicts) {
     }
 }
 
-// verdicts reads the folded evidence into the behavior outcomes: each
-// verdict holds only on its evidence floor (a bot that never fought
-// keeps the checks open, the detail says why).
+// verdicts reads the folded evidence into the outcomes: each verdict holds only
+// on its evidence floor (a bot that never fought keeps the check open).
 func (w fleetWatch) verdicts() fleetVerdicts {
     v := fleetVerdicts{
         maxRangeD: "no fight samples yet",
@@ -678,17 +646,16 @@ func (w fleetWatch) verdicts() fleetVerdicts {
         v.maxRangeD = fmt.Sprintf("median fight distance %.0f"+
             " units over %d samples", median, len(w.fightDists))
         if v.maxRange && w.shots < fleetMinShots {
-            // The distance evidence without the shots is not a kite
-            // held at range but a slot that never fought (a lingering
-            // attack stance measured 1434 unit medians with zero shots).
+            // The distance without the shots is not a kite held at range but
+            // a lingering attack stance (1434 unit medians with zero shots).
             v.maxRange = false
             v.maxRangeD = fmt.Sprintf("median fight distance %.0f"+
                 " units over %d samples, but only %d shots - the"+
                 " slot never fought",
                 median, len(w.fightDists), w.shots)
         }
-        // The floor arms on the shooting evidence too: a slot that never
-        // shot never fought a kite fight, whatever the stance sampled.
+        // The floor arms on the shooting evidence too: a slot that never shot
+        // never fought a kite fight, whatever the stance sampled.
         v.maxRangeE = w.shots >= fleetMinShots
     }
     if len(w.retreatLags) >= fleetMinRetreats {
@@ -707,9 +674,8 @@ func (w fleetWatch) verdicts() fleetVerdicts {
     return v
 }
 
-// fleetBotRun is the live state of one fleet bot: the slot, the
-// wrapped session log counter, the folded watch and the manager the
-// tracker resolves through.
+// fleetBotRun is the live state of one fleet bot: the slot, the log counter,
+// the folded watch and the manager the tracker resolves through.
 type fleetBotRun struct {
     slot    archerFleetSlotDesc
     manager *Manager
@@ -722,10 +688,9 @@ func (b *fleetBotRun) tracker() *state.Bot {
     return b.manager.registryTracker(b.slot.Account)
 }
 
-// archerFleetScenario runs the mass audit: reset the five slots,
-// launch the five archer sessions, sample the fleet through the
-// window and answer with the behavior matrix - the scenario fails
-// naming the behaviors the fleet does NOT implement.
+// archerFleetScenario runs the mass audit: reset the five slots, launch the
+// sessions, sample the fleet through the window and answer with the behavior
+// matrix; the scenario fails naming the missing behaviors.
 func archerFleetScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(archerFleetChecks())
@@ -777,8 +742,8 @@ func archerFleetScenario(ctx context.Context, m *Manager, t *Test) error {
     return fleetVerdict(test, bots, window, ran)
 }
 
-// launchFleet starts the five supervised archer sessions with the
-// staggered logins of the parallel runner.
+// launchFleet starts the five supervised archer sessions with staggered
+// logins.
 func launchFleet(
     ctx context.Context, m *Manager, test *Test,
 ) []*fleetBotRun {
@@ -792,9 +757,8 @@ func launchFleet(
             watch:   newFleetWatch(),
         }
         bots = append(bots, bot)
-        // The per-slot ground lock: the slot pins its OWN cell, so the
-        // five archers farm five different points instead of converging
-        // onto the shared ripe cells.
+        // The per-slot ground lock: the slot pins its own cell, so the archers
+        // farm five points instead of converging onto the ripe cells.
         hook := func(loop *hunt.Loop) {
             archerKiteTypeHook(loop)
             loop.SetCellPin(slot.Cell)
@@ -808,10 +772,9 @@ func launchFleet(
     return bots
 }
 
-// ensureFleetTracker registers the slot's tracker BEFORE the session
-// launches: the fleet runs five accounts under one definition, and
-// without the registration every resolution mints a fresh offline twin
-// the audit cannot see.
+// ensureFleetTracker registers the slot's tracker before the session launches:
+// without it every resolution mints a fresh offline twin the audit cannot
+// see.
 func (m *Manager) ensureFleetTracker(account string) *state.Bot {
     if bot, ok := m.registry.Get(account); ok {
         return bot
@@ -824,10 +787,10 @@ func (m *Manager) ensureFleetTracker(account string) *state.Bot {
     return bot
 }
 
-// waitFleetOnline waits until every fleet tracker entered the world
-// once or the budget lapses. The entry LATCH tolerates the
-// death-restart cycle: a bot that entered and died mid-launch still
-// entered, and the evidence floors name the recovering slots.
+// waitFleetOnline waits until every tracker entered the world once or the
+// budget lapses. The latch tolerates the death-restart cycle: a bot that
+// entered and died still entered, and the evidence floors name the recovering
+// slots.
 func waitFleetOnline(ctx context.Context, bots []*fleetBotRun) error {
     deadline := time.Now().Add(onlineWait)
     entered := make([]bool, len(bots))
@@ -858,8 +821,8 @@ func waitFleetOnline(ctx context.Context, bots []*fleetBotRun) error {
     return errors.New("a fleet bot never entered the world")
 }
 
-// sampleFleet samples every fleet bot through the window at the
-// quarter-second cadence and folds the samples into the watches.
+// sampleFleet samples every bot through the window at the quarter-second
+// cadence and folds the samples into the watches.
 func sampleFleet(ctx context.Context, bots []*fleetBotRun,
     deadline time.Time,
 ) {
@@ -905,8 +868,8 @@ func (b *fleetBotRun) foldSample() {
     b.watch = b.watch.fold(sample)
 }
 
-// joinFleet waits for the session goroutines to unwind (bounded by
-// the shutdown grace).
+// joinFleet waits for the session goroutines to unwind (bounded by the
+// shutdown grace).
 func joinFleet(bots []*fleetBotRun) {
     deadline := time.Now().Add(archerFleetShutdownGrace)
     for time.Now().Before(deadline) {
@@ -925,9 +888,8 @@ func joinFleet(bots []*fleetBotRun) {
     }
 }
 
-// fleetCheckFold books one bot's verdicts: a pass counts, an
-// evidenced fail names the slot behind, an unarmed floor names it
-// under "no evidence".
+// fleetCheckFold books one bot's verdicts: a pass counts, an evidenced fail
+// names the slot behind, an unarmed floor lands under "no evidence".
 func fleetCheckFold(
     counts map[string]int,
     behind, unevidenced map[string][]string,
@@ -971,10 +933,9 @@ func fleetBotLine(test *Test, bot *fleetBotRun, v fleetVerdicts) {
         v.runs, v.runsD))
 }
 
-// fleetVerdict folds the fleet watches into the behavior matrix and
-// the scenario answer: the per-bot table lands in the test log, the
-// checks carry the fleet-wide verdicts and the error names the
-// behaviors the fleet does not implement.
+// fleetVerdict folds the watches into the behavior matrix: the per-bot table
+// lands in the log, the checks carry the fleet-wide verdicts and the error
+// names the missing behaviors.
 func fleetVerdict(
     test *Test, bots []*fleetBotRun, window, ran time.Duration,
 ) error {
