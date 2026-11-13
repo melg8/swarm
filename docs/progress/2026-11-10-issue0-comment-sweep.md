@@ -1033,6 +1033,17 @@ corner probe is a length, not a leg at all.
   `golangci-lint run ./internal/swarm/proxy/...` 0 issues; no block
   above 8 lines in the six files.
 
+### 2026-11-13 - loop_state.go, the third and last field pass
+
+- The struct registry keeps one fact per field and drops the prose
+  around it: 268 comment lines of 573 (46.7 percent) fall to 215 of
+  520 (41.3 percent), and adjacent fields of one owner share a block
+  (the impending-add pacing trio, the two hold logs, the cornered
+  hold, the re-click ladder). Every pacing relation, window owner,
+  latch reason and pointer to the owning file stays.
+- Verified: `task fmt`, `go build ./...`, the hunt suite,
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
