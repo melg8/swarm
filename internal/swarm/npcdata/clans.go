@@ -30,12 +30,11 @@ var npcClanSets = buildNpcClanSets()
 // mask means the npc belongs to no clan.
 var npcClanMasks = buildNpcClanMasks()
 
-// NPCClanMask resolves the clan bitmask of an npc by the raw NpcInfo
-// template id (display id + 1000000): two npcs whose masks share a
-// bit belong to the same clan, a mask carrying ClanMaskAll matches
-// every clan, and a zero mask belongs to no clan. The tracker uses
-// the mask for the social pull check of the target search without
-// any string work.
+// NPCClanMask resolves the clan bitmask of an npc by the raw NpcInfo template
+// id (display id + 1000000): two npcs whose masks share a bit belong to the
+// same clan, ClanMaskAll matches every clan, and a zero mask belongs to none.
+// The tracker uses the mask for the social pull check of the target search
+// without any string work.
 func NPCClanMask(templateID int32) uint64 {
     if templateID <= NPCDisplayOffset {
         return 0

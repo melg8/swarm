@@ -20,13 +20,12 @@ import (
 )
 
 const (
-    // loginReadTimeout bounds one blocking read of the login flow.
-    // Every step is a single request/response round trip, so a stalled
-    // or half-open login server surfaces as a deadline error instead
-    // of parking the bot goroutine forever (the runBotForever
-    // supervisor only reloops when runBot returns - a read without a
-    // deadline is exactly the frozen state the in-world silence
-    // watchdog was built against, one stage earlier).
+    // loginReadTimeout bounds one blocking read of the login flow. Every step
+    // is a single request/response round trip, so a stalled or half-open login
+    // server surfaces as a deadline error instead of parking the bot goroutine
+    // forever: runBotForever only reloops when runBot returns, and a read
+    // without a deadline is the frozen state the in-world silence watchdog
+    // catches one stage later.
     loginReadTimeout = 30 * time.Second
 )
 

@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The acceptance run log wiring: the per-run file of the botlog
-// package opened at every scenario launch, the environment block the
-// header carries, the periodic character state sampler and the
-// account-to-run resolution the session runner uses to install the
-// packet taps.
+// The acceptance run log wiring: the per-run botlog file opened at every
+// scenario launch, the environment block of the header, the periodic
+// character state sampler and the account-to-run resolution the session
+// runner uses to install the packet taps.
 
 package acceptance
 
@@ -78,11 +77,10 @@ func checkDescs(test *Test) []botlog.CheckDesc {
     return out
 }
 
-// environment collects the wiring lines of the header: the build
-// identity, the login endpoint, the proxy, the database endpoint,
-// the navigator and the process facts. The game endpoint resolves
-// at the session start (the login server hands it over) and lands in
-// the session events instead.
+// environment collects the wiring lines of the header: the build identity,
+// the login endpoint, the proxy, the database endpoint, the navigator and the
+// process facts. The game endpoint resolves at the session start (the login
+// server hands it over) and lands in the session events instead.
 func (m *Manager) environment() []botlog.EnvLine {
     env := []botlog.EnvLine{
         {Key: "build", Value: version.Identity()},

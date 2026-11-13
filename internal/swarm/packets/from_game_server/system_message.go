@@ -26,10 +26,9 @@ const (
     sysParamUnknownTail = 8
 )
 
-// SystemMessageParam is one parameter of a system message: the type
-// decides which value is valid (text or int). The multi int
-// parameters carry their tail values in Level: the skill name
-// parameter writes the skill id and then the skill level
+// SystemMessageParam is one parameter of a system message: the type decides
+// which value is valid (text or int). The multi int parameters carry their tail
+// values in Level; the skill name writes the skill id and then the level
 // (SystemMessage.writeImpl of the Mobius server).
 type SystemMessageParam struct {
     Type  int32
@@ -38,14 +37,12 @@ type SystemMessageParam struct {
     Text  string
 }
 
-// SystemMessagePacket is a client chat notification: the message id
-// maps to the client side text (npcdata.SystemMessageText) and the
-// parameters substitute its $sN placeholders.
-// Wire format (see SystemMessage.writeImpl): [opcode 0x7A]
-// [messageId: 4][paramCount: 4] then per parameter [type: 4] followed
-// by the typed value: text and player name parameters carry a UTF-16
-// string, skill names two ints, zone names three ints, everything else
-// one int.
+// SystemMessagePacket is a client chat notification: the message id maps to
+// the client side text (npcdata.SystemMessageText) and the parameters
+// substitute its $sN placeholders. Wire (SystemMessage.writeImpl): [opcode
+// 0x7A][messageId: 4][paramCount: 4], then per parameter [type: 4] and the
+// typed value: text and player names carry a UTF-16 string, skill names two
+// ints, zone names three ints, everything else one int.
 type SystemMessagePacket struct {
     MessageID int32
     Params    []SystemMessageParam

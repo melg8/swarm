@@ -13,19 +13,18 @@ import (
 )
 
 // Icon serving of the equipment widget: the item icon pack lives in
-// data/icons of the repository (3134 PNG files of the classic client
-// naming scheme, see data/icons/Readme.txt) and the web interface
-// serves them at /icons/<name>.png with long lived caching - an icon
-// name never changes once the pack is in place.
+// data/icons (3134 PNG files of the classic client naming scheme, see
+// data/icons/Readme.txt) and the web interface serves them at
+// /icons/<name>.png with long lived caching - an icon name never changes once
+// the pack is in place.
 
 // iconsCacheMaxAge is the cache duration of one icon response.
 const iconsCacheMaxAge = "public, max-age=86400"
 
-// iconsDirCandidates returns the icon pack locations checked in
-// order: data/icons relative to the working directory first (the bot
-// runs from the repository root, like the geodata detection of
-// cmd/swarm), then the walk up from the current directory for other
-// launch directories. The candidates are computed per call so tests
+// iconsDirCandidates returns the icon pack locations checked in order:
+// data/icons relative to the working directory first (the bot runs from the
+// repository root, like the geodata detection of cmd/swarm), then the walk up
+// from the current directory. The candidates are computed per call so tests
 // with a changed working directory see them.
 func iconsDirCandidates() []string {
     candidates := []string{filepath.Join("data", "icons")}

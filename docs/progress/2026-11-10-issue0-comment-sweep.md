@@ -2496,6 +2496,37 @@ corner probe is a length, not a leg at all.
   and botlog (0.6 s) suites, `golangci-lint run` on the five paths
   0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the small packet, npcdata and test UI docs
+
+- `packets/to_game_server/attack_request.go`: two truncated comment
+  sentences (a half sentence above `package` and another inside the
+  `ToBytes` doc, both left by the lint debt commit) are gone; the dupl
+  relief sits once above the package clause where the report lands.
+  21 of 72 become 13 of 64.
+- `cmd/swarm/testui.go` keeps the thirty and forty variant counts and
+  the static tile pyramid fact across the five galleries; 31 of 169
+  become 21 of 159.
+- `packets/from_game_server/quest_list.go` keeps the push protocol and
+  the 5 byte empty form, `system_message.go` the typed parameter rule,
+  `abnormal_status_update.go` the effect list use; 34/25/22 become
+  31/22/21.
+- `npcdata/clans.go` keeps the ClanMaskAll and zero mask rules,
+  `merchant_spawns.go` the one spawn per display id fact;
+  `webserver/icons.go` the 3134 icon pack; 27/21/29 become 26/20/28.
+- `connection/authentificator.go` keeps the deadline reason,
+  `acceptance/runlog.go` the header environment block,
+  `acceptance/soak_helpers.go` the rising edge death count;
+  35/33/24 become 34/31/22.
+- `state/bot_info.go` keeps the two sidebar groups, `hunt/walk_core.go`
+  the shared click and cursor contract and the gated waypoint rule;
+  35/21 become 34/19.
+- Verified: `task fmt`, `go build ./...`, the packets (0.5 s),
+  cmd/swarm (0.2 s), state (1.3 s), connection (10.6 s), acceptance
+  (8.9 s), webserver (8.7 s), npcdata (0.4 s) and hunt (28.3 s) suites,
+  `golangci-lint run` on the eight paths 0 issues (the dupl relief was
+  moved to the package clause after the stale directive surfaced),
+  `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

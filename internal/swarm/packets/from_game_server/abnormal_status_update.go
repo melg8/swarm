@@ -28,14 +28,13 @@ type BuffEntry struct {
     Time    int32
 }
 
-// AbnormalStatusUpdatePacket is the active effect list of the
-// character, sent whenever the effects change: a buff lands, a debuff
-// expires, the last of a group leaves. The bot tracks the running
-// buffs through it - the self buff casting of the hunt loop skips the
-// buffs that already run, the web UI buffs widget renders the list
-// with the remaining durations.
-// Wire format (see AbnormalStatusUpdate.writeImpl): [opcode 0x97]
-// [count: 2] then per effect [skillId: 4][level: 2][time: 4].
+// AbnormalStatusUpdatePacket is the active effect list of the character, sent
+// whenever the effects change: a buff lands, a debuff expires, the last of a
+// group leaves. The bot tracks the running buffs through it - the self buff
+// casting of the hunt loop skips the buffs that already run, and the web UI
+// buffs widget renders the list with the remaining durations. Wire
+// (AbnormalStatusUpdate.writeImpl): [opcode 0x97][count: 2], then per effect
+// [skillId: 4][level: 2][time: 4].
 type AbnormalStatusUpdatePacket struct {
     Buffs []BuffEntry
 }

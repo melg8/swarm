@@ -23,11 +23,10 @@ const questCountCap = 64
 // is far past every honest packet and still cheap to fail on.
 const questItemCountCap = 256
 
-// QuestListEntry is one active quest of the journal: the quest id
-// (the numeric prefix of the script name, e.g. 406 of
-// Q00406_PathOfTheElvenKnight) and the state int - the cond step of
-// a started quest, or the completion flags mask when the quest has
-// completed paths (see docs/quest_protocol.md).
+// QuestListEntry is one active quest of the journal: the quest id (the
+// numeric prefix of the script name, e.g. 406 of Q00406_PathOfTheElvenKnight)
+// and the state int - the cond step of a started quest, or the completion
+// flags mask when the quest has completed paths (see docs/quest_protocol.md).
 type QuestListEntry struct {
     QuestID int32
     State   int32
@@ -44,14 +43,12 @@ type QuestItemEntry struct {
     BodyPart int32
 }
 
-// QuestListPacket is the quest journal snapshot the server pushes at
-// world entry and after every quest state change (a push protocol -
-// the client never polls; see docs/quest_protocol.md).
-// Wire format (see QuestList.writeImpl): [opcode 0x98]
-// [questCount: 2] then per quest [questId: 4][state: 4], then
-// [itemCount: 2] and per item [objectId: 4][itemId: 4][count: 4]
-// [bodyPart: 4]. The empty live form is 5 bytes: one opcode, two
-// zero counts.
+// QuestListPacket is the quest journal snapshot the server pushes at world
+// entry and after every quest state change (a push protocol - the client never
+// polls; see docs/quest_protocol.md). Wire (QuestList.writeImpl): [opcode
+// 0x98][questCount: 2], per quest [questId: 4][state: 4], then [itemCount: 2]
+// and per item [objectId: 4][itemId: 4][count: 4][bodyPart: 4]. The empty live
+// form is 5 bytes: one opcode, two zero counts.
 type QuestListPacket struct {
     Quests []QuestListEntry
     Items  []QuestItemEntry

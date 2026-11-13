@@ -19,11 +19,10 @@ type MerchantSpawn struct {
     Heading int32
 }
 
-// merchantSpawns holds every world spawn of every npc the
-// generated buylist catalogs know (one spawn per display id in the
-// C1 spawn data). The counterprobe tool derives the customer stand
-// points from it and the trip machinery resolves the approach
-// point of a merchant id through it.
+// merchantSpawns holds every world spawn of every npc the generated buylist
+// catalogs know (one spawn per display id in the C1 spawn data). The
+// counterprobe tool derives the customer stand points from it and the trip
+// machinery resolves the approach point of a merchant id through it.
 var merchantSpawns = map[int32]MerchantSpawn{
     7001:  {Name: "Lector", X: -86385, Y: 243267, Z: -3717, Heading: 52000},
     7002:  {Name: "Jackson", X: -86733, Y: 242918, Z: -3720, Heading: 61440},

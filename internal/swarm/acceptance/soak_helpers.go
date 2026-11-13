@@ -9,13 +9,12 @@ import (
 )
 
 // deathEdgeTracker counts the character deaths over the soak window by
-// watching the SelfDead flag for rising edges (false -> true). A death
-// is a known maximum HP with a zero current HP (see Bot.SelfDead); the
-// flag oscillates (the server resurrects the character at the village
-// after the death), so the count is the number of transitions into the
-// dead state, not the current flag value. The tracker is a
-// single-goroutine read of the public tracker API, so it stays inside
-// the T-001 acceptance scope.
+// watching the SelfDead flag for rising edges (false -> true). A death is a
+// known maximum HP with a zero current HP (see Bot.SelfDead); the flag
+// oscillates, since the server resurrects the character at the village, so the
+// count is the number of transitions into the dead state. The tracker is a
+// single-goroutine read of the public tracker API, so it stays inside the
+// acceptance scope.
 type deathEdgeTracker struct {
     previous bool
     seen     bool
@@ -53,10 +52,9 @@ func (d *deathEdgeTracker) deaths() int {
 }
 
 // soakRePaths reads the hunt loop re-path count from the tracker
-// diagnostics. Each re-path is a stuck-and-replanned segment, so the delta
-// over the soak window is the stuck-event metric the M1 trail
-// reports. The snapshot is a read under the tracker lock; a nil
-// engine or a not-yet-ticking loop reports zero.
+// diagnostics: each re-path is a stuck-and-replanned segment, so the delta over
+// the soak window is the stuck-event metric. The snapshot is a read under the
+// tracker lock; a nil engine or a not-yet-ticking loop reports zero.
 func soakRePaths(tracker *state.Bot) int {
     return tracker.Snapshot().Diagnostics.Hunt.RePaths
 }

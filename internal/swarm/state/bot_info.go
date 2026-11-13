@@ -10,11 +10,10 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// Bot kind constants: the role of a bot in the process. The empty
-// kind (the default of NewBot) is treated by the web UI as a regular
-// long-running bot - the explicit KindLongRunning lets the main entry
-// tag the fleet bots, the acceptance manager tags its temp bots with
-// KindAcceptance so the sidebar can split them into two groups.
+// Bot kind constants: the role of a bot in the process. The empty kind (the
+// default of NewBot) reads as a regular long-running bot; KindLongRunning lets
+// the main entry tag the fleet bots and KindAcceptance lets the acceptance
+// manager tag its temp bots, so the sidebar splits them into two groups.
 const (
     KindLongRunning = "long-running"
     KindAcceptance  = "acceptance"
