@@ -25,14 +25,11 @@ type townNpc struct {
 // searches.
 var zeroTownNpc = townNpc{TemplateID: 0, Name: "", X: 0, Y: 0, Z: 0}
 
-// townMerchants are the shop merchants of the known towns. Any merchant
-// accepts the sale of any sellable item (the inventory sell list), so
-// the bot simply walks to the nearest one; the list grows with the
-// farming areas of the deployment. Coordinates from the Mobius C1
-// spawn data (ElvenTerritory/ElvenVillageNPCs.xml). TemplateID is the
-// client display id the NpcInfo packet carries: the C1 spawn ids of the
-// traders (30147..30150) map to the CT0 display ids through
-// CT0_to_C4_ids.txt of the npc stats.
+// townMerchants are the shop merchants of the elven village, the default set of
+// the 1-19 band; any merchant accepts the sale of any sellable item, so the bot
+// walks to the nearest one. The coordinates come from the Mobius C1 spawn data
+// (ElvenVillageNPCs.xml) and TemplateID is the display id the NpcInfo packet
+// carries (the C1 spawn ids 30147..30150 map through CT0_to_C4_ids.txt).
 var townMerchants = []townNpc{
     {TemplateID: 7147, Name: "Unoren", X: 44667, Y: 46896, Z: -2982},
     {TemplateID: 7148, Name: "Ariel", X: 44683, Y: 46952, Z: -2981},
@@ -40,14 +37,10 @@ var townMerchants = []townNpc{
     {TemplateID: 7150, Name: "Herbiel", X: 42766, Y: 50037, Z: -2984},
 }
 
-// dionMerchants are the shop merchants of the Town of Dion the 20-25
-// band shopping trip targets, from docs/band_20_25_survey.md. The
-// coordinates are the spawn positions of spawns/Dion/DionNPCs.xml;
-// TemplateID is the CT0-to-C4 display id (the npcdata.npcBuyLists map
-// resolves their buylists). The elven village merchants stay the
-// default of the 1-19 band; the hunt loop switches to the Dion
-// merchants when the active zone region is Dion (see
-// shopCatalogForRegion).
+// dionMerchants are the shop merchants of the Town of Dion the 20-25 band trip
+// targets (docs/band_20_25_survey.md): the spawn positions of
+// spawns/Dion/DionNPCs.xml with their CT0-to-C4 display ids. The loop switches
+// to them when the zone region is Dion (shopCatalogForRegion).
 var dionMerchants = []townNpc{
     {TemplateID: 7060, Name: "Sabrin", X: 17999, Y: 144484, Z: -3048},
     {TemplateID: 7061, Name: "Casey", X: 17948, Y: 144560, Z: -3048},
@@ -55,32 +48,16 @@ var dionMerchants = []townNpc{
     {TemplateID: 7063, Name: "Lara", X: 19223, Y: 146228, Z: -3048},
 }
 
-// merchantStands are the customer stand points of the merchants that
-// trade behind a counter (the curated rows of the counter round: the
-// elven village and the Dion quarter). The merchant spawn itself is no
-// stand point: the spawn cell sits inside the roofed stall (the
-// geodata pack models the stall interior as roof-only cells over the
-// missing floor - the cell answers blocked, nobody can stand on it
-// directly, the user report of the shop quarter round), and the mesh
-// route to the spawn ends wherever the nearest floor poly happens to
-// sit - for Unoren that was the outer side of the stall front 42 units
-// north-west, not the customer side. The stand is the cell just
-// beyond the counter front along the merchant facing heading (the
-// counter sits on the facing side of the stall, the customer cell on
-// the other side of it), derived and verified with cmd/counterprobe
-// (-mode detect names the counter direction, -mode stands and
-// -mode scan pin the cell: every entry routes found with the plan
-// ending exactly on the cell, inside the interaction distance of the
-// spawn). A corrected or a new entry is one table row plus a rerun
-// of the probe; the z of every entry is the pack floor of the cell
-// so the exact search resolves it onto the right deck. The world
-// wide coverage of the same machinery rides the generated
-// merchantStandsWorld table (merchant_stands_world.go).
+// merchantStands are the curated customer stands of the merchants that trade
+// behind a counter. The spawn cell sits inside the roofed stall (roof only
+// cells, nobody can stand there) and the mesh route to it ends wherever the
+// nearest floor poly sits, so each stand is the cell just beyond the counter
+// front along the merchant facing heading, derived and verified with
+// cmd/counterprobe. Every z is the pack floor of the cell and the generated
+// merchantStandsWorld table covers the rest of the world (docs/hunting.md).
 var merchantStands = map[int32]pathfind.Vec3{
-    // Unoren, the customer corridor west of the counter front, at the
-    // corridor gate latitude (the gate cell row the east approach
-    // lines pass through; deeper rows clip the walled counter corner
-    // on the diagonal strides).
+    // Unoren, the corridor west of the counter front at the gate row (deeper
+    // rows clip the walled corner on the diagonal strides).
     7147: {X: 44584, Y: 46944, Z: -2984},
     // Ariel, the same corridor at her row.
     7148: {X: 44584, Y: 46952, Z: -2984},
@@ -88,27 +65,21 @@ var merchantStands = map[int32]pathfind.Vec3{
     7149: {X: 42727, Y: 50115, Z: -2984},
     // Herbiel, the open floor beyond the counter front south-east.
     7150: {X: 42798, Y: 50101, Z: -2984},
-    // Sabrin, the customer corridor east of the counter front.
+    // Sabrin, the corridor east of the counter front.
     7060: {X: 18072, Y: 144488, Z: -3040},
     // Casey, the same corridor at her row.
     7061: {X: 18044, Y: 144560, Z: -3040},
-    // Sonia, the customer corridor north of the counter front.
+    // Sonia, the corridor north of the counter front.
     7062: {X: 19320, Y: 146168, Z: -3064},
     // Lara, the same corridor at her row.
     7063: {X: 19224, Y: 146168, Z: -3064},
 }
 
-// merchantStandPoint returns the customer stand point of the merchant
-// when a stand table knows it, the spawn point otherwise. The curated
-// counter table answers first (the hand pinned elven and Dion rows),
-// the generated world table second (the counterprobe world pass rows
-// of merchant_stands_world.go) and the spawn fallback covers the
-// spawns the pack serves directly plus the flat placeholder regions.
-// The walk planning of the merchant stops targets the stand (the
-// character stops face to face with the merchant across the counter);
-// the interaction and approach gates keep measuring the spawn (the
-// stand sits 64-80 units from it, well inside the 250 interaction
-// distance).
+// merchantStandPoint returns the customer stand of the merchant: the curated
+// table first, the generated world table second and the spawn point otherwise
+// (the spawns the pack serves directly plus the flat placeholder regions). The
+// walks target the stand while the interaction and approach gates keep
+// measuring the spawn, which sits 64-80 units away.
 func merchantStandPoint(npc townNpc) pathfind.Vec3 {
     if stand, ok := merchantStands[npc.TemplateID]; ok {
         return stand
@@ -120,12 +91,10 @@ func merchantStandPoint(npc townNpc) pathfind.Vec3 {
     return townNpcPosition(npc)
 }
 
-// merchantsForRegion returns the shop merchants of the region the
-// loop farms near: the elven village set is the default and the Dion
-// set serves the 20-25 band region. The same set builds the region
-// shop catalog (see shopCatalogForRegion), so the trip targets, the
-// sell stop pick and the purchase plan always name the same town's
-// traders.
+// merchantsForRegion returns the shop merchants of the region the loop farms
+// near: the elven village set by default, the Dion set for the 20-25 band. The
+// same set builds the region catalog, so the trip targets, the sell stop pick
+// and the purchase plan name one town's traders.
 func merchantsForRegion(region string) []townNpc {
     if region == regionDion {
         return dionMerchants
@@ -155,10 +124,9 @@ func (l *Loop) nearestMerchant(
     return best, found
 }
 
-// merchantTemplates lists the packet template ids of the active
-// region's town merchants: the sell stop pick accepts any of them
-// (every vendor accepts the sale of any sellable item), while the buy
-// stops name their own trader through stopMerchantTemplates.
+// merchantTemplates lists the packet template ids of the active region's
+// merchants: the sell stop accepts any of them, the buy stops name their own
+// trader through stopMerchantTemplates.
 func (l *Loop) merchantTemplates() []int32 {
     return townMerchantTemplates(merchantsForRegion(l.zoneRegion))
 }
@@ -184,14 +152,11 @@ func townNpcPosition(npc townNpc) pathfind.Vec3 {
     }
 }
 
-// npcApproachPoint computes the ground click target for a town npc
-// approach: a point npcApproachOffset units from the npc toward the
-// bot, so the Bresenham click line the server validates stays outside
-// the building walls. The z is the npc's z: the server resolves the
-// target cell layer from it, picking the ground floor the npc stands
-// on. When the bot already stands within the offset distance, the
-// bot's own x and y are returned (the click collapses to a no-op the
-// caller skips in favor of the talk click).
+// npcApproachPoint computes the ground click target for a town npc approach: a
+// point npcApproachOffset units from the npc toward the bot, so the Bresenham
+// line the server validates stays outside the walls, carrying the npc z so the
+// server resolves its ground floor. A bot already inside the offset gets its
+// own x and y back (the click collapses and the caller talks instead).
 func npcApproachPoint(
     npcX, npcY, npcZ, selfX, selfY int32,
 ) (int32, int32, int32) {
@@ -211,10 +176,9 @@ func npcApproachPoint(
     return int32(math.Round(ax)), int32(math.Round(ay)), npcZ
 }
 
-// merchantWithinExactRange reports whether the merchant is close
-// enough for the exact segment: the distance gate of exactSegmentMaxDistance
-// (see the constant comment - the far exact searches are the
-// exhaustive flood class).
+// merchantWithinExactRange reports whether the merchant is close enough for the
+// exact segment: the exactSegmentMaxDistance gate (the far exact searches are
+// the exhaustive flood class).
 func (l *Loop) merchantWithinExactRange(npc townNpc) bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {

@@ -819,6 +819,17 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `city_shopping.go` fell from 26.4 to 18.2 percent
   (119 comment lines of 655), no block above 8 lines.
 
+### 2026-11-12 - hunt/town_merchants.go keeps the stand resolution
+
+- 11 blocks compress: the elven and Dion merchant headers, the 21 line
+  stand table header, the eight per merchant row notes, the stand
+  resolution, the region selection, the merchant template list, the
+  approach point and the exact range gate. `docs/hunting.md` gained the
+  `NPCDisplayOffset` clause on the tracker templates.
+- Verified: `task fmt`, `go build ./...`, the full hunt package,
+  `task lint:new`. `town_merchants.go` fell from 40.6 to 29.5 percent
+  (57 comment lines of 193), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -843,8 +854,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `cmd/counterprobe/world.go`, `hunt/lure.go`, `hunt/town_sell.go` and
 `gear/shopping.go`, `hunt/loop_zone.go`,
 `webserver/navmesh_geometry.go`, `hunt/kite_ledger.go`,
-`hunt/kite_lane.go` and `hunt/city_shopping.go` (second passes). Next:
-a fresh `task comment:audit --top 10` pick (the
+`hunt/kite_lane.go`, `hunt/city_shopping.go` and `hunt/town_merchants.go`
+(second passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.

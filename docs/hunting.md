@@ -1912,7 +1912,10 @@ The short form:
 - Merchants: townMerchants carries the shop npcs of the known towns
   with their spawn coordinates; the C1 spawn ids map to the client
   display ids the NpcInfo packets carry (30147..30150 -> 7147..7150
-  through CT0_to_C4_ids.txt). The sell uses RequestSellItem 0x1E with
+  through CT0_to_C4_ids.txt), and the tracker object templates carry
+  the display id plus `npcdata.NPCDisplayOffset`, so the merchant
+  template list adds that offset before matching a knownlist entry.
+  The sell uses RequestSellItem 0x1E with
   the standard inventory sell list (list id 0, the CUSTOM_CB_SELL_LIST
   of the official client): the server prices every item itself at
   referencePrice/2 (no prices in the packet), answers with
