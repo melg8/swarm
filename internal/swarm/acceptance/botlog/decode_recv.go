@@ -51,7 +51,6 @@ func decodeRecv(payload []byte) []string {
     return []string{unknownLine("recv", payload)}
 }
 
-// decodeRecvWorld dispatches the world object and movement packets.
 func decodeRecvWorld(payload []byte) ([]string, bool) {
     if lines, ok := decodeRecvObject(payload); ok {
         return lines, true
@@ -80,7 +79,6 @@ func decodeRecvWorld(payload []byte) ([]string, bool) {
     }
 }
 
-// decodeRecvObject dispatches the spawn, removal and vitals packets.
 func decodeRecvObject(payload []byte) ([]string, bool) {
     switch payload[0] {
     case 0x03:
@@ -104,7 +102,6 @@ func decodeRecvObject(payload []byte) ([]string, bool) {
     }
 }
 
-// decodeRecvCombat dispatches the combat and target packets.
 func decodeRecvCombat(payload []byte) ([]string, bool) {
     switch payload[0] {
     case 0x06:
@@ -150,7 +147,6 @@ func decodeRecvList(payload []byte) ([]string, bool) {
     }
 }
 
-// decodeRecvMoveToLocation renders the world movement broadcast.
 func decodeRecvMoveToLocation(payload []byte) []string {
     packet := fromgameserver.NewMoveToLocationPacket()
     if err := fromgameserver.ParseMoveToLocationPacket(
@@ -163,7 +159,6 @@ func decodeRecvMoveToLocation(payload []byte) []string {
         " from " + xyz(packet.X, packet.Y, packet.Z)}
 }
 
-// decodeRecvCharInfo renders another player appearing in the known list.
 func decodeRecvCharInfo(payload []byte) []string {
     packet := fromgameserver.NewCharInfoPacket()
     if err := fromgameserver.ParseCharInfoPacket(packet, payload); err != nil {
@@ -189,7 +184,6 @@ func decodeRecvCharInfo(payload []byte) []string {
         xyz(packet.X, packet.Y, packet.Z) + flagSuffix}
 }
 
-// decodeRecvUserInfo renders the self state broadcast with the vitals block.
 func decodeRecvUserInfo(payload []byte) []string {
     packet := fromgameserver.NewUserInfoPacket()
     if err := fromgameserver.ParseUserInfoPacket(packet, payload); err != nil {
@@ -209,7 +203,6 @@ func decodeRecvUserInfo(payload []byte) []string {
         strconv.Itoa(int(packet.MaxLoad))}
 }
 
-// decodeRecvAttack renders one combat swing broadcast.
 func decodeRecvAttack(payload []byte) []string {
     packet := fromgameserver.NewAttackPacket()
     if err := fromgameserver.ParseAttackPacket(packet, payload); err != nil {
@@ -232,7 +225,6 @@ func decodeRecvAttack(payload []byte) []string {
     return []string{line.String()}
 }
 
-// decodeRecvSpawnItem renders a ground item spawn.
 func decodeRecvSpawnItem(payload []byte) []string {
     packet := fromgameserver.NewSpawnItemPacket()
     if err := fromgameserver.ParseSpawnItemPacket(packet, payload); err != nil {
@@ -245,7 +237,6 @@ func decodeRecvSpawnItem(payload []byte) []string {
         xyz(packet.X, packet.Y, packet.Z)}
 }
 
-// decodeRecvDropItem renders a player dropping an item.
 func decodeRecvDropItem(payload []byte) []string {
     packet := fromgameserver.NewDropItemPacket()
     if err := fromgameserver.ParseDropItemPacket(packet, payload); err != nil {
@@ -258,7 +249,6 @@ func decodeRecvDropItem(payload []byte) []string {
         xyz(packet.X, packet.Y, packet.Z)}
 }
 
-// decodeRecvGetItem renders a pickup broadcast.
 func decodeRecvGetItem(payload []byte) []string {
     packet := fromgameserver.NewGetItemPacket()
     if err := fromgameserver.ParseGetItemPacket(packet, payload); err != nil {
@@ -270,7 +260,6 @@ func decodeRecvGetItem(payload []byte) []string {
         " at " + xyz(packet.X, packet.Y, packet.Z)}
 }
 
-// decodeRecvStatusUpdate renders the vitals attribute broadcast.
 func decodeRecvStatusUpdate(payload []byte) []string {
     packet := fromgameserver.NewStatusUpdatePacket()
     if err := fromgameserver.ParseStatusUpdatePacket(
@@ -301,7 +290,6 @@ var attrNames = map[int32]string{
     0x1A: "adena", 0x21: "sp",
 }
 
-// attrName resolves one StatusUpdate attribute id.
 func attrName(id int32) string {
     if name, ok := attrNames[id]; ok {
         return name
@@ -334,7 +322,6 @@ func decodeRecvNpcHTML(payload []byte) []string {
     return lines
 }
 
-// decodeRecvDeleteObject renders the known list removal.
 func decodeRecvDeleteObject(payload []byte) []string {
     packet := fromgameserver.NewDeleteObjectPacket()
     if err := fromgameserver.ParseDeleteObjectPacket(
@@ -367,7 +354,6 @@ func decodeRecvCharSelectInfo(payload []byte) []string {
     return lines
 }
 
-// decodeRecvCharSelected renders the session character handover.
 func decodeRecvCharSelected(payload []byte) []string {
     packet := fromgameserver.NewCharSelectedPacket()
     if err := fromgameserver.ParseCharSelectedPacket(
@@ -430,7 +416,6 @@ func decodeRecvItemList(payload []byte) []string {
     return lines
 }
 
-// decodeRecvInventoryUpdate renders the inventory delta per changed stack.
 func decodeRecvInventoryUpdate(payload []byte) []string {
     packet := fromgameserver.NewInventoryUpdatePacket()
     if err := fromgameserver.ParseInventoryUpdatePacket(
@@ -447,7 +432,6 @@ func decodeRecvInventoryUpdate(payload []byte) []string {
     return lines
 }
 
-// inventoryLine renders one inventory stack of a list or update.
 func inventoryLine(
     item *fromgameserver.InventoryItem, verb string,
 ) string {
@@ -465,7 +449,6 @@ func inventoryLine(
     return line
 }
 
-// changeWord maps the InventoryUpdate change code to a verb.
 func changeWord(change int16) string {
     switch change {
     case 1:
@@ -479,7 +462,6 @@ func changeWord(change int16) string {
     }
 }
 
-// decodeRecvTeleport renders the teleport placement.
 func decodeRecvTeleport(payload []byte) []string {
     packet := fromgameserver.NewTeleportToLocationPacket()
     if err := fromgameserver.ParseTeleportToLocationPacket(
@@ -491,7 +473,6 @@ func decodeRecvTeleport(payload []byte) []string {
         " teleported to " + xyz(packet.X, packet.Y, packet.Z)}
 }
 
-// decodeRecvTargetSelected renders the target pick of one object.
 func decodeRecvTargetSelected(payload []byte) []string {
     packet := fromgameserver.NewTargetSelectedPacket()
     if err := fromgameserver.ParseTargetSelectedPacket(
@@ -503,7 +484,6 @@ func decodeRecvTargetSelected(payload []byte) []string {
         " targeted object " + strconv.Itoa(int(packet.TargetID))}
 }
 
-// decodeRecvTargetUnselected renders the target drop of one object.
 func decodeRecvTargetUnselected(payload []byte) []string {
     packet := fromgameserver.NewTargetUnselectedPacket()
     if err := fromgameserver.ParseTargetUnselectedPacket(
@@ -515,7 +495,6 @@ func decodeRecvTargetUnselected(payload []byte) []string {
         " dropped its target"}
 }
 
-// decodeRecvSocialAction renders one social animation.
 func decodeRecvSocialAction(payload []byte) []string {
     packet := fromgameserver.NewSocialActionPacket()
     if err := fromgameserver.ParseSocialActionPacket(
@@ -527,7 +506,6 @@ func decodeRecvSocialAction(payload []byte) []string {
         " social action " + strconv.Itoa(int(packet.ActionID))}
 }
 
-// decodeRecvChangeMoveType renders the run/walk broadcast.
 func decodeRecvChangeMoveType(payload []byte) []string {
     packet := fromgameserver.NewChangeMoveTypePacket()
     if err := fromgameserver.ParseChangeMoveTypePacket(
@@ -543,7 +521,6 @@ func decodeRecvChangeMoveType(payload []byte) []string {
         " switches to " + stance}
 }
 
-// decodeRecvChangeWaitType renders the sit/stand broadcast.
 func decodeRecvChangeWaitType(payload []byte) []string {
     packet := fromgameserver.NewChangeWaitTypePacket()
     if err := fromgameserver.ParseChangeWaitTypePacket(
@@ -593,7 +570,6 @@ func decodeRecvSkillList(payload []byte) []string {
     return lines
 }
 
-// decodeRecvMoveToPawn renders the chase broadcast.
 func decodeRecvMoveToPawn(payload []byte) []string {
     packet := fromgameserver.NewMoveToPawnPacket()
     if err := fromgameserver.ParseMoveToPawnPacket(
@@ -607,7 +583,6 @@ func decodeRecvMoveToPawn(payload []byte) []string {
         " from " + xyz(packet.X, packet.Y, packet.Z)}
 }
 
-// decodeRecvValidateLocation renders the server side placement correction.
 func decodeRecvValidateLocation(payload []byte) []string {
     packet := fromgameserver.NewValidateLocationPacket()
     if err := fromgameserver.ParseValidateLocationPacket(
@@ -679,7 +654,6 @@ func skillParamName(
     return info.Name
 }
 
-// decodeRecvAbnormalStatus renders the buff and debuff list.
 func decodeRecvAbnormalStatus(payload []byte) []string {
     packet := fromgameserver.NewAbnormalStatusUpdatePacket()
     if err := fromgameserver.ParseAbnormalStatusUpdatePacket(
@@ -735,7 +709,6 @@ func parseRotation(payload []byte) (int32, int32, error) {
     return packet.ObjectID, packet.Heading, err
 }
 
-// decodeRecvAutoAttackStart renders the combat stance broadcast.
 func decodeRecvAutoAttackStart(payload []byte) []string {
     packet := fromgameserver.NewAutoAttackStartPacket()
     if err := fromgameserver.ParseAutoAttackStartPacket(
@@ -747,7 +720,6 @@ func decodeRecvAutoAttackStart(payload []byte) []string {
         " starts the auto attack"}
 }
 
-// decodeRecvAutoAttackStop renders the combat stance end broadcast.
 func decodeRecvAutoAttackStop(payload []byte) []string {
     packet := fromgameserver.NewAutoAttackStopPacket()
     if err := fromgameserver.ParseAutoAttackStopPacket(
@@ -759,7 +731,6 @@ func decodeRecvAutoAttackStop(payload []byte) []string {
         " stops the auto attack"}
 }
 
-// decodeRecvMyTargetSelected renders the own target confirmation.
 func decodeRecvMyTargetSelected(payload []byte) []string {
     packet := fromgameserver.NewMyTargetSelectedPacket()
     if err := fromgameserver.ParseMyTargetSelectedPacket(
@@ -771,7 +742,6 @@ func decodeRecvMyTargetSelected(payload []byte) []string {
         strconv.Itoa(int(packet.ObjectID))}
 }
 
-// flagWords renders the compact boolean flag suffix.
 func flagWords(flags []string) string {
     if len(flags) == 0 {
         return ""

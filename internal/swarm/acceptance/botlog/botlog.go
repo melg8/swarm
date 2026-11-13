@@ -264,7 +264,6 @@ func writeHeader(
 // separator is the horizontal rule of the header block.
 const separator = "=================================================="
 
-// checkMark renders the checkbox of one contract line.
 func checkMark(done bool) string {
     if done {
         return "[x]"
@@ -276,7 +275,6 @@ func checkMark(done bool) string {
 // checkIDWidth aligns the check ids of the contract block.
 const checkIDWidth = 12
 
-// padRight pads a string with spaces to the width.
 func padRight(value string, width int) string {
     for len(value) < width {
         value += " "
@@ -285,7 +283,6 @@ func padRight(value string, width int) string {
     return value
 }
 
-// writeln writes one line and its newline.
 func writeln(writer *bufio.Writer, line string) {
     _, _ = writer.WriteString(line)
     _ = writer.WriteByte('\n')

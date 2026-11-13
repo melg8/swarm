@@ -213,7 +213,6 @@ func evaluateVillageEscape(
     return dist >= villageEscapeRadius, detail
 }
 
-// villageEscapeChecks builds the initial check list of the escape scenario.
 func villageEscapeChecks() []Check {
     return []Check{{
         ID:     checkEscape,

@@ -45,7 +45,6 @@ func (d *deathEdgeTracker) update(tracker *state.Bot) {
     d.previous = current
 }
 
-// deaths returns the counted death transitions.
 func (d *deathEdgeTracker) deaths() int {
     return d.count
 }

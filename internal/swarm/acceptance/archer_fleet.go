@@ -98,7 +98,6 @@ const (
     checkFleetRuns     = "always-run"
 )
 
-// archerFleetChecks is the initial check list of the fleet scenario.
 func archerFleetChecks() []Check {
     return []Check{
         {
@@ -273,7 +272,6 @@ type fleetWatch struct {
     lastRetreatShotAt time.Time
 }
 
-// newFleetWatch arms the fold.
 func newFleetWatch() fleetWatch {
     return fleetWatch{}
 }
@@ -474,7 +472,6 @@ func (w fleetWatch) closeFight() fleetWatch {
     return w
 }
 
-// kiteFightDrifts answers the drifts of every kited fight, closed and open.
 func (w fleetWatch) kiteFightDrifts() []float64 {
     drifts := append([]float64{}, w.fightDrifts...)
     if w.fightTarget != 0 && w.fightRetreats > 0 {
@@ -495,7 +492,6 @@ func (w fleetWatch) curveCorners() int {
     return w.cornersCCW
 }
 
-// medianDuration answers the median of a duration slice.
 func medianDuration(values []time.Duration) time.Duration {
     if len(values) == 0 {
         return 0
@@ -508,7 +504,6 @@ func medianDuration(values []time.Duration) time.Duration {
     return sorted[len(sorted)/2]
 }
 
-// medianFloat answers the median of a float slice.
 func medianFloat(values []float64) float64 {
     if len(values) == 0 {
         return 0
@@ -681,7 +676,6 @@ type fleetBotRun struct {
     watch   fleetWatch
 }
 
-// tracker resolves the live tracker of the bot's account.
 func (b *fleetBotRun) tracker() *state.Bot {
     return b.manager.registryTracker(b.slot.Account)
 }
@@ -833,7 +827,6 @@ func sampleFleet(ctx context.Context, bots []*fleetBotRun,
     }
 }
 
-// foldSample latches one sample of the bot's tracker into its watch.
 func (b *fleetBotRun) foldSample() {
     tracker := b.tracker()
     sample := fleetSample{
@@ -914,7 +907,6 @@ func fleetCheckFold(
     }
 }
 
-// fleetBotLine prints the per-bot verdict table row.
 func fleetBotLine(test *Test, bot *fleetBotRun, v fleetVerdicts) {
     test.appendLog(fmt.Sprintf("fleet: %s on %s - max-range %t"+
         " (%s), shoots %t (%s), early-retreat %t (%s),"+

@@ -80,7 +80,6 @@ func churchEntryReset(account string) characterReset {
     }
 }
 
-// churchEntryChecks builds the initial check list of the scenario.
 func churchEntryChecks() []Check {
     return []Check{
         {

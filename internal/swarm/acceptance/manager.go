@@ -75,7 +75,6 @@ type TestDef struct {
     Scenario    ScenarioFunc
 }
 
-// TestView is the API payload of one test.
 type TestView struct {
     ID          string    `json:"id"`
     Title       string    `json:"title"`
@@ -119,7 +118,6 @@ type Test struct {
     runLog *botlog.RunLog
 }
 
-// view snapshots the test state for the API.
 func (t *Test) view() TestView {
     t.mu.Lock()
     defer t.mu.Unlock()
@@ -144,7 +142,6 @@ func (t *Test) view() TestView {
     }
 }
 
-// setRunning switches the test into the running state.
 func (t *Test) setRunning() {
     t.mu.Lock()
     defer t.mu.Unlock()
@@ -172,7 +169,6 @@ func (t *Test) finish(generation uint64, err error) {
     t.failReason = err.Error()
 }
 
-// setChecks publishes the condition list of the scenario.
 func (t *Test) setChecks(checks []Check) {
     if len(checks) > checkLogLimit {
         checks = checks[:checkLogLimit]
@@ -273,7 +269,6 @@ type Manager struct {
     db   *DB
 }
 
-// ManagerDeps carries the process level dependencies of the manager.
 type ManagerDeps struct {
     Registry *state.Registry
     Login    string
@@ -333,7 +328,6 @@ func NewManager(deps ManagerDeps, defs []TestDef) *Manager {
     return manager
 }
 
-// Tests snapshots the state of every scenario.
 func (m *Manager) Tests() []TestView {
     views := make([]TestView, 0, len(m.tests))
     for _, test := range m.tests {
@@ -343,7 +337,6 @@ func (m *Manager) Tests() []TestView {
     return views
 }
 
-// tracker returns the bot state tracker of a test.
 func (m *Manager) tracker(t *Test) *state.Bot {
     bot, _ := m.registry.Get(t.def.Account)
 
@@ -475,7 +468,6 @@ func (m *Manager) RunAllParallel(ctx context.Context) error {
     return nil
 }
 
-// findTest resolves the test by id.
 func (m *Manager) findTest(id string) (*Test, error) {
     for _, test := range m.tests {
         if test.def.ID == id {
@@ -735,7 +727,6 @@ func (m *Manager) injectReset(reset characterReset, test *Test) error {
     return nil
 }
 
-// itoa renders the decimal form of an int.
 func itoa(value int) string {
     return strconv.Itoa(value)
 }

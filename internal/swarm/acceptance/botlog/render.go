@@ -13,7 +13,6 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// xyz renders a world position tuple.
 func xyz(x int32, y int32, z int32) string {
     return "(" + strconv.Itoa(int(x)) + "," +
         strconv.Itoa(int(y)) + "," + strconv.Itoa(int(z)) + ")"
@@ -46,7 +45,6 @@ func unknownLine(side string, payload []byte) string {
         strconv.Itoa(len(payload)) + " bytes: " + string(hex)
 }
 
-// skillName resolves a skill id into its catalog name.
 func skillName(skillID int32) string {
     info, ok := npcdata.SkillInfoOf(skillID)
     if !ok || info.Name == "" {
@@ -101,7 +99,6 @@ func trimText(value string, limit int) string {
     return value[:limit] + "..."
 }
 
-// quote renders a quoted log field.
 func quote(value string) string {
     return "\"" + strings.ReplaceAll(value, "\"", "'") + "\""
 }

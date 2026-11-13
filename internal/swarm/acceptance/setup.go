@@ -67,7 +67,6 @@ const (
     onlinePollTimeout = 45 * time.Second
 )
 
-// characterReset is the injected start state of one temp character.
 type characterReset struct {
     Account string
     Char    string
@@ -427,7 +426,6 @@ func resetCharacter(db *DB, reset characterReset, log func(string)) error {
     return nil
 }
 
-// characterID resolves the character row id of the temp account.
 func characterID(db *DB, reset characterReset) (int64, error) {
     rows, err := db.Query(
         "SELECT charId FROM characters WHERE account_name='" +

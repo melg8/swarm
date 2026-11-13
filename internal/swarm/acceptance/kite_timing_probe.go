@@ -99,7 +99,6 @@ const (
     checkKiteProbeShot   = "wasd-shot"
 )
 
-// kiteProbeChecks is the initial check list of the probe.
 func kiteProbeChecks() []Check {
     return []Check{
         {
@@ -405,7 +404,6 @@ type probeWASDResult struct {
     damageLanded      bool
 }
 
-// markWASD writes the cursor key round into the checks and the log.
 func markWASD(test *Test, result probeWASDResult) {
     test.updateCheck(checkKiteProbeWASD, result.movedDuringWindup,
         fmt.Sprintf("moved %.0f units during the windup, %d claim"+
@@ -588,7 +586,6 @@ func (s *kiteProbeSession) dress() error {
     return nil
 }
 
-// inventoryObject resolves an item id to its inventory object id.
 func (s *kiteProbeSession) inventoryObject(itemID int32,
 ) (int32, bool) {
     for _, item := range s.tracker.Snapshot().Inventory {

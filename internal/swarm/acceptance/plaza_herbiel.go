@@ -75,7 +75,6 @@ func plazaHerbielReset(account string) characterReset {
     return reset
 }
 
-// plazaHerbielChecks builds the initial check list of the scenario.
 func plazaHerbielChecks() []Check {
     return []Check{
         {

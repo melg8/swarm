@@ -310,7 +310,6 @@ func evaluateFarmConditions(
     test.updateCheck(checkKill, killed, killDetail)
 }
 
-// weaponWord renders the weapon state of the equipment detail.
 func weaponWord(weapon int) string {
     if weapon == 1 {
         return ", weapon in hand"
@@ -319,7 +318,6 @@ func weaponWord(weapon int) string {
     return ", no weapon"
 }
 
-// auraWord renders the aura state of the buff detail.
 func auraWord(buffed bool) string {
     if buffed {
         return "attack aura and defence aura running"
@@ -328,7 +326,6 @@ func auraWord(buffed bool) string {
     return "the auras are not running"
 }
 
-// allChecksDone reports whether every check of the test holds.
 func allChecksDone(test *Test) bool {
     test.mu.Lock()
     defer test.mu.Unlock()

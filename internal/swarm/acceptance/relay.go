@@ -74,7 +74,6 @@ func startRelayProxy() (*relayProxy, relayAddresses, error) {
     return &relayProxy{server: server, logFile: logFile}, addresses, nil
 }
 
-// Stop shuts the dedicated proxy down.
 func (r *relayProxy) Stop() {
     ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
     defer cancel()
@@ -82,7 +81,6 @@ func (r *relayProxy) Stop() {
     _ = r.logFile.Close()
 }
 
-// relayAddresses carries the endpoints of the dedicated proxy.
 type relayAddresses struct {
     login    string
     gameHost string
@@ -123,7 +121,6 @@ type relayClient struct {
     readBuf []byte
 }
 
-// relayAddresses exposes the endpoints for the client dialing.
 type relayLoginClient struct {
     conn     net.Conn
     crypt    *crypt.LoginCrypt
@@ -132,7 +129,6 @@ type relayLoginClient struct {
     loginOk2 int32
 }
 
-// relayGameClient drives the game side through the proxy.
 type relayGameClient struct {
     conn     net.Conn
     crypt    *crypt.GameCrypt
@@ -327,7 +323,6 @@ func driveRelayWorld(
     return driveRelayTransit(game, tracker, test)
 }
 
-// close drops the client connections.
 func (c *relayClient) close() {
     if c.login != nil {
         _ = c.login.conn.Close()
@@ -337,7 +332,6 @@ func (c *relayClient) close() {
     }
 }
 
-// dialRelayLogin connects to the emulated login server.
 func dialRelayLogin(address string) (*relayLoginClient, error) {
     conn, err := relayDialer.Dial("tcp", address)
     if err != nil {
@@ -406,7 +400,6 @@ func (c *relayLoginClient) accept(
     return loginOk, nil
 }
 
-// serverList reads the server list of the emulated server.
 func (c *relayLoginClient) serverList() (
     *fromauthserver.ServerListPacket, error,
 ) {
@@ -429,7 +422,6 @@ func (c *relayLoginClient) serverList() (
     return list, nil
 }
 
-// play claims the game server slot and reads the PlayOk.
 func (c *relayLoginClient) play(
     serverID int8,
 ) (*fromauthserver.PlayOkPacket, error) {
@@ -473,7 +465,6 @@ func (c *relayLoginClient) send(p crypt.Serializable) error {
     return nil
 }
 
-// readSealed reads and opens one sealed login packet.
 func (c *relayLoginClient) readSealed() ([]byte, error) {
     payload, err := readWirePacket(c.conn)
     if err != nil {
@@ -496,7 +487,6 @@ func opcodeOf(content []byte) byte {
     return content[0]
 }
 
-// dialRelayGame connects to the emulated game server of the proxy.
 func dialRelayGame(addresses relayAddresses) (*relayGameClient, error) {
     address := net.JoinHostPort(addresses.gameHost,
         strconv.FormatInt(int64(addresses.gamePort), 10))
@@ -557,7 +547,6 @@ func (c *relayGameClient) authLogin(login *relayLoginClient) error {
     return c.sendRaw(payload)
 }
 
-// sendRaw encrypts and sends one client packet payload.
 func (c *relayGameClient) sendRaw(payload []byte) error {
     owned := make([]byte, len(payload))
     copy(owned, payload)
@@ -569,7 +558,6 @@ func (c *relayGameClient) sendRaw(payload []byte) error {
     return nil
 }
 
-// readRelayPacket reads and decrypts one server packet payload.
 func (c *relayGameClient) readRelayPacket() ([]byte, error) {
     payload, err := readWirePacket(c.conn)
     if err != nil {
@@ -639,7 +627,6 @@ func writeWirePacket(conn net.Conn, payload []byte) error {
     return err
 }
 
-// readFull fills the buffer completely.
 func readFull(conn net.Conn, buf []byte) error {
     total := 0
     for total < len(buf) {

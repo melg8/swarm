@@ -2672,6 +2672,19 @@ corner probe is a length, not a leg at all.
   and cmd/swarm (0.1 s) suites, `golangci-lint run` on the six paths 0
   issues, `task fmt:check` clean.
 
+### 2026-11-13 - the restating acceptance and botlog docs
+
+- The acceptance scenarios and the botlog renderers carried 134 one-line
+  docs that restate their own signature: the `*Checks` list builders, the
+  `decodeRecv*`/`decodeSend*` renderers, the relay and database protocol
+  helpers. They go; the docs that name a server fact (the sealed login
+  envelope, the null-terminated UTF-16LE field, the vitals block) stay.
+- 27 files, 134 comment lines fewer; the audit reads 16 816 of 170 351
+  (9.9 percent), so the share target keeps a margin.
+- Verified: `task fmt`, `go build ./...`, the acceptance (8.9 s) and
+  botlog (0.6 s) suites, `golangci-lint run` on the two paths 0 issues,
+  `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

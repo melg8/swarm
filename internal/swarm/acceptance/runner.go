@@ -154,14 +154,12 @@ func (m *Manager) openGame(
     return auth, game, nil
 }
 
-// gameAddress renders the game server endpoint of the auth result.
 func gameAddress(auth *connection.AuthResult) string {
     return fmt.Sprintf("%d.%d.%d.%d:%d",
         auth.ServerIP[0], auth.ServerIP[1], auth.ServerIP[2], auth.ServerIP[3],
         auth.ServerPort)
 }
 
-// tapGame wires the run log packet taps onto one game client.
 func (m *Manager) tapGame(game *connection.GameClient, account string) {
     runLog := m.runLogFor(account)
     if runLog == nil {
@@ -373,7 +371,6 @@ func (m *Manager) runSessionSupervised(
     }
 }
 
-// registryTracker resolves the tracker of a temp account.
 func (m *Manager) registryTracker(account string) *state.Bot {
     if bot, ok := m.registry.Get(account); ok {
         return bot
@@ -401,7 +398,6 @@ type logMirror struct {
     logLine func(string)
 }
 
-// Write implements io.Writer for the log package.
 func (m logMirror) Write(p []byte) (int, error) {
     line := trimLogSpace(string(p))
     if line == "" {
@@ -413,7 +409,6 @@ func (m logMirror) Write(p []byte) (int, error) {
     return len(p), nil
 }
 
-// trimLogSpace strips the line ends of a console log line.
 func trimLogSpace(value string) string {
     start := 0
     for start < len(value) && isLogSpace(value[start]) {

@@ -133,7 +133,6 @@ const (
     checkArcherKiteQuiver   = "quiver"
 )
 
-// archerKiteChecks is the initial check list of the archer scenario.
 func archerKiteChecks() []Check {
     return []Check{
         {
@@ -247,7 +246,6 @@ type archerKiteLog struct {
     kills  int
 }
 
-// newArcherKiteLog arms the wrapper around the base log line callback.
 func newArcherKiteLog(next func(string)) *archerKiteLog {
     return &archerKiteLog{next: next}
 }
@@ -276,7 +274,6 @@ func (l *archerKiteLog) line(line string) {
     l.next(line)
 }
 
-// counts reads the kite telemetry counters.
 func (l *archerKiteLog) counts() (
     steps, holds, reloads, kills int,
 ) {

@@ -101,7 +101,6 @@ func decodeSend(payload []byte) []string {
     return []string{unknownLine("send", payload)}
 }
 
-// decodeSendWorld dispatches the movement, target and skill packets.
 func decodeSendWorld(c *cursor, payload []byte) ([]string, bool) {
     switch payload[0] {
     case 0x01:
@@ -121,7 +120,6 @@ func decodeSendWorld(c *cursor, payload []byte) ([]string, bool) {
     }
 }
 
-// decodeSendInventory dispatches the account and item packets.
 func decodeSendInventory(c *cursor, payload []byte) ([]string, bool) {
     switch payload[0] {
     case 0x08:
@@ -201,7 +199,6 @@ func decodeSendAction(c *cursor) []string {
     return []string{line}
 }
 
-// decodeSendAuthLogin renders the game server auth login.
 func decodeSendAuthLogin(c *cursor) []string {
     account, ok := c.utf16()
     if !ok {
@@ -211,7 +208,6 @@ func decodeSendAuthLogin(c *cursor) []string {
     return []string{"auth login account=" + account}
 }
 
-// decodeSendCharCreate renders the character creation request.
 func decodeSendCharCreate(c *cursor) []string {
     name, ok := c.utf16()
     if !ok {
@@ -221,7 +217,6 @@ func decodeSendCharCreate(c *cursor) []string {
     return []string{"character create name=" + name}
 }
 
-// decodeSendCharSelect renders the character slot selection.
 func decodeSendCharSelect(c *cursor) []string {
     slot, ok := c.int32()
     if !ok {
@@ -231,7 +226,6 @@ func decodeSendCharSelect(c *cursor) []string {
     return []string{"character select slot=" + strconv.Itoa(int(slot))}
 }
 
-// decodeSendDropItem renders the ground drop request.
 func decodeSendDropItem(c *cursor) []string {
     objectID, ok1 := c.int32()
     count, ok2 := c.int32()
@@ -246,7 +240,6 @@ func decodeSendDropItem(c *cursor) []string {
         " count=" + strconv.Itoa(int(count)) + " at=" + xyz(x, y, z)}
 }
 
-// decodeSendUseItem renders the use/equip request.
 func decodeSendUseItem(c *cursor) []string {
     objectID, ok := c.int32()
     if !ok {
@@ -256,7 +249,6 @@ func decodeSendUseItem(c *cursor) []string {
     return []string{"use item object=" + strconv.Itoa(int(objectID))}
 }
 
-// decodeSendChangeMoveType renders the run/walk stance switch.
 func decodeSendChangeMoveType(c *cursor) []string {
     run, ok := c.int32()
     if !ok {
@@ -335,7 +327,6 @@ func decodeSendBypass(c *cursor) []string {
     return []string{"bypass \"" + command + "\""}
 }
 
-// decodeSendMagicSkillUse renders the skill cast request.
 func decodeSendMagicSkillUse(c *cursor) []string {
     skillID, ok1 := c.int32()
     ctrl, ok2 := c.int32()
@@ -390,7 +381,6 @@ func decodeSendValidatePosition(c *cursor) []string {
         " heading=" + strconv.Itoa(int(heading))}
 }
 
-// decodeSendDestroyItem renders the destroy request.
 func decodeSendDestroyItem(c *cursor) []string {
     objectID, ok1 := c.int32()
     count, ok2 := c.int32()
@@ -403,7 +393,6 @@ func decodeSendDestroyItem(c *cursor) []string {
         strconv.Itoa(int(count))}
 }
 
-// decodeSendAcquireSkill renders the lesson request.
 func decodeSendAcquireSkill(c *cursor) []string {
     skillID, ok1 := c.int32()
     level, ok2 := c.int32()

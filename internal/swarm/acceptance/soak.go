@@ -80,7 +80,6 @@ const (
     checkSoakGraceful = "graceful"
 )
 
-// soakChecks is the initial check list of the soak scenario.
 func soakChecks() []Check {
     return []Check{
         {

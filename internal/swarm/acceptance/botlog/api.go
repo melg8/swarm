@@ -150,14 +150,12 @@ func (l *RunLog) Sample(line string) {
     l.emit(tagSample, []string{line})
 }
 
-// Stats carries the counters of the finished run.
 type Stats struct {
     RecvPackets uint64
     SentPackets uint64
     Dropped     uint64
 }
 
-// stats snapshots the counters.
 func (l *RunLog) stats() Stats {
     return Stats{
         RecvPackets: l.recvN.Load(),

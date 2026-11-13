@@ -144,7 +144,6 @@ func evaluateRailingPocket(
     return dist >= railingPocketRadius, detail
 }
 
-// railingPocketChecks builds the initial check list of the pocket scenario.
 func railingPocketChecks() []Check {
     return []Check{{
         ID:     checkPocketEscape,

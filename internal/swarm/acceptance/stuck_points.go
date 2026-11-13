@@ -166,13 +166,11 @@ func stuckPointChecks() []Check {
     }}
 }
 
-// stuckPointAScenario runs the first reported spot round.
 func stuckPointAScenario(ctx context.Context, m *Manager, t *Test) error {
     return runStuckPointScenario(ctx, m, t, stuckAccountA, stuckPasswordA,
         stuckPointAX, stuckPointAY, stuckPointAZ)
 }
 
-// stuckPointBScenario runs the second reported spot round.
 func stuckPointBScenario(ctx context.Context, m *Manager, t *Test) error {
     return runStuckPointScenario(ctx, m, t, stuckAccountB, stuckPasswordB,
         stuckPointBX, stuckPointBY, stuckPointBZ)

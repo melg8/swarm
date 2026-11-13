@@ -80,14 +80,12 @@ func (db *DB) SetQueryLog(log func(statement string)) {
     db.queryLog = log
 }
 
-// note hands one executed statement to the observer.
 func (db *DB) note(sql string) {
     if db.queryLog != nil {
         db.queryLog(sql)
     }
 }
 
-// DBConfig describes the database endpoint of the deployment.
 type DBConfig struct {
     Address  string
     Socket   string
@@ -231,7 +229,6 @@ func (db *DB) handshake(config DBConfig) error {
     }
 }
 
-// handshakeResponse builds the HandshakeResponse41 payload.
 func handshakeResponse(config DBConfig) []byte {
     payload := make([]byte, 0, 96)
     payload = appendUint32(payload,
@@ -309,7 +306,6 @@ func (db *DB) Query(sql string) ([][]string, error) {
     }
 }
 
-// Exec runs one SQL statement and returns the affected row count.
 func (db *DB) Exec(sql string) (int64, error) {
     if err := db.conn.SetDeadline(time.Now().Add(dbTimeout)); err != nil {
         return 0, fmt.Errorf("deadline: %w", err)
@@ -337,7 +333,6 @@ func (db *DB) Exec(sql string) (int64, error) {
     }
 }
 
-// Close closes the connection.
 func (db *DB) Close() error {
     return db.conn.Close()
 }
@@ -353,7 +348,6 @@ func (db *DB) sendCommand(sql string) error {
 // Wire packet framing: the 3 byte little endian length prefix, the
 // sequence byte, then the payload.
 
-// writePacket writes one framed packet.
 func (db *DB) writePacket(payload []byte) error {
     header := []byte{
         byte(len(payload)), byte(len(payload) >> 8), byte(len(payload) >> 16),
@@ -371,7 +365,6 @@ func (db *DB) writePacket(payload []byte) error {
     return err
 }
 
-// readPacket reads one framed packet.
 func (db *DB) readPacket() ([]byte, error) {
     header := make([]byte, 4)
     if _, err := io.ReadFull(db.conn, header); err != nil {
@@ -387,7 +380,6 @@ func (db *DB) readPacket() ([]byte, error) {
     return payload, nil
 }
 
-// protocolError turns an ERR payload into an error value.
 func (db *DB) protocolError(payload []byte, context string) error {
     if len(payload) >= 3 && payload[0] == errHeader {
         code := int(payload[1]) | int(payload[2])<<8
@@ -404,7 +396,6 @@ func (db *DB) protocolError(payload []byte, context string) error {
     return fmt.Errorf("db %s: unexpected payload % x", context, payload)
 }
 
-// parseGreetingPlugin reads the auth plugin name of the server greeting.
 func parseGreetingPlugin(payload []byte) (string, error) {
     // int<1> protocol version.
     if len(payload) < 2 {
@@ -445,7 +436,6 @@ func parseGreetingPlugin(payload []byte) (string, error) {
     return string(payload[pos:min(end, len(payload))]), nil
 }
 
-// parseTextRow splits one text result row into its column strings.
 func parseTextRow(payload []byte, columns int) ([]string, error) {
     row := make([]string, 0, columns)
     pos := 0
@@ -475,7 +465,6 @@ func parseTextRow(payload []byte, columns int) ([]string, error) {
     return row, nil
 }
 
-// readLenEncInt reads one length encoded integer.
 func readLenEncInt(payload []byte, pos int) (int64, int, error) {
     if pos >= len(payload) {
         return 0, 0, errors.New("length encoded integer past the end")
@@ -513,7 +502,6 @@ func readLenEncInt(payload []byte, pos int) (int64, int, error) {
     }
 }
 
-// appendUint32 appends a little endian uint32.
 func appendUint32(dst []byte, value uint32) []byte {
     return append(dst, byte(value), byte(value>>8), byte(value>>16),
         byte(value>>24))

@@ -118,7 +118,6 @@ func scrollEscapeReset(account string) characterReset {
     }
 }
 
-// scrollEscapeChecks builds the initial check list in its narrative order.
 func scrollEscapeChecks() []Check {
     return []Check{
         {
@@ -355,7 +354,6 @@ type scrollEscapeWatch struct {
     landedDetail   string
 }
 
-// evaluate rewrites the check list from one live tracker read.
 func (w *scrollEscapeWatch) evaluate(tracker *state.Bot, test *Test) {
     if tracker.Status() != state.StatusOnline {
         return

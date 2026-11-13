@@ -120,7 +120,6 @@ func (g *stagnationGuard) update(tracker *state.Bot) {
     }
 }
 
-// fired reports whether the guard tripped.
 func (g *stagnationGuard) fired() bool {
     return g.firedReason != ""
 }

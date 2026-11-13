@@ -117,7 +117,6 @@ func classTransferReset() characterReset {
     }
 }
 
-// classTransferChecks is the staged condition list of the scenario.
 func classTransferChecks() []Check {
     return []Check{
         {
@@ -426,7 +425,6 @@ func classTransferAbort(
     return errors.New(reason)
 }
 
-// classTransferPass writes the PASS metrics row of the full run.
 func classTransferPass(
     test *Test, tracker *state.Bot, start time.Time,
 ) error {
@@ -470,7 +468,6 @@ func awaitSelfClassID(
     }
 }
 
-// awaitQuestNpc waits for the quest npc to appear in the world store.
 func awaitQuestNpc(
     ctx context.Context, tracker *state.Bot, npc hunt.QuestNpc,
     wait time.Duration, test *Test,
@@ -577,7 +574,6 @@ func writeClassTransferOutcomeMetrics(
     })
 }
 
-// writeClassTransferFailMetrics appends the fail row of a setup failure.
 func writeClassTransferFailMetrics(test *Test, reason string) {
     writeSoakMetrics(test, soakMetrics{
         Date:        nowUTC(),

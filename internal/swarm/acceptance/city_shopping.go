@@ -328,7 +328,6 @@ type cityShoppingWatch struct {
     farmDone     bool
 }
 
-// evaluate rewrites the check list from one live tracker snapshot.
 func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
     if tracker.Status() != state.StatusOnline {
         return

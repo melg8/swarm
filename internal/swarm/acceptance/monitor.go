@@ -106,7 +106,6 @@ func evaluateLesson(tracker *state.Bot) (detail string, done bool) {
     return fmt.Sprintf("%d sp, the lessons began", sp), true
 }
 
-// farmChecks is the initial check list of the farm readiness scenario.
 func farmChecks() []Check {
     return []Check{
         {
@@ -136,7 +135,6 @@ func farmChecks() []Check {
     }
 }
 
-// lifetimeChecks is the check list of the bot lifetime scenario.
 func lifetimeChecks() []Check {
     return []Check{
         {
@@ -185,7 +183,6 @@ var fullDressSlots = [...]int{
     state.PaperdollLFinger, state.PaperdollRFinger,
 }
 
-// fullDressChecks is the check list of the world entry burst scenario.
 func fullDressChecks() []Check {
     return []Check{
         {
@@ -297,7 +294,6 @@ func evaluateGearGapConditions(tracker *state.Bot, test *Test) {
         legsWord(counts.legs))
 }
 
-// legsWord renders the legs slot state of the gear gap detail.
 func legsWord(legs int) string {
     if legs == 1 {
         return "the legs slot is dressed"
@@ -306,7 +302,6 @@ func legsWord(legs int) string {
     return "the legs slot is still empty"
 }
 
-// relayChecks is the check list of the proxy relay scenario.
 func relayChecks() []Check {
     return []Check{
         {
@@ -332,7 +327,6 @@ func relayChecks() []Check {
     }
 }
 
-// equipCounts summarizes the paperdoll of the character.
 type equipCounts struct {
     weapon int
     chest  int
@@ -345,7 +339,6 @@ type equipCounts struct {
     shield int
 }
 
-// armor sums the six armor slots.
 func (c equipCounts) armor() int {
     return c.chest + c.legs + c.head + c.gloves + c.feet + c.back
 }
@@ -377,7 +370,6 @@ func evaluateEquipment(tracker *state.Bot) (equipCounts, bool) {
     return counts, proper
 }
 
-// filled reports a filled paperdoll slot.
 func filled(objectID int32) int {
     if objectID != 0 {
         return 1
@@ -455,7 +447,6 @@ func insideZone(zone *state.Zone, x int32, y int32) bool {
     return abs32(x-zone.CX) <= zone.Half && abs32(y-zone.CY) <= zone.Half
 }
 
-// abs32 is the absolute value of an int32.
 func abs32(value int32) int32 {
     if value < 0 {
         return -value

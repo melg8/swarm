@@ -58,7 +58,6 @@ func (m *Manager) openRunLog(test *Test, generation uint64) *botlog.RunLog {
     return log
 }
 
-// checkDescs snapshots the check list of a test into the botlog shape.
 func checkDescs(test *Test) []botlog.CheckDesc {
     test.mu.Lock()
     defer test.mu.Unlock()
@@ -157,7 +156,6 @@ func (s *runLogSampler) Run(ctx context.Context) {
     }
 }
 
-// renderSample reads the tracker into one sample line.
 func renderSample(tracker *state.Bot) string {
     x, y, z, ok := tracker.SelfPosition()
     position := "unknown"
