@@ -489,6 +489,35 @@ manages its own budgets). Covered by hunt/loop_los_test.go
 stale stance timeout, timeout hold, attempt scoping, fresh fight
 guard) and the state tracker test of the refusal recording.
 
+## The covered pick lure (hunt/lure.go)
+
+A melee hunter answers a pick that stands inside the aggro radius of a
+covering pack the archer way, using the bow the gear plan buys behind
+the weapon milestone (`gear/bow.go` restocks the quiver on the town
+trips):
+
+- the cover detection (`targetCovered`): an idle aggressive mob whose
+  on-sight circle plus the 200 unit slack reaches the pick or the
+  straight approach segment;
+- the approach stops at the 420 unit standoff, a hair inside the 500
+  unit bow range and outside every threat circle. The standoff
+  direction is the one from the target toward the character, rotated
+  through the eight compass directions until a candidate is clean; the
+  fallback keeps the character side;
+- the arm phase equips the bow and the quiver through the ordinary use
+  item requests, paced at the 2 s flood protector window and held by
+  the paperdoll confirmation gate;
+- the pull is the ordinary forced attack request: with the bow in hand
+  the server starts the ranged auto attack and the learned Power Shot
+  casts through the combat skill flow. The hunter holds the position,
+  so the attacked mob runs to the shooter and the cover does not (the
+  character never entered its aggro radius);
+- the arrival at 200 units swaps the melee weapon back and the fight
+  continues as an ordinary one. A pull that never engages releases the
+  target within 30 s to the ordinary skip machinery.
+
+Pinned by `hunt/lure_test.go`.
+
 ## The archer kite (hunt/kite.go)
 
 The typed fleet of the config launch (docs/launch_config.md) runs

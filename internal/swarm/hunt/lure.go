@@ -4,30 +4,11 @@
 
 package hunt
 
-// The ranged luring of the melee hunter: a mob that stands covered by
-// other monsters (an aggressive pack between the character and the
-// pick, or an aggressive neighbor sharing the ground with it) cannot
-// be approached without pulling the cover, so the hunter that owns a
-// bow answers the covered pick the archer way:
-//
-//   - the approach stops at a standoff point outside every threat
-//     circle (a bow shoots at 500 units, the approach segment walks there
-//     without entering the aggro radius of the cover);
-//   - the arm phase equips the bow (the right hand swap: the melee
-//     weapon remembers itself for the swap back) and the quiver (the
-//     arrows ride the left hand);
-//   - the pull fires the ordinary forced attack request - with the
-//     bow in hand the server starts the ranged auto attack and the
-//     learned bow strike (Power Shot) casts through the ordinary
-//     combat skill flow - and the hunter HOLDS the position: the
-//     attacked mob runs to the shooter, the cover does not (the
-//     character never entered its aggro radius);
-//   - the arrival swaps the melee weapon back once the mob closed to
-//     the melee range, and the fight continues as an ordinary one.
-//
-// The ownership of the tool lives in the shop strategy (see
-// gear/bow.go): the melee profiles buy the next bow rung behind the
-// weapon milestone and restock the quiver on the town trips.
+// The covered pick lure: a melee hunter whose pick stands inside the aggro
+// radius of a covering pack approaches the archer way - a standoff point
+// outside every threat circle, the bow and quiver armed, the ordinary forced
+// attack fired from there. The attacked mob runs to the shooter, the cover
+// does not, and the arrival swaps the melee weapon back (docs/hunting.md).
 
 import (
     "math"
@@ -40,34 +21,30 @@ import (
 
 // The timing and geometry constants of the luring.
 const (
-    // lureStandoff is the shooting distance the approach stops at: a
-    // hair inside the 500 unit bow attack range, far outside the melee
-    // approach that would walk into the cover.
+    // lureStandoff stops the approach a hair inside the 500 unit bow range,
+    // far outside the melee approach that would walk into the cover.
     lureStandoff = 420.0
-    // lureArriveRange is the distance the pulled mob closes to before
-    // the melee weapon swaps back.
+    // lureArriveRange is the distance the pulled mob closes to before the
+    // melee weapon swaps back.
     lureArriveRange = 200.0
-    // lureApproachSlack widens the approach segment pacing: one walk
-    // request per second matches the far target walk cadence.
+    // lureSegmentPeriod paces the approach: one walk request per second, the
+    // far target walk cadence.
     lureSegmentPeriod = 1 * time.Second
-    // lureArmPeriod paces the equip requests of the arm phase: the
-    // flood protector window of the player actions.
+    // lureArmPeriod paces the equip requests: the flood protector window of
+    // the player actions.
     lureArmPeriod = 2 * time.Second
-    // lureTimeout bounds the whole lure: a mob that never answers the
-    // pull (leashed behind an obstacle, despawned mid pull) releases
+    // lureTimeout bounds the lure: a mob that never answers the pull releases
     // the target to the ordinary skip machinery.
     lureTimeout = 30 * time.Second
-    // lureCoverSlack widens the cover detection: the melee approach of
-    // the pick ends within ~100 units of it, an aggro circle that
-    // reaches the neighborhood of the pick fires on the approach.
+    // lureCoverSlack widens the cover detection: the melee approach ends
+    // within ~100 units of the pick, so the reaching circle fires on it.
     lureCoverSlack = 200.0
-    // lureCoverProbe walks the standoff candidates around the target:
-    // eight directions, the character side first.
+    // lureCoverProbe walks the standoff candidates: eight directions, the
+    // character side first.
     lureCoverProbe = 8
 )
 
-// weaponTypeBow is the gear weapon family of the bows (the luring
-// tool of the melee hunter).
+// weaponTypeBow is the gear weapon family of the bows.
 const weaponTypeBow = "BOW"
 
 // lurePhase is one step of the lure state machine.
@@ -103,10 +80,8 @@ func (l *Loop) lureArmed() bool {
     return l.lure != nil
 }
 
-// maybeBeginLure answers a fresh pick: when the target stands covered
-// by other monsters and the hunter owns the ranged tool, the lure
-// state machine takes the pick over. The caller just picked the
-// target; the ordinary attack flow keeps running when no lure began.
+// maybeBeginLure takes a fresh pick over when the target stands covered and
+// the hunter owns the ranged tool; otherwise the ordinary attack flow runs.
 func (l *Loop) maybeBeginLure(now time.Time) {
     if l.equip == nil || !l.profileLuresWithBow() {
         return
@@ -134,8 +109,8 @@ func (l *Loop) maybeBeginLure(now time.Time) {
     if paperdoll[state.PaperdollRHand] != 0 {
         kind, weaponOK := l.tracker.SelfWeaponKind()
         if weaponOK && kind == weaponTypeBow {
-            // The bow is already worn (an interrupted lure, a manual
-            // swap): the arm phase skips its own equip.
+            // The bow is already worn (an interrupted lure): the arm phase
+            // skips its own equip.
             meleeObjID = 0
         } else {
             meleeObjID = paperdoll[state.PaperdollRHand]
@@ -160,10 +135,9 @@ func (l *Loop) maybeBeginLure(now time.Time) {
         standX, standY)
 }
 
-// lureTick advances the lure state machine. It reports true when the
-// tick is consumed (the approach and the arm phases own the movement
-// and the action budget); the shoot phase lets the ordinary attack
-// flow fire and only watches the arrival.
+// lureTick advances the lure state machine, reporting whether the tick is
+// consumed: the approach and arm phases own the movement and action budget,
+// the shoot phase lets the ordinary attack flow fire and watches the arrival.
 func (l *Loop) lureTick(now time.Time) bool {
     lure := l.lure
     if lure == nil {
@@ -175,9 +149,8 @@ func (l *Loop) lureTick(now time.Time) bool {
         return false
     }
     if lure.target != l.target || !l.tracker.ObjectAlive(lure.target) {
-        // The target switched or died mid lure: the ordinary flow
-        // owns the aftermath, the weapon restores through the auto
-        // equipment.
+        // The target switched or died mid lure: the ordinary flow owns the
+        // aftermath, the weapon restores through the auto equipment.
         l.clearLure()
 
         return false
@@ -196,8 +169,8 @@ func (l *Loop) lureTick(now time.Time) bool {
     return false
 }
 
-// lureApproachTick walks the character to the standoff point one
-// paced segment at a time. The arrival hands the phase over to the arm.
+// lureApproachTick walks the character to the standoff point one paced
+// segment at a time; the arrival hands the phase over to the arm.
 func (l *Loop) lureApproachTick(lure *lureState, now time.Time) bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
@@ -224,16 +197,14 @@ func (l *Loop) lureApproachTick(lure *lureState, now time.Time) bool {
     return true
 }
 
-// lureArmTick equips the ranged tool: the bow first, the quiver
-// second (the arrows ride the left hand the bow frees). The phase
-// completes when the paperdoll shows both pieces.
+// lureArmTick equips the ranged tool, the bow first and then the quiver; the
+// phase completes when the paperdoll shows both pieces.
 func (l *Loop) lureArmTick(lure *lureState, now time.Time) bool {
     if !lure.armAt.IsZero() && now.Sub(lure.armAt) < lureArmPeriod {
         return true
     }
     if len(l.userDeferred) > 0 {
-        // The manual command queue owns the item action budget right
-        // now.
+        // The manual command queue owns the item action budget right now.
         return true
     }
     kind, weaponOK := l.tracker.SelfWeaponKind()
@@ -242,8 +213,8 @@ func (l *Loop) lureArmTick(lure *lureState, now time.Time) bool {
         if !lure.armedBow {
             if !l.inventoryItemAllowed(lure.bowObjID,
                 gear.ServerWriteSlots(l.equipment(), lure.bowObjID)) {
-                // The bow equip request is in flight: the confirmation
-                // gate holds the arm until the paperdoll answers.
+                // The equip request is in flight: the confirmation gate holds
+                // the arm until the paperdoll answers.
                 lure.armAt = now
 
                 return true
@@ -261,8 +232,7 @@ func (l *Loop) lureArmTick(lure *lureState, now time.Time) bool {
 
             return true
         }
-        // The equip request is in flight: the confirmation gate holds
-        // the next action until the paperdoll answers.
+        // The equip confirmation is still in flight: hold the next action.
         lure.armAt = now
 
         return true
@@ -270,8 +240,8 @@ func (l *Loop) lureArmTick(lure *lureState, now time.Time) bool {
     if !lure.armedArrow {
         if !l.inventoryItemAllowed(lure.arrowObjID,
             gear.ServerWriteSlots(l.equipment(), lure.arrowObjID)) {
-            // The quiver request races an in flight write set (the
-            // bow freeing the left hand): hold until it confirms.
+            // The quiver races the bow freeing the left hand: hold until the
+            // write set confirms.
             lure.armAt = now
 
             return true
@@ -295,9 +265,8 @@ func (l *Loop) lureArmTick(lure *lureState, now time.Time) bool {
     return false
 }
 
-// lureShootTick watches the pulled mob run: the ordinary attack flow
-// keeps the ranged auto attack running, the arrival swaps the melee
-// weapon back and ends the lure.
+// lureShootTick watches the pulled mob run: the ordinary attack flow keeps
+// the ranged auto attack up, the arrival swaps the melee weapon back.
 func (l *Loop) lureShootTick(lure *lureState) {
     targetX, targetY, _, ok := l.tracker.ObjectPosition(lure.target)
     if !ok {
@@ -313,8 +282,8 @@ func (l *Loop) lureShootTick(lure *lureState) {
     if dist > lureArriveRange {
         return
     }
-    // The mob closed to the melee range: back to the sword, the fight
-    // continues the ordinary way.
+    // The mob closed to the melee range: back to the sword and the ordinary
+    // fight.
     l.clearLure()
     if lure.meleeObjID != 0 {
         l.markInventoryAction(lure.meleeObjID)
@@ -328,9 +297,9 @@ func (l *Loop) lureShootTick(lure *lureState) {
     }
 }
 
-// abortLure ends the lure on a failure: the target skips for a while
-// (the ordinary engage skip machinery takes it) and the weapon
-// restores through the auto equipment.
+// abortLure ends the lure on a failure: the target skips for a while (the
+// ordinary engage skip machinery) and the weapon restores through the auto
+// equipment.
 func (l *Loop) abortLure(reason string, now time.Time) {
     lure := l.lure
     if lure == nil {
@@ -351,15 +320,14 @@ func (l *Loop) abortLure(reason string, now time.Time) {
     l.logf("Hunt: the lure of %s aborted: %s", name, reason)
 }
 
-// clearLure drops the lure state without side effects: the auto
-// equipment restores the melee weapon (the bow scores zero for the
-// profile, the planner swaps it back on the next scan).
+// clearLure drops the lure state: the auto equipment restores the melee
+// weapon because the bow scores zero for the melee profile.
 func (l *Loop) clearLure() {
     l.lure = nil
 }
 
-// profileLuresWithBow reports whether the gear profile of the loop
-// fights in melee (the mystic casts from range, no luring tool).
+// profileLuresWithBow reports whether the gear profile fights in melee (the
+// mystic casts from range, no luring tool).
 func (l *Loop) profileLuresWithBow() bool {
     if l.equip == nil {
         return false
@@ -368,9 +336,8 @@ func (l *Loop) profileLuresWithBow() bool {
     return l.equip.profile.Name() == "melee fighter"
 }
 
-// bowAndArrow resolves the ranged tool of the inventory: the strongest
-// bow (equipped or bagged) and the largest arrow stack. A missing
-// piece answers false.
+// bowAndArrow resolves the strongest bow (equipped or bagged) and the largest
+// arrow stack of the inventory; a missing piece answers false.
 func (l *Loop) bowAndArrow() (int32, int32, bool) {
     var bowID, arrowID int32
     var bowPower int32
@@ -399,11 +366,9 @@ func (l *Loop) bowAndArrow() (int32, int32, bool) {
     return bowID, arrowID, true
 }
 
-// targetCovered reports whether the pick stands covered by other
-// monsters: an idle aggressive mob whose on-sight circle reaches the
-// target neighborhood (the melee approach ends inside it) or the
-// straight approach segment. The second answer names the cover for
-// the log.
+// targetCovered reports whether an idle aggressive mob's on-sight circle
+// reaches the target neighborhood or the straight approach segment; the
+// second answer names the cover for the log.
 func (l *Loop) targetCovered(targetID int32) (bool, string) {
     selfX, selfY, _, selfOK := l.tracker.SelfPosition()
     targetX, targetY, _, targetOK := l.tracker.ObjectPosition(targetID)
@@ -430,10 +395,10 @@ func (l *Loop) targetCovered(targetID int32) (bool, string) {
     return false, ""
 }
 
-// lureStandoffPoint resolves the shooting position: the direction
-// from the target toward the character first, rotated through the
-// eight compass directions until a candidate sits outside every
-// threat circle. The fallback keeps the character side.
+// lureStandoffPoint resolves the shooting position: the direction from the
+// target toward the character first, then the eight compass directions until
+// a candidate sits outside every threat circle; the fallback keeps the
+// character side.
 func (l *Loop) lureStandoffPoint(
     selfX int32, selfY int32, targetX int32, targetY int32,
 ) (int32, int32) {
@@ -468,8 +433,8 @@ func (l *Loop) lureStandoffPoint(
         int32(math.Round(float64(targetY) + dy*lureStandoff))
 }
 
-// segmentDistance measures the distance from the point to the line
-// segment (the approach corridor check of the cover detection).
+// segmentDistance measures the point to the line segment (the approach
+// corridor check of the cover detection).
 func segmentDistance(
     ax, ay, bx, by, px, py float64,
 ) float64 {
@@ -489,8 +454,7 @@ func segmentDistance(
     return math.Hypot(px-(ax+dx*t), py-(ay+dy*t))
 }
 
-// targetName resolves the display name of the object id for the lure
-// log lines.
+// targetName resolves the display name of the object id for the log.
 func (l *Loop) targetName(objectID int32) string {
     if name := l.tracker.ObjectName(objectID); name != "" {
         return name

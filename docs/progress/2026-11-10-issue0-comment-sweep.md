@@ -719,6 +719,20 @@ corner probe is a length, not a leg at all.
   ./cmd/counterprobe/`, `task lint:new`. `world.go` fell from 21.5 to
   14.8 percent (61 comment lines of 412), no block above 8 lines.
 
+### 2026-11-12 - hunt/lure.go gets its own doc section
+
+- 29 blocks compress: the 24 line lure header, the seven constant
+  notes, the phase and state notes, the begin/tick entry points, the
+  three phase ticks with their confirmation gates, the abort and clear
+  paths, the tool resolution, the cover detection and the standoff
+  search. A new `## The covered pick lure` section of `docs/hunting.md`
+  carries the cover detection, the 420 standoff and its eight
+  direction search, the arm pacing, the pull semantics and the 200
+  unit arrival swap.
+- Verified: `task fmt`, `go build ./...`, the five lure tests, `task
+  lint:new`. `lure.go` fell from 21.6 to 15.5 percent (72 comment
+  lines of 465), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -739,8 +753,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go`,
 `hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go`,
 `gear/shopping_candidates.go`, `hunt/town_segment.go`,
-`acceptance/plaza_herbiel.go`, `pathfind/click_validate.go` and
-`cmd/counterprobe/world.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the `proxy/game.go` and
+`acceptance/plaza_herbiel.go`, `pathfind/click_validate.go`,
+`cmd/counterprobe/world.go` and `hunt/lure.go` (second passes). Next: a
+fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
 `hunt/loop_state.go` entries stay untouched while their fragments are
 active); the share and the block count are re-measured at the end.
