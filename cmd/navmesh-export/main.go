@@ -2,28 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The navmesh-export command bridges the built tile pack to the
-// external pathfinding harnesses. It dumps the polygons, the links
-// and the portal segments of the requested regions into a flat
-// little endian binary the raasta and the condor benchmark ports
-// read, so the third party algorithms answer the same queries over
-// the same graph the game mesh answers. The optional -probe flag
-// times the production Route over the same pack and endpoints, which
-// puts the flat numbers next to the external ones in one run.
-//
-// The dump layout (little endian):
-//
-//    header: magic u32 'L2MB', version u32, polyCount u32,
-//            linkCount u32, skippedLinks u32,
-//            start xyz f64, goal xyz f64 (6 doubles total),
-//            regionCount u32, region entries col i16 row i16 base u32
-//    polys:  x0 y0 x1 y1 f32 (the world rect), area u8, 7 pad bytes
-//    links:  from u32, to u32 (the global poly indices),
-//            ax ay bx by f32 (the portal segment endpoints)
-//
-// The links whose external target region is not in the -regions set
-// are skipped and counted in the header (the harnesses see exactly
-// the closed subgraph).
+// The navmesh-export command bridges the built tile pack to the external
+// pathfinding harnesses: it dumps the polygons, the links and the portal
+// segments of the requested regions into a flat little endian binary the raasta
+// and condor ports read, so third party algorithms answer the same queries over
+// the same graph the game mesh answers. The optional -probe flag times the
+// production Route over the same pack and endpoints, putting both numbers in
+// one run. The dump layout: docs/fastpath_research.md.
 package main
 
 import (
@@ -83,12 +68,9 @@ func main() {
     }
 }
 
-// runProbe times the production Route three times over a fresh mesh:
-// the first answer is the user visible cold path (the tile decode,
-// the sidecar loads, the coarse search and the refinement hops), the
-// second reuses the decoded tiles and the loaded abstracts (the
-// warm path), the third pins the steady state. The decode share of
-// the cold answer falls out of the difference between the first two.
+// runProbe times the production Route three times over a fresh mesh: the first
+// answer is the user visible cold path, the second the warm path (decoded tiles
+// and loaded abstracts reused), the third the steady state.
 func runProbe(dir string, start, end navmesh.Pos) {
     mesh := navmesh.NewMesh(dir)
     for round := 1; round <= 3; round++ {

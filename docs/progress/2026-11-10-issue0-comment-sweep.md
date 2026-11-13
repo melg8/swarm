@@ -880,6 +880,16 @@ corner probe is a length, not a leg at all.
   lint:new`. `audit.go` fell from 18.3 to 15.6 percent (94 comment
   lines of 604), no block above 8 lines.
 
+### 2026-11-12 - cmd/navmesh-export moves the dump layout to the doc
+
+- 2 blocks compress: the 22 line package doc and the probe note. The
+  binary layout (the header fields, the poly and link records, the
+  skipped link count) moves to section 7 of `docs/fastpath_research.md`,
+  next to the harness round it serves.
+- Verified: `task fmt`, `go build ./...`, `go vet` (the tool has no
+  tests), `task lint:new`. `main.go` fell from 13.5 to 8.4 percent (26
+  comment lines of 309), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -906,8 +916,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `webserver/navmesh_geometry.go`, `hunt/kite_ledger.go`,
 `hunt/kite_lane.go`, `hunt/city_shopping.go`, `hunt/town_merchants.go`,
 `acceptance/delevel.go`, `pathfind/navbuild/sheet.go`,
-`pathfind/navmesh/abstract.go` and `huntaudit/audit.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
+`pathfind/navmesh/abstract.go`, `huntaudit/audit.go` and
+`cmd/navmesh-export/main.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.

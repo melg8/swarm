@@ -179,6 +179,15 @@ water polys 3x through the NavPoly cost field (the swim filter
 semantics of the production Route, the plain find_path applies the
 poly cost).
 
+The dump layout (little endian): a header (the `L2MB` magic, the
+format version, the poly, link and skipped link counts, the start and
+goal xyz as six f64, the region count and the col/row/base entries), a
+poly array (the world rect as four f32, the area u8, 7 pad bytes) and a
+link array (the global from/to indices and the portal endpoints as four
+f32). The links whose external target region is not in the `-regions`
+set are skipped and counted in the header, so the harnesses see exactly
+the closed subgraph.
+
 ### 7.1 The owner diagonal across the 4 tile corridor
 
 The dump of the 20_19, 20_20, 21_19, 21_20 corridor: 2,541,901
