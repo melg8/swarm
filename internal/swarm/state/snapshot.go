@@ -53,17 +53,10 @@ type CharacterSnapshot struct {
 }
 
 // InventoryItemSnapshot is the JSON view of one inventory item of the
-// equipment widget. BodyPart is the slot mask of the item template
-// (0x80 right hand, 0x400 chest and so on), Icon the file name inside
-// data/icons and Name the resolved display name; both are empty for
-// unknown items.
-//
-// The Type, WeaponType, ArmorType, PAtk, MAtk, PDef, MDef, SDef, RShld,
-// PAtkSpd, SoulShots, SpiritShots, Weight and Price fields drive the
-// multi line item status tooltip of the equipment widget (one stat
-// line per family: weapon, armor, jewelry, etc). They stay zero / empty
-// when the item carries no value of that field, so the tooltip renders
-// only the lines the item actually has.
+// equipment widget: BodyPart is the slot mask of the template (0x80 right
+// hand, 0x400 chest), Name and Icon stay empty for unknown items. The stat
+// fields drive the multi line item tooltip and stay zero for a field the
+// item does not carry, so the tooltip renders only the real lines.
 type InventoryItemSnapshot struct {
     ObjectID    int32  `json:"objectId"`
     ItemID      int32  `json:"itemId"`
@@ -101,16 +94,13 @@ type ObjectSnapshot struct {
     Attackable bool       `json:"attackable"`
     Aggressive bool       `json:"aggressive"`
     AggroRange int32      `json:"aggroRange"`
-    // ClanHelpRange is the distance within the attacked npc calls
-    // its clan mates to help (0 for loners): the map draws the
-    // social links between clan mates inside it.
+    // ClanHelpRange is the distance within which the attacked npc calls its
+    // clan mates (0 for loners); the map draws the social links inside it.
     ClanHelpRange int32 `json:"clanHelpRange"`
-    // ClanMask is the clan bitmask of the npc as a decimal string
-    // (see npcdata.NPCClanMask: the low bits are the clan alphabet,
-    // the top bit marks the ALL clan that matches everything). A
-    // string because the ALL bit exceeds the safe integer range of
-    // JavaScript; the map parses it with BigInt for the pairwise
-    // link test.
+    // ClanMask is the npc clan bitmask as a decimal string (see
+    // npcdata.NPCClanMask: the low bits are the clan alphabet, the top bit
+    // is the ALL clan). A string because the ALL bit exceeds the JavaScript
+    // safe integer range; the map parses it with BigInt.
     ClanMask        string  `json:"clanMask"`
     Level           int32   `json:"level"`
     TargetID        int32   `json:"targetId"`
@@ -157,11 +147,9 @@ type CombatEventView struct {
 type Snapshot struct {
     ID     string `json:"id"`
     Status Status `json:"status"`
-    // Phase is the last published hunt loop phase (hunt.HuntPhase*
-    // string values: engage, loot, townWalk, townSell, townReturn,
-    // delevel, user, idle). The web UI maps it to the human readable
-    // activity banner of the bot widget. Empty before the loop sets
-    // it (the manual only sessions never do).
+    // Phase is the last published hunt phase (hunt.HuntPhase* strings: engage,
+    // loot, townWalk, townSell, townReturn, delevel, user, idle); the web UI
+    // maps it to the activity banner. A manual-only session leaves it empty.
     Phase     string                  `json:"phase"`
     Character CharacterSnapshot       `json:"character"`
     Inventory []InventoryItemSnapshot `json:"inventory"`
@@ -169,82 +157,59 @@ type Snapshot struct {
     Events    []Event                 `json:"events"`
     Chat      []ChatEvent             `json:"chat"`
     WalkPath  []WalkPoint             `json:"walkPath"`
-    // WalkOrigin is the position the published segment was planned
-    // from (the "where we wanted to go from" of the dump), null
-    // when the publisher carries no origin.
+    // WalkOrigin is the position the published segment was planned from;
+    // null when the publisher carries no origin.
     WalkOrigin *WalkPoint `json:"walkOrigin"`
-    // WalkIndex is the position in WalkPath the follower
-    // currently aims at: the waypoints before it are passed, the
-    // rest lies ahead.
+    // WalkIndex is the waypoint the follower aims at: the ones before it are
+    // passed, the rest lies ahead.
     WalkIndex int `json:"walkIndex"`
-    // WalkDest is the final destination of the published walk,
-    // null when the plan itself carries it.
+    // WalkDest is the final destination; null when the plan carries it.
     WalkDest *WalkPoint `json:"walkDest"`
-    // WalkSearch is the mesh search contract behind the published
-    // walk (the repro contract of the 3D pathfind link), null when
-    // the plan came from no mesh search.
+    // WalkSearch is the mesh search contract behind the published walk (the
+    // repro contract of the 3D pathfind link); null without a mesh search.
     WalkSearch *WalkSearch `json:"walkSearch"`
-    // LastWalkPath carries the most recent published walk plan after
-    // its walk ended (see state lastWalkPlan): the report of a stuck
-    // segment needs the whole planned walk even when the live plan is
-    // already gone. The fields ride the Go side dump only, the wire
-    // payload of the snapshot stays byte identical (the json "-").
+    // LastWalkPath keeps the last walk after it ended (see lastWalkPlan): a
+    // stuck segment report needs the whole plan. These fields ride the Go
+    // side dump only (json "-"), so the wire payload stays byte identical.
     LastWalkPath   []WalkPoint `json:"-"`
     LastWalkOrigin *WalkPoint  `json:"-"`
     LastWalkIndex  int         `json:"-"`
     LastWalkDest   *WalkPoint  `json:"-"`
     LastWalkSearch *WalkSearch `json:"-"`
     LastWalkAt     time.Time   `json:"-"`
-    // WalkStart is the moment the published walk was first seen
-    // (the zero point of the waypoint timing) and WalkWpAt holds
-    // the observed arrival time of every waypoint (the entry i is
-    // set when the follower cursor moved past i). WalkAt is the
-    // last plan refresh (the moment the walk was last seen alive).
-    // The timing view rides the Go side dump only (the json "-",
-    // see LastWalkPath); the last walk record carries its own copy
-    // in LastWalkStart and LastWalkWpAt.
+    // WalkStart is when the published walk was first seen (the zero point of
+    // the timing), WalkWpAt the arrival of every waypoint and WalkAt the last
+    // refresh. The timing rides the Go side dump only (json "-"), and the
+    // last walk carries its own LastWalkStart and LastWalkWpAt.
     WalkStart     time.Time   `json:"-"`
     WalkWpAt      []time.Time `json:"-"`
     WalkAt        time.Time   `json:"-"`
     LastWalkStart time.Time   `json:"-"`
     LastWalkWpAt  []time.Time `json:"-"`
-    // Shopping carries the published purchase queue of the shop
-    // strategy (see SetShoppingPlan): what the bot plans to buy next
-    // with the prices and the missing adena, null when nothing is
-    // published or the plan expired.
+    // Shopping is the published purchase queue (see SetShoppingPlan); null
+    // when nothing is published or the plan expired.
     Shopping *ShoppingPlanView `json:"shopping"`
-    // Skills carries the learned skill list of the server SkillList
-    // packets enriched with the display data of the generated
-    // dictionary (name, icon, passive flag).
+    // Skills is the learned list, enriched with name, icon and the passive
+    // flag of the generated dictionary.
     Skills []SkillSnapshot `json:"skills"`
-    // SkillPlan carries the learning queue of the class tree (see
-    // skillPlanViewLocked): the remaining lessons in the planned
-    // order with the SP costs, null when the class is unknown or
-    // nothing is left to learn.
+    // SkillPlan is the learning queue (see skillPlanViewLocked): the
+    // remaining lessons with their SP costs; null when the class is unknown
+    // or nothing is left.
     SkillPlan *SkillPlanView `json:"skillPlan"`
-    // Buffs carries the active effect list of the character (see
-    // SetBuffs): the running buffs with their levels and remaining
-    // seconds, resolved with the display data of the generated
-    // dictionary. The web UI buffs widget renders it.
+    // Buffs is the active effect list (see SetBuffs): levels, remaining
+    // seconds and the display data; the web UI buffs widget renders it.
     Buffs []BuffSnapshot `json:"buffs"`
-    // SkillStates carries the live cast and reuse windows of the
-    // played character (see ApplySkillCast): the milliseconds left of
-    // the cast and the cooldown at the snapshot moment, the window
-    // totals and the display icon of the skill (the learned skills and
-    // the item skills of the bag alike). The web UI cast fills and the
-    // cooldown countdowns of the skills widget render it; the map cast
-    // icon reads the running cast from it.
+    // SkillStates is the live cast and reuse view (see ApplySkillCast): the
+    // milliseconds left, the window totals and the icon. The skills widget
+    // renders the fills and the countdowns, the map reads the running cast.
     SkillStates []SkillStateView `json:"skillStates"`
-    // CombatEvents carries the recent swings and damage
-    // landings of the animation layer: the last
-    // combatEventTTL window, in chronological order,
-    // deduped by the client on the sequence.
+    // CombatEvents is the animation feed of the last combatEventTTL window,
+    // chronological and deduped by the client on the sequence.
     CombatEvents []CombatEventView `json:"combatEvents"`
     HuntingZone  *Zone             `json:"huntingZone"`
     HuntingZones []ZoneView        `json:"huntingZones"`
-    // HuntMesh is the version of the installed Voronoi hunt mesh
-    // (empty when no cell-mode registry is installed), HuntCell the
-    // live record of the cell the loop holds (nil when none).
+    // HuntMesh is the installed Voronoi mesh version (empty without one),
+    // HuntCell the live record of the cell the loop holds (nil when none).
     HuntMesh     string        `json:"huntMesh"`
     HuntCell     *CellLiveView `json:"huntCell"`
     Packets      int64         `json:"packets"`
@@ -252,29 +217,21 @@ type Snapshot struct {
     ServerTimeMs int64         `json:"serverTimeMs"`
     StartedAt    time.Time     `json:"startedAt"`
     UpdatedAt    time.Time     `json:"updatedAt"`
-    // ActionFailedAt is the arrival time of the last ActionFailed
-    // (0x35) refusal answer of the server (the zero time when none
-    // arrived): the dump prints its age next to the session header
-    // so a server that refuses the move requests names itself in
-    // the report (see ApplyActionFailed). The JSON tag stays "-":
-    // the field feeds the Go side dump only, the wire payload of
-    // the snapshot stays byte identical.
+    // ActionFailedAt is the arrival of the last ActionFailed (0x35) refusal;
+    // the dump prints its age, so a server refusing the moves names itself
+    // (see ApplyActionFailed). The field rides the Go side dump only.
     ActionFailedAt time.Time `json:"-"`
-    // Diagnostics is the health view of the live state: the
-    // liveness ages and rates, the combat nuance, the known
-    // list summary and the hunt loop internals (see
-    // Diagnostics). The section rides the end of the snapshot,
-    // after the world data it summarizes.
+    // Diagnostics is the health view of the live state (see Diagnostics): the
+    // liveness ages and rates, the combat nuance, the known list and the loop
+    // internals.
     Diagnostics Diagnostics `json:"diagnostics"`
 }
 
-// ZoneView is one hunting ground of the map view: the registry entry
-// of the deployment with the active marker of the ground the loop
-// hunts in, the death bookkeeping of the session and - for the spot
-// registries - the respawn window, the expected population, the
-// measured income rate and the next respawn prediction of the spot
-// economy. The legacy square entries leave the spot fields zero and
-// the kind empty.
+// ZoneView is one hunting ground of the map view: the deployment registry
+// entry with the active marker, the session deaths and, for the spot
+// registries, the respawn window, the expected populations, the measured
+// income and the next respawn prediction. Legacy squares leave the spot
+// fields zero.
 type ZoneView struct {
     ID       string `json:"id"`
     Name     string `json:"name"`
@@ -288,70 +245,52 @@ type ZoneView struct {
     Active   bool   `json:"active"`
     Deaths   int32  `json:"deaths"`
     Demoted  bool   `json:"demoted"`
-    // Kind marks the registry shape: "spot" for the spot anchored
-    // registry (circles on the map), empty for the legacy squares.
+    // Kind marks the registry shape: "spot" or empty for the legacy squares.
     Kind string `json:"kind"`
-    // Radius is the spot circle (the leash square Half inscribes
-    // in it); zero for the legacy squares.
+    // Radius is the spot circle (the leash square Half inscribes in it).
     Radius int32 `json:"radius"`
-    // RespawnMinSec and RespawnMaxSec bound the respawn window of
-    // the ground.
+    // RespawnMinSec and RespawnMaxSec bound the respawn window.
     RespawnMinSec int32 `json:"respawnMinSec"`
     RespawnMaxSec int32 `json:"respawnMaxSec"`
     // SpawnMass is the expected population of the spot ground.
     SpawnMass int32 `json:"spawnMass"`
-    // AggroMass is the expected aggressive population (the static
-    // danger input of the spot safety).
+    // AggroMass is the expected aggressive population (a danger input).
     AggroMass int32 `json:"aggroMass"`
-    // AdenaPerMin is the measured income rate of the session at
-    // the ground (the bootstrap prior stays out of the view - the
-    // measurement replaces it silently).
+    // AdenaPerMin is the measured income rate at the ground; the bootstrap
+    // prior stays out.
     AdenaPerMin float64 `json:"adenaPerMin"`
-    // DeathHeat is the decayed death heat of the spot (the safety
-    // multiplier input, see the spot metrics).
+    // DeathHeat is the decayed death heat (a safety multiplier input).
     DeathHeat float64 `json:"deathHeat"`
-    // NextRespawnSec is the predicted ETA of the earliest respawn
-    // of the spot overlay, -1 when the overlay holds no pending
-    // prediction.
+    // NextRespawnSec is the predicted ETA of the earliest respawn, -1 when
+    // the overlay holds no pending prediction.
     NextRespawnSec int32 `json:"nextRespawnSec"`
-    // Occupancy is the number of hunters of the fleet holding the
-    // spot right now.
+    // Occupancy is the number of hunters holding the spot right now.
     Occupancy int32 `json:"occupancy"`
-    // KillX and KillY are the live kill centroid of the session at
-    // the spot (the EMA of the kill positions, zero before the
-    // first kill).
+    // KillX and KillY are the live kill centroid (the EMA of the kill
+    // positions, zero before the first kill).
     KillX int32 `json:"killX"`
     KillY int32 `json:"killY"`
 }
 
-// KillMarkView is one recent kill of the fleet kill ring: the ground
-// position where a bot's target died with the time of the kill. The
-// web map draws the marks as the crosses of the whole deployment -
-// they accumulate across the bots (every kill of every bot stays
-// visible) instead of the per zone centroid that the observed bot
-// alone carries.
+// KillMarkView is one recent kill of the fleet ring: the ground position, the
+// time and the victim. The map draws the marks of the whole deployment, not
+// the per zone centroid of the observed bot alone.
 type KillMarkView struct {
-    // BotID names the bot that landed the kill (the tooltip of
-    // the skull).
+    // BotID names the bot that landed the kill (the skull tooltip).
     BotID string `json:"botId"`
     X     int32  `json:"x"`
     Y     int32  `json:"y"`
     AtMs  int64  `json:"atMs"`
-    // Name and Level carry the victim the tooltip shows (the mob
-    // display name and its level, captured at the kill; the level is
-    // 0 when the corpse left the knownlist before the record).
+    // Name and Level carry the victim the tooltip shows; the level is 0
+    // when the corpse left the knownlist before the record.
     Name  string `json:"name"`
     Level int32  `json:"level"`
 }
 
-// SelfSnapshot returns the live character view of the played character
-// alone (no world, inventory or event copies). The proxy uses it to
-// patch the entering world packets of a connecting client with the
-// position, vitals and level the bot has right now, so the reconnection
-// replay never spawns the client at a stale login-time place. The
-// adena sum and the slot count come from the inventory store, so the
-// statistics sampler and the proxy read the real wallet, not a zero
-// placeholder.
+// SelfSnapshot returns the live character view alone (no world, inventory or
+// event copies): the proxy patches the entering world packets with it, so the
+// replay never spawns the client at a stale login-time place. The adena sum
+// and the slot count come from the inventory store, not a zero placeholder.
 func (b *Bot) SelfSnapshot() CharacterSnapshot {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -362,8 +301,6 @@ func (b *Bot) SelfSnapshot() CharacterSnapshot {
 }
 
 // Snapshot returns a deep copy of the current state for serialization.
-// The full world copy of the web view; the section split is planned
-// (docs/quality_review_and_agent_prompts.md P11).
 func (b *Bot) Snapshot() Snapshot { //nolint:funlen
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -510,13 +447,11 @@ func (b *Bot) Snapshot() Snapshot { //nolint:funlen
     return snap
 }
 
-// fillInventorySnapshot completes the character view with the inventory
-// usage and builds the item list of the equipment widget: every entry
-// carries the resolved display name, the icon file name of the icon
-// pack and the paperdoll slot mask. The dense store keeps the records
-// in the canonical widget order (see inventoryStore), so the fill is a
-// straight sequential walk with no read time sort. The caller must
-// hold the read lock.
+// fillInventorySnapshot completes the character view with the inventory use
+// and builds the equipment list: every entry carries the display name, the
+// icon and the slot mask. The dense store keeps the canonical widget order
+// (see inventoryStore), so the fill is a sequential walk. The caller holds
+// the read lock.
 func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
     snap.Character.CurrentLoad = b.char.CurrentLoad
     snap.Character.MaxLoad = b.char.MaxLoad
@@ -561,9 +496,8 @@ func (b *Bot) fillInventorySnapshot(snap *Snapshot) {
     }
 }
 
-// compareInventoryItems orders two widget entries: the equipped gear
-// first, then the item id, the object id breaks the ties. It doubles as
-// the canonical order comparator of the dense inventory store.
+// compareInventoryItems orders the widget entries (equipped first, then the
+// item id, the object id breaks the ties) and defines the dense store order.
 func compareInventoryItems(
     a InventoryItem, b InventoryItem,
 ) int {

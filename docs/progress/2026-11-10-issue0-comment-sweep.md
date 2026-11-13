@@ -1178,6 +1178,16 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the webserver suite (8.3 s),
   `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
 
+### 2026-11-13 - state/snapshot.go keeps the wire contract only
+
+- 36 view blocks compress: the snapshot keeps the dangling `json:"-"`
+  timing fields and their Go side dump purpose, the JavaScript safe
+  integer reason for the string clan mask, the tooltip zero rule, the
+  walk origin/index/destination contract and the spot economy field
+  meanings. 160 comment lines of 593 become 94 of 527.
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
