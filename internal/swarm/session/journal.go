@@ -310,8 +310,7 @@ func (j *Journal) Close() {
     j.wg.Wait()
 }
 
-// Build writes the process identity line (the first record of the
-// file).
+// Build writes the process identity line (the first record of the file).
 func (j *Journal) Build(identity string) {
     r := newRecord("", kindBuild, time.Now())
     r.V = identity
@@ -578,8 +577,7 @@ func closeGzipHandle(logger *log.Logger, stage string, handle *os.File) {
     gzipLog(logger, stage, handle.Close())
 }
 
-// gzipLog reports one gzip stage failure when the journal carries a
-// logger.
+// gzipLog reports one gzip stage failure when the journal carries a logger.
 func gzipLog(logger *log.Logger, stage string, err error) {
     if logger == nil || err == nil {
         return

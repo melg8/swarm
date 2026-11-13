@@ -49,10 +49,9 @@ const origRegionSide = 2048
 // origLayerStackBufSize is the layer stack buffer a cell walk reuses.
 const origLayerStackBufSize = 8
 
-// buildOriginalPolys walks every cell of the region and merges the
-// walkable layers into the exact height rectangles. The result is
-// deterministic: heights ascend, seeds scan row major, ties keep the
-// first rectangle.
+// buildOriginalPolys walks every cell of the region and merges the walkable
+// layers into the exact height rectangles. The result is deterministic: heights
+// ascend, seeds scan row major, ties keep the first rectangle.
 func buildOriginalPolys(region *pathfind.Region) []origPoly {
     pairs := origWalkCells(region)
     polys := make([]origPoly, 0, len(pairs)/8+64)
@@ -419,9 +418,8 @@ func origWallVertical(writer *[]byte, a, b *origPoly) {
         lo, hi, a.Area, navmeshWallVertical)
 }
 
-// origWallHorizontal walls the MaxY edge of the emitter against the
-// MinY edge of the target: the shared y line, the overlapping x
-// range.
+// origWallHorizontal walls the MaxY edge of the emitter against the MinY edge
+// of the target: the shared y line, the overlapping x range.
 func origWallHorizontal(writer *[]byte, a, b *origPoly) {
     lo := max(a.X0, b.X0)
     hi := min(a.X1, b.X1)

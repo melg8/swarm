@@ -130,8 +130,7 @@ func (w *packetRateWindow) note(sec int64) {
     }
 }
 
-// rate returns the packets per second over the filled part of the
-// window.
+// rate returns the packets per second over the filled part of the window.
 func (w *packetRateWindow) rate() float64 {
     if w.filled == 0 {
         return 0

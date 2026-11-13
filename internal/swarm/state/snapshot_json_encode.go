@@ -32,12 +32,11 @@ var jsonHTMLSafeSet = func() [utf8.RuneSelf]bool {
     return set
 }()
 
-// appendJSONString appends the JSON encoding of s - the exact bytes
-// of the encoding/json string encoder with HTML escaping: the two
-// mandatory escapes, the control bytes as \u00XX, the invalid UTF-8
-// bytes as the replacement form of the running stdlib and the
-// U+2028/U+2029 line break escapes (they are valid JSON but break
-// JavaScript string literals).
+// appendJSONString appends the JSON encoding of s - the exact bytes of the
+// encoding/json string encoder with HTML escaping: the two mandatory escapes,
+// the control bytes as \u00XX, the invalid UTF-8 bytes as the replacement form
+// of the running stdlib and the U+2028/U+2029 line break escapes (they are
+// valid JSON but break JavaScript string literals).
 func appendJSONString(dst []byte, s string) []byte {
     dst = append(dst, '"')
     start := 0

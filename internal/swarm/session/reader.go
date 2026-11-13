@@ -16,11 +16,10 @@ import (
     "time"
 )
 
-// JournalFile is the parsed view of one journal file: the per-bot
-// aggregates and the provenance of the file. The -session-report CLI
-// and any post-mortem investigation of a finished or crashed run build
-// it from disk (the live journal serves the web UI endpoint from
-// memory).
+// JournalFile is the parsed view of one journal file: the per-bot aggregates
+// and the provenance of the file. The -session-report CLI and any post-mortem
+// investigation of a finished or crashed run build it from disk (the live
+// journal serves the web UI endpoint from memory).
 type JournalFile struct {
     Path   string
     Build  string
@@ -91,11 +90,10 @@ func scanJournal(path string, visit func(record) error) error {
         }
         var r record
         if err := json.Unmarshal(line, &r); err != nil {
-            // A torn final line of a crashed run is expected: the
-            // records before it still parse. The skips stay counted -
-            // a silent skip made the report undercount against the
-            // file, and a corrupted middle line would hide behind the
-            // same silence as the torn tail.
+            // A torn final line of a crashed run is expected: the records
+            // before it still parse. The skips stay counted - a silent skip
+            // made the report undercount against the file, and a corrupted
+            // middle line would hide behind the same silence as the torn tail.
             skipped++
 
             continue
@@ -120,11 +118,10 @@ func hasGzipExt(path string) bool {
     return len(path) > 3 && path[len(path)-3:] == ".gz"
 }
 
-// parseJournalWindow folds every record of the stream inside the window
-// into fresh aggregates. The parser shares the apply path with the live
-// journal, so the offline report and the live report agree by
-// construction. The bare clock bounds resolve against the first record
-// date exactly like the query filters.
+// parseJournalWindow folds every record of the stream inside the window into
+// fresh aggregates. The parser shares the apply path with the live journal, so
+// the offline report and the live report agree by construction. The bare clock
+// bounds resolve against the first record date exactly like the query filters.
 func parseJournalWindow(
     path string, fromArg string, toArg string,
 ) (*JournalFile, error) {

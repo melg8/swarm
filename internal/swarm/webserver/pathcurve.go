@@ -9,11 +9,10 @@ import (
     "net/http"
 )
 
-// NewTestPathCurveServer creates the web server of the smooth curve
-// animation lab: the comparison page of the Catmull-Rom walk motion
-// and drawing ideas, no bot and no geodata behind it (the map
-// background of the cells is the static tile pyramid that ships with
-// the web content).
+// NewTestPathCurveServer creates the web server of the smooth curve animation
+// lab: the comparison page of the Catmull-Rom walk motion and drawing ideas, no
+// bot and no geodata behind it (the map background of the cells is the static
+// tile pyramid that ships with the web content).
 func NewTestPathCurveServer(address string, logger *log.Logger) *Server {
     server := newServer(address, logger)
 
@@ -23,8 +22,7 @@ func NewTestPathCurveServer(address string, logger *log.Logger) *Server {
     return server
 }
 
-// handlePathCurveConfig reports the smooth curve lab mode of the web
-// UI.
+// handlePathCurveConfig reports the smooth curve lab mode of the web UI.
 func (s *Server) handlePathCurveConfig(
     w http.ResponseWriter, _ *http.Request,
 ) {

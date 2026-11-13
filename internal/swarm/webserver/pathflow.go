@@ -9,11 +9,10 @@ import (
     "net/http"
 )
 
-// NewTestPathFlowServer creates the web server of the flow and snake
-// speed lab: the comparison page of the rainbow flow and the pulse
-// snake variants, no bot and no geodata behind it (the map background
-// of the cells is the static tile pyramid that ships with the web
-// content).
+// NewTestPathFlowServer creates the web server of the flow and snake speed lab:
+// the comparison page of the rainbow flow and the pulse snake variants, no bot
+// and no geodata behind it (the map background of the cells is the static tile
+// pyramid that ships with the web content).
 func NewTestPathFlowServer(address string, logger *log.Logger) *Server {
     server := newServer(address, logger)
 
@@ -23,8 +22,7 @@ func NewTestPathFlowServer(address string, logger *log.Logger) *Server {
     return server
 }
 
-// handlePathFlowConfig reports the flow and snake lab mode of the web
-// UI.
+// handlePathFlowConfig reports the flow and snake lab mode of the web UI.
 func (s *Server) handlePathFlowConfig(
     w http.ResponseWriter, _ *http.Request,
 ) {

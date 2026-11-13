@@ -13,14 +13,13 @@ import (
     "sync"
 )
 
-// Recorder keeps the decrypted server-to-client stream of one bot
-// session so a connecting client can replay the world state and then
-// continue with the live feed. Every entry owns an immutable payload
-// copy: replay readers and live subscribers share it, and the senders
-// that encrypt in place work on their own copies. The history is
-// bounded: the prologue entries (char selected and the enter world
-// burst) and a rolling tail always stay, the middle drops at the byte
-// cap - a dropped middle degrades the replay, never the cipher chains.
+// Recorder keeps the decrypted server-to-client stream of one bot session so a
+// connecting client can replay the world state and then continue with the live
+// feed. Every entry owns an immutable payload copy: replay readers and live
+// subscribers share it, and the senders that encrypt in place work on their own
+// copies. The history is bounded: the prologue entries (char selected and the
+// enter world burst) and a rolling tail always stay, the middle drops at the
+// byte cap - a dropped middle degrades the replay, never the cipher chains.
 type Recorder struct {
     mu          sync.Mutex
     entries     []RecorderEntry
@@ -167,11 +166,10 @@ func (r *Recorder) Entry(seq int64) []byte {
     return nil
 }
 
-// Attach returns every entry recorded after the given sequence together
-// with a live subscription that continues exactly where the returned
-// entries end: the snapshot and the subscription are taken under one
-// lock, so no entry is lost between them. The returned payloads must not
-// be modified.
+// Attach returns every entry recorded after the given sequence together with a
+// live subscription that continues exactly where the returned entries end: the
+// snapshot and the subscription are taken under one lock, so no entry is lost
+// between them. The returned payloads must not be modified.
 func (r *Recorder) Attach(afterSeq int64) ([]RecorderEntry, *Subscriber) {
     r.mu.Lock()
     defer r.mu.Unlock()
@@ -247,9 +245,8 @@ type Subscriber struct {
     stopped bool
 }
 
-// deliver hands one update to the subscriber without blocking the
-// recorder: a full queue poisons the subscriber. The caller holds the
-// recorder lock.
+// deliver hands one update to the subscriber without blocking the recorder: a
+// full queue poisons the subscriber. The caller holds the recorder lock.
 func (s *Subscriber) deliver(update liveUpdate) {
     if s.stopped {
         return

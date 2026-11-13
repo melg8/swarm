@@ -9,11 +9,10 @@ import (
     "net/http"
 )
 
-// NewTestPathServer creates the web server of the walk plan
-// visualization gallery: the animated comparison page of the walk plan
-// drawing ideas, no bot and no geodata behind it (the map background
-// of the cells is the static tile pyramid that ships with the web
-// content).
+// NewTestPathServer creates the web server of the walk plan visualization
+// gallery: the animated comparison page of the walk plan drawing ideas, no bot
+// and no geodata behind it (the map background of the cells is the static tile
+// pyramid that ships with the web content).
 func NewTestPathServer(address string, logger *log.Logger) *Server {
     server := newServer(address, logger)
 
@@ -23,8 +22,7 @@ func NewTestPathServer(address string, logger *log.Logger) *Server {
     return server
 }
 
-// handlePathGalleryConfig reports the walk plan gallery mode of the
-// web UI.
+// handlePathGalleryConfig reports the walk plan gallery mode of the web UI.
 func (s *Server) handlePathGalleryConfig(
     w http.ResponseWriter, _ *http.Request,
 ) {

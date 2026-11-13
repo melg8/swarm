@@ -68,8 +68,7 @@ type ObjectTrack struct {
     // Speed is the fastest movement speed of the object in world
     // units per second (see chaseSpeed).
     Speed float64
-    // Moving reports whether the last movement packet left the
-    // object walking.
+    // Moving reports whether the last movement packet left the object walking.
     Moving bool
 }
 

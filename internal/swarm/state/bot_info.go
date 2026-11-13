@@ -36,10 +36,9 @@ type BotInfo struct {
     // of an untagged bot and reads as long-running.
     Kind  string `json:"kind"`
     Level int32  `json:"level"`
-    // DelevelTarget is the level the running deleveling drops the
-    // character to (non zero only while the delevel phase runs): the
-    // sidebar row renders it in the compact activity banner
-    // ("deleveling -> lv 9").
+    // DelevelTarget is the level the running deleveling drops the character to
+    // (non zero only while the delevel phase runs): the sidebar row renders it
+    // in the compact activity banner ("deleveling -> lv 9").
     DelevelTarget int32   `json:"delevelTarget"`
     CurHP         float64 `json:"curHp"`
     MaxHP         float64 `json:"maxHp"`
@@ -84,8 +83,7 @@ func (b *Bot) Info() BotInfo {
     }
 }
 
-// bowWeaponType is the weapon family of a bow in the item stats
-// dictionary.
+// bowWeaponType is the weapon family of a bow in the item stats dictionary.
 const bowWeaponType = "BOW"
 
 // npcBowWielding resolves whether the NpcInfo right hand item id is

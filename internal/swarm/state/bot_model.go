@@ -188,9 +188,8 @@ func (c CharacterState) fightingFresh(now time.Time) bool {
     return now.Sub(c.CombatActiveAt) <= fightingFreshWindow
 }
 
-// noteSelfCombatLocked records fresh fight activity of the played
-// character (a swing or a chase step). The caller must hold the write
-// lock.
+// noteSelfCombatLocked records fresh fight activity of the played character (a
+// swing or a chase step). The caller must hold the write lock.
 func (b *Bot) noteSelfCombatLocked(now time.Time) {
     b.char.CombatActiveAt = now
     b.char.CombatUntil = now.Add(combatWindow)

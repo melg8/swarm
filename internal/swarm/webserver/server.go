@@ -103,9 +103,8 @@ func armSSEWrite(w http.ResponseWriter) {
         time.Now().Add(sseWriteTimeout))
 }
 
-// appendEventFrame assembles the SSE event frame for a payload into
-// dst: the event header, the data bytes and the blank line that
-// terminates the frame.
+// appendEventFrame assembles the SSE event frame for a payload into dst: the
+// event header, the data bytes and the blank line that terminates the frame.
 func appendEventFrame(dst, data []byte) []byte {
     dst = append(dst, "event: snapshot\ndata: "...)
     dst = append(dst, data...)
@@ -386,8 +385,7 @@ func (s *Server) handleBotList(w http.ResponseWriter, _ *http.Request) {
 func (s *Server) handleFleetKills(w http.ResponseWriter, _ *http.Request) {
     marks := s.registry.FleetKillMarks(fleetKillMarkLimit)
     if marks == nil {
-        // An idle fleet serves an empty array: the map layer feeds it
-        // directly.
+        // An idle fleet serves an empty array: the map layer feeds it directly.
         marks = []state.KillMarkView{}
     }
     writeJSON(w, s.logger, marks)
@@ -421,8 +419,7 @@ func (s *Server) handleBotEvents(w http.ResponseWriter, r *http.Request) {
     s.streamEvents(r.Context(), w, bot)
 }
 
-// streamEvents writes snapshot events until the request or the server
-// ends.
+// streamEvents writes snapshot events until the request or the server ends.
 func (s *Server) streamEvents(
     ctx context.Context, w http.ResponseWriter, bot *state.Bot,
 ) {

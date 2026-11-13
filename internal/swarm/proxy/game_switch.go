@@ -8,13 +8,12 @@ import (
     "time"
 )
 
-// serveBotSwitch handles a WebUI selection change while a client is
-// connected: a different ready bot (online with its CharSelected
-// recorded) starts the restart dance onto it. It returns the target id
-// with the new session when the dance started, the target id with a
-// nil session while the target is not ready (the caller arms the
-// pending switch), and "" with a nil session when the selection names
-// the current bot or nothing (docs/proxy.md, "Switching bots").
+// serveBotSwitch handles a WebUI selection change while a client is connected:
+// a different ready bot (online with its CharSelected recorded) starts the
+// restart dance onto it. It returns the target id with the new session when the
+// dance started, the target id with a nil session while the target is not ready
+// (the caller arms the pending switch), and "" with a nil session when the
+// selection names the current bot or nothing (docs/proxy.md, "Switching bots").
 func (gc *gameConn) serveBotSwitch(current *botSession) (string, *botSession) {
     target := gc.server.SelectedBot()
     if target == "" || target == current.id {
@@ -39,13 +38,12 @@ func (gc *gameConn) serveBotSwitch(current *botSession) (string, *botSession) {
     return target, next
 }
 
-// retryPendingSwitch resolves one poll tick of the pending bot switch:
-// the WebUI selection named a bot that was not online yet when it
-// fired, and the tick checks whether the target entered the world in
-// the meantime. It starts the restart dance onto it and returns the
-// new session with ok=true, returns nil with ok=true while the target
-// is still not online (the live feed keeps flowing), and ok=false when
-// the connection died mid dance.
+// retryPendingSwitch resolves one poll tick of the pending bot switch: the
+// WebUI selection named a bot that was not online yet when it fired, and the
+// tick checks whether the target entered the world in the meantime. It starts
+// the restart dance onto it and returns the new session with ok=true, returns
+// nil with ok=true while the target is still not online (the live feed keeps
+// flowing), and ok=false when the connection died mid dance.
 func (gc *gameConn) retryPendingSwitch(
     session *botSession, pending string,
 ) (*botSession, bool) {
@@ -136,13 +134,12 @@ func (gc *gameConn) offerCharList(next *botSession) bool {
     return true
 }
 
-// parkAtCharSelect parks the relay while the client sits on the char
-// select screen of a restart dance: it waits for the read loop to
-// report the re-entry (the EnterWorld after the served char selected
-// answer), tracks newer WebUI selections (the screen re-offers the
-// newest char list) and polls for a pending target that was offline at
-// the selection time. It returns the replay sequence of the entered
-// session, or ok=false when the connection ended.
+// parkAtCharSelect parks the relay while the client sits on the char select
+// screen of a restart dance: it waits for the read loop to report the re-entry
+// (the EnterWorld after the served char selected answer), tracks newer WebUI
+// selections (the screen re-offers the newest char list) and polls for a
+// pending target that was offline at the selection time. It returns the replay
+// sequence of the entered session, or ok=false when the connection ended.
 func (gc *gameConn) parkAtCharSelect() (int64, bool) {
     // Drain any stale re-entry report before parking: a duplicate
     // EnterWorld of the previous cycle must not leak into this one.
@@ -181,11 +178,10 @@ func (gc *gameConn) parkAtCharSelect() (int64, bool) {
     }
 }
 
-// parkSelectionTarget resolves what a selection change means for a
-// parked client: the ready session of the newest selection to
-// re-offer, or the pending target id when the selection is not ready
-// yet ("" when the selection names the current bot or nothing - the
-// park keeps offering what it has).
+// parkSelectionTarget resolves what a selection change means for a parked
+// client: the ready session of the newest selection to re-offer, or the pending
+// target id when the selection is not ready yet ("" when the selection names
+// the current bot or nothing - the park keeps offering what it has).
 func parkSelectionTarget(s *Server, currentID string) (string, *botSession) {
     target := s.SelectedBot()
     if target == "" || target == currentID {
@@ -244,11 +240,10 @@ func (gc *gameConn) cancelAutoSelect() {
     gc.mu.Unlock()
 }
 
-// autoSelectCharSelected is the proxy's own double click: it serves the
-// char selected answer of the offered character while the client still
-// sits on the char select screen. A client that moved on (the state
-// left the chars screen - the user clicked first or the connection is
-// gone) makes the timer a no-op.
+// autoSelectCharSelected is the proxy's own double click: it serves the char
+// selected answer of the offered character while the client still sits on the
+// char select screen. A client that moved on (the state left the chars screen -
+// the user clicked first or the connection is gone) makes the timer a no-op.
 func (gc *gameConn) autoSelectCharSelected() {
     gc.mu.Lock()
     gc.autoSelect = nil

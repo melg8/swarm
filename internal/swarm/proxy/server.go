@@ -47,8 +47,7 @@ func DefaultLoginAddresses() []string {
     }
 }
 
-// DefaultGameAddresses is the game listener set of the default
-// configuration.
+// DefaultGameAddresses is the game listener set of the default configuration.
 func DefaultGameAddresses() []string {
     return []string{DefaultGameAddress, GameFallbackAddress}
 }

@@ -85,9 +85,8 @@ type Bot struct {
     commandQueue chan Command
     // walkPlan is the published walk of the web UI and the dump (see
     // SetWalkPlan): the segment waypoints, the current cursor and the
-    // destination. walkPlanStart is the zero point of the timing, and
-    // walkWpAt holds the arrival of every waypoint (see
-    // publishWalkPlanLocked).
+    // destination. walkPlanStart is the zero point of the timing, and walkWpAt
+    // holds the arrival of every waypoint (see publishWalkPlanLocked).
     walkPlan      *WalkPlan
     walkPlanAt    time.Time
     walkPlanStart time.Time
@@ -99,9 +98,8 @@ type Bot struct {
     lastWalkPlanAt time.Time
     lastWalkStart  time.Time
     lastWalkWpAt   []time.Time
-    // shopping is the published purchase queue (see SetShoppingPlan), nil
-    // while nothing is published; shoppingAt bounds its freshness
-    // (shoppingPlanTTL).
+    // shopping is the published purchase queue (see SetShoppingPlan), nil while
+    // nothing is published; shoppingAt bounds its freshness (shoppingPlanTTL).
     shopping   *ShoppingPlanView
     shoppingAt time.Time
     // dialog is the open NPC_HTML page (see dialog.go): one page, replaced on
@@ -120,10 +118,9 @@ type Bot struct {
     skillsRevision  uint64
     skillQueueCache atomic.Pointer[skillQueueCache]
     skillWeapons    []string
-    // bookKeepCache caches the demanded spellbook ids (see
-    // demandedBooksLocked) between skill revisions: the sell trips read it
-    // under the read lock, so the atomic pointer keeps those readers
-    // read-only.
+    // bookKeepCache caches the demanded spellbook ids (see demandedBooksLocked)
+    // between skill revisions: the sell trips read it under the read lock, so
+    // the atomic pointer keeps those readers read-only.
     bookKeepCache atomic.Pointer[bookKeepCache]
     // buffs holds the AbnormalStatusUpdate effects (skill -> level + seconds
     // left at arrival); buffsAt anchors the countdown (see SetBuffs).

@@ -26,8 +26,7 @@ type configResponse struct {
     Defaults *pathfindDefaults `json:"defaults,omitempty"`
 }
 
-// pathfindDefaults carries the suggested initial map view of the
-// pathfind test.
+// pathfindDefaults carries the suggested initial map view of the pathfind test.
 type pathfindDefaults struct {
     Center pathfind.Vec3 `json:"center"`
     Scale  float64       `json:"scale"`

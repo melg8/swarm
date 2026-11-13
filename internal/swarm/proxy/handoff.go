@@ -12,12 +12,11 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The bot relogin handoff: a client in the world must survive the
-// session cycle of its bot. The relay suppresses the bot's LeaveWorld,
-// holds the client while the character is offline, and resyncs it onto
-// the replacement session through the restart dance once that session
-// enters the world. A user logout keeps the classic relay path
-// (docs/proxy.md, "The bot relogin handoff").
+// The bot relogin handoff: a client in the world must survive the session cycle
+// of its bot. The relay suppresses the bot's LeaveWorld, holds the client while
+// the character is offline, and resyncs it onto the replacement session through
+// the restart dance once that session enters the world. A user logout keeps the
+// classic relay path (docs/proxy.md, "The bot relogin handoff").
 
 // Server packet opcodes the handoff synthesizes or suppresses (the C1
 // values of the Mobius ServerPackets enum).
@@ -37,12 +36,11 @@ const (
     serverOpNetPing = 0xEC
 )
 
-// isNetPingAnswerPayload reports whether the payload is the NetPing
-// answer of the bot session's own keepalive. Those answers describe no
-// world state and are never relayed: the client keepalive is answered
-// locally, and relaying the bot answers arms the ping feedback loop
-// that accelerates without bound (docs/proxy.md, "The client
-// keepalive").
+// isNetPingAnswerPayload reports whether the payload is the NetPing answer of
+// the bot session's own keepalive. Those answers describe no world state and
+// are never relayed: the client keepalive is answered locally, and relaying the
+// bot answers arms the ping feedback loop that accelerates without bound
+// (docs/proxy.md, "The client keepalive").
 func isNetPingAnswerPayload(payload []byte) bool {
     return len(payload) > 0 && payload[0] == serverOpNetPing
 }
@@ -74,12 +72,11 @@ func holdTimings() (timeout time.Duration, poll time.Duration) {
     return clientHoldTimeout, holdPollPeriod
 }
 
-// botSwitchAutoSelectDelay is how long the restart dance waits before
-// the proxy serves the char selected answer of the offered character
-// itself: the client needs the time to tear its world down and render
-// the char select screen, and the unsolicited answer lands exactly like
-// the user's own double click of the only listed character. A variable
-// so the tests can shorten it.
+// botSwitchAutoSelectDelay is how long the restart dance waits before the proxy
+// serves the char selected answer of the offered character itself: the client
+// needs the time to tear its world down and render the char select screen, and
+// the unsolicited answer lands exactly like the user's own double click of the
+// only listed character. A variable so the tests can shorten it.
 var botSwitchAutoSelectDelay = 1500 * time.Millisecond
 
 // switchTimings snapshots the switch tunables under the knob mutex (the

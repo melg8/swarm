@@ -6,29 +6,26 @@ package state
 
 import "sort"
 
-// QuestEntryView is one active quest of the journal as the
-// connection layer hands it over: the quest id and the state int
-// (the cond step of a started quest or the completion flags mask -
-// see docs/quest_protocol.md).
+// QuestEntryView is one active quest of the journal as the connection layer
+// hands it over: the quest id and the state int (the cond step of a started
+// quest or the completion flags mask - see docs/quest_protocol.md).
 type QuestEntryView struct {
     QuestID int32
     State   int32
 }
 
-// QuestItemView is one quest item stack of the journal: the item id
-// and its count. The object id of the packet is inventory detail the
-// tracker already owns through the ordinary item packets; what the
-// journal adds is WHICH items are quest bound - the fact the sell
-// filter of the shop strategy will need.
+// QuestItemView is one quest item stack of the journal: the item id and its
+// count. The object id of the packet is inventory detail the tracker already
+// owns through the ordinary item packets; what the journal adds is WHICH items
+// are quest bound - the fact the sell filter of the shop strategy will need.
 type QuestItemView struct {
     ItemID int32
     Count  int32
 }
 
-// ApplyQuestList replaces the quest journal: the server always sends
-// the whole journal (at world entry and after every state change),
-// so the maps are replaced, not merged - the same whole-list
-// semantics the skill list applies.
+// ApplyQuestList replaces the quest journal: the server always sends the whole
+// journal (at world entry and after every state change), so the maps are
+// replaced, not merged - the same whole-list semantics the skill list applies.
 func (b *Bot) ApplyQuestList(quests []QuestEntryView, items []QuestItemView) {
     b.mu.Lock()
     defer b.mu.Unlock()

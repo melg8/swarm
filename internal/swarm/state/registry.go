@@ -12,11 +12,10 @@ import (
 // Registry keeps the bot sessions known to the process so that the web
 // interface can enumerate and switch between them.
 //
-// Data oriented layout: the sessions live in one dense slice walked
-// by List (sequential memory, no per bot map hashing on the poll path
-// of the web view), while the id lookup stays a map. The map holds
-// positions instead of pointers, so both structures stay consistent
-// through the same write lock.
+// Data oriented layout: the sessions live in one dense slice walked by List
+// (sequential memory, no per bot map hashing on the poll path of the web view),
+// while the id lookup stays a map. The map holds positions instead of pointers,
+// so both structures stay consistent through the same write lock.
 type Registry struct {
     mu    sync.RWMutex
     bots  []*Bot

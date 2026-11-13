@@ -4,39 +4,35 @@
 
 package state
 
-// ZoneVertex is one vertex of a convex cell polygon in world
-// coordinates. The vertices are ordered counter-clockwise (the
-// generator normalizes the orientation), so the containment test
-// walks the left side of every edge.
+// ZoneVertex is one vertex of a convex cell polygon in world coordinates. The
+// vertices are ordered counter-clockwise (the generator normalizes the
+// orientation), so the containment test walks the left side of every edge.
 type ZoneVertex struct {
     X int32
     Y int32
 }
 
-// CellZone is the convex polygon leash of the Voronoi cell hunting:
-// the ground is the whole cell, not a square approximation, so the
-// target searches, the loot scans and the emptiness readings fence on
-// the exact cell shape the generator clipped. A point belongs when the
-// cross product of every edge and the difference to its vertex stays
-// non-negative (a CCW polygon); a nil CellZone or a degenerate vertex
-// list means no limit, like a nil *Zone.
+// CellZone is the convex polygon leash of the Voronoi cell hunting: the ground
+// is the whole cell, not a square approximation, so the target searches, the
+// loot scans and the emptiness readings fence on the exact cell shape the
+// generator clipped. A point belongs when the cross product of every edge and
+// the difference to its vertex stays non-negative (a CCW polygon); a nil
+// CellZone or a degenerate vertex list means no limit, like a nil *Zone.
 type CellZone struct {
     Vertices []ZoneVertex
 }
 
-// NewCellZone builds the convex polygon leash from the
-// counter-clockwise vertex list (the hunt registry order; the
-// generator guarantees the CCW orientation and the convexity, the
-// constructor only wraps).
+// NewCellZone builds the convex polygon leash from the counter-clockwise vertex
+// list (the hunt registry order; the generator guarantees the CCW orientation
+// and the convexity, the constructor only wraps).
 func NewCellZone(vertices []ZoneVertex) *CellZone {
     return &CellZone{Vertices: vertices}
 }
 
-// Contains reports whether the world point lies inside the convex
-// polygon. The cross products run on int64: the vertex coordinates
-// and the tested points span tens of thousands of world units, an
-// int32 product of two such differences would overflow on the far
-// map regions.
+// Contains reports whether the world point lies inside the convex polygon. The
+// cross products run on int64: the vertex coordinates and the tested points
+// span tens of thousands of world units, an int32 product of two such
+// differences would overflow on the far map regions.
 func (z *CellZone) Contains(x int32, y int32) bool {
     if z == nil {
         return true
@@ -58,11 +54,10 @@ func (z *CellZone) Contains(x int32, y int32) bool {
     return true
 }
 
-// CellZoneFromPairs builds the convex polygon leash from a flat
-// x,y coordinate sequence (the wire form of the mesh payload: the
-// pairs arrive counter-clockwise). An odd or short sequence leaves
-// no leash at all (no limit), the malformed input never fences the
-// hunt.
+// CellZoneFromPairs builds the convex polygon leash from a flat x,y coordinate
+// sequence (the wire form of the mesh payload: the pairs arrive
+// counter-clockwise). An odd or short sequence leaves no leash at all (no
+// limit), the malformed input never fences the hunt.
 func CellZoneFromPairs(pairs []int32) *CellZone {
     if len(pairs) < 6 || len(pairs)%2 != 0 {
         return nil

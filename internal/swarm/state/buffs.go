@@ -21,31 +21,28 @@ type BuffEntry struct {
     Time    int32
 }
 
-// buffRecord is the stored form of one active effect: the learned
-// level of the buff skill, the seconds it still had when the server
-// last refreshed the list and the duration the remaining time percent
-// rides against (the full abnormal time of the skill stats when it is
-// known, else the seconds the effect carried when the process first
-// saw it).
+// buffRecord is the stored form of one active effect: the learned level of the
+// buff skill, the seconds it still had when the server last refreshed the list
+// and the duration the remaining time percent rides against (the full abnormal
+// time of the skill stats when it is known, else the seconds the effect carried
+// when the process first saw it).
 type buffRecord struct {
     level int32
     left  int32
     total int32
 }
 
-// buffTotalGraceSeconds is the clock jitter grace of the recast
-// detection: a continuing effect reports its remaining time slightly
-// ahead of the local countdown now and then, and that jitter must not
-// read as a fresh cast.
+// buffTotalGraceSeconds is the clock jitter grace of the recast detection: a
+// continuing effect reports its remaining time slightly ahead of the local
+// countdown now and then, and that jitter must not read as a fresh cast.
 const buffTotalGraceSeconds = 2
 
-// BuffSnapshot is one active effect: the skill and level, the
-// remaining seconds and the duration the remaining percent rides
-// against (Total - the full abnormal time of the skill stats when the
-// server carries it, else the seconds the effect had when the process
-// first saw it), plus the display data. Desc is the generic client
-// tooltip line of the level and Effect the numeric effect summary,
-// both empty when the server data carries none; the web UI buffs
+// BuffSnapshot is one active effect: the skill and level, the remaining seconds
+// and the duration the remaining percent rides against (Total - the full
+// abnormal time of the skill stats when the server carries it, else the seconds
+// the effect had when the process first saw it), plus the display data. Desc is
+// the generic client tooltip line of the level and Effect the numeric effect
+// summary, both empty when the server data carries none; the web UI buffs
 // widget renders the list.
 type BuffSnapshot struct {
     SkillID int32  `json:"skillId"`
@@ -73,25 +70,23 @@ func (b *Bot) SetBuffs(buffs []BuffEntry) {
     for _, buff := range buffs {
         total := buff.Time
         prev, seen := b.buffs[buff.SkillID]
-        // A continuing effect reports its current remaining time,
-        // which only sinks below the previous reading (plus the
-        // jitter grace); a reading above that marks a recast, and
-        // the total restarts from the fresh duration. A different
-        // level is a replaced effect (another cast overwriting the
-        // same skill id) - always a recast, even when the fresh
+        // A continuing effect reports its current remaining time, which only
+        // sinks below the previous reading (plus the jitter grace); a reading
+        // above that marks a recast, and the total restarts from the fresh
+        // duration. A different level is a replaced effect (another cast
+        // overwriting the same skill id) - always a recast, even when the fresh
         // duration fits under the counted down previous one.
         if seen && prev.level == buff.Level &&
             buff.Time <= prev.left-elapsed+buffTotalGraceSeconds {
             total = prev.total
         } else if !seen {
-            // The first observation of the process reports the
-            // seconds the effect still has, not the seconds it
-            // landed with - a login in the middle of a running buff
-            // would read a full strip draining to zero otherwise.
-            // The abnormal time of the skill stats answers the full
-            // duration when it is known and longer, so the strip
-            // reads remaining over full (5 minutes left of a 20
-            // minute buff renders a quarter of the strip).
+            // The first observation of the process reports the seconds the
+            // effect still has, not the seconds it landed with - a login in the
+            // middle of a running buff would read a full strip draining to zero
+            // otherwise. The abnormal time of the skill stats answers the full
+            // duration when it is known and longer, so the strip reads
+            // remaining over full (5 minutes left of a 20 minute buff renders a
+            // quarter of the strip).
             if cast, ok := npcdata.SkillCastOf(buff.SkillID); ok &&
                 cast.BuffTime > total {
                 total = cast.BuffTime
@@ -108,10 +103,9 @@ func (b *Bot) SetBuffs(buffs []BuffEntry) {
     b.touch()
 }
 
-// buffLeftCapped bounds the remaining seconds of an effect: the
-// server marks the effects it never times out with a huge value
-// (2147483647), the views clamp those to a day so the countdown
-// never renders as nonsense.
+// buffLeftCapped bounds the remaining seconds of an effect: the server marks
+// the effects it never times out with a huge value (2147483647), the views
+// clamp those to a day so the countdown never renders as nonsense.
 func buffLeftCapped(left int32) int32 {
     if left < 0 {
         return 0
@@ -154,10 +148,9 @@ func (b *Bot) SelfCurMP() float64 {
     return b.char.CurMP
 }
 
-// SelfRunSpeed returns the running speed of the character the server
-// reported (the UserInfo character data): the travel economy prices
-// the walking legs with it. The zero answer marks the speed the
-// server has not sent yet.
+// SelfRunSpeed returns the running speed of the character the server reported
+// (the UserInfo character data): the travel economy prices the walking legs
+// with it. The zero answer marks the speed the server has not sent yet.
 func (b *Bot) SelfRunSpeed() float64 {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -165,12 +158,11 @@ func (b *Bot) SelfRunSpeed() float64 {
     return b.char.RunSpeed
 }
 
-// SelfWeaponKind returns the weapon family of the equipped weapon
-// (SWORD, BLUNT, DAGGER, BOW, POLE): the weapon of the right hand
-// paperdoll slot resolved through the item stats of the generated
-// dictionary. The second answer is false when no weapon is worn or
-// its family is unknown - the weapon priority of the skill queue
-// then falls back to the plain category order.
+// SelfWeaponKind returns the weapon family of the equipped weapon (SWORD,
+// BLUNT, DAGGER, BOW, POLE): the weapon of the right hand paperdoll slot
+// resolved through the item stats of the generated dictionary. The second
+// answer is false when no weapon is worn or its family is unknown - the weapon
+// priority of the skill queue then falls back to the plain category order.
 func (b *Bot) SelfWeaponKind() (string, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -231,11 +223,10 @@ func (b *Bot) buffSnapshotsLocked(now time.Time) []BuffSnapshot {
     return snapshots
 }
 
-// SetSkillWeaponPriority overrides the weapon kinds the learning
-// queue prefers: the skills usable with the given weapon families
-// (the equipped weapon and the next weapon of the purchase plan)
-// sort before the rest of their category. An empty slice restores
-// the plain category order.
+// SetSkillWeaponPriority overrides the weapon kinds the learning queue prefers:
+// the skills usable with the given weapon families (the equipped weapon and the
+// next weapon of the purchase plan) sort before the rest of their category. An
+// empty slice restores the plain category order.
 func (b *Bot) SetSkillWeaponPriority(kinds []string) {
     b.mu.Lock()
     defer b.mu.Unlock()

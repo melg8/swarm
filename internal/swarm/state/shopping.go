@@ -6,13 +6,12 @@ package state
 
 import "time"
 
-// ShoppingEntryView is one planned purchase: the item, the merchant,
-// the buy price with the shop tax and the planning bookkeeping (the
-// score gain, the sell credit of the displaced gear, the affordability
-// against the adena the plan was computed with and the adena still
-// missing). The combat stat fields mirror InventoryItemSnapshot, so
-// the shop widget tooltip reuses the item tooltip shape of the classic
-// client.
+// ShoppingEntryView is one planned purchase: the item, the merchant, the buy
+// price with the shop tax and the planning bookkeeping (the score gain, the
+// sell credit of the displaced gear, the affordability against the adena the
+// plan was computed with and the adena still missing). The combat stat fields
+// mirror InventoryItemSnapshot, so the shop widget tooltip reuses the item
+// tooltip shape of the classic client.
 type ShoppingEntryView struct {
     ItemID      int32   `json:"itemId"`
     Name        string  `json:"name"`
@@ -42,13 +41,12 @@ type ShoppingEntryView struct {
     Reason      string  `json:"reason"`
 }
 
-// ShoppingPlanView is the published shopping queue of the web UI: the
-// purchase entries in the order the strategy wants them (the
-// affordable plan of the next trip first, then the wanted tail), the
-// adena the plan was computed against and the total price of the
-// affordable entries. Trip marks a view that mirrors the buys of a
-// running town trip instead of the trigger plan (the in-flight batch
-// entries carry Buying).
+// ShoppingPlanView is the published shopping queue of the web UI: the purchase
+// entries in the order the strategy wants them (the affordable plan of the next
+// trip first, then the wanted tail), the adena the plan was computed against
+// and the total price of the affordable entries. Trip marks a view that mirrors
+// the buys of a running town trip instead of the trigger plan (the in-flight
+// batch entries carry Buying).
 type ShoppingPlanView struct {
     Entries []ShoppingEntryView `json:"entries"`
     Adena   int64               `json:"adena"`
@@ -56,21 +54,19 @@ type ShoppingPlanView struct {
     Trip    bool                `json:"trip"`
 }
 
-// shoppingPlanTTL bounds how long a published shopping plan survives
-// without a refresh: the hunt loop republishes on every tick (well
-// under a second), so an expired plan means the loop moved on (or
-// died) and the snapshot falls back to null like an expired walk
-// plan. The window is generous against a slow tick (a heavy geodata
-// segment) because a stale queue misleads far less than a stale walk
-// line.
+// shoppingPlanTTL bounds how long a published shopping plan survives without a
+// refresh: the hunt loop republishes on every tick (well under a second), so an
+// expired plan means the loop moved on (or died) and the snapshot falls back to
+// null like an expired walk plan. The window is generous against a slow tick (a
+// heavy geodata segment) because a stale queue misleads far less than a stale
+// walk line.
 const shoppingPlanTTL = 10 * time.Second
 
-// SetShoppingPlan publishes the shopping queue of the shop strategy so
-// the web UI can show what the bot plans to buy next. An empty view
-// clears the plan. A repeated identical view only refreshes its
-// lifetime: the periodic republish of the hunt loop never churns the
-// event stream. The entries slice is copied defensively - the caller
-// keeps its own queue state after the publish.
+// SetShoppingPlan publishes the shopping queue of the shop strategy so the web
+// UI can show what the bot plans to buy next. An empty view clears the plan. A
+// repeated identical view only refreshes its lifetime: the periodic republish
+// of the hunt loop never churns the event stream. The entries slice is copied
+// defensively - the caller keeps its own queue state after the publish.
 func (b *Bot) SetShoppingPlan(view ShoppingPlanView) {
     b.mu.Lock()
     defer b.mu.Unlock()

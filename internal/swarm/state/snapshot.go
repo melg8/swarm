@@ -227,11 +227,10 @@ type Snapshot struct {
     Diagnostics Diagnostics `json:"diagnostics"`
 }
 
-// ZoneView is one hunting ground of the map view: the deployment registry
-// entry with the active marker, the session deaths and, for the spot
-// registries, the respawn window, the expected populations, the measured
-// income and the next respawn prediction. Legacy squares leave the spot
-// fields zero.
+// ZoneView is one hunting ground of the map view: the deployment registry entry
+// with the active marker, the session deaths and, for the spot registries, the
+// respawn window, the expected populations, the measured income and the next
+// respawn prediction. Legacy squares leave the spot fields zero.
 type ZoneView struct {
     ID       string `json:"id"`
     Name     string `json:"name"`

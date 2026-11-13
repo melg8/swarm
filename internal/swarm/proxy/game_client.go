@@ -47,11 +47,10 @@ func (gc *gameConn) handleClientPacket(payload []byte) error {
             return gc.handleEnterWorld()
         }
         if opcode == gameOpCharacterSelect {
-            // The client is still at (or back on) the char
-            // select screen: the unsolicited answer of the
-            // auto select may not have taken (the packet raced
-            // the client state), and the user's own double
-            // click is served the same way - idempotent.
+            // The client is still at (or back on) the char select screen: the
+            // unsolicited answer of the auto select may not have taken (the
+            // packet raced the client state), and the user's own double click
+            // is served the same way - idempotent.
             return gc.handleCharacterSelect(payload)
         }
         gc.queueClientPacket(payload)

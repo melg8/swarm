@@ -477,8 +477,7 @@ func geoLerp(h0, h1 int16, t0, t1, v int32) float64 {
     return float64(h0) + float64(h1-h0)*float64(v-t0)/float64(t1-t0)
 }
 
-// geoOffset quantizes one tile local world offset (0..32768) into the
-// wire u16.
+// geoOffset quantizes one tile local world offset (0..32768) into the wire u16.
 func geoOffset(v float64) uint16 {
     return uint16(math.Round(v))
 }

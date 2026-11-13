@@ -11,31 +11,28 @@ import "strings"
 // so a pathological page cannot grow the tracker state.
 const dialogLinkCap = 128
 
-// DialogLinkView is one link of the open dialog page: the bypass
-// command the link carries (the exact string RequestBypassToServer
-// must send back) and the visible text the dialog walker matches
-// pages by.
+// DialogLinkView is one link of the open dialog page: the bypass command the
+// link carries (the exact string RequestBypassToServer must send back) and the
+// visible text the dialog walker matches pages by.
 type DialogLinkView struct {
     Command string
     Text    string
 }
 
-// DialogPageView is one server dialog page (an NpcHtmlMessage the
-// connection layer parsed and extracted): the npc the dialog
-// belongs to (the origin object id of every bypass it carries - the
-// 250 unit interaction check rides on it), the item id of item
-// bound dialogs (0 for the npc scope) and the page links.
+// DialogPageView is one server dialog page (an NpcHtmlMessage the connection
+// layer parsed and extracted): the npc the dialog belongs to (the origin object
+// id of every bypass it carries - the 250 unit interaction check rides on it),
+// the item id of item bound dialogs (0 for the npc scope) and the page links.
 type DialogPageView struct {
     NpcObjID int32
     ItemID   int32
     Links    []DialogLinkView
 }
 
-// ApplyDialog replaces the open dialog page: the NPC_HTML scope of
-// the server holds only the last page (every arrival clears the
-// scope cache before caching the new links, see
-// HtmlUtil.buildHtmlActionCache), so the tracker stores exactly one
-// page and replaces it whole.
+// ApplyDialog replaces the open dialog page: the NPC_HTML scope of the server
+// holds only the last page (every arrival clears the scope cache before caching
+// the new links, see HtmlUtil.buildHtmlActionCache), so the tracker stores
+// exactly one page and replaces it whole.
 func (b *Bot) ApplyDialog(page DialogPageView) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -73,12 +70,11 @@ func (b *Bot) DialogOrigin() int32 {
 }
 
 // IsDialogCommand mirrors the server side validation of
-// Player.validateHtmlAction: a command passes when the open page
-// carries it exactly, or when the page carries it as a variable
-// parameter link (the command prefix up to the '$' marker matches).
-// A command the open page never offered must not be sent - the
-// server drops it silently (the anti-injection gate of
-// docs/quest_protocol.md).
+// Player.validateHtmlAction: a command passes when the open page carries it
+// exactly, or when the page carries it as a variable parameter link (the
+// command prefix up to the '$' marker matches). A command the open page never
+// offered must not be sent - the server drops it silently (the anti-injection
+// gate of docs/quest_protocol.md).
 func (b *Bot) IsDialogCommand(command string) bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -103,10 +99,9 @@ type openDialog struct {
     links    []DialogLinkView
 }
 
-// dialogPrefix returns the validation prefix of a variable
-// parameter link: the '$' marker stripped and the remainder
-// trimmed - the form the server compares commands against (see
-// Player.validateHtmlAction).
+// dialogPrefix returns the validation prefix of a variable parameter link: the
+// '$' marker stripped and the remainder trimmed - the form the server compares
+// commands against (see Player.validateHtmlAction).
 func dialogPrefix(cached string) string {
     return strings.TrimSpace(strings.TrimSuffix(cached, "$"))
 }

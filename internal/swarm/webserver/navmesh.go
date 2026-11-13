@@ -288,9 +288,8 @@ func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
     _, _ = w.Write(payload)
 }
 
-// handleNavmeshPath runs one corridor search between the double clicked
-// points (or one plan repro search of a pathfind link) and measures the
-// time.
+// handleNavmeshPath runs one corridor search between the double clicked points
+// (or one plan repro search of a pathfind link) and measures the time.
 func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     body, err := io.ReadAll(io.LimitReader(r.Body, navmeshPathBodyLimit))
     if err != nil {
@@ -603,8 +602,7 @@ func (s *Server) navmeshGeometryCached(
     return payload, navmeshGeoETag(key, payload), nil
 }
 
-// navmeshGeoETag derives the immutable tag: the key and the three block
-// counts.
+// navmeshGeoETag derives the immutable tag: the key and the three block counts.
 func navmeshGeoETag(key navmesh.RegionKey, payload []byte) string {
     return fmt.Sprintf(`"nmv2-%d_%d-%d-%d-%d"`, key.Col, key.Row,
         binary.LittleEndian.Uint32(payload[20:24]),

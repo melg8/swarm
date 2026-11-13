@@ -28,13 +28,12 @@ func (gc *gameConn) answerNetPingLocally() {
     _ = gc.sendToClient(answer)
 }
 
-// clientViewDiverged reports whether one client position report
-// contradicts the projected live place by more than one move speed
-// plus validateDivergenceSlack. The band under the server's 500 unit
-// correction threshold is the silent snap window this check closes;
-// the projected place is compared, not the last broadcast origin,
-// which sits a walk segment behind a moving character
-// (docs/proxy.md, "The client position reports").
+// clientViewDiverged reports whether one client position report contradicts the
+// projected live place by more than one move speed plus
+// validateDivergenceSlack. The band under the server's 500 unit correction
+// threshold is the silent snap window this check closes; the projected place is
+// compared, not the last broadcast origin, which sits a walk segment behind a
+// moving character (docs/proxy.md, "The client position reports").
 func (gc *gameConn) clientViewDiverged(payload []byte) bool {
     if len(payload) < 13 {
         return false

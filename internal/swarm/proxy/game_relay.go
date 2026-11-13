@@ -134,10 +134,9 @@ func (gc *gameConn) drainOutbound(buf []byte) {
     }
 }
 
-// writeOutbound encrypts one payload on the scratch buffer and writes
-// it to the client socket. It reports false when the write failed: the
-// socket is closed right away (the reader must be released), the
-// remaining queue is dropped.
+// writeOutbound encrypts one payload on the scratch buffer and writes it to the
+// client socket. It reports false when the write failed: the socket is closed
+// right away (the reader must be released), the remaining queue is dropped.
 func (gc *gameConn) writeOutbound(buf []byte, payload []byte) bool {
     // The payload may be shared with the recorder history: the
     // encryption transforms in place, so it runs on the copy.
@@ -179,10 +178,9 @@ func (gc *gameConn) runRelay() {
     }
 }
 
-// streamSession serves one bot session cycle: the replay of everything
-// recorded after the given sequence, followed by the live feed. It
-// returns the replay start sequence of the next cycle, or ok=false
-// when the connection is done.
+// streamSession serves one bot session cycle: the replay of everything recorded
+// after the given sequence, followed by the live feed. It returns the replay
+// start sequence of the next cycle, or ok=false when the connection is done.
 //
 // The LeaveWorld of a bot logout is suppressed in both phases (see
 // handoff.go); a client that asked for the logout itself receives it.
@@ -197,13 +195,12 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
     // and the client switches onto the newly selected bot.
     selectionCh := gc.server.selectionChannel()
 
-    // A selection whose target bot is not online yet (registered but
-    // still connecting, or not registered at all) arms a pending
-    // switch: the live feed keeps flowing while the poll ticker below
-    // retries the switch, so the client lands on the target the
-    // moment it enters the world. Without the pending the relay would
-    // stay on the current bot forever: SelectBot of the same id is a
-    // no-op that never refires the channel.
+    // A selection whose target bot is not online yet (registered but still
+    // connecting, or not registered at all) arms a pending switch: the live
+    // feed keeps flowing while the poll ticker below retries the switch, so the
+    // client lands on the target the moment it enters the world. Without the
+    // pending the relay would stay on the current bot forever: SelectBot of the
+    // same id is a no-op that never refires the channel.
     pendingSwitch := ""
     switchPoll := time.NewTicker(botSwitchPollPeriod)
     defer switchPoll.Stop()
@@ -238,11 +235,10 @@ func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
             if next != nil {
                 return gc.parkAtCharSelect()
             }
-            // The selection did not resolve to a different online
-            // session: stay on the current live feed, and arm the
-            // pending switch when the target is not online yet
-            // ("" when the selection names the current bot or
-            // nothing).
+            // The selection did not resolve to a different online session: stay
+            // on the current live feed, and arm the pending switch when the
+            // target is not online yet ("" when the selection names the current
+            // bot or nothing).
             pendingSwitch = target
             selectionCh = gc.server.selectionChannel()
         case <-switchPoll.C:

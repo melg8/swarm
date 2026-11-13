@@ -148,8 +148,7 @@ func (b *Bot) SelfWalking() bool {
     return b.char.Moving && b.now().Sub(b.char.MoveAt) <= walkingFreshWindow
 }
 
-// SelfPosition returns the last observed placement of the played
-// character.
+// SelfPosition returns the last observed placement of the played character.
 func (b *Bot) SelfPosition() (int32, int32, int32, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -230,9 +229,8 @@ func (b *Bot) ApplySelfFacing(heading int32) {
     b.touch()
 }
 
-// SelfSitting reports whether the character is sitting. The hunt loop
-// gates the rest transitions on it because the sit/stand action is a
-// server side toggle.
+// SelfSitting reports whether the character is sitting. The hunt loop gates the
+// rest transitions on it because the sit/stand action is a server side toggle.
 func (b *Bot) SelfSitting() bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -249,9 +247,8 @@ func (b *Bot) SelfLevel() int32 {
     return b.char.Level
 }
 
-// SelfClassID returns the class id of the played character: the skill
-// teachers and the learning queue resolve through it. Zero before the
-// first UserInfo.
+// SelfClassID returns the class id of the played character: the skill teachers
+// and the learning queue resolve through it. Zero before the first UserInfo.
 func (b *Bot) SelfClassID() int32 {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -259,9 +256,8 @@ func (b *Bot) SelfClassID() int32 {
     return b.char.ClassID
 }
 
-// SelfSp returns the current skill points of the played character:
-// the learning trigger and the per lesson budget of the teacher stop
-// read it.
+// SelfSp returns the current skill points of the played character: the learning
+// trigger and the per lesson budget of the teacher stop read it.
 func (b *Bot) SelfSp() int32 {
     b.mu.RLock()
     defer b.mu.RUnlock()

@@ -622,8 +622,7 @@ func (p *dumpParser) parseWalkPlan(header string, last bool) error {
         case strings.HasPrefix(field, "search "):
             parseWalkSearchLine(field, search)
         case strings.HasPrefix(field, "wp "):
-            // "wp <i>: <x> <y> <z>" or "... (passed)" or
-            // "... <-- TARGET"
+            // "wp <i>: <x> <y> <z>" or "... (passed)" or "... <-- TARGET"
             rest := takeAfter(field, "wp ")
             idxStr := takeBefore(rest, ":")
             _ = parseInt32(idxStr) // index implicit in slice order

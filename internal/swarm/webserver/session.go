@@ -19,12 +19,11 @@ import (
 // long-lived run on the user machine hands its whole history to the
 // developer agent in one click, no file digging on the user side.
 
-// SetSessionJournal attaches the session journal and registers the
-// report endpoint. The single and the fleet modes of cmd/swarm both
-// call it right after startWebInterface (the ServeMux registration is
-// mutex guarded, so a request racing the call sees at worst a 404 in
-// the first microseconds); without a journal the endpoint answers 503
-// (the -session-dir "" mode).
+// SetSessionJournal attaches the session journal and registers the report
+// endpoint. The single and the fleet modes of cmd/swarm both call it right
+// after startWebInterface (the ServeMux registration is mutex guarded, so a
+// request racing the call sees at worst a 404 in the first microseconds);
+// without a journal the endpoint answers 503 (the -session-dir "" mode).
 func (s *Server) SetSessionJournal(journal *session.Journal) {
     s.journal = journal
     mux := s.httpServer.Handler.(*http.ServeMux)
@@ -32,8 +31,7 @@ func (s *Server) SetSessionJournal(journal *session.Journal) {
         "GET /api/bots/{id}/session-report", s.handleSessionReport)
 }
 
-// handleSessionReport serves the session report of one bot as plain
-// text.
+// handleSessionReport serves the session report of one bot as plain text.
 func (s *Server) handleSessionReport(w http.ResponseWriter, r *http.Request) {
     if s.journal == nil {
         http.Error(w, "session journal is disabled",

@@ -61,10 +61,9 @@ func detectIconsDir() string {
     return ""
 }
 
-// serveIcons answers GET /icons/{name}.png from the icon pack on disk.
-// Missing packs answer 404 for every name, the widget renders its
-// fallback glyphs instead. The path is cleaned and must stay inside
-// the pack directory.
+// serveIcons answers GET /icons/{name}.png from the icon pack on disk. Missing
+// packs answer 404 for every name, the widget renders its fallback glyphs
+// instead. The path is cleaned and must stay inside the pack directory.
 func (s *Server) serveIcons(w http.ResponseWriter, r *http.Request) {
     dir := s.iconsDir.Load().(string)
     if dir == "" {

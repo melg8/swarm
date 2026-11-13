@@ -39,11 +39,10 @@ const (
     chatParamSkill = 4
 )
 
-// ChatEvent is one line of the web chat window: a parsed system
-// message, a social animation of a creature around the bot or a
-// world chat line of the CreatureSay packet. The From field carries
-// the sender name of the chat lines and stays empty for the system
-// and social kinds.
+// ChatEvent is one line of the web chat window: a parsed system message, a
+// social animation of a creature around the bot or a world chat line of the
+// CreatureSay packet. The From field carries the sender name of the chat lines
+// and stays empty for the system and social kinds.
 type ChatEvent struct {
     Time time.Time `json:"time"`
     Kind string    `json:"kind"`
@@ -85,9 +84,8 @@ func chatKindForChannel(channel int32) string {
     }
 }
 
-// Say carries the parsed CreatureSay packet: one world chat line of
-// a creature (the own sends of the character echo back through the
-// same broadcast).
+// Say carries the parsed CreatureSay packet: one world chat line of a creature
+// (the own sends of the character echo back through the same broadcast).
 type Say struct {
     ObjectID int32
     Channel  int32
@@ -106,10 +104,9 @@ func (b *Bot) ApplySay(s Say) {
     b.touch()
 }
 
-// ChatMessageParam mirrors one SystemMessage packet parameter: the type
-// decides whether the int or the text value is meaningful. Level
-// carries the second int of the multi int parameters (the skill level
-// of a skill name parameter).
+// ChatMessageParam mirrors one SystemMessage packet parameter: the type decides
+// whether the int or the text value is meaningful. Level carries the second int
+// of the multi int parameters (the skill level of a skill name parameter).
 type ChatMessageParam struct {
     Type  int32
     Int   int32
@@ -117,9 +114,8 @@ type ChatMessageParam struct {
     Text  string
 }
 
-// SystemMessage carries the parsed SystemMessage packet: the id maps to
-// the client side text and the parameters substitute its $sN and $cN
-// placeholders.
+// SystemMessage carries the parsed SystemMessage packet: the id maps to the
+// client side text and the parameters substitute its $sN and $cN placeholders.
 type SystemMessage struct {
     ID     int32
     Params []ChatMessageParam
@@ -179,11 +175,10 @@ func (b *Bot) recordChatLocked(kind string, text string) {
     b.touch()
 }
 
-// chatLog is the rolling chat window of one bot session, split out of
-// the Bot god object: a fixed capacity ring written by the system
-// message and social action paths and read whole by the snapshot. The
-// ring allocates lazily on the first line so idle sessions pay no
-// per bot chat memory.
+// chatLog is the rolling chat window of one bot session, split out of the Bot
+// god object: a fixed capacity ring written by the system message and social
+// action paths and read whole by the snapshot. The ring allocates lazily on the
+// first line so idle sessions pay no per bot chat memory.
 type chatLog struct {
     ring   []ChatEvent
     length int
@@ -195,8 +190,7 @@ func newChatLog() chatLog {
     return chatLog{ring: nil, length: 0, head: 0}
 }
 
-// record appends one chat line. The caller must hold the bot write
-// lock.
+// record appends one chat line. The caller must hold the bot write lock.
 func (l *chatLog) record(
     kind string, text string, from string, at time.Time,
 ) {
@@ -220,11 +214,10 @@ func (l *chatLog) appendAll(dst []ChatEvent) []ChatEvent {
     return dst
 }
 
-// formatChatText substitutes the $sN and $cN placeholders of a system
-// message text with the packet parameters in their order. A missing
-// parameter renders as nothing (the server sendMessage texts ride the
-// generic "$s1 $s2" template with one parameter) and the trailing gap
-// it leaves is trimmed.
+// formatChatText substitutes the $sN and $cN placeholders of a system message
+// text with the packet parameters in their order. A missing parameter renders
+// as nothing (the server sendMessage texts ride the generic "$s1 $s2" template
+// with one parameter) and the trailing gap it leaves is trimmed.
 func formatChatText(text string, params []ChatMessageParam) string {
     var out strings.Builder
     for i := 0; i < len(text); {
@@ -250,11 +243,10 @@ func formatChatText(text string, params []ChatMessageParam) string {
     return strings.TrimRight(out.String(), " ")
 }
 
-// renderChatParam renders one parameter for the chat text: item, npc
-// and skill name parameters resolve through the generated
-// dictionaries, a missing parameter renders as nothing so the unused
-// tail placeholders of the server templates never surface, everything
-// else falls back to its raw value.
+// renderChatParam renders one parameter for the chat text: item, npc and skill
+// name parameters resolve through the generated dictionaries, a missing
+// parameter renders as nothing so the unused tail placeholders of the server
+// templates never surface, everything else falls back to its raw value.
 func renderChatParam(params []ChatMessageParam, index int) string {
     if index >= len(params) {
         return ""
@@ -280,10 +272,9 @@ func renderChatParam(params []ChatMessageParam, index int) string {
     return strconv.Itoa(int(param.Int))
 }
 
-// skillChatName renders a skill name parameter as the generated
-// dictionary name with its level: "Power Strike lvl 3". The level
-// rides the second int of the packet parameter and a skill without
-// one renders the bare name.
+// skillChatName renders a skill name parameter as the generated dictionary name
+// with its level: "Power Strike lvl 3". The level rides the second int of the
+// packet parameter and a skill without one renders the bare name.
 func skillChatName(param ChatMessageParam) string {
     info, ok := npcdata.SkillInfoOf(param.Int)
     if !ok || info.Name == "" {

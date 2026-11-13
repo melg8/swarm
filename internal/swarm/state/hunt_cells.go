@@ -49,8 +49,7 @@ type CellLiveView struct {
     // NextRespawnSec is the predicted ETA of the earliest respawn of
     // the overlay, -1 when no prediction is pending.
     NextRespawnSec int32 `json:"nextRespawnSec"`
-    // AdenaPerMin is the measured income rate of the session at the
-    // ground.
+    // AdenaPerMin is the measured income rate of the session at the ground.
     AdenaPerMin float64 `json:"adenaPerMin"`
     // DeathHeat is the decayed death heat of the cell.
     DeathHeat float64 `json:"deathHeat"`
@@ -98,10 +97,9 @@ func (b *Bot) HuntMesh() (string, []byte) {
     return version, payload
 }
 
-// HuntCell returns the live record of the cell the loop holds (the
-// zero view when none is published): the map highlight and the
-// status line of the web UI read it through the snapshot, the tests
-// read it directly.
+// HuntCell returns the live record of the cell the loop holds (the zero view
+// when none is published): the map highlight and the status line of the web UI
+// read it through the snapshot, the tests read it directly.
 func (b *Bot) HuntCell() CellLiveView {
     b.mu.RLock()
     view := b.huntCell
@@ -189,10 +187,9 @@ func appendCellLiveJSON(dst []byte, view CellLiveView) []byte {
     return append(dst, '}')
 }
 
-// appendHuntMeshVersionJSON writes the mesh version marker of the
-// snapshot: the string the web client compares against its cached
-// mesh to decide the refetch (empty when no cell-mode registry is
-// installed).
+// appendHuntMeshVersionJSON writes the mesh version marker of the snapshot: the
+// string the web client compares against its cached mesh to decide the refetch
+// (empty when no cell-mode registry is installed).
 func appendHuntMeshVersionJSON(dst []byte, version string) []byte {
     dst = append(dst, `,"huntMesh":`...)
 

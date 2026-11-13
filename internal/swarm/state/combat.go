@@ -132,9 +132,8 @@ func (b *Bot) recordObjectDamageLocked(
     }
 }
 
-// markObjectCombatLocked refreshes the combat window of an object and
-// logs the transition into combat once. The caller must hold the state
-// write lock.
+// markObjectCombatLocked refreshes the combat window of an object and logs the
+// transition into combat once. The caller must hold the state write lock.
 func (b *Bot) markObjectCombatLocked(
     hot *objectHot, cold *objectCold, now time.Time,
 ) {

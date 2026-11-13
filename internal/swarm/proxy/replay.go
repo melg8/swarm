@@ -11,14 +11,13 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The replayed history describes the world as the bot saw it: the
-// kept world object packets stay valid for a reconnecting client (the
-// objects converge through the prologue and the tail), but the
-// self-state packets do not - the recorded CharSelected and UserInfo
-// carry the login-time place, so a client that reconnects after the
-// bot walked away spawns at the stale spot and crashes. The patchers
-// rewrite them with the live tracker snapshot and the filter drops the
-// stale self movement packets, keeping the newest one.
+// The replayed history describes the world as the bot saw it: the kept world
+// object packets stay valid for a reconnecting client (the objects converge
+// through the prologue and the tail), but the self-state packets do not - the
+// recorded CharSelected and UserInfo carry the login-time place, so a client
+// that reconnects after the bot walked away spawns at the stale spot and
+// crashes. The patchers rewrite them with the live tracker snapshot and the
+// filter drops the stale self movement packets, keeping the newest one.
 
 // Server packet opcodes the replay patching understands. Every movement
 // family packet carries the moved object id in its first int32.
@@ -63,9 +62,8 @@ func patchCharSelectedLive(
     return patched
 }
 
-// charSelectedHeaderInts counts the int32 fields between the title
-// string and the x coordinate: session, clan, unknown, sex, race,
-// class and active.
+// charSelectedHeaderInts counts the int32 fields between the title string and
+// the x coordinate: session, clan, unknown, sex, race, class and active.
 const charSelectedHeaderInts = 7
 
 // charSelectedPositionOffset scans the header of the recorded
@@ -96,9 +94,8 @@ func skipUtf16String(payload []byte, offset int) int {
     return -1
 }
 
-// userInfoFixedHeaderLen is the byte length of the fixed UserInfo
-// header before the name string: opcode, x, y, z, vehicle id and
-// object id.
+// userInfoFixedHeaderLen is the byte length of the fixed UserInfo header before
+// the name string: opcode, x, y, z, vehicle id and object id.
 const userInfoFixedHeaderLen = 21
 
 // userInfoPatchedTailLen is the byte length of the UserInfo block after
@@ -106,12 +103,11 @@ const userInfoFixedHeaderLen = 21
 // exp, six stats, the four vitals and sp.
 const userInfoPatchedTailLen = 64
 
-// patchUserInfoSelfLive returns a copy of a replayed UserInfo packet of
-// the played character with the position, vitals, level and progression
-// fields rewritten from the live snapshot. A UserInfo of any other
-// object (or a packet without the fixed header) is returned unchanged;
-// when the name string cannot be scanned the patch degrades to the
-// fixed header position fields.
+// patchUserInfoSelfLive returns a copy of a replayed UserInfo packet of the
+// played character with the position, vitals, level and progression fields
+// rewritten from the live snapshot. A UserInfo of any other object (or a packet
+// without the fixed header) is returned unchanged; when the name string cannot
+// be scanned the patch degrades to the fixed header position fields.
 func patchUserInfoSelfLive(
     payload []byte, selfID int32, char state.CharacterSnapshot,
 ) []byte {
@@ -169,11 +165,10 @@ func isSelfMovementPayload(payload []byte, selfID int32) bool {
     }
 }
 
-// lastSelfMovementSeq returns the sequence number of the newest self
-// movement entry of the replay window: the one recorded packet whose
-// coordinates still match the live tracker position (the tracker takes
-// its position from exactly these packets), so the replay keeps it and
-// drops the older ones.
+// lastSelfMovementSeq returns the sequence number of the newest self movement
+// entry of the replay window: the one recorded packet whose coordinates still
+// match the live tracker position (the tracker takes its position from exactly
+// these packets), so the replay keeps it and drops the older ones.
 func lastSelfMovementSeq(entries []RecorderEntry, selfID int32) int64 {
     var last int64
     for i := range entries {

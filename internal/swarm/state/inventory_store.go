@@ -44,12 +44,11 @@ func (s *inventoryStore) lookupLocked(objectID int32) (InventoryItem, bool) {
     return InventoryItem{}, false
 }
 
-// upsertLocked stores the item record and reports the previous one: a
-// new object id appends at the end of the slice, an existing one is
-// modified in place. Both the append and the equip flag flip mark the
-// canonical order dirty - a pure count, enchant or type change keeps
-// the record position and costs no re-sort. The caller must hold the
-// write lock.
+// upsertLocked stores the item record and reports the previous one: a new
+// object id appends at the end of the slice, an existing one is modified in
+// place. Both the append and the equip flag flip mark the canonical order dirty
+// - a pure count, enchant or type change keeps the record position and costs no
+// re-sort. The caller must hold the write lock.
 func (s *inventoryStore) upsertLocked(
     item InventoryItem,
 ) (previous InventoryItem, existed bool) {
@@ -70,11 +69,10 @@ func (s *inventoryStore) upsertLocked(
     return InventoryItem{}, false
 }
 
-// removeLocked drops the record of the object id and reports whether
-// it existed: the last record swaps into the freed slot so the array
-// stays dense. The swap leaves the canonical order, so the removal
-// marks it dirty for the batch end canonicalizeLocked call. The
-// caller must hold the write lock.
+// removeLocked drops the record of the object id and reports whether it
+// existed: the last record swaps into the freed slot so the array stays dense.
+// The swap leaves the canonical order, so the removal marks it dirty for the
+// batch end canonicalizeLocked call. The caller must hold the write lock.
 func (s *inventoryStore) removeLocked(objectID int32) bool {
     slot, ok := s.index[objectID]
     if !ok {
@@ -92,9 +90,8 @@ func (s *inventoryStore) removeLocked(objectID int32) bool {
     return true
 }
 
-// replaceLocked swaps the whole tracked inventory with the given
-// records (the full ItemList packet apply). The caller must hold the
-// write lock.
+// replaceLocked swaps the whole tracked inventory with the given records (the
+// full ItemList packet apply). The caller must hold the write lock.
 func (s *inventoryStore) replaceLocked(items []InventoryItem) {
     s.items = s.items[:0]
     clear(s.index)
@@ -103,11 +100,10 @@ func (s *inventoryStore) replaceLocked(items []InventoryItem) {
     s.canonicalizeLocked()
 }
 
-// canonicalizeLocked restores the canonical widget order and rebuilds
-// the slot index: a no-op unless a mutation marked the order dirty.
-// The inventory stays under the slot limit in practice, so the sort
-// costs a microsecond on the rare mutation batches only. The caller
-// must hold the write lock.
+// canonicalizeLocked restores the canonical widget order and rebuilds the slot
+// index: a no-op unless a mutation marked the order dirty. The inventory stays
+// under the slot limit in practice, so the sort costs a microsecond on the rare
+// mutation batches only. The caller must hold the write lock.
 func (s *inventoryStore) canonicalizeLocked() {
     if !s.orderDirty {
         return

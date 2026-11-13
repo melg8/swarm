@@ -4,12 +4,11 @@
 
 // Package session owns the persistent session journal of the bot: an
 // append-only JSONL file in logs/ that records the whole run from the
-// application start (the tracker event story, periodic character
-// samples and the structured hunt events) plus the compact report
-// rendered from it. The state dump is a point-in-time snapshot and the
-// tracker event log a 512-entry ring, so a 8-24 hour run left no trace
-// to analyze; the journal keeps the full story on disk for the web UI
-// "session dump" and the -session-report CLI.
+// application start (the tracker event story, periodic character samples and
+// the structured hunt events) plus the compact report rendered from it. The
+// state dump is a point-in-time snapshot and the tracker event log a 512-entry
+// ring, so a 8-24 hour run left no trace to analyze; the journal keeps the full
+// story on disk for the web UI "session dump" and the -session-report CLI.
 package session
 
 import "time"
@@ -147,9 +146,8 @@ type Sample struct {
     Phase  string
 }
 
-// LiveView is the point-in-time state of one bot the live report
-// header carries (the web server builds it from the tracker; the
-// offline CLI passes nil).
+// LiveView is the point-in-time state of one bot the live report header carries
+// (the web server builds it from the tracker; the offline CLI passes nil).
 type LiveView struct {
     ID          string
     Status      string

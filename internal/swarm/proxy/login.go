@@ -17,12 +17,11 @@ import (
     "github.com/melg8/swarm/internal/swarm/packets/packet"
 )
 
-// loginConn drives one client connection of the emulated login server.
-// The emulation is complete: any account/password pair is accepted, the
-// server list advertises exactly one game server (the proxy game
-// listener on the address family the client used) and the PlayOk
-// session keys are generated locally. The client never talks to the
-// real Mobius login server.
+// loginConn drives one client connection of the emulated login server. The
+// emulation is complete: any account/password pair is accepted, the server list
+// advertises exactly one game server (the proxy game listener on the address
+// family the client used) and the PlayOk session keys are generated locally.
+// The client never talks to the real Mobius login server.
 type loginConn struct {
     server   *Server
     conn     net.Conn
@@ -316,9 +315,8 @@ func (lc *loginConn) sendSealed(content []byte) error {
     return nil
 }
 
-// localIP returns the IPv4 address the client used to reach this login
-// listener (the server list entry advertises the same family for the
-// game connection).
+// localIP returns the IPv4 address the client used to reach this login listener
+// (the server list entry advertises the same family for the game connection).
 func (lc *loginConn) localIP() [4]byte {
     addr, ok := lc.conn.LocalAddr().(*net.TCPAddr)
     if ok {

@@ -48,11 +48,10 @@ var (
     errQueryBadRegex = errors.New("bad match expression")
 )
 
-// ParseQueryTime resolves one -from/-to argument: a full RFC3339
-// timestamp passes through, a bare 15:04 or 15:04:05 clock lands on the
-// day of the base time that sits closest to it (a session crossing
-// midnight binds 01:30 to the morning after the 22:51 start, not the
-// 21 hours before it).
+// ParseQueryTime resolves one -from/-to argument: a full RFC3339 timestamp
+// passes through, a bare 15:04 or 15:04:05 clock lands on the day of the base
+// time that sits closest to it (a session crossing midnight binds 01:30 to the
+// morning after the 22:51 start, not the 21 hours before it).
 func ParseQueryTime(value string, base time.Time) (time.Time, error) {
     for _, layout := range [...]string{"15:04", "15:04:05"} {
         if len(value) != len(layout) {
@@ -187,11 +186,10 @@ type queryStats struct {
     printed int
 }
 
-// RunQuery streams the journal file once and prints every record that
-// passes the filter, with optional time context around the matches.
-// The output lands in out; the tool is the grep of the journal, bounded
-// in memory whatever the file size (only the context ring and the
-// summary counters live).
+// RunQuery streams the journal file once and prints every record that passes
+// the filter, with optional time context around the matches. The output lands
+// in out; the tool is the grep of the journal, bounded in memory whatever the
+// file size (only the context ring and the summary counters live).
 func RunQuery(path string, filter QueryFilter, out io.Writer) error {
     matcher, err := newQueryMatcher(filter)
     if err != nil {

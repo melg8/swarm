@@ -238,10 +238,9 @@ func newBotAgg(id string) *botAgg {
     }
 }
 
-// accept reports whether the record rides the journal. The story
-// records pass a per-minute budget: a flooded event log (a misbehaving
-// loop) mutes instead of filling the disk, and the muted count names
-// the flood in the report.
+// accept reports whether the record rides the journal. The story records pass a
+// per-minute budget: a flooded event log (a misbehaving loop) mutes instead of
+// filling the disk, and the muted count names the flood in the report.
 func (a *botAgg) accept(r record) bool {
     if r.E != kindStory {
         return true
@@ -261,9 +260,8 @@ func (a *botAgg) accept(r record) bool {
     return true
 }
 
-// apply folds one record into the aggregate. The caller must hold the
-// journal write lock (the report readers walk the same state under
-// the read lock).
+// apply folds one record into the aggregate. The caller must hold the journal
+// write lock (the report readers walk the same state under the read lock).
 func (a *botAgg) apply(r record) {
     if a.first == 0 {
         a.first = r.T
@@ -390,9 +388,8 @@ func (a *botAgg) bucketFirst(s *sampleState) {
     bucket.adLast = s.ad
 }
 
-// bucketDelta folds the transition between two samples into the hour
-// buckets of both (the phase seconds attribute to the bucket the
-// interval starts in).
+// bucketDelta folds the transition between two samples into the hour buckets of
+// both (the phase seconds attribute to the bucket the interval starts in).
 func (a *botAgg) bucketDelta(from *sampleState, to *sampleState) {
     dt := float64(to.t - from.t)
     if dt <= 0 {

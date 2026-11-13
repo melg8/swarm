@@ -2556,6 +2556,22 @@ corner probe is a length, not a leg at all.
   pathfind (56.6 s), navbuild (37.3 s) and navmesh (34.8 s) suites,
   `golangci-lint run` on the six paths 0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the comment wrapping reflow of the first group
+
+- The comments were wrapped well below the 80 column budget (the older
+  blocks broke at 72 or less), so a paragraph packer was added to the
+  throwaway tooling and every plain prose paragraph of the state,
+  session, proxy and webserver packages is now packed to the limit -
+  no fact, no word and no paragraph break lost, only the line breaks
+  move.
+- 53 files, 135 comment lines fewer (the 484 insertions against 629
+  deletions of the diff are the rewritten lines).
+- The wire format blocks, the bullet lists, the directives and the
+  blocks carrying brackets or pipes stay untouched by the packer.
+- Verified: `task fmt`, `go build ./...`, the state (1.2 s), session
+  (0.5 s), proxy (6.9 s) and webserver (8.1 s) suites, `golangci-lint
+  run` on the four paths 0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

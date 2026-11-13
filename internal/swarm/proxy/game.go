@@ -42,19 +42,17 @@ type gameConn struct {
     queue           [][]byte
 
     // viewLogAt bounds the client view divergence logging of the
-    // ValidatePosition interception (the corrections themselves may
-    // repeat with every report), vetoLogAt the same for the dropped
-    // CannotMoveAnymore vetoes. Owned by the read loop: the transits
-    // all run there.
+    // ValidatePosition interception (the corrections themselves may repeat with
+    // every report), vetoLogAt the same for the dropped CannotMoveAnymore
+    // vetoes. Owned by the read loop: the transits all run there.
     viewLogAt time.Time
     vetoLogAt time.Time
 
-    // relayLive, autoSelect and enterWorldCh are guarded by mu:
-    // relayLive marks the relay goroutine as the owner of the
-    // stream (the read loop signals instead of starting a second
-    // one when a restart dance hands the flow back), autoSelect is
-    // the pending unsolicited char selected answer of a dance, and
-    // enterWorldCh carries the replay sequence the read loop hands
+    // relayLive, autoSelect and enterWorldCh are guarded by mu: relayLive marks
+    // the relay goroutine as the owner of the stream (the read loop signals
+    // instead of starting a second one when a restart dance hands the flow
+    // back), autoSelect is the pending unsolicited char selected answer of a
+    // dance, and enterWorldCh carries the replay sequence the read loop hands
     // the parked relay when the client re-enters the world.
     relayLive    bool
     autoSelect   *time.Timer
@@ -103,12 +101,11 @@ const (
     serverOpValidateLocation  = 0x76
 )
 
-// validateDivergenceSlack widens the server out of sync rule for the
-// projection error: the self projection runs up to one 100 ms tick
-// ahead and the client report is one network hop old. The rule is the
-// live move speed; the server corrects only above 500 units (or a
-// >200 z gap), so the band under 500 is the silent snap window this
-// check closes.
+// validateDivergenceSlack widens the server out of sync rule for the projection
+// error: the self projection runs up to one 100 ms tick ahead and the client
+// report is one network hop old. The rule is the live move speed; the server
+// corrects only above 500 units (or a >200 z gap), so the band under 500 is the
+// silent snap window this check closes.
 const validateDivergenceSlack = 25.0
 
 // validateLogPeriod bounds the divergence logging: a client whose
@@ -136,13 +133,12 @@ const shutdownFlushWait = time.Second
 // outboundQueueSize bounds the client bound packet queue of one client.
 const outboundQueueSize = 512
 
-// botSwitchPollPeriod is how often the live relay retries a pending
-// bot switch: the WebUI selection fired but the target bot was not
-// online yet (registered but still connecting, or not registered at
-// all), so the relay keeps serving the current live feed and polls
-// for the target to enter the world - the client lands on the newly
-// selected bot within one period of it appearing, without a stalled
-// feed or a reconnect.
+// botSwitchPollPeriod is how often the live relay retries a pending bot switch:
+// the WebUI selection fired but the target bot was not online yet (registered
+// but still connecting, or not registered at all), so the relay keeps serving
+// the current live feed and polls for the target to enter the world - the
+// client lands on the newly selected bot within one period of it appearing,
+// without a stalled feed or a reconnect.
 const botSwitchPollPeriod = 250 * time.Millisecond
 
 // handleGameConn runs the game server emulation for one client.
@@ -304,10 +300,9 @@ func (gc *gameConn) setSession(session *botSession) {
     gc.session = session
 }
 
-// setHolding toggles the hold of the relogin handoff: while held, the
-// client packets are swallowed instead of transiting - the bot session
-// they would reach is gone and the world behind the client is frozen
-// anyway.
+// setHolding toggles the hold of the relogin handoff: while held, the client
+// packets are swallowed instead of transiting - the bot session they would
+// reach is gone and the world behind the client is frozen anyway.
 func (gc *gameConn) setHolding(holding bool) {
     gc.mu.Lock()
     defer gc.mu.Unlock()
@@ -323,9 +318,8 @@ func (gc *gameConn) isHolding() bool {
 }
 
 // markUserLogout records that the client itself asked for the logout: the
-// LeaveWorld answer is then relayed (the client returns to the login
-// screen on its own) and the session end closes the connection instead
-// of holding it.
+// LeaveWorld answer is then relayed (the client returns to the login screen on
+// its own) and the session end closes the connection instead of holding it.
 func (gc *gameConn) markUserLogout() {
     gc.mu.Lock()
     defer gc.mu.Unlock()
@@ -364,12 +358,11 @@ func (gc *gameConn) currentState() gameState {
     return gc.state
 }
 
-// shutdown closes the client connection once with the given reason.
-// When the sender goroutine is live it flushes the queued packets and
-// closes the socket itself; shutdown only waits a bounded time for
-// that (a stalled write cannot hold the teardown hostage) and force
-// closes the socket afterwards. A connection without the sender (a
-// failed handshake) is closed directly.
+// shutdown closes the client connection once with the given reason. When the
+// sender goroutine is live it flushes the queued packets and closes the socket
+// itself; shutdown only waits a bounded time for that (a stalled write cannot
+// hold the teardown hostage) and force closes the socket afterwards. A
+// connection without the sender (a failed handshake) is closed directly.
 func (gc *gameConn) shutdown(reason string) {
     gc.closeOnce.Do(func() {
         gc.server.logger.Printf("game#%d: closing, %s", gc.id, reason)

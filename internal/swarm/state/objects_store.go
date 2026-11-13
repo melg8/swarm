@@ -4,14 +4,13 @@
 
 package state
 
-// objectStore is the world object storage of one bot session: a dense
-// slot array (no holes, the apply paths mutate in place and the scans
-// walk it sequentially) plus the object id to slot index. The records
-// split into a hot and a cold array on the same slot and stay length
-// locked, so the scans stream the compact hot block while the display
-// fields sit in the cold one. A removal swaps the last records of both
-// halves into the freed slot and moves the index entry, so the arrays
-// never fragment. Every method expects the bot lock.
+// objectStore is the world object storage of one bot session: a dense slot
+// array (no holes, the apply paths mutate in place and the scans walk it
+// sequentially) plus the object id to slot index. The records split into a hot
+// and a cold array on the same slot and stay length locked, so the scans stream
+// the compact hot block while the display fields sit in the cold one. A removal
+// swaps the last records of both halves into the freed slot and moves the index
+// entry, so the arrays never fragment. Every method expects the bot lock.
 type objectStore struct {
     hot   []objectHot
     cold  []objectCold
@@ -27,11 +26,10 @@ func newObjectStore() objectStore {
     }
 }
 
-// lookupLocked returns the pointers to the hot and cold records of
-// the object id, both nil when the id is unknown. The pointers stay
-// valid until the next append or removal - the packet apply paths
-// finish their mutation before either happens. The caller must hold
-// a lock.
+// lookupLocked returns the pointers to the hot and cold records of the object
+// id, both nil when the id is unknown. The pointers stay valid until the next
+// append or removal - the packet apply paths finish their mutation before
+// either happens. The caller must hold a lock.
 func (s *objectStore) lookupLocked(
     objectID int32,
 ) (*objectHot, *objectCold) {
@@ -42,11 +40,10 @@ func (s *objectStore) lookupLocked(
     return nil, nil
 }
 
-// upsertLocked returns the pointers to the existing records of the
-// object id or appends fresh ones for the id. A fresh record carries
-// the spawn defaults of the old newWorldObject: running, unit move
-// multiplier and unit item count. The caller must hold the write
-// lock.
+// upsertLocked returns the pointers to the existing records of the object id or
+// appends fresh ones for the id. A fresh record carries the spawn defaults of
+// the old newWorldObject: running, unit move multiplier and unit item count.
+// The caller must hold the write lock.
 func (s *objectStore) upsertLocked(
     objectID int32, kind int8,
 ) (*objectHot, *objectCold) {
@@ -68,10 +65,9 @@ func (s *objectStore) upsertLocked(
     return &s.hot[slot], &s.cold[slot]
 }
 
-// removeAtLocked frees a slot of the dense object arrays: the last
-// records of both halves move into the freed slot and the index
-// follows them, so the arrays stay dense and length locked. The
-// caller must hold the write lock.
+// removeAtLocked frees a slot of the dense object arrays: the last records of
+// both halves move into the freed slot and the index follows them, so the
+// arrays stay dense and length locked. The caller must hold the write lock.
 func (s *objectStore) removeAtLocked(slot int32, objectID int32) {
     last := int32(len(s.hot) - 1)
     if slot != last {

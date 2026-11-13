@@ -11,10 +11,9 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// samplePeriod is the sampler tick: thirty seconds of resolution is
-// one thousand lines a day (roughly 100 KB), enough for the hourly
-// tables, the level marks and the freeze detection without any
-// per-packet cost.
+// samplePeriod is the sampler tick: thirty seconds of resolution is one
+// thousand lines a day (roughly 100 KB), enough for the hourly tables, the
+// level marks and the freeze detection without any per-packet cost.
 const samplePeriod = 30 * time.Second
 
 // Sampler is the periodic character state publisher of one bot: it
@@ -61,13 +60,12 @@ func (s *Sampler) Run(ctx context.Context) {
     }
 }
 
-// publish reads the tracker and hands the sample to the journal; a
-// level change also emits the level mark. A character out of the
-// world (level zero of a connecting session) skips the sample.
-// The exp field of the tracker is already the cumulative total (the
-// Mobius PlayerStat keeps one running number; the level derives from
-// the table - see the soak metrics note), so the sample carries it
-// as is.
+// publish reads the tracker and hands the sample to the journal; a level change
+// also emits the level mark. A character out of the world (level zero of a
+// connecting session) skips the sample. The exp field of the tracker is already
+// the cumulative total (the Mobius PlayerStat keeps one running number; the
+// level derives from the table - see the soak metrics note), so the sample
+// carries it as is.
 func (s *Sampler) publish() {
     level := s.tracker.SelfLevel()
     if level <= 0 {

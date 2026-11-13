@@ -220,13 +220,12 @@ func (b *Bot) demandedBooksLocked() map[int32]bool {
     return books
 }
 
-// buildSkillQueue sorts the remaining lessons (not learned, not auto
-// granted) by the warrior priority: the attack power skills whose weapon
-// condition accepts a preferred family first (the weapon in hand and the next
-// one of the purchase plan), the other attack power skills second, the
-// defense skills third, the rest last, with the stable tree order (unlock
-// level, skill id, level) inside a group. The views fill the affordability
-// flag, never here.
+// buildSkillQueue sorts the remaining lessons (not learned, not auto granted)
+// by the warrior priority: the attack power skills whose weapon condition
+// accepts a preferred family first (the weapon in hand and the next one of the
+// purchase plan), the other attack power skills second, the defense skills
+// third, the rest last, with the stable tree order (unlock level, skill id,
+// level) inside a group. The views fill the affordability flag, never here.
 func buildSkillQueue(
     classID int32, learned map[int32]learnedSkill, weapons []string,
 ) []SkillPlanEntry {
