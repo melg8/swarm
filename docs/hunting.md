@@ -2100,6 +2100,37 @@ into the world and broadcasts it). The escape emulates exactly that:
   its obstacle front along it, so a mirrored heading probes behind the
   character.
 
+## The continuous waypoint flow (hunt/flow.go)
+
+The click target of both ground walk followers spans several route
+waypoints, so the character never reaches the aimed point before the
+next request re-aims farther. The server replaces the destination of a
+running move without stopping the character, but every reached click
+target stops it (the zero distance arrival broadcast), and a follower
+that aims only the current waypoint stops on every dense route point of
+a smoothed plan. The flow scan picks the farthest route waypoint the
+click transport delivers inside the aim span:
+
+- The aim span is `flowAimPeriods` request periods of the measured run
+  speed (`flowDefaultRunSpeed` 120 before the UserInfo), floored at
+  `flowAimFloor` and capped at `maxMoveDistance`, so the click is never
+  clipped short of the aim.
+- `flowOnRoute` keeps the flow a shortcut of the planned route, never a
+  different route: every skipped waypoint must project inside the chord
+  within `waypointCorridor` and its anchored height must stay within
+  `flowLayerTolerance` of the chord height. That denies a chord across
+  a switchback or a priced water dip the plan walks around even where
+  the server click validation would allow it.
+- `flowAdvance` probes the farthest candidates first (`flowProbeMax`
+  probes over the arc), and a cursor jump only lands on a validated
+  line; the skip bookkeeping denies a repeat jump from a cell the
+  character never left (the dead click transport, see `skipMoveFresh`).
+- `flowPreClick` re-aims a running walk within `flowCornerLead` of the
+  current target, so the server replaces the destination mid-move
+  instead of stopping the character on the arrival. It stays off while
+  the character is not walking and paces the click and the scan at
+  `flowPreClickGap`.
+
 ## The server frame click transport (hunt/click_frame.go)
 
 The Mobius C1 server resolves the destination layer of a mouse click by

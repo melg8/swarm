@@ -4,17 +4,10 @@
 
 package hunt
 
-// The continuous waypoint flow: the click target of both ground walk
-// followers spans several route waypoints, so the character never
-// reaches the aimed point before the next request re-aims farther.
-// The server replaces the destination of a running move without
-// stopping the character, but every reached click target stops it
-// (the zero distance arrival broadcast), and a follower that aims
-// only the current waypoint stops on every dense route point of a
-// smoothed plan. The flow scan picks the farthest route waypoint the
-// server click transport delivers inside the aim span, so the
-// character cuts the corners the validation allows, keeps the bends
-// it walls, and runs through the rest without an arrival stop.
+// The continuous waypoint flow: the scan picks the farthest route waypoint
+// the server click transport delivers inside the aim span, so the character
+// cuts the corners the validation allows and never stops on a dense route
+// point of a smoothed plan (docs/hunting.md).
 
 import (
     "math"
@@ -27,10 +20,9 @@ import (
 // sends the UserInfo character data.
 const flowDefaultRunSpeed = 120.0
 
-// flowAim returns the click span of the continuous follower: the
-// ground two request periods of the measured run speed cover, floored
-// for the pre UserInfo clicks and capped at the server move limit so
-// the click is never clipped short of the aim.
+// flowAim returns the click span: the ground the request periods of the
+// measured run speed cover, floored before the UserInfo and capped at the
+// server move limit.
 func (l *Loop) flowAim() float64 {
     speed := l.tracker.SelfRunSpeed()
     if speed <= 0 {
@@ -47,13 +39,11 @@ func (l *Loop) flowAim() float64 {
     return aim
 }
 
-// flowOnRoute reports whether the click chord to the candidate stays
-// on the drawn route: every skipped waypoint must project inside the
-// chord within the route corridor and its anchored height must stay
-// within flowLayerTolerance of the chord height. The server click
-// validation alone allows a chord across a switchback or a priced
-// water dip the plan walks around; the corridor keeps the flow a
-// shortcut of the planned route, never a different route.
+// flowOnRoute reports whether the click chord stays on the drawn route:
+// every skipped waypoint projects inside the chord within waypointCorridor
+// and its anchored height stays within flowLayerTolerance of the chord. The
+// click validation alone would allow a switchback cut or a priced water dip;
+// this gate keeps the flow a shortcut of the planned route.
 func flowOnRoute(
     waypoints []pathfind.Vec3, index, next int, frameOffset float64,
     selfX, selfY, selfZ int32,
@@ -71,12 +61,9 @@ func flowOnRoute(
         relX, relY := wp.X-fromX, wp.Y-fromY
         along := (relX*dx + relY*dy) / length
         if along < 0 {
-            // The cursor itself may sit behind the character (a
-            // pinned waypoint the route samples walked past): the
-            // flow serves the forward march, the cursor is no
-            // intermediate route point then. A later waypoint
-            // behind the chord is a switchback the flow must not
-            // cut.
+            // The cursor itself may sit behind the character (a pinned
+            // waypoint walked past); a later waypoint behind the chord is a
+            // switchback the flow must not cut.
             if j == index {
                 continue
             }
@@ -100,15 +87,13 @@ func flowOnRoute(
     return true
 }
 
-// flowAdvance moves the waypoint cursor onto the farthest route
-// waypoint the click transport delivers from the standing cell. The
-// scan bounds the route arc by flowAim and probes the farthest
-// candidates first, so the character cuts the corners the server's
-// own click validation allows and keeps the planned bends it walls.
-// A cursor jump only lands on a validated line and the skip
-// bookkeeping denies a repeat jump from a cell the character never
-// left (the dead click transport, see skipMoveFresh). It reports the
-// cursor to use: the input index when no farther target validates.
+// flowAdvance moves the waypoint cursor onto the farthest route waypoint
+// the click transport delivers from the standing cell: the scan bounds the
+// arc by flowAim and probes the farthest candidates first. A jump lands only
+// on a validated line, and the skip bookkeeping denies a repeat jump from a
+// cell the character never left (the dead click transport, see
+// skipMoveFresh). It returns the cursor to use, the input index when no
+// farther target validates.
 func (l *Loop) flowAdvance(
     waypoints []pathfind.Vec3, index int, frameOffset float64,
     selfX, selfY, selfZ int32,
@@ -117,9 +102,8 @@ func (l *Loop) flowAdvance(
         return index
     }
     if !l.skipMoveFresh(selfX, selfY) {
-        // The previous cursor jump left the character standing on this
-        // cell: the click transport is dead here and the recovery
-        // ladder owns the walk.
+        // The previous jump left the character on this cell: the click
+        // transport is dead here and the recovery ladder owns the walk.
         return index
     }
     aim := l.flowAim()
@@ -168,14 +152,11 @@ func (l *Loop) flowAdvance(
     return index
 }
 
-// flowPreClick re-aims a running walk before the character reaches
-// the current click target: within flowCornerLead of it the follower
-// scans for a farther validated target and sends the click at once,
-// so the server replaces the destination mid-move instead of
-// stopping the character on the arrival. The pre-click stays off
-// when the character is not walking (a dead click owns the stuck
-// ladder) and paces both the click and the scan at flowPreClickGap.
-// It reports whether a click went out.
+// flowPreClick re-aims a running walk within flowCornerLead of the current
+// click target, so the server replaces the destination mid-move instead of
+// stopping the character on the arrival. It stays off while the character is
+// not walking and paces the click and the scan at flowPreClickGap; it
+// reports whether a click went out.
 func (l *Loop) flowPreClick(
     selfX, selfY, selfZ int32, now time.Time,
 ) bool {
