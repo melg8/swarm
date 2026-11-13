@@ -12,79 +12,53 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// Auto equipment of the hunt loop: the burst planner of the gear
-// package (gear.BurstUpgrade) computes every strictly improving use
-// item action the paperdoll still needs and that cannot race another
-// request of the same burst on the server, and the per item
-// confirmation gate (markInventoryAction, inventoryItemAllowed)
-// paces only the requests that actually share state. The gate is
-// shared with the manual inventory commands: a request never goes
-// out while an in flight one targets the same item (a second request
-// would toggle the first one's effect back) or writes a paperdoll
-// slot the in flight one writes too (the Mobius packet executor runs
-// every client packet as its own thread pool task, so same slot
-// requests can interleave on the server and cancel each other).
-// The deployed build disables the UseItem flood protector
-// (FloodProtectorUseItemInterval = 0, the retail matching config) and
-// gives no same client ordering guarantee, so the limit of the
-// sequential equip acceleration is exactly this write set model: the
-// independent equips - the whole starting bag on an empty paperdoll -
-// go out in one tick, the dependent steps (the pair swap refill, the
-// one-piece drop follow up) ride the next tick after their
-// prerequisite confirmed.
+// equipManager runs the auto equipment of the hunt loop: gear.BurstUpgrade
+// computes every strictly improving use item action the paperdoll needs, and
+// the per item confirmation gate (markInventoryAction, inventoryItemAllowed)
+// paces the requests that share state. A request waits while an in flight one
+// targets the same item (a second request toggles the first back) or writes a
+// paperdoll slot the other writes too, or the server threads could cancel each
+// other. The independent equips go out in one tick; the dependent steps ride
+// the next tick after their prerequisite confirmed (docs/shopping_strategy.md).
 type equipManager struct {
     // profile scores the gear for the combat class of the character.
     profile gear.Profile
-    // lastActionAt records the last inventory action of the manager:
-    // the starter destroy flow keeps its fixed spacing from it (the
-    // equips themselves pace on the confirmation gate alone, see
-    // equipActionPeriod).
+    // lastActionAt records the last inventory action (the starter destroy
+    // spacing reads it); the equips pace on the confirmation gate alone.
     lastActionAt time.Time
     // starterRetryAt maps a starter item object id to the time its
     // failed destroy request may retry.
     starterRetryAt map[int32]time.Time
-    // equipScanVersion holds the tracker inventory version the last
-    // upgrade scan ran against, equipScanNone its empty result: the
-    // tick path skips the gear scoring while the bag is unchanged
-    // (the scan cost the full inventory walk of the planner).
+    // equipScanVersion holds the inventory version of the last upgrade scan and
+    // equipScanNone its empty result: an unchanged bag skips the gear scoring.
     equipScanVersion uint64
     equipScanNone    bool
-    // starterScanVersion and starterScanNone gate the starter item
-    // scan the same way.
+    // starterScanVersion and starterScanNone gate the starter scan the same
+    // way.
     starterScanVersion uint64
     starterScanNone    bool
-    // keepsCache holds the planned equip object ids of the last keeps
-    // scan and keepsVersion the tracker inventory version it ran
-    // against: the junk flows (the shop selling, the overflow destroy)
-    // consult the set on every tick, so the scan is cached per
-    // inventory mutation like the upgrade scan.
+    // keepsCache holds the planned keep object ids of the last scan at
+    // keepsVersion: the junk flows (the shop selling, the overflow destroy)
+    // consult it every tick, so the scan caches per inventory mutation.
     keepsCache   map[int32]bool
     keepsVersion uint64
     keepsScanned bool
-    // bowAttack caches the best owned bow attack and bowAttackVersion
-    // the tracker inventory version it was scanned at: the city
-    // shopping gate asks the bow question on every tick (see
-    // city_shopping.go), so the bag copy scan runs per mutation.
+    // bowAttack caches the best owned bow attack at bowAttackVersion: the city
+    // shopping gate asks every tick, while the answer only moves with an
+    // inventory mutation.
     bowAttack        int32
     bowAttackVersion uint64
     bowAttackScanned bool
 }
 
-// equipActionPeriod spaces the item flows that keep a fixed window:
-// the starter kit destroys (the server refuses fast destroys with
-// "You are destroying items too fast.") and the shop unequip request
-// retries of the replacement sales. The auto equips do not use it -
-// the deployed build disables the UseItem flood protector
-// (FloodProtectorUseItemInterval = 0) and the UseItem request never
-// touches the one second PlayerActionFloodProtector of the attack and
-// select packets, so the write set gate of the burst plan alone paces
-// them at the speed the server actually applies the flips (see
-// gear.BurstUpgrade).
+// equipActionPeriod spaces the fixed-window flows: the starter destroys (the
+// server refuses fast destroys) and the shop unequip retries. The auto equips
+// pace on the write set gate alone: the deployed build disables the UseItem
+// flood protector (see gear.BurstUpgrade).
 const equipActionPeriod = 2 * time.Second
 
-// starterRetryDelay spaces the destroy retries of one starter item:
-// a refused or lost request must not re-send and re-log every pacing
-// period.
+// starterRetryDelay spaces the destroy retries of one starter item, so a lost
+// request does not re-log every pacing period.
 const starterRetryDelay = 10 * time.Second
 
 // newEquipManager creates the manager for the gear profile.
@@ -106,15 +80,10 @@ func newEquipManager(profile gear.Profile) *equipManager {
     }
 }
 
-// plannedEquipKeeps resolves the object ids the junk flows must keep:
-// the unequipped inventory items the gear simulation places on the
-// paperdoll (see gear.PlannedEquips) plus the ranged luring tool of
-// the melee profiles (see addLureToolKeeps). The junk flows of the
-// town trips and the overflow cleanup exclude them - a looted or
-// bought upgrade waiting for its paced use item request (a pair swap
-// in flight, the confirmation window) is never sold for its instant
-// adena and never destroyed for bag space. The set is cached per
-// inventory mutation; sessions without a gear profile keep nothing.
+// plannedEquipKeeps resolves the object ids the junk flows must keep: the
+// unequipped items the gear simulation places on the paperdoll plus the ranged
+// luring tool of the melee profiles. A looted or bought upgrade waiting for its
+// paced request is never sold or destroyed. Cached per inventory mutation.
 func (l *Loop) plannedEquipKeeps() map[int32]bool {
     manager := l.equip
     if manager == nil || l.game == nil {
@@ -133,24 +102,11 @@ func (l *Loop) plannedEquipKeeps() map[int32]bool {
     return manager.keepsCache
 }
 
-// addLureToolKeeps adds the ranged tooling of the bow shooting
-// profiles to the keep set: for the melee lurer the bow scores zero
-// under the profile (the profile's weapon ladder ranks the close
-// combat damage), so the gear simulation never places it on the
-// paperdoll and the plain keep set never holds it - the junk flows
-// would sell the bought luring bow at the very next vendor visit
-// (the owner report: the bot reaches the vendor and sells the bow it
-// owns although it plans no more expensive bow) and the overflow
-// cleanup would destroy it for bag space. The lure flow equips the
-// bow from the bag on demand (see lure.go), so the strongest owned
-// bow and the arrow stacks must survive every junk decision. For the
-// archer the bow itself is planner managed (WeaponScore ranks it),
-// but the ARROWS still score zero under every profile - the quiver
-// of the primary weapon must survive the junk decisions the same
-// way (the keep is redundant for the bow and harmless). A second,
-// weaker bow stays plain junk (the duplicate gear rank of the sell
-// order owns it), the mystic profiles never shoot - their inventory
-// bows are junk.
+// addLureToolKeeps adds the ranged tooling of the quiver carriers to the keep
+// set: the melee lurer's bow scores zero under its profile, so the gear
+// simulation never places it and the junk flows would sell the bought luring
+// bow at the next vendor visit or destroy it for bag space. Every arrow stack
+// stays too - ammo scores zero under every profile.
 func (l *Loop) addLureToolKeeps(
     profile gear.Profile, keeps map[int32]bool,
 ) {
@@ -174,9 +130,8 @@ func (l *Loop) addLureToolKeeps(
         }
         if stats.Type == "EtcItem" && stats.BodyPart == "lhand" &&
             stats.WeaponType == "" {
-            // The ammo discriminator of gear/bow.go: an etc item that
-            // rides the left hand is a quiver item (the Mobius arrow
-            // xml: etcitem_type ARROW, bodypart lhand).
+            // The ammo discriminator of gear/bow.go: an etc item riding the
+            // left hand is a quiver item (the Mobius arrow xml).
             keeps[item.ObjectID] = true
         }
     }
@@ -192,10 +147,9 @@ func (l *Loop) equipment() gear.Equipment {
         l.tracker.PaperdollSlotObjectIDs())
 }
 
-// ownedBowAttack resolves the best owned bow attack through the
-// version cache of the gear manager: the city shopping gate asks the
-// question on every tick, while the answer only moves with an
-// inventory mutation (the scan copies the bag).
+// ownedBowAttack resolves the best owned bow attack through the version cache:
+// the city shopping gate asks every tick, while the answer only moves with an
+// inventory mutation.
 func (l *Loop) ownedBowAttack() int32 {
     manager := l.equip
     if manager == nil {
@@ -212,17 +166,11 @@ func (l *Loop) ownedBowAttack() int32 {
     return manager.bowAttack
 }
 
-// maybeArmQuiver equips the arrow stack of the archer onto the
-// paperdoll: the bow in the right hand shoots only with a quiver in
-// the left, but the ammo scores zero under every profile (a
-// consumable, not gear), so the equip planner never places it - the
-// arming is the loop's own step, the same contract the lure arm
-// phase follows for the melee pull (see lure.go). One use item
-// request per arming, gated on the same in flight write set as the
-// auto equips; a worn left hand item (the quiver itself - the
-// profile never plans a shield) means the arming already holds. The
-// stack runs dry server side, the left hand empties, and the next
-// tick re-arms from the biggest bag stack of the restock.
+// maybeArmQuiver equips the archer's arrow stack: the bow shoots only with a
+// quiver in the left hand, but ammo scores zero under every profile, so the
+// equip planner never places it. One use item request per arming on the same
+// write set gate; a dry stack empties the hand and the next tick re-arms from
+// the biggest bag stack.
 func (l *Loop) maybeArmQuiver() {
     manager := l.equip
     if manager == nil || l.game == nil {
@@ -233,8 +181,8 @@ func (l *Loop) maybeArmQuiver() {
     }
     paperdoll := l.tracker.PaperdollSlotObjectIDs()
     if paperdoll[state.PaperdollLHand] != 0 {
-        // The quiver (the only left hand item the archer profile
-        // lets stay) is worn already.
+        // The quiver (the only left hand item the archer profile keeps) is
+        // worn already.
         return
     }
     if paperdoll[state.PaperdollRHand] == 0 {
@@ -266,24 +214,12 @@ func (l *Loop) maybeArmQuiver() {
         "the arrows worn")
 }
 
-// maybeEquipGear executes the auto equipment burst: every
-// independent upgrade the burst planner offers goes out ONE PER TICK
-// (the tick cadence serializes the packets: the Mobius PacketExecutor
-// runs one shared pool with no same-client ordering, and two jewel
-// packets of one burst can race the paperdoll placement read
-// server-side - a bounced member re-rides the next tick), the steps
-// that would race an in flight request wait for its confirmation
-// behind the per item gate. A full starting bag on an empty paperdoll
-// dresses in plan order across a handful of ticks (the 250 ms
-// cadence, ~2.5 s for the whole kit) instead of one racing burst. It
-// defers to the manual inventory command queue (in flight or
-// deferred commands own the item action budget) and arms the
-// confirmation gate for every request it sends. The deployed build
-// disables the UseItem flood protector, so no fixed pause limits the
-// chain. Called on every tick of the autonomous hunting phases;
-// after every inventory changing event (loot, buy, sell) the next
-// call re-plans and keeps the paperdoll up to date while the bot
-// works.
+// maybeEquipGear executes the auto equipment burst: one independent upgrade per
+// tick (the Mobius PacketExecutor has no same-client ordering, so a racing pair
+// can bounce a member, which re-rides the next tick), while the dependent steps
+// wait for their confirmation behind the per item gate. A full starting bag
+// dresses in plan order across a handful of ticks. The manual command queue and
+// the lure own the item budget.
 func (l *Loop) maybeEquipGear() {
     manager := l.equip
     if manager == nil || l.game == nil {
@@ -295,16 +231,14 @@ func (l *Loop) maybeEquipGear() {
         return
     }
     if l.replacementSellingActive() {
-        // The sell first step of the replacement sales owns the
-        // affected slots right now: an auto equip here would pull the
-        // just unequipped pieces right back on before their sale.
+        // The sell first step of the replacement sales owns the affected slots:
+        // an auto equip would pull the pieces back on before their sale.
         return
     }
     if l.lureArmed() {
-        // The lure owns the weapon slots while it runs: the auto
-        // equipment would pull the melee weapon back over the bow in
-        // the middle of the pull (the bow scores zero for the melee
-        // profile, the planner cannot know the lure wants it worn).
+        // The lure owns the weapon slots: the auto equipment would pull the
+        // melee weapon back over the bow mid pull (the planner cannot know the
+        // lure wants it worn).
         return
     }
     // The scan cache: an unchanged bag since the last empty scan
@@ -318,10 +252,8 @@ func (l *Loop) maybeEquipGear() {
     manager.equipScanNone = len(planned) == 0
     for _, action := range planned {
         if !l.inventoryItemAllowed(action.ObjectID, action.Slots) {
-            // The step races an in flight request (its own item or
-            // write set): it rides the next tick after the
-            // confirmation. The scan stays armed (equipScanNone is
-            // false for a non empty plan) so the tick re-plans.
+            // The step races an in flight request: it rides the next tick
+            // after the confirmation.
             continue
         }
         l.markInventoryAction(action.ObjectID)
@@ -333,24 +265,17 @@ func (l *Loop) maybeEquipGear() {
         manager.lastActionAt = now
         l.logf("Hunt: gear: %s", action.Reason)
 
-        // ONE equip per tick (see the function comment): the next
-        // planned action rides the next tick behind the confirmation
-        // gate - the serialized chain cannot race itself server-side.
+        // ONE equip per tick: the next planned action rides the next tick
+        // behind the confirmation gate.
         return
     }
 }
 
-// maybeDestroyReplacedStarters destroys the starter kit items a
-// replacement has already displaced on the paperdoll: the Squire's
-// set is neither sellable to a shop nor droppable on the ground
-// (is_sellable=false, is_dropable=false in the Mobius item xml), so
-// the destroy request is the only way the dead weight ever leaves
-// the character. The request runs behind the same confirmation gate
-// as the equips (the vanishing of the item confirms it) and shares
-// the equip action budget, so a replace swap always lands its equip
-// first and the starter item is destroyed only once the tracker
-// shows the replacement worn. Called on every tick of the
-// autonomous hunting phases right after the auto equipment.
+// maybeDestroyReplacedStarters destroys the starter kit pieces a replacement
+// displaced: the Squire's set is neither sellable nor droppable, so the destroy
+// is the only way it leaves the character. The request runs behind the same
+// gate and budget as the equips, so the replacement always shows worn first,
+// and a failed destroy retries after starterRetryDelay.
 func (l *Loop) maybeDestroyReplacedStarters() {
     manager := l.equip
     if manager == nil || l.game == nil {

@@ -950,6 +950,19 @@ corner probe is a length, not a leg at all.
   lint:new`. `navmesh_navigator.go` fell from 32.6 to 21.5 percent (60
   comment lines of 279), no block above 8 lines.
 
+### 2026-11-12 - hunt/equip.go hands the execution model to the strategy doc
+
+- 20 blocks compress: the 20 line manager header, the field notes, the
+  action period and retry delay, the keep set and lure keeps, the bow
+  query, the quiver arming, the burst runner, the starter destroy and
+  the inline gate notes. A new `## The equip execution` section of
+  `docs/shopping_strategy.md` carries the write set model, the UseItem
+  flood protector fact, the 2 s fixed-window spacing, the starter set
+  flags, the quiver arming and the keep set.
+- Verified: `task fmt`, `go build ./...`, the full hunt package and the
+  gear package, `task lint:new`. `equip.go` fell from 38.5 to 24.6
+  percent (82 comment lines of 333), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -979,8 +992,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `pathfind/navmesh/abstract.go`, `huntaudit/audit.go`,
 `cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go`,
 `acceptance/botlog/botlog.go`, `cmd/counterprobe/detect.go` and
-`hunt/recovery_heal.go` and `hunt/navmesh_navigator.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
+`hunt/recovery_heal.go`, `hunt/navmesh_navigator.go` and `hunt/equip.go`
+(second passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.

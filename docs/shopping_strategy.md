@@ -449,6 +449,46 @@ fine: the catalogs are process lifetime singletons built once
 maps are never cleared; the number of distinct pairs is bounded by
 the bot classes times the regions.
 
+## The equip execution (hunt/equip.go)
+
+`gear.BurstUpgrade` computes every strictly improving use item action
+the paperdoll still needs, and the per item confirmation gate
+(`markInventoryAction`, `inventoryItemAllowed`) paces only the
+requests that share state: a request never goes out while an in
+flight one targets the same item (a second request would toggle the
+first effect back) or writes a paperdoll slot the in flight one
+writes too (the Mobius `PacketExecutor` runs every client packet as
+its own pool task, so same slot requests interleave and cancel each
+other). The deployed build disables the `UseItem` flood protector
+(`FloodProtectorUseItemInterval = 0`), so one independent upgrade
+goes out per tick and the dependent steps (the pair swap refill, the
+one-piece drop follow up) ride the next tick after their prerequisite
+confirmed; a full starting bag on an empty paperdoll dresses in plan
+order across a handful of ticks. `equipActionPeriod` (2 s) spaces
+only the fixed-window flows: the starter destroys (the server refuses
+fast destroys with "You are destroying items too fast.") and the shop
+unequip retries.
+
+- **The starter destroy**: the Squire's set is neither sellable nor
+  droppable (`is_sellable=false`, `is_dropable=false` in the Mobius
+  item xml), so `maybeDestroyReplacedStarters` destroys a piece once
+  the replacement shows worn; a failed request retries after
+  `starterRetryDelay` (10 s).
+- **The quiver arming**: the archer's bow shoots only with a quiver in
+  the left hand, but ammo scores zero under every profile, so
+  `maybeArmQuiver` equips the arrow stack on the same write set gate;
+  a worn left hand item means the arming holds, and a dry stack
+  re-arms from the biggest bag stack on the next tick.
+- **The lure keeps**: `addLureToolKeeps` keeps the strongest owned bow
+  and every arrow stack out of the junk decisions while
+  `gear.QuiverCarrier` holds - the melee lurer's bow scores zero under
+  its profile and would otherwise sell at the next vendor visit or
+  die in the overflow cleanup. A second, weaker bow stays junk and
+  the mystic profiles never shoot.
+- **The scans**: the upgrade, starter, keep and bow scans cache their
+  answer per `InventoryVersion`, so the tick path never walks the
+  whole bag while the inventory is unchanged.
+
 ## Where each piece lives
 
 - `tools/generate_item_stats.sh` - the prices, weights and combat
