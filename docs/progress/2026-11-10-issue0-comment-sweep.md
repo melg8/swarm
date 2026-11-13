@@ -2102,6 +2102,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - acceptance/botlog/decode_recv.go keeps the decode facts
+
+- 20 blocks compress: the file keeps the dispatch shape (the session
+  family answers directly, the world, combat and list families mirror
+  the connection routing), the parse failure fallback to the size and
+  hex tail instead of a panic on the reader goroutine, the `attrNames`
+  table with `attrN` for an unmapped id, the 16 link dialog cap, the
+  `sysParamSkillName` type 4 of `SystemMessage.java writeImpl` (the int
+  pair carries the skill id then the level), the `$sN` substitution
+  through the generated dictionary, the rotation wire difference (stop
+  is two ints shorter, so the begin parser reads a stop packet as
+  short). All per function repeats of "one continuation line per entry"
+  become the loop fact. 86 comment lines of 798 become 70 of 782.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s)
+  including `botlog`, `golangci-lint run ./internal/swarm/acceptance/...`
+  0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

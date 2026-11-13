@@ -19,10 +19,9 @@ import (
     fromgameserver "github.com/melg8/swarm/internal/swarm/packets/from_game_server"
 )
 
-// decodeRecv renders one server packet into its log lines: the
-// session family answers directly, the world, combat and list
-// families ride their dispatchers (the mirror of the connection
-// layer routing).
+// decodeRecv renders one server packet into its log lines: the session family
+// answers directly, while the world, combat and list families ride the
+// dispatchers that mirror the connection routing.
 func decodeRecv(payload []byte) []string {
     if len(payload) == 0 {
         return nil
@@ -53,8 +52,7 @@ func decodeRecv(payload []byte) []string {
     return []string{unknownLine("recv", payload)}
 }
 
-// decodeRecvWorld dispatches the world state packets: the objects
-// answer through their dispatcher, the movement family directly.
+// decodeRecvWorld dispatches the world object and movement packets.
 func decodeRecvWorld(payload []byte) ([]string, bool) {
     if lines, ok := decodeRecvObject(payload); ok {
         return lines, true
@@ -129,8 +127,7 @@ func decodeRecvCombat(payload []byte) ([]string, bool) {
     }
 }
 
-// decodeRecvList dispatches the account, character and inventory
-// list packets.
+// decodeRecvList dispatches the account, character and inventory list packets.
 func decodeRecvList(payload []byte) ([]string, bool) {
     switch payload[0] {
     case 0x1B:
@@ -167,8 +164,7 @@ func decodeRecvMoveToLocation(payload []byte) []string {
         " from " + xyz(packet.X, packet.Y, packet.Z)}
 }
 
-// decodeRecvCharInfo renders another player appearing in the known
-// list.
+// decodeRecvCharInfo renders another player appearing in the known list.
 func decodeRecvCharInfo(payload []byte) []string {
     packet := fromgameserver.NewCharInfoPacket()
     if err := fromgameserver.ParseCharInfoPacket(packet, payload); err != nil {
@@ -194,8 +190,7 @@ func decodeRecvCharInfo(payload []byte) []string {
         xyz(packet.X, packet.Y, packet.Z) + flagSuffix}
 }
 
-// decodeRecvUserInfo renders the self state broadcast (the vitals
-// block of the played character).
+// decodeRecvUserInfo renders the self state broadcast with the vitals block.
 func decodeRecvUserInfo(payload []byte) []string {
     packet := fromgameserver.NewUserInfoPacket()
     if err := fromgameserver.ParseUserInfoPacket(packet, payload); err != nil {
@@ -297,8 +292,8 @@ func decodeRecvStatusUpdate(payload []byte) []string {
     return []string{line.String()}
 }
 
-// attrNames maps the StatusUpdate attribute ids of the C1 protocol
-// to their names (the unmapped ids render as attrN).
+// attrNames names the StatusUpdate attribute ids (an unmapped one renders as
+// attrN).
 var attrNames = map[int32]string{
     0x01: "level", 0x02: "exp", 0x03: "str", 0x04: "dex",
     0x05: "con", 0x06: "int", 0x07: "wit", 0x08: "men",
@@ -316,8 +311,7 @@ func attrName(id int32) string {
     return "attr" + strconv.Itoa(int(id))
 }
 
-// decodeRecvNpcHTML renders the npc dialog page with its clickable
-// bypass links (the shop windows and the teacher dialogs).
+// decodeRecvNpcHTML renders the dialog page with its clickable bypass links.
 func decodeRecvNpcHTML(payload []byte) []string {
     packet := fromgameserver.NewNpcHTMLMessage()
     if err := fromgameserver.ParseNpcHTMLMessage(packet, payload); err != nil {
@@ -353,8 +347,8 @@ func decodeRecvDeleteObject(payload []byte) []string {
         " removed"}
 }
 
-// decodeRecvCharSelectInfo renders the account character list with
-// one continuation line per character.
+// decodeRecvCharSelectInfo renders the account character list, one line per
+// slot.
 func decodeRecvCharSelectInfo(payload []byte) []string {
     packet := fromgameserver.NewCharSelectInfoPacket()
     if err := fromgameserver.ParseCharSelectInfoPacket(
@@ -391,7 +385,7 @@ func decodeRecvCharSelected(payload []byte) []string {
 }
 
 // decodeRecvNpcInfo renders one npc spawn with the catalog level and
-// aggression of its template.
+// aggression.
 func decodeRecvNpcInfo(payload []byte) []string {
     packet := fromgameserver.NewNpcInfoPacket()
     if err := fromgameserver.ParseNpcInfoPacket(packet, payload); err != nil {
@@ -422,8 +416,7 @@ func decodeRecvNpcInfo(payload []byte) []string {
     return []string{line}
 }
 
-// decodeRecvItemList renders the full inventory with one
-// continuation line per stack.
+// decodeRecvItemList renders the full inventory, a continuation line per stack.
 func decodeRecvItemList(payload []byte) []string {
     packet := fromgameserver.NewItemListPacket()
     if err := fromgameserver.ParseItemListPacket(packet, payload); err != nil {
@@ -438,8 +431,7 @@ func decodeRecvItemList(payload []byte) []string {
     return lines
 }
 
-// decodeRecvInventoryUpdate renders the inventory delta with one
-// continuation line per changed stack.
+// decodeRecvInventoryUpdate renders the inventory delta per changed stack.
 func decodeRecvInventoryUpdate(payload []byte) []string {
     packet := fromgameserver.NewInventoryUpdatePacket()
     if err := fromgameserver.ParseInventoryUpdatePacket(
@@ -580,8 +572,7 @@ func decodeRecvStopMove(payload []byte) []string {
         " heading " + strconv.Itoa(int(packet.Heading))}
 }
 
-// decodeRecvSkillList renders the learned skill list with one
-// continuation line per skill.
+// decodeRecvSkillList renders the learned skill list, one line per skill.
 func decodeRecvSkillList(payload []byte) []string {
     packet := fromgameserver.NewSkillListPacket()
     if err := fromgameserver.ParseSkillListPacket(packet, payload); err != nil {
@@ -617,8 +608,7 @@ func decodeRecvMoveToPawn(payload []byte) []string {
         " from " + xyz(packet.X, packet.Y, packet.Z)}
 }
 
-// decodeRecvValidateLocation renders the server side placement
-// correction.
+// decodeRecvValidateLocation renders the server side placement correction.
 func decodeRecvValidateLocation(payload []byte) []string {
     packet := fromgameserver.NewValidateLocationPacket()
     if err := fromgameserver.ParseValidateLocationPacket(
@@ -631,8 +621,8 @@ func decodeRecvValidateLocation(payload []byte) []string {
         " heading " + strconv.Itoa(int(packet.Heading))}
 }
 
-// decodeRecvSystemMessage renders the chat notification with its
-// substituted text.
+// decodeRecvSystemMessage renders the chat notification with its text
+// substituted.
 func decodeRecvSystemMessage(payload []byte) []string {
     packet := fromgameserver.NewSystemMessagePacket()
     if err := fromgameserver.ParseSystemMessagePacket(
@@ -645,15 +635,13 @@ func decodeRecvSystemMessage(payload []byte) []string {
         strconv.Itoa(int(packet.MessageID)) + ")"}
 }
 
-// sysParamSkillName is the skill name parameter type of the
-// SystemMessage packet (SystemMessage.java writeImpl of the Mobius
-// server): the int pair carries the skill id then the skill level.
+// sysParamSkillName is the skill name parameter type of SystemMessage.java
+// writeImpl: the int pair carries the skill id then the skill level.
 const sysParamSkillName = 4
 
-// substituteMessageText renders the message text with its $sN
-// placeholders replaced by the packet parameters. A skill name
-// parameter resolves through the generated skill dictionary like the
-// chat window does - the raw id never surfaces in the terminal line.
+// substituteMessageText renders the message text with its $sN placeholders
+// replaced by the packet parameters; a skill name parameter resolves through
+// the generated dictionary, so the raw id never surfaces in the line.
 func substituteMessageText(
     packet *fromgameserver.SystemMessagePacket,
 ) string {
@@ -676,9 +664,8 @@ func substituteMessageText(
     return text
 }
 
-// skillParamName renders one skill name parameter as the dictionary
-// name with its level ("Power Strike lvl 3", the bare name without a
-// level).
+// skillParamName renders one skill name parameter as the dictionary name with
+// its level ("Power Strike lvl 3", the bare name without a level).
 func skillParamName(
     param *fromgameserver.SystemMessageParam,
 ) string {
@@ -715,11 +702,10 @@ func decodeRecvAbnormalStatus(payload []byte) []string {
     return []string{line.String()}
 }
 
-// decodeRecvRotation renders the turn broadcasts: the begin and the
-// stop rotation packets share the object id and heading fields but
-// differ behind them (the begin packet carries the side and the
-// speed ints, the stop packet only the speed and an unknown byte),
-// so each parses through its own wire shape.
+// decodeRecvRotation renders the turn broadcasts: the begin and stop packets
+// share the object id and heading fields but differ behind them (begin carries
+// the side and the speed ints, stop only the speed and an unknown byte), so
+// each parses through its own wire shape.
 func decodeRecvRotation(payload []byte, name string) []string {
     objectID, heading, err := parseRotation(payload)
     if err != nil {
@@ -731,14 +717,12 @@ func decodeRecvRotation(payload []byte, name string) []string {
         strconv.Itoa(int(heading))}
 }
 
-// stopRotationOpcode picks the stop rotation wire shape inside
-// parseRotation (the dispatch switch above routes the packet here).
+// stopRotationOpcode picks the stop rotation wire shape inside parseRotation.
 const stopRotationOpcode = 0x78
 
-// parseRotation reads the object id and the heading of the begin
-// and stop rotation packets: the opcode picks the wire shape (the
-// stop wire is two ints shorter, so the begin parser reads a real
-// stop packet as a short payload).
+// parseRotation reads the object id and the heading of either rotation packet:
+// the stop wire is two ints shorter, so the begin parser reads a real stop
+// packet as a short payload.
 func parseRotation(payload []byte) (int32, int32, error) {
     if payload[0] == stopRotationOpcode {
         packet := fromgameserver.NewStopRotationPacket()
