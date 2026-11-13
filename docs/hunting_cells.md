@@ -1,4 +1,4 @@
-# The hexagon cell hunting (hunt/cell*.go, hunt/cells_elven.go)
+# The hexagon cell hunting (hunt/cell*.go, huntdata/cells_elven.go)
 
 The cell mode is the current hunting system of the elven lands (the
 user orders of 2026-09-13: the Voronoi partition first, the uniform
@@ -80,7 +80,7 @@ standing anywhere in its patrol square.
   registry (symmetric by construction, mean degree 5.3) - the
   rotation graph of the hunt policy.
 
-The registry (`hunt/cells_elven.go`, 540 hexagons) is generated
+The registry (`huntdata/cells_elven.go`, 540 hexagons) is generated
 code: re-run `tools/generate_hunt_cells.py` after any spawn data
 change (the JSON twin `docs/hunt_analysis/cells_elven.json` and the
 report `docs/hunt_analysis/cells_report.txt` regenerate with it).

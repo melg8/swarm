@@ -159,7 +159,7 @@ func newCellHunter(cells []Cell, hub *cellHub) *cellHunter {
         leashes: make([]*state.CellZone, len(cells)),
     }
     for index := range cells {
-        hunter.leashes[index] = cells[index].targetZone()
+        hunter.leashes[index] = cells[index].TargetZone()
     }
     hunter.metrics = make([]cellMetric, len(cells))
     hunter.aggro = make([]float64, len(cells))
@@ -668,7 +668,7 @@ func (h *cellHunter) applyGround(l *Loop, index int, now time.Time) {
     h.enteredAt = now
     cell := h.cells[index]
     h.leave = h.hub.enter(cell.ID)
-    h.leash = cell.targetZone()
+    h.leash = cell.TargetZone()
     l.zonePickedID = cell.ID
     l.zoneCX, l.zoneCY, l.zoneHalf = cell.FocusX, cell.FocusY, cell.PatrolHalf
     l.farmX, l.farmY, l.farmZ = 0, 0, 0

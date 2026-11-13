@@ -46,7 +46,7 @@ Inputs (env-overridable):
   JSON_OUT   the JSON twin for the map mesh and the tools
   REPORT     the human readable generation report
 
-Output: deterministic Go source (hunt/cells_elven.go, spaces only),
+Output: deterministic Go source (huntdata/cells_elven.go, spaces only),
 the JSON twin and the report. Re-run after any spawn data change.
 """
 
@@ -66,7 +66,7 @@ AUDIT = os.environ.get(
     os.path.join(HERE, "..", "docs", "hunt_analysis", "spot_audit.json"))
 OUT = os.environ.get(
     "OUT",
-    os.path.join(HERE, "..", "internal", "swarm", "hunt", "cells_elven.go"))
+    os.path.join(HERE, "..", "internal", "swarm", "huntdata", "cells_elven.go"))
 JSON_OUT = os.environ.get(
     "JSON_OUT",
     os.path.join(HERE, "..", "docs", "hunt_analysis", "cells_elven.json"))
@@ -657,7 +657,7 @@ def render_go(cells):
         "// the registry. See docs/hunting_cells.md for the model and")
     lines.append("// docs/hunting.md for the hunt policy.")
     lines.append("")
-    lines.append("package hunt")
+    lines.append("package huntdata")
     lines.append("")
     lines.append(
         "// elvenHuntingCells partitions the elven spawn ground in")

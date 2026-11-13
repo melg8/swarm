@@ -9,7 +9,7 @@
 // the full mob list of its territory (all species farmed, the level
 // sorted priorities bias the engage toward the exp rich mobs).
 
-package hunt
+package huntdata
 
 // elvenHuntingZones ladders the elven lands in the ten mob level
 // bands over 227 compact squares generated from the 73 kept spawn

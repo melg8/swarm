@@ -9,6 +9,7 @@ import (
     "strconv"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/huntdata"
     "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
 )
@@ -22,57 +23,20 @@ import (
 // cooldown, so the sweep moves forward A to B to C; the death regression
 // demotes a band, and tools/generate_hunt_zones.py builds the registry.
 
-// ZoneMob describes one mob species of a hunting zone: the whole mob
-// list of the spawn territory the square covers. Every species is
-// farmed; Priority adds the soft engage preference of targetPriorityBonus.
-type ZoneMob struct {
-    // TemplateID is the npc template id of the spawn data.
-    TemplateID int32
-    // Name is the display name of the mob.
-    Name string
-    // Level is the mob level of the npc stats.
-    Level int32
-    // Count is the spawned count of the parent territory.
-    Count int32
-    // Priority biases the engage toward this species: every point
-    // makes the mob read as closer than it stands (soft tie break,
-    // distance still dominates far picks).
-    Priority int32
-}
+// ZoneMob is one mob species of a hunting zone (huntdata).
+type ZoneMob = huntdata.ZoneMob
 
-// HuntingZone describes one hunting ground: the level band of its
-// mobs, the gear gate in zone gating points and the square the bot
-// leashes itself to (the engage zone of the hunt loop).
-type HuntingZone struct {
-    // ID is the stable identifier of the zone (region prefixed).
-    ID string
-    // Name is the display name of the map view.
-    Name string
-    // Region groups the zones of one territory (elven, orc, ...).
-    Region string
-    // MinLevel and MaxLevel are the mob level band of the zone.
-    MinLevel int32
-    MaxLevel int32
-    // MinGear is the zone gating points the equipped gear must reach
-    // before the bot hunts here (see gear.TotalGearPoints).
-    MinGear int32
-    // CX, CY and Half describe the hunting square.
-    CX   int32
-    CY   int32
-    Half int32
-    // Mobs lists every mob species of the spawn territory the square
-    // covers (all of them are farmed inside the square, the
-    // priorities bias the engage; empty for hand placed zones).
-    Mobs []ZoneMob
-}
+// HuntingZone is one hunting ground of the generated registry
+// (huntdata).
+type HuntingZone = huntdata.HuntingZone
 
 // regionElven is the region key of the elven lands zone registry.
-const regionElven = "elven"
+const regionElven = huntdata.RegionElven
 
 // regionDion is the region key of the Dion 20-25 band (the survey
-// grounds of docs/band_20_25_survey.md, the zones_dion.go registry and
-// the gear.DionCatalog of T-010).
-const regionDion = "dion"
+// grounds of docs/band_20_25_survey.md and the zones_dion.go
+// registry).
+const regionDion = huntdata.RegionDion
 
 // zoneLevelLead is the level lead the character must hold over the top
 // mob of a band before the picker opens it (the observed deaths came
@@ -230,13 +194,6 @@ func starterZone(
     }
 
     return zones[best], true
-}
-
-// containsPoint reports whether the world point lies inside the
-// hunting square of the zone.
-func (z HuntingZone) containsPoint(x int32, y int32) bool {
-    return z.Half > 0 && x >= z.CX-z.Half && x <= z.CX+z.Half &&
-        y >= z.CY-z.Half && y <= z.CY+z.Half
 }
 
 // noZone is the zero zone of the not-found returns (exhaustruct
@@ -578,7 +535,7 @@ const zoneDangerWindow = time.Hour
 func (l *Loop) seedZoneDanger() {
     for _, spot := range l.tracker.DangerSpots(zoneDangerWindow) {
         for index := range l.zones {
-            if !l.zones[index].containsPoint(spot.X, spot.Y) {
+            if !l.zones[index].ContainsPoint(spot.X, spot.Y) {
                 continue
             }
             if l.zoneDeaths == nil {
@@ -598,7 +555,7 @@ func (l *Loop) seedZoneDanger() {
 func (l *Loop) deathZone() (HuntingZone, bool) {
     if x, y, _, ok := l.tracker.SelfPosition(); ok {
         for index := range l.zones {
-            if l.zones[index].containsPoint(x, y) {
+            if l.zones[index].ContainsPoint(x, y) {
                 return l.zones[index], true
             }
         }
@@ -692,4 +649,14 @@ func (l *Loop) publishZoneView() {
         })
     }
     l.tracker.SetHuntingZones(views)
+}
+
+// ElvenHuntingZones returns the hunting grounds of the elven lands.
+func ElvenHuntingZones() []HuntingZone {
+    return huntdata.ElvenHuntingZones()
+}
+
+// DionHuntingZones returns the hunting grounds of the Dion 20-25 band.
+func DionHuntingZones() []HuntingZone {
+    return huntdata.DionHuntingZones()
 }

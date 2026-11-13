@@ -11,7 +11,7 @@
 // farmed, the level sorted priorities bias the engage toward the exp
 // rich mobs).
 
-package hunt
+package huntdata
 
 // dionHuntingZones ladders the Dion grounds of the 20-25 band in
 // five mob level bands over 75 compact squares generated from the

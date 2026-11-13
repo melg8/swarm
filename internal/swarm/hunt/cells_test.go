@@ -74,7 +74,7 @@ func TestElvenCellRegistryInvariants(t *testing.T) {
             // The leash semantics: the polygon containment answers
             // true inside, false outside (a sample in and out of the
             // bounding box of the polygon).
-            zone := cell.targetZone()
+            zone := cell.TargetZone()
             minX, minY := cell.Vertices[0].X, cell.Vertices[0].Y
             maxX, maxY := minX, minY
             for _, v := range cell.Vertices {

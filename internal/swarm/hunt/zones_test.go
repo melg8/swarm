@@ -22,7 +22,7 @@ import (
 // contains the point (the first match wins, like deathZone).
 func zoneIndexAt(zones []HuntingZone, x, y int32) int {
     for index := range zones {
-        if zones[index].containsPoint(x, y) {
+        if zones[index].ContainsPoint(x, y) {
             return index
         }
     }

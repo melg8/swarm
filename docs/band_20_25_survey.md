@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 # The 20-25 band survey: the hunting grounds reachable from the elven lands
 
 The survey of the first band beyond the elven ladder (the elven lands
-top out at the liren 16-19 band of `zones_elven.go`): which grounds a
+top out at the liren 16-19 band of `huntdata/zones_elven.go`): which grounds a
 level 20-25 character can actually farm from the elven lands, how it
 travels there, where it buys and where it learns. Produced by T-006
 (ROADMAP milestone M3 preparation); the data was extracted with
@@ -17,7 +17,7 @@ data) on 2026-09-12 and cross-checked against the Java sources named
 below.
 
 The shape follows the elven zone survey (the territory/mob/transport
-knowledge behind `zones_elven.go` and the hunting.md sections): the
+knowledge behind `huntdata/zones_elven.go` and the hunting.md sections): the
 territories with their real spawn polygons, the towns, the merchants,
 the teachers, the follow-up tasks. The registry generation itself is
 a separate task and waits for M1 green.
@@ -183,7 +183,7 @@ earlier trip).
    extend `tools/generate_hunt_zones.py` with the Dion spawn sources
    (CrumaMarshlands/ExecutionGrounds/PlainsOfDion) and generate the
    spawn-true squares of the band in the same shape as
-   `zones_elven.go` - the survey territories above are the exact
+   `huntdata/zones_elven.go` - the survey territories above are the exact
    input polygons.
 3. **The band gear catalogs** (M3): the D-grade weapon/armor/jewel
    catalogs of the Dion merchants (buylists 3006000-3006300) wired

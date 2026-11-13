@@ -18,9 +18,9 @@ Inputs (env-overridable):
   MOBIUS_C1  the L2J_Mobius_C1_HarbingersOfWar dist tree
              (default: the in-repo l2j_mobius checkout)
   OUT        the generated Go file path
-             (default: internal/swarm/hunt/zones_elven.go of this repo)
+             (default: internal/swarm/huntdata/zones_elven.go of this repo)
   DION_OUT   the generated Go file path of the Dion registry
-             (default: internal/swarm/hunt/zones_dion.go of this repo)
+             (default: internal/swarm/huntdata/zones_dion.go of this repo)
 
 Output: deterministic Go source with the elvenHuntingZones registry.
 
@@ -64,11 +64,11 @@ TELEPORTER_DIR = os.path.join(
 OUT = os.environ.get(
     "OUT",
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                 "internal/swarm/hunt/zones_elven.go"))
+                 "internal/swarm/huntdata/zones_elven.go"))
 DION_OUT = os.environ.get(
     "DION_OUT",
     os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                 "internal/swarm/hunt/zones_dion.go"))
+                 "internal/swarm/huntdata/zones_dion.go"))
 
 # The ten mob level bands of the elven ladder: (minLevel, maxLevel,
 # minGear). The band of a territory is the lowest band whose window
@@ -570,7 +570,7 @@ def generate_registry(spec):
     for line in spec["generated_header"]:
         lines.append(line % values)
     lines.append("")
-    lines.append("package hunt")
+    lines.append("package huntdata")
     lines.append("")
     for line in spec["registry_doc"]:
         lines.append(line % values)

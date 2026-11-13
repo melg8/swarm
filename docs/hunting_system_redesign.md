@@ -10,7 +10,7 @@ depletion/oversaturation cycle the partition kills by construction.
 The economy sections below (the respawn overlay, the efficiency
 scoring, the level window, the fleet occupancy) carried into the cell
 policy almost verbatim; the geometry did not. Source data: the generated zone registry
-(`internal/swarm/hunt/zones_elven.go` — the parsed Mobius
+(`internal/swarm/huntdata/zones_elven.go` — the parsed Mobius
 `ElvenStarting.xml`), `internal/swarm/npcdata` (aggressive flags, aggro and
 clan help ranges), the live-validated server facts of `AGENTS.md`, a
 quantitative analysis of the registry (`tools/analyze_hunt_registry.py`) and

@@ -16,7 +16,7 @@
 // the registry. See docs/hunting_cells.md for the model and
 // docs/hunting.md for the hunt policy.
 
-package hunt
+package huntdata
 
 // elvenHuntingCells partitions the elven spawn ground in
 //

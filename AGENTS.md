@@ -329,6 +329,7 @@ internal/swarm/
   crypt/              Login Blowfish, game XOR cipher, checksum
   state/              The live state tracker (the source of truth)
   hunt/               The autonomous hunt loop
+  huntdata/           The generated hunting registries (cells, zones)
   gear/               Equipment scoring and the shop planner
   npcdata/            The generated npc/item/shop tables
   packets/            The wire parsers, one package per direction

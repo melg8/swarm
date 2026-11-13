@@ -18,9 +18,9 @@ The four pillars, each detailed in its section below:
   siblings, `hunt/shopping.go`, `docs/shopping_strategy.md`) plans and
   executes the purchases.
 - **Multi-zone hunting** (`hunt/zones.go`, the generated registry
-  `hunt/zones_elven.go`) climbs the mob level ladder of the region.
+  `huntdata/zones_elven.go`) climbs the mob level ladder of the region.
 - **Hexagon cell hunting** (`hunt/cell*.go`, the generated registry
-  `hunt/cells_elven.go`) replaces the ladder on the elven lands: the
+  `huntdata/cells_elven.go`) replaces the ladder on the elven lands: the
   uniform hexagon partition, the respawn-paced neighbor rotation, the
   enemy-first free roam and the measured scoring (the design of
   `docs/hunting_cells.md`).
@@ -1226,7 +1226,7 @@ the shares of a two-tick fight carry no evidence. The ledger gates on
 the kite layer and the bow, closes on a fresh target or a cleared
 one, and reads no position beyond the oracles the kite already reads.
 
-## Hexagon cell hunting (hunt/cell*.go, hunt/cells_elven.go)
+## Hexagon cell hunting (hunt/cell*.go, huntdata/cells_elven.go)
 
 The cell mode replaces the square zone ladder of the elven lands (the
 design and the full reasoning live in `docs/hunting_cells.md`;
@@ -1265,7 +1265,7 @@ migrated yet; `SetHuntingZones` stands the cell mode down and
 `SetHuntingCells` stands the zone mode down - one loop, two
 registries.
 
-## Multi-zone hunting (hunt/zones.go, hunt/zones_elven.go)
+## Multi-zone hunting (hunt/zones.go, huntdata/zones_elven.go)
 
 The hunting squares derive from the real spawn polygons - a Mobius
 territory spawns its mobs at uniformly random points of its polygon
@@ -1324,7 +1324,7 @@ gear 260, spiders 13-16 gear 300, lirein 16-19 gear 380).
   holds until the character outgrows the band or dies it out) - see
   docs/webui.md.
 
-## The Dion 20-25 band registry (hunt/zones_dion.go)
+## The Dion 20-25 band registry (huntdata/zones_dion.go)
 
 The first registry beyond the elven ladder: the hunting grounds of
 the 20-25 character band (the M3 survey of
