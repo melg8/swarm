@@ -1376,6 +1376,19 @@ corner probe is a length, not a leg at all.
   now name the decoder and the wire order walk.
 - 35 comment lines of 296 become 22 of 283.
 
+### 2026-11-13 - pathfind/navbuild/rect.go keeps the merge invariants only
+
+- 12 blocks compress: the builder keeps the flat square quad rule of the
+  raw l2j geodata (no bilinear vertex field), the working grid reuse per
+  sheet, the NSWE wall rule (the paired walls of both sides plus the
+  climb height) that makes every polygon interior walkable for the link
+  walk and the funnel, the exact height rule, the no-overlap cover
+  invariant of the downward growth and the wall edge ownership. The
+  measured 1.24M/1.43M tunneled pairs of the Dion quarter and the owner
+  directive drop. 70 comment lines of 259 become 48 of 237.
+- Verified: `task fmt`, `go build ./...`, the navbuild suite (31.1 s),
+  `golangci-lint run ./internal/swarm/pathfind/navbuild/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

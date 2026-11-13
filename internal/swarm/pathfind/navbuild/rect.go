@@ -4,24 +4,20 @@
 
 package navbuild
 
-// rectPoly is one rectangle polygon of the built tile: the region
-// local cell bounds (half open) and the exact geodata height of its
-// cells. A rectangle merges only the cells of one exact height, so
-// every polygon is the flat square quad the raw l2j geodata holds -
-// the detour mesh represents the original squares as they are, the
-// visual and the actual surface alike, quantization staircase
-// included (the owner's porting directive; the bilinear vertex field
-// of the previous rounds smoothed that staircase away and the owner
-// pinned the faithful representation instead).
+// rectPoly is one rectangle polygon of the built tile: the region local cell
+// bounds (half open) and the exact geodata height of its cells. A rectangle
+// merges only cells of one exact height, so every polygon is the flat square
+// quad the raw l2j geodata holds, quantization staircase included (no bilinear
+// vertex field smooths it away).
 type rectPoly struct {
     x0, y0, x1, y1     int32
     h00, h10, h01, h11 int16
     area               uint8
 }
 
-// rectBuilder decomposes the kept sheets into rectangle polygons. The
-// two working grids are reused across the sheets (a cell belongs to
-// at most one layer per sheet, so the grid entry is the layer index).
+// rectBuilder decomposes the kept sheets into rectangle polygons. The working
+// grids are reused across the sheets (a cell belongs to at most one layer per
+// sheet, so the grid entry is the layer index).
 type rectBuilder struct {
     grid    []int32 // per cell: the layer index of the current sheet
     covered []bool  // per cell: the maximal rectangles took it
@@ -33,24 +29,14 @@ type rectBuilder struct {
 // cellsTotal is the cell count of one region.
 const cellsTotal = regionCellsSide * regionCellsSide
 
-// buildRects decomposes every kept sheet into maximal rectangles of
-// one exact cell height. The answer is the polygon list and the
-// layer-instance-to-polygon map the link walk consumes.
-//
-// The growth respects the NSWE walls: a rectangle only spans cells
-// whose mutual steps are open (the paired walls of both sides plus
-// the climb height rule), so the interior of every polygon is
-// walkable by construction - the contract the link walk's
-// same-polygon skip and the funnel segments rely on. The wall-blind
-// growth of the first rounds let a single polygon swallow walled
-// cell pairs (the Dion merchant quarter measured 1.24M such pairs in
-// 21_22, 1.43M in 22_22): the corridor search then tunnelled
-// straight through the buildings and the bots walked out of town.
-//
-// The growth also respects the exact height: two cells of a different
-// height never share a rectangle, so a polygon's surface is exactly
-// the height its cells carry in the geodata - the port of the l2j
-// squares changes nothing about where the ground sits.
+// buildRects decomposes every kept sheet into maximal rectangles of one exact
+// cell height and answers the polygon list plus the layer-instance-to-polygon
+// map the link walk consumes. The growth respects the NSWE walls (a rectangle
+// only spans cells whose mutual steps are open: the paired walls of both sides
+// plus the climb height rule), so every polygon interior is walkable by
+// construction - the contract the link walk's same-polygon skip and the funnel
+// segments rely on. Two different heights never share a rectangle, and a
+// wall-blind growth would let the search tunnel through the buildings.
 func buildRects(rl *regionLayers, sh *sheets,
     climb int32,
 ) ([]rectPoly, []int32) {
@@ -95,8 +81,8 @@ func sheetMembers(sh *sheets) [][]uint32 {
     return members
 }
 
-// decomposeSheet runs the maximal same-height rectangle decomposition
-// of one sheet.
+// decomposeSheet runs the maximal same-height rectangle decomposition of one
+// sheet.
 func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
     members [][]uint32, sheet int, climb int32,
 ) {
@@ -115,8 +101,8 @@ func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
         b.markCovered(cx, cy, x1, y1)
         b.emitRect(cx, cy, x1, y1, sh.class[sheet])
     }
-    // The working grids reset per sheet: a stacked column holds one
-    // layer per sheet, the covered flag is sheet local.
+    // The working grids reset per sheet: a stacked column holds one layer per
+    // sheet, the covered flag is sheet local.
     for _, j := range members[sheet] {
         cell := rl.cellIndexOf[j]
         b.grid[cell] = -1
@@ -124,9 +110,8 @@ func (b *rectBuilder) decomposeSheet(rl *regionLayers, sh *sheets,
     }
 }
 
-// extendRight grows the rectangle width while the row stays in the
-// sheet, uncovered, carries the seed cell's exact height and the
-// horizontal step into the new cell crosses no wall.
+// extendRight grows the rectangle width while the row stays in the sheet,
+// uncovered, carries the seed height and the horizontal step crosses no wall.
 func (b *rectBuilder) extendRight(cx, cy int, climb int32) int32 {
     height := b.cellHeight(cx, cy)
     x1 := int32(cx + 1)
@@ -140,13 +125,10 @@ func (b *rectBuilder) extendRight(cx, cy int, climb int32) int32 {
     return x1
 }
 
-// extendDown grows the rectangle height while every cell of the next
-// row stays in the sheet, uncovered, carries the seed cell's exact
-// height, the vertical step into it crosses no wall and the row
-// itself holds no interior wall (the exact cover invariant: the
-// emitted rectangles never overlap; the wall invariant: every
-// adjacent cell pair inside one polygon is an open step, so the
-// interior stays walkable by construction).
+// extendDown grows the rectangle height while every cell of the next row stays
+// in the sheet, uncovered, carries the seed height, the vertical step crosses
+// no wall and the row holds no interior wall: the emitted rectangles never
+// overlap and every adjacent cell pair inside one polygon is an open step.
 func (b *rectBuilder) extendDown(cx, cy int, x1 int32, climb int32) int32 {
     height := b.cellHeight(cx, cy)
     y1 := int32(cy + 1)
@@ -169,10 +151,9 @@ rows:
     return y1
 }
 
-// hStepOpen reports whether the horizontal step between the cells
-// (x, y) and (x+1, y) of the current sheet is an open passage: the
-// east wall of the source, the west wall of the target (the
-// wallsOpen rule of the grid search) and the climb height range.
+// hStepOpen reports whether the horizontal step between the cells (x, y) and
+// (x+1, y) of the current sheet is open: the east wall of the source, the west
+// wall of the target and the climb height range.
 func (b *rectBuilder) hStepOpen(x, y int, climb int32) bool {
     a := b.grid[x*regionCellsSide+y]
     c := b.grid[(x+1)*regionCellsSide+y]
@@ -183,8 +164,8 @@ func (b *rectBuilder) hStepOpen(x, y int, climb int32) bool {
     return stepOpen(b.layers[a], b.layers[c], 1, 0, climb)
 }
 
-// vStepOpen reports whether the vertical step between the cells
-// (x, y) and (x, y+1) of the current sheet is an open passage.
+// vStepOpen reports whether the vertical step between (x, y) and (x, y+1) of
+// the current sheet is open.
 func (b *rectBuilder) vStepOpen(x, y int, climb int32) bool {
     a := b.grid[x*regionCellsSide+y]
     c := b.grid[x*regionCellsSide+y+1]
@@ -195,9 +176,9 @@ func (b *rectBuilder) vStepOpen(x, y int, climb int32) bool {
     return stepOpen(b.layers[a], b.layers[c], 0, 1, climb)
 }
 
-// stepOpen reports whether the cell layer pair admits the step in
-// (dx, dy): the paired NSWE walls of both sides plus the climb
-// height rule - the same canStep the grid search walks on.
+// stepOpen reports whether the layer pair admits the step in (dx, dy): the
+// paired NSWE walls of both sides plus the climb height rule, the same canStep
+// the grid search walks on.
 func stepOpen(a, b cellLayer, dx, dy int32, climb int32) bool {
     if abs16(a.h-b.h) > climb {
         return false
@@ -223,12 +204,9 @@ func (b *rectBuilder) markCovered(cx, cy int, x1, y1 int32) {
     }
 }
 
-// emitRect appends one rectangle polygon flat at the exact geodata
-// height of its cells: the growth above only ever spans cells of one
-// height, so all four corners carry that height and the polygon
-// surface is the square the raw l2j geometry holds - no vertex
-// field, no bilinear approximation, nothing between the mesh and the
-// geodata numbers.
+// emitRect appends one rectangle polygon flat at the exact geodata height of
+// its cells: the growth only spans cells of one height, so all four corners
+// carry it and the polygon surface is the square the raw l2j geometry holds.
 func (b *rectBuilder) emitRect(cx, cy int, x1, y1 int32, area uint8) {
     height := b.cellHeight(cx, cy)
     index := int32(len(b.polys))
@@ -240,8 +218,8 @@ func (b *rectBuilder) emitRect(cx, cy int, x1, y1 int32, area uint8) {
     b.bindLayers(cx, cy, x1, y1, index)
 }
 
-// cellHeight returns the exact geodata height of the cell's layer in
-// the current sheet (the callers only ask for sheet members).
+// cellHeight returns the exact geodata height of the cell layer in the current
+// sheet (the callers only ask for sheet members).
 func (b *rectBuilder) cellHeight(cx, cy int) int16 {
     return b.layers[b.grid[cx*regionCellsSide+cy]].h
 }
