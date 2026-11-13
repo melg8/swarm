@@ -1208,6 +1208,16 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the webserver suite (8.3 s),
   `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
 
+### 2026-11-13 - hunt/loop_actions.go keeps the loot timing only
+
+- 16 blocks compress: the loot constants keep the 15 s ranged kill
+  grace, the 2 s corpse arrival hold, the 300 unit approach radius and
+  search slack; the rest keeps the 2.5 s StandUpTask window, the one
+  potion reuse window and the server side sit toggle confirmation. 150
+  comment lines of 457 become 93 of 400.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

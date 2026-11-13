@@ -4,9 +4,8 @@
 
 package hunt
 
-// The between-fights phases of the hunt loop, split out of the
-// loop.go god file: resting to full health (with the stand guard the
-// movement layers call first), looting the corpses and the inventory
+// The between-fights phases of the hunt loop: resting to full health (with the
+// stand guard the movement layers call first), looting and the inventory
 // overflow cleanup.
 
 import (
@@ -16,27 +15,19 @@ import (
 
 // The loot timing constants of the ranged-kill grace.
 const (
-    // lootKillGrace bounds how long the loot phase may hold after a
-    // kill whose corpse sits away from the character (the bow lure,
-    // the caster spells): the drops land at the corpse, their
-    // broadcast can trail the death packet, and the walk there costs
-    // seconds - the grace covers the approach and the broadcast lag
-    // instead of leaving the loot on the ground.
+    // lootKillGrace bounds the hold of the loot phase after a ranged kill:
+    // the drops land at the corpse, their broadcast can trail the death
+    // packet, and the walk there costs seconds.
     lootKillGrace = 15 * time.Second
-    // lootKillArriveGrace is the short hold AFTER the character
-    // reached the corpse: the drops that broadcast a moment behind
-    // the death packet still land within it, then the hunt resumes -
-    // a mob that dropped nothing never stalls the phase longer.
+    // lootKillArriveGrace is the short hold after the character reached the
+    // corpse, so a late drop broadcast still lands.
     lootKillArriveGrace = 2 * time.Second
-    // lootKillApproachRadius is the distance that separates a melee
-    // kill from a ranged one: a corpse within it died at the
-    // character's feet (the melee range plus the scatter), a corpse
-    // beyond it died to a ranged shot or a spell - the character
-    // walks there and loots it instead of leaving the drops behind.
+    // lootKillApproachRadius separates a melee kill from a ranged one: a
+    // corpse within it died at the character's feet, a farther one died to a
+    // shot or a spell and is walked to.
     lootKillApproachRadius = 300.0
-    // lootKillSearchSlack widens the item search past the corpse
-    // distance: the drop broadcast lands the items at the corpse
-    // plus the scatter.
+    // lootKillSearchSlack widens the item search past the corpse distance:
+    // the drops land at the corpse plus the scatter.
     lootKillSearchSlack = 300.0
 )
 
@@ -51,19 +42,12 @@ func (l *Loop) restSittingHeld(hp float64) bool {
     return hp < standUpHealthPercent || l.mageManaLow()
 }
 
-// rest brings the resting character back to full health (and a
-// caster back to full mana). Sitting accelerates the regeneration,
-// so the character sits down below the sit threshold and stands up
-// again once recovered. The mana of a mystic rides the same toggles:
-// the dry caster sits down under the mana sit threshold and keeps
-// sitting until the mana recovered to the stand one (see
-// combat_skills.go), a fighter ignores the mana gates entirely. A
-// character that knows an instant self heal casts it instead of the
-// sit down while the mana pays and no blow is landing (see
-// recovery_heal.go) - standing up first when the rest already sat
-// it down. The sit/stand action is a server side toggle, so every
-// transition is confirmed by the ChangeWaitType broadcast before
-// the opposite one is ever sent.
+// rest brings the resting character back to full health (a caster to full
+// mana). A mystic sits under the mana threshold and stands at the stand one
+// (see combat_skills.go), a fighter ignores the mana gates, and an instant
+// self heal replaces the sit while the mana pays and no blow lands (see
+// recovery_heal.go). The sit/stand toggle is server side, so each transition
+// waits for the ChangeWaitType broadcast before the opposite one.
 func (l *Loop) rest() {
     now := l.now()
     if now.Sub(l.lastActionAt) < selectPeriod {
@@ -110,11 +94,9 @@ func (l *Loop) rest() {
     l.restToggleTo(now, wantSit, standToHeal, hp)
 }
 
-// restToggleTo sends one sit or stand transition of the rest logic
-// through its confirmation guard: the previous transition must be
-// confirmed (or have timed out) before the opposite one goes out,
-// so a slow ChangeWaitType broadcast can never double toggle. The
-// standToHeal flag only names the stand reason in the log.
+// restToggleTo sends one sit or stand transition through its confirmation
+// guard: the previous one must be confirmed or timed out, so a slow
+// ChangeWaitType broadcast can never double toggle.
 func (l *Loop) restToggleTo(
     now time.Time, wantSit, standToHeal bool, hp float64,
 ) {
@@ -151,19 +133,11 @@ func (l *Loop) restToggleTo(
     l.restActionSit = wantSit
 }
 
-// standUpGuarded stands a sitting character up before an action the
-// server refuses while it sits: the trip walks, the zone returns and
-// the escape runs of the combat safety all move the character, and a
-// walk started sitting would stall into the stuck re-paths. The
-// toggle shares the pending transition gate with the rest logic, so
-// the two never double toggle each other, and the walk starts on a
-// later tick once the ChangeWaitType broadcast confirms the standing.
-// The confirmation broadcast itself is only the start of the stand:
-// the server holds the character paralyzed on the REST intention for
-// a fixed animation window after it (the 2.5 s StandUpTask), and
-// every move request of that window bounces off ActionFailed - the
-// guard holds the caller through the settle window so the first walk
-// request lands on a movable character.
+// standUpGuarded stands a sitting character up before an action the server
+// refuses while it sits (the trip walks, the zone returns and the escapes): a
+// walk started sitting stalls into the stuck re-paths. The toggle shares the
+// pending transition gate with the rest logic, and the caller is held through
+// the 2.5 s StandUpTask window, where every move bounces off ActionFailed.
 func (l *Loop) standUpGuarded(now time.Time) bool {
     if !l.tracker.SelfSitting() {
         // Standing already: a stand transition of this guard went
@@ -197,14 +171,10 @@ func (l *Loop) standUpGuarded(now time.Time) bool {
     return false
 }
 
-// maybeDrinkFightPotion drinks a healing potion in the running fight
-// when the health fell under the fight threshold: the tanked pile up
-// grinds the bar down faster than the natural regeneration, and the
-// potion is the difference between finishing the first attacker and
-// the emergency logout (the owner recipe: the healers keep the
-// first kill alive). The reuse window is shared with the quest trip
-// potion pacing (questPotionAt) - the server paces ONE potion reuse
-// window across every source, so the engine mirrors it.
+// maybeDrinkFightPotion drinks a healing potion when the health fell under the
+// fight threshold: the tanked pile up grinds the bar faster than the natural
+// regeneration. The server paces one potion reuse window across every source,
+// so the window is shared with the quest trip (questPotionAt).
 func (l *Loop) maybeDrinkFightPotion(now time.Time) {
     if l.tracker.SelfHealthPercent() >= fightPotionHealthPercent {
         return
@@ -233,12 +203,9 @@ func (l *Loop) maybeDrinkFightPotion(now time.Time) {
     }
 }
 
-// noteKillPosition records where the killed mob died: the corpse
-// position of the target (the character position when the corpse
-// already vanished from the knownlist - it died at the feet). The
-// loot phase uses it for the ranged-kill grace walk: the drops land
-// at the corpse, and a mob shot down from a distance is approached
-// and looted, never left behind.
+// noteKillPosition records where the mob died: the corpse position, or the
+// character position when the corpse already left the knownlist. The loot
+// phase uses it for the ranged-kill grace walk.
 func (l *Loop) noteKillPosition(objectID int32, now time.Time) {
     l.killPosKnown = false
     l.killWalked = false
@@ -256,16 +223,10 @@ func (l *Loop) noteKillPosition(objectID int32, now time.Time) {
     }
 }
 
-// killApproachWalk walks the looter to the corpse of a kill that
-// happened at range (the bow lure, the caster spell) and holds the
-// loot phase until the drops had their chance to land: the drops
-// spawn at the corpse and their broadcast can trail the death
-// packet, so the character walks there and the per tick item scan
-// picks up anything that appears on the way. A melee kill (the
-// corpse within lootKillApproachRadius) never holds the phase - the
-// ordinary scan radius already covers its drops. Reports whether
-// the loot phase stays held; false hands the phase back to the
-// engage (nothing more to loot).
+// killApproachWalk walks the looter to a corpse killed at range and holds the
+// loot phase until the drops land: they spawn at the corpse and their
+// broadcast can trail the death packet. A melee kill never holds the phase.
+// Reports whether the phase stays held.
 func (l *Loop) killApproachWalk() bool {
     if !l.killPosKnown || l.killAt.IsZero() || l.killLooted {
         return false
@@ -309,25 +270,15 @@ func (l *Loop) killApproachWalk() bool {
     return true
 }
 
-// loot picks up the ground items around the character until none is left
-// within the loot radius, then hunts the next target. Farther items are
-// approached with an explicit walk first so the character visibly runs
-// toward the loot instead of trusting the click to start the whole
-// approach. The search carries no zone filter: the kill that produced
-// the drop often happens past the square line (the chase, the scatter
-// of the drop), and a drop left on the ground because a line on the
-// map crossed it is a pure loss - anything within the loot radius of
-// the character is picked up, wherever it lies. The radius extends to
-// the corpse of the last kill (a mob shot down from a distance drops
-// at its corpse), and the corpse approach walk of the ranged kills
-// holds the phase until the drops land instead of leaving them behind.
-// A living attacker outranks the drops: the tick hands to the engage
-// (see lootAnswerAttacker) and the loot resumes after the fight.
+// loot picks up the ground items within the loot radius, walking to the far
+// ones first, then hunts the next target. The search carries no zone filter:
+// the kill often happens past the square line, and a drop left because a line
+// on the map crossed it is a pure loss. The radius extends to the last kill,
+// whose corpse approach walk holds the phase until the drops land. A living
+// attacker outranks the drops (see lootAnswerAttacker).
 func (l *Loop) loot() {
-    // The potion serves the loot too: the kill that emptied the
-    // health bar (the tanked pair, the hard single) leaves the
-    // character picking up drops at a bar the survivor's next swing
-    // can empty - drink before the walk to the corpse.
+    // The kill may have emptied the bar: drink before the corpse walk, while
+    // the survivor's next swing can still land.
     now := l.now()
     l.maybeDrinkFightPotion(now)
     if l.lootAnswerAttacker(now) {
@@ -345,10 +296,8 @@ func (l *Loop) loot() {
     }
     item, ok := l.tracker.NearestGroundItemExcluding(radius, l.itemSkip, nil)
     if ok {
-        // A drop of the kill is in sight: the ordinary pickup flow
-        // owns the phase (the approach walk to it, the pickup
-        // request), the corpse grace stands down - the drops ARE
-        // being looted.
+        // A drop is in sight: the pickup flow owns the phase, so the corpse
+        // grace stands down.
         l.killLooted = true
     }
     if !ok {
@@ -395,14 +344,10 @@ func (l *Loop) loot() {
     }
 }
 
-// lootAnswerAttacker hands the loot tick to the engage when a living
-// mob holds the character as its target: a mob that reached the
-// character while it picks up the kill must be answered before
-// another corpse step - standing in the blows for a drop is the
-// reported peaceful pick death. The handoff is the engage's own aggro
-// answer: the winnable attacker becomes the target (the loot phase
-// resumes after the fight, the drops stay on the ground), the rest
-// keep the defense flow. It reports whether the tick was consumed.
+// lootAnswerAttacker hands the loot tick to the engage when a living mob holds
+// the character: a mob reached while it picks up a kill must be answered
+// before another corpse step. A winnable attacker becomes the target, the rest
+// take the defense flow. Reports whether the tick was consumed.
 func (l *Loop) lootAnswerAttacker(now time.Time) bool {
     attacker, ok := l.tracker.NearestAttacker()
     if !ok {
@@ -428,11 +373,9 @@ func (l *Loop) lootAnswerAttacker(now time.Time) bool {
     return true
 }
 
-// cleanupInventory destroys junk items when the slots or the weight of
-// the character approach the server limits. The planned equips of the
-// auto equipment stay out of the destroy candidates: a looted upgrade
-// waiting for its paced use item request is never destroyed for bag
-// space - the bot wears it instead.
+// cleanupInventory destroys junk items when the slots or the weight approach
+// the server limits. The planned equips stay out: a looted upgrade waiting for
+// its paced use request is worn, never destroyed for bag space.
 func (l *Loop) cleanupInventory() {
     stats := l.tracker.InventoryStats()
     if stats.SlotPercent < cleanupSlotPercent &&
