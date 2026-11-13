@@ -319,12 +319,12 @@ coarse search fell back to the tile decode per frontier region -
 the silent multi second degradation on exactly the machines the
 route is already cold on. The v2 sidecar adds the head and the tail
 CRC32 of the tile file bytes (the 56 byte header had the room):
-the runtime guard reads ~1 KB and accepts a same size same checksum
-tile regardless of the mtime. A rebuilt tile almost surely changes
-the header counts or the tail tree, so a stale sidecar never
-serves; the legacy v1 sidecars keep the mtime only guard. The
-measured sidecar load after the fix: 1.43 s -> 10.5 ms per 4
-regions.
+the runtime guard reads the two 512 byte end windows and accepts a
+same size same checksum tile regardless of the mtime. A rebuilt tile
+almost surely changes the header counts or the tail tree, so a stale
+sidecar never serves; the legacy v1 sidecars keep the mtime only
+guard. The measured sidecar load after the fix: 1.43 s -> 10.5 ms
+per 4 regions.
 
 **The cold loads run in parallel now.** The Tile decode moved
 outside the mesh lock behind a per key singleflight (the

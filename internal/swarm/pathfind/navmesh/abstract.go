@@ -16,35 +16,21 @@ import (
 )
 
 // The hierarchical route layer (the HNA* adaptation of
-// https://github.com/educharlie/HNA-Algorithm for the region tile
-// world): the polygon mesh stays the level 0 geometry, the cluster
-// graph is the level 1 abstraction above it. One abstract node is a
-// square block of clusterCellsSide x clusterCellsSide geodata cells
-// (2048 x 2048 world units); one abstract edge is a mesh link whose
-// portal crosses a cluster boundary, carrying the crossing midpoint
-// the refinement hops search through. The abstract graph of a region
-// builds lazily from the decoded tile (one pass over the links),
-// caches forever (a few megabytes for the densest region) and lets
-// the tile itself leave under the LRU. The HNA* paper builds the
-// same shape of hierarchy with a graph partitioner (METIS) over one
-// Recast tile; the region grid of this world already partitions the
-// map, so the clusters are the deterministic spatial blocks between
-// the region borders and the partitioner step disappears.
-//
-// The whole map arithmetic (the layer count answer): the 165 region
-// pack holds ~50M polygons at level 0, 165 x 16 x 16 = 42240 cluster
-// nodes at level 1 and 165 region nodes at level 2. Level 1 fits one
-// search budget whole map wide, level 2 is the trivial shortcut the
-// region keys already give; three levels cover the world.
+// https://github.com/educharlie/HNA-Algorithm for the region tile world): the
+// polygon mesh stays the level 0 geometry, the cluster graph is the level 1
+// abstraction above it. One node is a clusterCellsSide square block of geodata
+// cells (2048 world units), one edge a mesh link whose portal crosses a cluster
+// boundary. The HNA* paper partitions one Recast tile with METIS; the region
+// grid already partitions this world, so the blocks are deterministic.
+// The whole map arithmetic: docs/navmesh.md.
 const (
-    // clusterCellsSide is the cell count of one cluster side (128
-    // cells = 2048 world units).
+    // clusterCellsSide is the cell count of one cluster side (2048 world
+    // units).
     clusterCellsSide = int32(128)
-    // clustersPerSide is the cluster count of one region side (16).
+    // clustersPerSide is the cluster count of one region side.
     clustersPerSide = regionCellsSide / clusterCellsSide
-    // unknownArea marks the target area an external link cannot name
-    // without decoding the neighbour tile (the coarse search prices
-    // it as ground, the dry search lets the refinement decide).
+    // unknownArea marks an external target area the coarse search prices as
+    // ground (the dry search lets the refinement decide).
     unknownArea = uint8(0xFF)
 )
 
@@ -63,9 +49,8 @@ func clusterOfCell(cx, cy int32) clusterID {
         uint8(cy/clusterCellsSide))
 }
 
-// clusterOfPos returns the cluster key of a world position (the
-// position clamps into the region - a border position belongs to the
-// region the query named).
+// clusterOfPos returns the cluster key of a world position, clamped into the
+// region the query named.
 func clusterOfPos(col, row int16, x, y float64) clusterKey {
     minX := (float64(col) - tileZeroCol) * tileWorldSize
     minY := (float64(row) - tileZeroRow) * tileWorldSize
@@ -89,40 +74,32 @@ func clampCell(c int32) int32 {
     return c
 }
 
-// abstractEdgeRef identifies one coarse edge of the whole world: the
-// region that owns it plus the local edge index (the hop cache and
-// the query bans name edges through it).
+// abstractEdgeRef identifies one coarse edge of the whole world: the owning
+// region plus the local edge index (the hop cache and the query bans use it).
 type abstractEdgeRef struct {
     Region RegionKey
     Index  int32
 }
 
-// abstractEdge is one cluster to cluster portal: the mesh link whose
-// portal span crosses a cluster boundary. The refinement hop resolves
-// the target polygon through the source link (the neighbour tile
-// decodes on demand) and searches from the crossing midpoint.
+// abstractEdge is one cluster to cluster portal: the mesh link whose portal
+// span crosses a cluster boundary (the refinement hop starts from its
+// midpoint).
 type abstractEdge struct {
     to clusterKey
-    // toRef is the target polygon of the crossing when the link is
-    // internal; zero defers to the link resolution (external target).
+    // toRef is the target polygon of an internal crossing; zero defers to the
+    // link resolution.
     toRef PolyRef
-    // link is the index into the source tile's link store: the
-    // refinement resolves the target through it (the tile may need a
-    // decode at that point).
+    // link indexes the source tile link store the refinement resolves the
+    // target through.
     link int32
-    // mid is the portal midpoint: the world position the hop searches
-    // through (on the shared edge, at the surface height).
+    // mid is the portal midpoint (on the shared edge, at the surface height).
     mid Pos
-    // srcComp is the link component of the source polygon; dstComp is
-    // the component of the target polygon (known at build time for
-    // the internal links, zero until the coarse search resolves it
-    // through the neighbour abstract for the external ones).
+    // srcComp and dstComp are the link components of the source and target
+    // polygons (the external target resolves its component at coarse time).
     srcComp uint32
     dstComp uint32
-    // extTarget names the neighbour side of an external crossing (the
-    // record the source tile already carries): the coarse search
-    // resolves the target component through it without a neighbour
-    // tile decode. Zero poly marks the internal edges.
+    // extTarget names the neighbour side of an external crossing, so the coarse
+    // search resolves the target component without a tile decode.
     extCol  int16
     extRow  int16
     extPoly uint32
@@ -134,19 +111,14 @@ type abstractEdge struct {
 type abstractNode struct {
     id    clusterID
     edges []int32
-    // classes dedupes the parallel crossings: one representative edge
-    // per target cluster and area pair (the crossing closest to the
-    // shared side center). The exact square port produces millions of
-    // tiny polygons, a cluster border holds thousands of open cell
-    // pairs - the coarse search needs the connectivity and one honest
-    // crossing point per class, not every cell pair of the border.
+    // classes dedupes the parallel crossings: one representative edge per
+    // target cluster and area pair (the crossing closest to the side center).
     classes map[abstractClassKey]int32
 }
 
-// abstractClassKey dedupes the parallel edges of one node: the
-// target cluster, the area pair of the crossing and the source
-// component (the crossings of different components serve different
-// parts of the cluster and must all survive the dedupe).
+// abstractClassKey dedupes the parallel edges of one node: the target cluster,
+// the area pair and the source component (different components serve different
+// parts of the cluster and must all survive).
 type abstractClassKey struct {
     to      clusterKey
     srcArea uint8
@@ -154,28 +126,22 @@ type abstractClassKey struct {
     srcComp uint32
 }
 
-// regionAbstract is the level 1 graph of one region: the clusters
-// with polygons as nodes, the boundary crossing portals as edges.
+// regionAbstract is the level 1 graph of one region: the clusters as nodes and
+// the boundary crossing portals as edges.
 type regionAbstract struct {
     key   RegionKey
     nodes []abstractNode
     index map[clusterID]int32
     edges []abstractEdge
-    // comps is the link component id per polygon of the source tile
-    // (the whole tile link graph is bidirectional, the union find
-    // over the links labels it): the coarse search chains two edges
-    // through one cluster only when the crossing they stand on and
-    // the crossing they leave through share the component - the
-    // intra cluster connectivity the HPA* entrance analysis gives.
+    // comps is the link component id per polygon of the source tile: the coarse
+    // search chains two edges of one cluster only when their crossings share
+    // the component (the intra cluster connectivity of HPA*).
     comps []uint32
-    // polys is the polygon count of the source tile (the level 0
-    // size the doc arithmetic quotes).
+    // polys is the polygon count of the source tile.
     polys int
-    // TileSize/TileModTime are the tile file stat the sidecar was
-    // built against (the staleness guard of the sidecar load; the
-    // in memory rebuild leaves them zero). The v2 sidecars also
-    // carry the head and the tail CRC32 of the tile file bytes
-    // (TileChecksums): the mtime loss tolerant guard.
+    // TileSize/TileModTime are the tile file stat the sidecar was built against
+    // (zero for an in memory rebuild); the v2 sidecars carry the head and tail
+    // CRC32 of the tile bytes instead (docs/fastpath_research.md).
     TileSize      int64
     TileModTime   time.Time
     TileChecksums bool
@@ -183,35 +149,23 @@ type regionAbstract struct {
     TileTailCRC   uint32
 }
 
-// BuildAbstract scans one decoded tile into its cluster graph (the
-// exported path of the pack sidecar pass and the tests). The answer
-// shares the buildAbstract semantics: one deterministic pass over the
-// link chains.
+// BuildAbstract scans one decoded tile into its cluster graph (the sidecar pass
+// and the tests forward the answer opaquely).
 //
-// sidecar pass and the tests forward the answer opaquely (encode,
-// diff), the exported shape keeps the call sites uniform.
-//
-//nolint:revive // the graph type stays internal by design; the
+//nolint:revive // the graph type stays internal by design
 func BuildAbstract(tile *Tile) *regionAbstract {
     return buildAbstract(tile)
 }
 
-// The abstract cache bound. The abstracts were cached forever and the
-// whole map coarse walks accumulated every region's graph (the comps
-// array alone is 4 bytes per polygon - the 100M polygon pack sums
-// into the hundreds of megabytes); the LRU keeps the working set of
-// the running queries (the current coarse frontier and the hop
-// refinement tiles) and rebuilds the evicted ones on demand (one
-// deterministic pass over the immutable tile, the edge indices stay
-// stable across the rebuilds - the ban bookkeeping survives).
+// abstractCacheCapacity bounds the abstract LRU: the comps array alone costs 4
+// bytes per polygon, so caching every region would sum into the hundreds of
+// megabytes. An evicted graph rebuilds deterministically, so the edge indices
+// and the ban bookkeeping survive.
 const abstractCacheCapacity = 32
 
-// abstractOf returns the cached cluster graph of a region, building it
-// over the decoded tile on demand. A tile that fails to load answers
-// nil (the coarse search treats the region as a wall, the same
-// semantics the fine search applies to a missing tile). The LRU bound
-// keeps the whole map walks from accumulating every region graph; the
-// rebuilds are deterministic and cheap against the route costs.
+// abstractOf returns the cluster graph of a region, from the sidecar or a fresh
+// build on demand. A tile that fails to load answers nil, which the coarse
+// search treats as a wall.
 func (m *Mesh) abstractOf(key RegionKey) *regionAbstract {
     m.abstractMu.Lock()
     abstract, ok := m.abstracts[key]
@@ -223,10 +177,8 @@ func (m *Mesh) abstractOf(key RegionKey) *regionAbstract {
     }
     m.abstractMu.Unlock()
 
-    // The persistent coarse layer first: the sidecar answers without
-    // decoding the tile (the stat guard inside ties it to the exact
-    // tile file). The tile decode stays for the rebuild fallback, the
-    // refinement hops and the nearest poly queries.
+    // The persistent coarse layer answers without a tile decode; the decode
+    // stays for the rebuild fallback, the hops and the nearest poly queries.
     if sidecar := m.abstractSidecarOf(key); sidecar != nil {
         m.cacheAbstract(key, sidecar)
 
@@ -245,9 +197,8 @@ func (m *Mesh) abstractOf(key RegionKey) *regionAbstract {
     return built
 }
 
-// cacheAbstract stores the abstract in the LRU (nil caches the miss).
-// The last writer wins: the build is a deterministic function of the
-// immutable tile, the concurrent duplicate is discarded.
+// cacheAbstract stores the abstract in the LRU (nil caches the miss); the last
+// writer wins, since the build is deterministic over the immutable tile.
 func (m *Mesh) cacheAbstract(key RegionKey, abstract *regionAbstract) {
     m.abstractMu.Lock()
     m.abstracts[key] = abstract
@@ -256,17 +207,10 @@ func (m *Mesh) cacheAbstract(key RegionKey, abstract *regionAbstract) {
     m.abstractMu.Unlock()
 }
 
-// abstractSidecarOf loads the region abstract from the X_Y.ab sidecar
-// without decoding the tile (a nil answer means the sidecar is
-// absent, stale or unreadable and the caller decodes and rebuilds).
-// The sidecar carries the tile file size and mtime it was built
-// against; the mismatch rejects it, so a stale sidecar never serves.
-// The v2 sidecars carry the tile head and tail checksums instead:
-// the deployment copies that lose the file mtimes keep serving (the
-// same size and the same end checksums mean the same tile file). A
-// tile rewrite that changes the content almost surely changes the
-// header counts or the tail tree, so a rebuilt tile never passes a
-// stale sidecar.
+// abstractSidecarOf loads the region abstract from the X_Y.ab sidecar without
+// decoding the tile: a nil answer means absent, stale or unreadable and the
+// caller rebuilds. A size mismatch rejects the sidecar, and the v2 checksums
+// replace the mtime guard for copies that lost it (docs/fastpath_research.md).
 func (m *Mesh) abstractSidecarOf(key RegionKey) *regionAbstract {
     sidecarPath := filepath.Join(m.dir,
         fmt.Sprintf("%d_%d%s", key.Col, key.Row, abstractFileExt))
@@ -274,9 +218,8 @@ func (m *Mesh) abstractSidecarOf(key RegionKey) *regionAbstract {
     if err != nil {
         return nil
     }
-    // The sidecar may carry the zstd wrapping (the pack compression
-    // round of issue #11): the magic word decides, the plain sidecars
-    // of the older packs keep decoding as they were.
+    // The sidecar may carry the zstd wrapping: the magic word decides, so the
+    // plain sidecars of older packs keep decoding.
     if isZstdFrame(data) {
         raw, zsErr := decodeZstdFrame(data)
         if zsErr != nil {
@@ -311,13 +254,11 @@ func (m *Mesh) abstractSidecarOf(key RegionKey) *regionAbstract {
     return abstract
 }
 
-// tileChecksumWindow is the byte count of each file end the sidecar
-// checksum covers.
+// tileChecksumWindow is the byte count of each file end the guard covers.
 const tileChecksumWindow = 512
 
-// TileChecksumsOf computes the tile head and tail CRC32 over the
-// byte windows the sidecar guard checks (the shared definition the
-// pack build and the runtime probe compile against).
+// TileChecksumsOf computes the head and tail CRC32 over the windows the sidecar
+// guard checks (shared by the pack build and the runtime).
 func TileChecksumsOf(data []byte) (head, tail uint32) {
     headEnd := tileChecksumWindow
     if len(data) < headEnd {
@@ -332,9 +273,9 @@ func TileChecksumsOf(data []byte) (head, tail uint32) {
     return head, crc32.ChecksumIEEE(data[tailStart:])
 }
 
-// tileChecksumsMatch reads the two file ends and compares them with
-// the sidecar recorded checksums (the ~1 KB read against a multi
-// megabyte decode of a wrongly rejected sidecar).
+// tileChecksumsMatch reads the two file ends and compares them with the
+// recorded checksums (a ~1 KB read against the decode of a wrongly rejected
+// sidecar).
 func tileChecksumsMatch(path string, abstract *regionAbstract) bool {
     file, err := os.Open(path)
     if err != nil {
@@ -394,9 +335,8 @@ func (m *Mesh) evictAbstracts() {
     }
 }
 
-// buildAbstract scans one decoded tile into its cluster graph: one
-// pass over the polygon link chains, every link whose portal crosses
-// a cluster boundary becomes an abstract edge. The node set is the
+// buildAbstract scans one decoded tile into its cluster graph: every link whose
+// portal crosses a cluster boundary becomes an edge, and the node set is the
 // cluster blocks the polygon footprints touch.
 func buildAbstract(tile *Tile) *regionAbstract {
     abstract := &regionAbstract{
@@ -422,9 +362,8 @@ func buildAbstract(tile *Tile) *regionAbstract {
             }
             if edge.to.Col == tile.Col && edge.to.Row == tile.Row &&
                 edge.to.ID == sourceID {
-                // The link stays inside one cluster: the coarse graph
-                // does not see it (the refinement searches the real
-                // mesh).
+                // A link inside one cluster is invisible to the coarse
+                // graph (the refinement searches the real mesh).
                 continue
             }
             node := abstract.nodeOf(sourceID)
@@ -438,9 +377,8 @@ func buildAbstract(tile *Tile) *regionAbstract {
                 srcComp: edge.srcComp,
             }
             if idx, seen := node.classes[class]; seen {
-                // Keep the crossing closest to the side center: the
-                // representative of the open span the funnel routes
-                // through.
+                // Keep the crossing closest to the side center: the open
+                // span the funnel routes through.
                 if edgeCrossingDistance(tile, sourceID, edge) <
                     edgeCrossingDistance(tile, sourceID,
                         abstract.edges[idx]) {
@@ -458,10 +396,9 @@ func buildAbstract(tile *Tile) *regionAbstract {
     return abstract
 }
 
-// linkComponents labels every polygon of the tile with its link
-// component (union find over the internal links; the tile link graph
-// is bidirectional by construction, the labels are the strongly
-// connected pieces the coarse chain verification needs).
+// linkComponents labels every polygon with its link component (union find over
+// the bidirectional internal links): the strongly connected pieces the coarse
+// chain verification needs.
 func linkComponents(tile *Tile) []uint32 {
     parent := make([]uint32, len(tile.Polys))
     for i := range parent {
@@ -506,9 +443,8 @@ func linkComponents(tile *Tile) []uint32 {
     return comps
 }
 
-// edgeCrossingDistance measures how far a crossing sits from the
-// center of the cluster side it leaves through (the dedupe metric:
-// the central crossing represents the open span best).
+// edgeCrossingDistance measures how far a crossing sits from the center of the
+// cluster side it leaves through.
 func edgeCrossingDistance(tile *Tile, sourceID clusterID,
     edge abstractEdge,
 ) float64 {
@@ -523,9 +459,8 @@ func edgeCrossingDistance(tile *Tile, sourceID clusterID,
     return dx*dx + dy*dy
 }
 
-// markClusters creates a node for every cluster block a polygon
-// footprint touches (a region wide sea rectangle touches all of them
-// - the node set stays complete without a per cell walk).
+// markClusters creates a node for every cluster block a polygon footprint
+// touches, so a region wide sea rectangle marks all of them in one walk.
 func markClusters(tile *Tile, abstract *regionAbstract) {
     for i := range tile.Polys {
         poly := &tile.Polys[i]
@@ -553,12 +488,9 @@ func (a *regionAbstract) nodeOf(id clusterID) *abstractNode {
     return &a.nodes[len(a.nodes)-1]
 }
 
-// abstractEdgeOf derives the coarse edge of one mesh link: the
-// crossing midpoint, the source and target clusters and the target
-// polygon reference (internal links name it directly, external ones
-// resolve at refinement time). The link index rides the edge: the
-// external target and its component resolve through the source tile's
-// link store.
+// abstractEdgeOf derives the coarse edge of one mesh link: the crossing
+// midpoint, the source and target clusters and the target polygon (internal
+// links name it, external ones resolve at refinement time).
 func abstractEdgeOf(tile *Tile, comps []uint32, poly int32,
     linkIdx int32, link *Link,
 ) (abstractEdge, bool) {
@@ -597,9 +529,8 @@ func abstractEdgeOf(tile *Tile, comps []uint32, poly int32,
     return abstractExternalEdge(tile, link, edge, cx, cy)
 }
 
-// abstractInternalEdge finishes the coarse edge of an internal link:
-// the target polygon of the same tile names the target cluster, the
-// polygon reference and the surface area (false on a corrupt link).
+// abstractInternalEdge finishes an internal link's edge: the target polygon of
+// the same tile names the cluster, the reference and the area.
 func abstractInternalEdge(tile *Tile, comps []uint32, link *Link,
     edge abstractEdge, cx, cy int32,
 ) (abstractEdge, bool) {
@@ -620,10 +551,8 @@ func abstractInternalEdge(tile *Tile, comps []uint32, link *Link,
     return edge, true
 }
 
-// abstractExternalEdge finishes the coarse edge of an external link:
-// the neighbour cell mirrors onto the opposite border of the
-// neighbour region, its cluster folds the border coordinate (false on
-// a corrupt or absent link).
+// abstractExternalEdge finishes an external link's edge: the neighbour cell
+// mirrors onto the opposite border and folds into its cluster there.
 func abstractExternalEdge(tile *Tile, link *Link, edge abstractEdge,
     cx, cy int32,
 ) (abstractEdge, bool) {
@@ -661,16 +590,15 @@ func abstractExternalEdge(tile *Tile, link *Link, edge abstractEdge,
     return edge, true
 }
 
-// clusterOfEdgeSource returns the cluster of the cell just inside the
-// source polygon at the crossing (the source node of the edge).
+// clusterOfEdgeSource returns the cluster just inside the crossing portal.
 func clusterOfEdgeSource(_ *Tile, p *Poly, link *Link) clusterID {
     cx, cy := edgeSourceCell(p, link)
 
     return clusterOfCell(clampCell(cx), clampCell(cy))
 }
 
-// edgeSourceCell returns the region local cell of the polygon just
-// inside the crossing portal (before the step across the side).
+// edgeSourceCell returns the region local cell just inside the crossing portal,
+// before the step across the side.
 func edgeSourceCell(p *Poly, link *Link) (cx, cy int32) {
     span := (link.T0 + link.T1) / 2
     switch link.Side {

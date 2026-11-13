@@ -855,6 +855,21 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `sheet.go` fell from 21.0 to 13.7 percent (34
   comment lines of 249), no block above 8 lines.
 
+### 2026-11-12 - pathfind/navmesh/abstract.go hands the map arithmetic to the doc
+
+- 40 blocks compress: the 21 line hierarchy header, the constant notes,
+  the edge and class struct notes, the component and sidecar stat
+  fields, the build entry (the dangling paragraph and the truncated
+  nolint reason are gone), the cache bound, the sidecar loader, the
+  checksum helpers and the edge derivation helpers. `docs/navmesh.md`
+  gains the three level arithmetic (165 regions, ~50M level 0
+  polygons, 42240 cluster nodes, 165 region nodes) and the edge dedupe
+  bullet; `docs/fastpath_research.md` names the two 512 byte checksum
+  windows.
+- Verified: `task fmt`, `go build ./...`, the full navmesh package,
+  `task lint:new`. `abstract.go` fell from 26.1 to 17.5 percent (108
+  comment lines of 617), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -880,8 +895,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `gear/shopping.go`, `hunt/loop_zone.go`,
 `webserver/navmesh_geometry.go`, `hunt/kite_ledger.go`,
 `hunt/kite_lane.go`, `hunt/city_shopping.go`, `hunt/town_merchants.go`,
-`acceptance/delevel.go` and `pathfind/navbuild/sheet.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
+`acceptance/delevel.go`, `pathfind/navbuild/sheet.go` and
+`pathfind/navmesh/abstract.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.

@@ -281,6 +281,19 @@ mesh hop by hop through it (the hop corridors cache - the HNA*
 intra-edge answers), and the confined fallback threads the chain
 clusters on the real mesh when the sampled crossings strand.
 
+Three levels cover the world: the 165 region pack holds ~50M polygons
+at level 0, 165 x 16 x 16 = 42240 cluster nodes at level 1 (2048
+world units a side) and 165 region nodes at level 2. Level 1 fits one
+search budget whole map wide, level 2 is the trivial shortcut the
+region keys already give.
+
+- **The edges**: one edge per mesh link whose portal crosses a
+  cluster boundary, carrying the crossing midpoint the refinement
+  hops search through. The parallel crossings of a node dedupe to one
+  representative per target cluster, area pair and source component
+  (the crossing closest to the side center): a cluster border holds
+  thousands of open cell pairs and the coarse search needs the
+  connectivity, not every pair.
 - **The coarse guide** prices the edges by the same zone aware swim
   model the refinement runs (`hierQuery.waterMultiplier`): a crossing
   whose destination area is water pays the filter water cost, the
