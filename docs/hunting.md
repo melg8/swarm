@@ -1202,6 +1202,30 @@ The acceptance band verdict reads standing samples only (see the
 previous section), so the walking legs the fence redirects cannot
 fail the range check.
 
+### The kite motion ledger (hunt/kite_ledger.go)
+
+The bow profile books every fight into four motion buckets, sampled
+once per loop tick and reported in one fight-end log line with the
+health cost:
+
+- `MOVING` - the character walks (the retreat, the re-click ladder
+  recovery, any walk of the fight);
+- `WINDUP` - the character stands inside the bow windup of its own
+  shot, the ~1.5 s server-forced standstill (a `MoveToLocation`
+  inside it is saved and replayed at the cycle end, see
+  `docs/kite_timing_findings.md`); the only standing the kite spec
+  allows;
+- `HOLD` - the character stands on a fresh cornered or encircled
+  hold verdict (`kiteHoldGround`): the straight lane found no walk;
+- `IDLE` - the character stands in the fight with no verdict, the
+  unattributed standing the design exists to shrink (an unanswered
+  engage, a lost tick, a recovery pause).
+
+A fight shorter than `kiteMotionMinFight` (2 s) books no summary:
+the shares of a two-tick fight carry no evidence. The ledger gates on
+the kite layer and the bow, closes on a fresh target or a cleared
+one, and reads no position beyond the oracles the kite already reads.
+
 ## Hexagon cell hunting (hunt/cell*.go, hunt/cells_elven.go)
 
 The cell mode replaces the square zone ladder of the elven lands (the

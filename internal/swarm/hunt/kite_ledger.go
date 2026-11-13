@@ -6,43 +6,23 @@ package hunt
 
 import "time"
 
-// The kite motion ledger (issue #70, the round-14 feedback ask): the
-// owner complaint "the archer does not run all the time, it eats
-// damage" needs a measurement that answers it DIRECTLY, in the live
-// log, at the moment the fight ends - not only in the offline fleet
-// audit. The ledger samples the motion state of the current fight
-// once per loop tick and books every second into exactly one bucket:
-//
-//   - MOVING: the character walks (the retreat, the re-click ladder
-//     recovery - any walk of the fight).
-//   - WINDUP: the character stands inside the bow windup of its own
-//     shot - the ~1.5 s standstill the SERVER forces (a
-//     MoveToLocation inside it is saved and replayed at the cycle
-//     end, see docs/kite_timing_findings.md); the only standing the
-//     kite spec allows.
-//   - HOLD: the character stands on a cornered/encircled hold
-//     verdict (kiteHoldGround) - the straight lane found no walk.
-//   - IDLE: the character stands in the fight with no verdict - the
-//     unattributed standing the redesign exists to shrink (an
-//     unanswered engage, a lost tick, a recovery pause).
-//
-// The fight-end summary line carries the shares and the health cost,
-// so a bad fight names its own problem in one readable line.
+// The kite motion ledger answers "the archer does not run all the time, it eats
+// damage" directly in the live log: every loop tick samples the motion state of
+// the current fight and books the time into one bucket - MOVING, WINDUP (the
+// server-forced bow standstill), HOLD (the cornered hold verdict) or IDLE (the
+// unattributed standing the design exists to shrink). The fight-end summary
+// carries the shares and the health cost, so a bad fight names its own problem
+// (docs/hunting.md).
 
-// kiteMotionMinFight bounds the ledger noise: a fight shorter than
-// this books no summary (a one-shot kill, a target switch inside a
-// volley - the shares of a two-tick fight carry no evidence).
+// kiteMotionMinFight bounds the ledger noise: a shorter fight books no summary,
+// because the shares of a two-tick fight carry no evidence.
 const kiteMotionMinFight = 2 * time.Second
 
-// kiteLedgerTick samples the motion state of the current fight and
-// closes the ledger of a finished one: the kite layer gates the
-// bookkeeping (a non-kite profile never arms it), a fresh target
-// closes the previous ledger and opens its own, and a cleared target
-// (the kill, the drop, the death) closes the ledger with the
-// summary. The tick is cheap (no position scan beyond the oracles
-// the kite itself already reads) and runs on every loop tick of the
-// fight path - the samples are the tick cadence the loop already
-// paces.
+// kiteLedgerTick samples the current fight and closes the ledger of a finished
+// one: the kite layer gates the bookkeeping (a non-kite profile never arms it),
+// a fresh target closes the previous ledger and opens its own, and a cleared
+// target (the kill, the drop, the death) closes with the summary. The tick
+// reads no position beyond the oracles the kite already reads.
 func (l *Loop) kiteLedgerTick(now time.Time) {
     if l.target == 0 || !l.kite.Enabled || !l.bowEquipped() {
         l.kiteLedgerClose()
@@ -87,14 +67,10 @@ func (l *Loop) kiteLedgerTick(now time.Time) {
     }
 }
 
-// kiteLedgerKind names the motion bucket of the current moment: a
-// walking character is MOVING whatever walks it (the ladder, the
-// re-click recovery - the oracle cannot split the walker, the
-// fight's walks own the kite window by contract), a standing one
-// inside the windup of its own fresh shot is WINDUP (the
-// server-forced standstill), a standing one on a fresh hold verdict
-// is HOLD, and everything else is IDLE - the unattributed standing
-// the summary names.
+// kiteLedgerKind names the motion bucket of the current moment: a walking
+// character is MOVING whatever walks it (the oracle cannot split the walker),
+// a standing one inside the windup of its own fresh shot is WINDUP, a standing
+// one on a fresh hold verdict is HOLD, and everything else is IDLE.
 func (l *Loop) kiteLedgerKind(now time.Time) kiteMotionKind {
     if l.tracker.SelfWalking() {
         return kiteMotionMoving
@@ -113,9 +89,8 @@ func (l *Loop) kiteLedgerKind(now time.Time) kiteMotionKind {
     return kiteMotionIdle
 }
 
-// kiteLedgerClose closes the ledger of the finished fight: the
-// summary line lands when the fight ran long enough to carry
-// evidence, and the ledger resets whole for the next one.
+// kiteLedgerClose closes the ledger of the finished fight: the summary lands
+// when the fight carried evidence, and the ledger resets whole.
 func (l *Loop) kiteLedgerClose() {
     if l.kiteMotionFor == 0 {
         l.kiteLedgerReset()

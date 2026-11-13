@@ -783,6 +783,17 @@ corner probe is a length, not a leg at all.
   lint:new`. `navmesh_geometry.go` fell from 29.0 to 21.5 percent (107
   comment lines of 498), no block above 8 lines.
 
+### 2026-11-12 - hunt/kite_ledger.go loses the issue story
+
+- 5 blocks compress: the 22 line ledger header (the owner complaint,
+  the issue id and the four bucket stories), the noise bound, the tick,
+  the bucket naming and the close. A new `### The kite motion ledger`
+  subsection of `docs/hunting.md` carries the four buckets, the 2 s
+  evidence bound and the summary contract.
+- Verified: `task fmt`, `go build ./...`, the kite tests, `task
+  lint:new`. `kite_ledger.go` fell from 29.8 to 17.5 percent (25
+  comment lines of 143), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -805,9 +816,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `gear/shopping_candidates.go`, `hunt/town_segment.go`,
 `acceptance/plaza_herbiel.go`, `pathfind/click_validate.go`,
 `cmd/counterprobe/world.go`, `hunt/lure.go`, `hunt/town_sell.go` and
-`gear/shopping.go`, `hunt/loop_zone.go` and
-`webserver/navmesh_geometry.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the
+`gear/shopping.go`, `hunt/loop_zone.go`,
+`webserver/navmesh_geometry.go` and `hunt/kite_ledger.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
