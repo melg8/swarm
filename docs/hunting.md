@@ -2284,6 +2284,34 @@ spot picker itself skips eligible grounds whose static median sits at
 the delevel gap - the spot window (level-8) admits grounds the
 deleveling would immediately answer with guard deaths.
 
+### The delevel acceptance scenario (acceptance/delevel.go)
+
+The live scenario `delevel` (account `temp14`) injects the start state
+through the database rewrite and watches the production deleveling end
+to end:
+
+- the character wakes as a level 15 elven fighter at the bottom of the
+  level experience with the milestone wallet and SP, wearing the
+  Brandish, the Wooden Breastplate, Bone Gaiters, the Leather Helmet
+  and Gloves, the Apprentice's Shoes, both earrings, two Rings of
+  Anguish and the Necklace of Anguish (nothing sellable, so no junk
+  trip delays the cycle);
+- the spot is the Green Dryad S-16 focus cell (43500 54560, z -3664,
+  the single pack layer), 3200 units south of the Starden guard post:
+  the cell median 8 holds the trigger gap 7 for the live and the
+  static median alike, the target (median + 5) is 13, two deaths from
+  the level bottom, and the finished level sits below the gap
+  (hysteresis);
+- the checks: the world entry, the announcement (target, start level
+  and zone median), the walk progress of at least 2000 units (the
+  frozen walk of the stuck reports never leaves the neighborhood), one
+  death, the target level, the return inside 1500 units of the farm
+  ground and the 6 minute no retry window (the
+  `SWARM_DELEVEL_NORETRY_SECONDS` knob 1..3600 shortens it for sandbox
+  runs). A deleveling that re-enters after the finished cycle fails
+  the run - the farm and village ping-pong the contract forbids;
+- the whole scenario is bounded by 25 minutes.
+
 ## The quest dialog walker (hunt/quest_walker.go)
 
 The dialog engine the M2 quest brain runs on: DriveDialog walks one

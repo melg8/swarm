@@ -16,73 +16,51 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The delevel scenario (the owner demand): the guard death cycle must
-// run end to end on the live stack - the outleveled character walks
-// to the archer guards, provokes them, pays the death experience
-// penalty down to the announced target level and returns to the farm
-// spot WITHOUT re-entering the deleveling - and the webui message of
-// the running deleveling must carry the target level and the trigger
-// evidence (the start level against the median mob level of the held
-// ground).
-//
-// The start state forces the trigger honestly: the character wakes ON
-// the Green Dryad S-16 hunting cell (the standing ground handoff of
-// the cell policy - the position IS the intent) as level 15 with the
-// bottom of level experience. The cell median is 8 (the Green Dryad
-// and the Kaboo Orc Grunt of the ground), so the trigger gap (level -
-// median >= 7) holds for the live and the static median alike, and
-// the target (median + 5) lands at 13 - two guard deaths from the
-// level bottom (the Mobius death penalty removes a percentage of the
-// LEVEL SPAN, so every death from the bottom crosses one level
-// boundary). The finished cycle holds the hysteresis: level 13 over
-// the median 8 sits below the trigger gap, so the hunt resumes
-// instead of a second deleveling.
+// The delevel acceptance scenario runs the guard death cycle end to end on the
+// live stack: the outleveled character walks to the archer guards, provokes
+// them, pays the death experience penalty down to the announced target level
+// and returns to the farm spot without a second deleveling, while the webui
+// message carries the target level and the trigger evidence. The start state
+// forces the trigger honestly: level 15 at the bottom of its level experience
+// on the Green Dryad S-16 cell (median 8, target 13), so two deaths cross the
+// boundary and the finished level sits below the gap (docs/hunting.md).
 const (
     delevelScenarioID = "delevel"
     delevelAccount    = "temp14"
     delevelPassword   = "temp14"
 )
 
-// delevelStartLevel is the injected level: 15 sits above the dryad
-// ground median by exactly the trigger gap 7, keeps the character
-// above the Lucky protection (the deaths pay the penalty from 10 up)
-// and two deaths short of the target level 13.
+// delevelStartLevel is the injected level: above the dryad median by the
+// trigger gap 7, above the Lucky protection and two deaths short of the target
+// level 13.
 const delevelStartLevel = 15
 
-// The start ground: the Green Dryad S-16 focus cell (43500 54560) on
-// its single geodata layer (the probe of the pack answers z -3664
-// for every reference height) - 3200 units south of the Starden
-// guard post, the shortest honest guard walk of the low ground
-// registry.
+// The start ground: the Green Dryad S-16 focus cell (43500 54560) on its
+// single geodata layer (z -3664), 3200 units south of the Starden guard post -
+// the shortest honest guard walk of the low ground registry.
 const (
     delevelGroundX = 43500
     delevelGroundY = 54560
     delevelGroundZ = -3664
 )
 
-// delevelProgressUnits is the movement the delevel walk must cover
-// while the phase runs: the guard post sits ~3200 units from the
-// dryad ground, the honest attempt crosses thousands of units, a
-// frozen walk (the stuck report class the check owns) never leaves
-// the start neighborhood.
+// delevelProgressUnits is the movement the delevel walk must cover: the guard
+// post sits ~3200 units away, so a frozen walk never leaves the start
+// neighborhood.
 const delevelProgressUnits = 2000.0
 
-// delevelReturnRadius is the arrival ring of the walk home: the
-// return segment aims at the remembered farm spot (the injection point),
-// the arrival lands the character back on the dryad ground.
+// delevelReturnRadius is the arrival ring of the walk home at the remembered
+// farm spot (the injection point).
 const delevelReturnRadius = 1500.0
 
-// delevelNoRetryDefault is the watch after the finished deleveling:
-// the phase must stay out of delevel while the bot walks home and
-// resumes the hunt (the anti ping-pong contract - the bots must not
-// return to the farm spot only to run back to the guards).
+// delevelNoRetryDefault is the watch after the finished deleveling: the phase
+// must stay out of delevel while the bot walks home and resumes the hunt, or
+// it would run back to the guards (the anti ping-pong contract).
 const delevelNoRetryDefault = 6 * time.Minute
 
 // delevelNoRetryWindow resolves the watch duration: the
-// SWARM_DELEVEL_NORETRY_SECONDS environment variable shapes it the
-// way the soak duration and milestone level knobs do (the sandbox
-// verification runs with a bounded tool window shorten it; the
-// deployment default stays the six minute contract).
+// SWARM_DELEVEL_NORETRY_SECONDS knob shortens it for sandbox runs, the
+// deployment default stays the six minute contract.
 func delevelNoRetryWindow() time.Duration {
     raw := os.Getenv("SWARM_DELEVEL_NORETRY_SECONDS")
     if raw != "" {
@@ -97,39 +75,33 @@ func delevelNoRetryWindow() time.Duration {
     return delevelNoRetryDefault
 }
 
-// delevelTimeout bounds the whole scenario: the two guard death
-// cycles (the walk to the guard, the provoke, the revive, the second
-// walk), the return walk and the no retry watch fit well inside a
-// quarter and a half of the farm readiness budget.
+// delevelTimeout bounds the whole scenario: both guard death cycles, the
+// return walk and the no retry watch.
 const delevelTimeout = 25 * time.Minute
 
 // The delevel condition ids.
 const (
-    // checkDelevelStart holds once the diagnostics carried the full
-    // deleveling message: the target level, the start level and the
-    // median mob level of the held ground.
+    // checkDelevelStart holds once the message carried the target, the start
+    // level and the median mob level.
     checkDelevelStart = "delevel-start"
-    // checkDelevelProgress holds once the delevel walk covered the
-    // stuck detector distance (the frozen walk never does).
+    // checkDelevelProgress holds once the walk covered the stuck detector
+    // distance.
     checkDelevelProgress = "delevel-progress"
-    // checkDelevelDeath holds once a death paid the experience
-    // penalty (the level dropped).
+    // checkDelevelDeath holds once a death paid the experience penalty.
     checkDelevelDeath = "delevel-death"
-    // checkDelevelTarget holds once the character reached the
-    // announced target level and the phase left the deleveling.
+    // checkDelevelTarget holds once the level reached the announcement and the
+    // phase left the deleveling.
     checkDelevelTarget = "delevel-target"
-    // checkDelevelReturn holds once the bot walked back onto the farm
-    // ground after the finish.
+    // checkDelevelReturn holds once the bot walked back onto the farm ground.
     checkDelevelReturn = "delevel-return"
-    // checkDelevelNoRetry holds once the no retry window passed
-    // without a deleveling re-entry.
+    // checkDelevelNoRetry holds once the no retry window passed without a
+    // re-entry.
     checkDelevelNoRetry = "delevel-no-retry"
 )
 
-// delevelItems is the wearable outfit of the start state: every slot
-// dressed from the bag by the world entry auto equipment, nothing
-// sellable (the junk town trip would delay the deleveling the
-// scenario watches).
+// delevelItems is the wearable outfit of the start state, dressed from the bag
+// by the world entry auto equipment; nothing sellable, so no junk trip delays
+// the deleveling.
 var delevelItems = []ResetItem{
     {ItemID: 1333, Count: 1}, // Brandish (the two hand sword)
     {ItemID: 23, Count: 1},   // Wooden Breastplate
@@ -143,10 +115,9 @@ var delevelItems = []ResetItem{
     {ItemID: 907, Count: 1},  // Necklace of Anguish
 }
 
-// delevelReset returns the start state of the delevel scenario: the
-// level 15 fighter at the bottom of the level experience (every
-// guard death crosses one level boundary), standing on the dryad
-// ground cell.
+// delevelReset returns the start state: the level 15 fighter at the bottom of
+// the level experience (every death crosses one boundary), standing on the
+// dryad cell.
 func delevelReset(account string) characterReset {
     gain := elvenFighterVitals[delevelStartLevel-1]
 
@@ -212,9 +183,8 @@ func delevelChecks() []Check {
     }
 }
 
-// delevelScenario runs the guard death cycle round: the outleveled
-// character delevels at the town guards to the announced target and
-// returns to the farm spot without re-entering the deleveling.
+// delevelScenario runs the guard death cycle: the outleveled character
+// delevels at the guard to the announced target and returns to the farm spot.
 func delevelScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(delevelChecks())
@@ -252,10 +222,9 @@ func delevelScenario(ctx context.Context, m *Manager, t *Test) error {
     return delevelWatch(ctx, test, tracker)
 }
 
-// delevelObserver accumulates the watch state of the delevel
-// scenario: the announcement capture, the walk progress, the death
-// count and the post finish gates (the return and the no retry
-// window), one tracker snapshot per monitor tick.
+// delevelObserver accumulates the watch state: the announcement, the walk
+// progress, the death count and the post finish return and no retry gates, one
+// snapshot per monitor tick.
 type delevelObserver struct {
     deaths        *deathEdgeTracker
     announced     int32
@@ -289,12 +258,10 @@ func newDelevelObserver(tracker *state.Bot) *delevelObserver {
     }
 }
 
-// observeDelevel refreshes the announcement and progress checks from
-// one snapshot: the announcement check holds once the diagnostics
-// carried the full deleveling message (the target level, the start
-// level and the zone median), the progress check holds once the
-// delevel walk crossed the stuck detector distance (the frozen walk
-// of the stuck reports never leaves the start neighborhood).
+// observeDelevel refreshes the announcement and progress checks from one
+// snapshot: the announcement holds once the diagnostics carried the target, the
+// start level and the zone median, the progress once the walk crossed the
+// stuck detector distance.
 func (o *delevelObserver) observeDelevel(
     test *Test, diag state.HuntDiagnostics, x, y int32, posOK bool,
 ) {
@@ -323,10 +290,9 @@ func (o *delevelObserver) observeDelevel(
             o.progressUnits, delevelProgressUnits))
 }
 
-// observeOutcome refreshes the death, target, return and no retry
-// checks from one snapshot. It reports true once every gate of the
-// cycle latched (the pass) and fails with the ping-pong error when
-// the deleveling re-entered after the finished cycle.
+// observeOutcome refreshes the death, target, return and no retry checks from
+// one snapshot, reporting true once every gate latched and failing on a
+// deleveling that re-entered after the finished cycle.
 func (o *delevelObserver) observeOutcome(
     test *Test, tracker *state.Bot, diag state.HuntDiagnostics,
     x, y int32, posOK bool,
@@ -379,11 +345,9 @@ func (o *delevelObserver) observeOutcome(
     return o.returned && o.noRetryHeld, nil
 }
 
-// delevelWatch observes the session through the guard death cycle:
-// the announcement, the walk progress, the deaths, the target, the
-// return and the no retry window. The pass hands over to the
-// teardown, the context end (the manager timeout among others) or a
-// deleveling re-entry inside the window fails the run.
+// delevelWatch observes the session through the guard death cycle: the
+// announcement, the progress, the deaths, the target, the return and the no
+// retry window; the pass or the context end hands over, a re-entry fails.
 func delevelWatch(
     ctx context.Context, test *Test, tracker *state.Bot,
 ) error {
