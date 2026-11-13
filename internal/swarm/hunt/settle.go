@@ -11,34 +11,25 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The spawn protection settle of the hunt loop, split out of the
-// loop.go god file: the post relogin window where the character
-// holds the spot, regenerates under the server spawn protection and
-// opens the next fight with a deliberate first strike instead of
-// walking into an aggressive pack.
+// The spawn protection settle: the post relogin window where the
+// character holds the spot, regenerates under the server spawn protection
+// and opens the next fight with a deliberate first strike instead of
+// walking into an aggressive pack (docs/hunting.md).
 
-// The verified server facts the settle builds on (Mobius C1, see the
-// H-005 registry entry and docs/hunting.md): every EnterWorld arms
-// the spawn protection (PlayerSpawnProtection = 600 s in the deployed
-// Player.ini), Attackable.getHating strips the aggro of a protected
-// player every AI tick, and the protection clears ONLY on one of the
-// five action packets - MoveToLocation, AttackRequest, Action,
-// UseItem and RequestMagicSkillUse. The sit toggle of RequestActionUse
-// is not in the list, so a sitting character keeps the protection and
-// regenerates in peace even with an aggressive mob standing on it.
+// The verified server facts (H-005, docs/hunting.md): every EnterWorld
+// arms the spawn protection (PlayerSpawnProtection = 600 s), the
+// Attackable.getHating gate strips the aggro of a protected player every
+// AI tick, and only MoveToLocation, AttackRequest, Action, UseItem and
+// RequestMagicSkillUse clear it. The RequestActionUse sit toggle is not in
+// that list, so a sitting character regenerates in peace.
 
-// settleAfterLogin holds the freshly logged in character on the spawn
-// protection while it regenerates and aggressive mobs stand within
-// their on-sight circles. It reports true while it owns the tick
-// (the hold, the sit toggles, the stand up waits). The first call of
-// a session that finds nothing to hold for, a blow that already
-// landed (the protection is gone - somebody reached the character
-// anyway) or a recovered health ends the settle: the recovered
-// character opens with the first strike instead of walking (see
-// maybeBeginFirstStrike), the rest falls through to the ordinary
-// engage flow. The whole flow is opt in - the supervisor enables it
-// for every session (every login IS a relogin into the same world
-// spot), the unit tests and the manual sessions keep it off.
+// settleAfterLogin holds the fresh character on the spawn protection while
+// it regenerates and aggressive mobs stand within their on-sight circles,
+// and reports true while it owns the tick. A clear ground, a landed blow or
+// a recovered bar ends the settle; the recovered character opens with the
+// first strike (see maybeBeginFirstStrike) and the rest falls through to the
+// ordinary engage flow. The flow is opt in: the supervisor arms it for every
+// session, the tests and the manual sessions keep it off.
 func (l *Loop) settleAfterLogin(now time.Time) bool {
     if !l.spawnSettle || l.settled {
         return false
@@ -91,8 +82,8 @@ func (l *Loop) settleAfterLogin(now time.Time) bool {
     return true
 }
 
-// endSettle closes the settle window once. The empty reason skips
-// the log line (a quiet end - the recovery simply finished).
+// endSettle closes the settle window once; an empty reason skips the log
+// line of a quiet end.
 func (l *Loop) endSettle(reason string) {
     if l.settled {
         return
@@ -104,10 +95,9 @@ func (l *Loop) endSettle(reason string) {
     }
 }
 
-// settleRecovered finishes the settle on a recovered health bar: the
-// stand transition runs first (the server refuses the attack requests
-// of a sitting character, the stand window of the rest guard paces
-// the transition), then the first strike opens the fight.
+// settleRecovered finishes the settle on a recovered bar: the stand runs
+// first (the server refuses the attacks of a sitting character, and the rest
+// guard paces the transition), then the first strike opens the fight.
 func (l *Loop) settleRecovered(now time.Time) bool {
     if l.settleSitPending(now) {
         // The sit request is still unconfirmed: hold until the
@@ -126,11 +116,9 @@ func (l *Loop) settleRecovered(now time.Time) bool {
     return false
 }
 
-// settleRest manages the sit/stand toggles of the settle hold: the
-// character sits for the faster regeneration (the sit packet never
-// clears the spawn protection) and holds the sit until the stand up
-// health. The transitions reuse the rest confirmation fields - the
-// same guard against a double toggle the rest logic runs.
+// settleRest toggles the sit of the hold for the faster regeneration (the
+// sit packet never clears the spawn protection) and keeps it until the
+// stand up health; the rest confirmation fields guard a double toggle.
 func (l *Loop) settleRest(now time.Time, hp float64) {
     if l.tracker.SelfSitting() {
         return
@@ -151,37 +139,31 @@ func (l *Loop) settleRest(now time.Time, hp float64) {
     l.logf("Hunt: sitting down under the spawn protection at %.0f%% HP", hp)
 }
 
-// settleSitPending reports whether the settle sit request is still
-// unconfirmed: the rest action guard window has not lapsed and the
-// last transition sent was a sit. The stand and strike sequence
-// waits it out - a strike fired before the confirm would land on a
-// sitting character (the server refuses those attacks).
+// settleSitPending reports whether the settle sit is still unconfirmed:
+// the stand and strike sequence waits the guard window out, since a strike
+// before the confirm would land on a sitting character.
 func (l *Loop) settleSitPending(now time.Time) bool {
     return !l.restActionAt.IsZero() && l.restActionSit &&
         now.Sub(l.restActionAt) < restRetryPeriod
 }
 
-// settleHolding reports whether the settle hold is active right now:
-// the tick pile up gate suppresses the panic run while it holds - the
-// protected character has no real attackers (the protection strips
-// the hate before any broadcast), a phantom pair reading must not arm
-// the irreversible run the settle exists to prevent.
+// settleHolding reports whether the hold is active: the pile up gate
+// suppresses the panic run while it holds, since the protection strips the
+// hate before any broadcast and a phantom pair must not arm the irreversible
+// run.
 func (l *Loop) settleHolding() bool {
     return l.spawnSettle && !l.settled
 }
 
-// EnableSpawnSettle arms the post relogin settle: the supervisor
-// calls it on every fresh session (the login IS the relogin into the
-// same world spot), the tests and the manual sessions stay off.
+// EnableSpawnSettle arms the post relogin settle on a fresh session; the
+// tests and the manual sessions stay off.
 func (l *Loop) EnableSpawnSettle() {
     l.spawnSettle = true
 }
 
-// aggressiveMobNearby reports whether an idle aggressive mob stands
-// within its own on-sight circle (plus the lure cover slack) of the
-// character: the first move breaks the spawn protection straight
-// into that mob's aggro (the AI scan adds the hate of a now
-// unprotected player every second, no movement needed).
+// aggressiveMobNearby reports whether an idle aggressive mob stands within
+// its own on-sight circle (plus the lure cover slack): the first move breaks
+// the protection straight into that mob's aggro.
 func (l *Loop) aggressiveMobNearby() bool {
     selfX, selfY, _, ok := l.tracker.SelfPosition()
     if !ok {
@@ -199,15 +181,11 @@ func (l *Loop) aggressiveMobNearby() bool {
     return false
 }
 
-// maybeBeginFirstStrike opens the post settle fight the deliberate
-// way: the nearest aggressive mob inside the first strike range is
-// attacked from the spot - the bow owner arms the ranged tool and
-// fires while the mob still has to close the distance (the lure
-// shoot phase runs the ranged fight and swaps the melee weapon back
-// on the arrival), everyone else answers it in melee at the chosen
-// spot with a recovered health bar. Without an aggressive mob in
-// range the strike is a no-op: the ordinary pick flow walks out of
-// the safe spot.
+// maybeBeginFirstStrike attacks the nearest aggressive mob inside the
+// first strike range from the spot: the bow owner arms the ranged tool and
+// fires while the mob closes the distance (the lure phases swap the melee
+// weapon back on arrival), everyone else answers in melee. Without a mob in
+// range the ordinary pick flow walks out of the safe spot.
 func (l *Loop) maybeBeginFirstStrike(now time.Time) bool {
     strike, ok := l.nearestAggressiveMob(firstStrikeRange)
     if !ok {
@@ -270,8 +248,7 @@ func (l *Loop) maybeBeginFirstStrike(now time.Time) bool {
 }
 
 // nearestAggressiveMob returns the closest idle aggressive npc within
-// maxDistance of the character (the threat list of the tracker, the
-// projected positions of the moving mobs included).
+// maxDistance, the projected positions of moving mobs included.
 func (l *Loop) nearestAggressiveMob(
     maxDistance float64,
 ) (state.AggroThreat, bool) {

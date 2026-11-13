@@ -2204,7 +2204,7 @@ corner probe is a length, not a leg at all.
   written field made two snapshot encoders writers of the single source
   of truth, two concurrent rebuilds store two consistent snapshots and
   one wins), the immutable slice and allocation free read contract, the
-  `corridor`-free plan order (the warrior priorities, the stable unlock
+  plan order (the warrior priorities, the stable unlock
   level, skill id, level order) and the demanded book rule (an unlock
   level reached demands the book, a book sold for `referencePrice/2`
   returns as a full priced buy and its lesson waits forever) with the
@@ -2213,6 +2213,33 @@ corner probe is a length, not a leg at all.
   block above 8 lines.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
+### 2026-11-13 - hunt/settle.go keeps the spawn protection facts
+
+- 12 blocks compress: the file keeps the H-005 server facts (the 600 s
+  `PlayerSpawnProtection`, the `Attackable.getHating` strip on every AI
+  tick, the five packets that clear the protection and the
+  `RequestActionUse` sit toggle that is not one of them), the opt in
+  contract, the one shot rule (an empty knownlist or an unknown
+  position holds without deciding), the stand before the strike and
+  the first strike (the bow owner through the lure phases, everyone
+  else in melee from the protected spot). The "split out of the
+  `loop.go` god file" refactor note and the retold flow drop. 90
+  comment lines of 296 become 67 of 274, no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
+### 2026-11-13 - hunt/flow.go moves the flow rules to the doc
+
+- 7 blocks compress: the file keeps the aim span (`flowAimPeriods`,
+  the 120 fallback speed, the floor and the `maxMoveDistance` cap), the
+  `flowOnRoute` corridor and height gate, the farthest first probe, the
+  dead click denial of `skipMoveFresh` and the `flowCornerLead`
+  pre-click pacing. A new `## The continuous waypoint flow` section of
+  `docs/hunting.md` carries the moved rules and every constant name.
+  55 comment lines of 208 become 36 of 190, no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
 ## Status
 
