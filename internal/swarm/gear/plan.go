@@ -12,22 +12,20 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// EquipAction is one use item request of the equip planner: using an
-// equippable inventory item toggles it (see UseItem), so equipping
-// into a slot the server replaces directly (weapons, chest, neck,
-// ...) and swapping one jewel of a pair (ears, fingers) needs the
-// unequip of the worse piece first - the next planner call equips the
-// better item into the freed slot.
+// EquipAction is one use item request of the equip planner: using an equippable
+// item toggles it, so a slot the server replaces directly (weapons, chest,
+// neck) equips in one request, while swapping one jewel of a pair (ears,
+// fingers) needs the unequip of the worse piece first - the next planner call
+// fills the freed slot.
 type EquipAction struct {
     // ObjectID is the inventory item the use item request targets.
     ObjectID int32
-    // Equip is true for an equip request and false for the freeing
-    // unequip of a pair swap.
+    // Equip is true for an equip request, false for the freeing unequip of a
+    // pair swap.
     Equip bool
     // Slot is the paperdoll slot the action improves.
     Slot Slot
-    // Gain is the score the swap gains on the slot (the net gain of
-    // the pair swap: the better item minus the worse equipped one).
+    // Gain is the net score the swap gains on the slot.
     Gain float64
     // Reason is the human readable log line.
     Reason string
@@ -36,12 +34,9 @@ type EquipAction struct {
 // nextPlanCandidate is the internal best action accumulator.
 type nextPlanCandidate struct {
     action EquipAction
-    // The reason inputs of the winning offer: the text shape and the
-    // paperdoll entries the text names beside the candidate. The
-    // reason string builds once for the winner in describeUpgrade -
-    // building it per offered candidate allocated two item
-    // descriptions and a concatenation for every offer that lost the
-    // better() race.
+    // The reason inputs of the winning offer; describeUpgrade builds the string
+    // once for the winner, so no losing offer pays two item descriptions and a
+    // concatenation.
     kind      planKind
     candidate ScoredItem
     current   ScoredItem
@@ -62,8 +57,7 @@ const (
     planKindLegsOverOnePiece
 )
 
-// better replaces the accumulator when the gain strictly improves
-// (the candidate iteration order breaks ties deterministically).
+// better replaces the accumulator when the gain strictly improves.
 func (c *nextPlanCandidate) better(
     action EquipAction, kind planKind,
     candidate ScoredItem, current ScoredItem, slot Slot,
@@ -78,9 +72,8 @@ func (c *nextPlanCandidate) better(
     }
 }
 
-// describeUpgrade renders the reason of the winning action: the same
-// text shapes the eager per candidate reasons used to carry (the
-// test pins read them), built once per planner call.
+// describeUpgrade renders the reason of the winning action, once per planner
+// call.
 func describeUpgrade(best nextPlanCandidate) string {
     switch best.kind {
     case planKindEmpty:
@@ -109,14 +102,10 @@ func describeUpgrade(best nextPlanCandidate) string {
     }
 }
 
-// HasWeapon reports whether the character wears or carries any weapon
-// the profile can fight with: every inventory item (equipped or
-// bagged) whose gear stats place it in the weapon family with a
-// positive profile score counts - a bow is no weapon for the melee
-// fighter, a sword is none for the mystic, the profile decides. The
-// weapon run trigger of the hunt loop reads it: a character that
-// answers false while its plan offers an affordable weapon shops for
-// the weapon before anything else (see hunt/shopping.go).
+// HasWeapon reports whether the character wears or carries any weapon the
+// profile can fight with: a weapon family item with a positive profile score (a
+// bow is no weapon for the melee fighter, a sword none for the mystic). The
+// weapon run trigger of the hunt loop reads it.
 func HasWeapon(profile Profile, equipment Equipment) bool {
     for _, item := range equipment.Items {
         stats, ok := npcdata.ItemGearStats(item.ItemID)
@@ -132,11 +121,9 @@ func HasWeapon(profile Profile, equipment Equipment) bool {
     return false
 }
 
-// NextUpgrade plans the next equip action that strictly improves the
-// paperdoll under the profile: an empty slot filled with the best
-// scoring fitting item, a slot swapped for a strictly better item or
-// the worse jewel of a pair freed for the better inventory item. It
-// reports ok=false when the paperdoll is already optimal for the
+// NextUpgrade plans the next equip action that strictly improves the paperdoll:
+// an empty slot filled, a slot swapped for a better item, or the worse jewel of
+// a pair freed. It reports ok=false when the paperdoll is optimal for the
 // inventory.
 func NextUpgrade(
     profile Profile, equipment Equipment,
@@ -166,28 +153,22 @@ func NextUpgrade(
         }
     }
     if best.found {
-        // The reason text builds once for the winning action: the
-        // eager per candidate strings were pure waste - every offer
-        // that lost the better() race allocated two item descriptions
-        // and a concatenation the planner threw away (the 40 bot
-        // fleet profile held them at 3.6 percent of all allocated
-        // bytes).
+        // The reason builds once for the winning action: the eager per
+        // candidate strings held 3.6 percent of all allocated bytes in the 40
+        // bot fleet profile.
         best.action.Reason = describeUpgrade(best)
     }
 
     return best.action, best.found
 }
 
-// emptyScoredItem is the no entry sentinel of the reason inputs (the
-// text shapes that name no paperdoll entry beside the candidate).
+// emptyScoredItem is the no entry sentinel of the reason inputs.
 var emptyScoredItem ScoredItem
 
-// scoredItemPool recycles the candidate slices of the planner scans:
-// the equip planner re-scores the whole inventory once per planner
-// call and the burst loop calls the planner once per collected
-// action, so a fresh slice per call was the dominant allocation
-// source of the fleet (the 40 bot run held it at over half of all
-// allocated bytes).
+// scoredItemPool recycles the candidate slices of the planner scans: the
+// planner re-scores the whole inventory once per call and the burst loop calls
+// it once per collected action, which held over half of all allocated bytes in
+// the 40 bot run.
 var scoredItemPool = sync.Pool{
     New: func() any {
         buf := make([]ScoredItem, 0, 64)
@@ -196,11 +177,9 @@ var scoredItemPool = sync.Pool{
     },
 }
 
-// scoreUnequipped lists the unequipped inventory items the profile
-// can use with their scores, the highest score first (the object id
-// breaks ties so the plan is deterministic). The one-shot form of
-// appendScoredUnequipped: the planner's own hot path uses the pooled
-// buffer (see NextUpgrade).
+// scoreUnequipped lists the usable unequipped items with their scores, highest
+// first (the object id breaks ties); the one-shot form of
+// appendScoredUnequipped.
 func scoreUnequipped(
     profile Profile, equipment Equipment,
 ) []ScoredItem {
@@ -208,11 +187,9 @@ func scoreUnequipped(
         profile, equipment, make([]ScoredItem, 0, len(equipment.Items)))
 }
 
-// appendScoredUnequipped appends the scored unequipped inventory
-// items of the profile to the given buffer and sorts it, the highest
-// score first (the object id breaks ties so the plan is
-// deterministic). The buffer form exists so the burst loop can
-// recycle the backing array across its planner calls.
+// appendScoredUnequipped appends the scored unequipped items to the buffer and
+// sorts them, highest first (the object id breaks ties), so the caller recycles
+// the backing array.
 func appendScoredUnequipped(
     profile Profile, equipment Equipment, candidates []ScoredItem,
 ) []ScoredItem {
@@ -235,9 +212,9 @@ func appendScoredUnequipped(
             Slot:  slotInvalid,
         })
     }
-    // slices.SortFunc over sort.Slice: the generic sort needs no
-    // reflection swapper, the planner scan ran the reflectlite
-    // allocation on every call of the fleet profile.
+    // slices.SortFunc over sort.Slice: the generic sort needs no reflection
+    // swapper, whose reflectlite allocation ran on every planner call of the
+    // fleet profile.
     slices.SortFunc(candidates, func(i, j ScoredItem) int {
         if i.Score != j.Score {
             if i.Score > j.Score {
@@ -259,12 +236,11 @@ func appendScoredUnequipped(
     return candidates
 }
 
-// planSimple plans the equip of a single slot item (weapon, chest,
-// neck, gloves, feet, head, back, underwear) and the pair families
-// (ears, fingers): an empty slot equips directly, an occupied slot
-// swaps when the candidate is strictly better. A full pair swaps
-// through the unequip of the worse piece: the server would replace
-// the left slot blindly, which can hit the better item.
+// planSimple plans a single slot item (weapon, chest, neck, gloves, feet, head,
+// back, underwear) and the pair families (ears, fingers): an empty slot equips
+// directly, an occupied one swaps when the candidate is strictly better. A full
+// pair frees the worse piece first, because the server would replace the left
+// slot blindly.
 func planSimple(
     best *nextPlanCandidate, paperdoll [slotCount]ScoredItem,
     candidate ScoredItem, slots []Slot,
@@ -302,9 +278,8 @@ func planSimple(
     }
 }
 
-// planPair plans the equip of an ear or finger jewel: an empty slot
-// of the pair equips directly; a full pair frees its worse piece
-// first so the next planner call equips the candidate into it.
+// planPair plans an ear or finger jewel: an empty slot of the pair equips
+// directly, a full pair frees its worse piece first.
 func planPair(
     best *nextPlanCandidate, paperdoll [slotCount]ScoredItem,
     candidate ScoredItem, first Slot, second Slot,
@@ -341,10 +316,8 @@ func planPair(
     }
 }
 
-// planTwoHandWeapon plans lrhand weapons (poles, bows): equipping one
-// unequips a shield the server drops from the left hand, so the gain
-// must cover the loss (bows never reach here for a melee profile:
-// they score zero).
+// planTwoHandWeapon plans lrhand weapons: equipping one drops a shield from the
+// left hand, so the gain must cover it (a bow scores zero for a melee profile).
 func planTwoHandWeapon(
     best *nextPlanCandidate, paperdoll [slotCount]ScoredItem,
     candidate ScoredItem,
@@ -369,10 +342,8 @@ func planTwoHandWeapon(
     }
 }
 
-// planShield plans left hand shields: equipping a shield while a two
-// hand weapon occupies the right hand unequips the weapon (the
-// server drops it from the right hand slot), so the gain must cover
-// the weapon loss.
+// planShield plans left hand shields: equipping one drops a two hand weapon
+// from the right hand, so the gain must cover the weapon loss.
 func planShield(
     best *nextPlanCandidate, paperdoll [slotCount]ScoredItem,
     candidate ScoredItem,
@@ -397,9 +368,8 @@ func planShield(
     }
 }
 
-// planOnePiece plans one-piece armors: they occupy the chest slot and
-// block the legs slot, so their gain replaces the family (chest plus
-// legs) and only a strictly better family total equips.
+// planOnePiece plans one-piece armors: they occupy the chest and block the
+// legs, so their gain replaces the chest plus legs family.
 func planOnePiece(
     best *nextPlanCandidate, paperdoll [slotCount]ScoredItem,
     candidate ScoredItem,
@@ -418,10 +388,9 @@ func planOnePiece(
     }
 }
 
-// planLegs plans legs armor: equipping legs while a one-piece armor
-// occupies the chest unequips it (the server drops it from the chest
-// slot), so the gain compares against the one-piece score minus the
-// best chest armor the inventory can refill the freed chest with.
+// planLegs plans legs armor: equipping legs drops a one-piece armor from the
+// chest, so the gain compares against the one-piece minus the best chest armor
+// the inventory refills.
 func planLegs(
     best *nextPlanCandidate, paperdoll [slotCount]ScoredItem,
     candidate ScoredItem, equipment Equipment, profile Profile,
@@ -433,8 +402,8 @@ func planLegs(
 
         return
     }
-    // The one-piece leaves the chest empty: the best unequipped chest
-    // candidate refills it on the next planner call.
+    // The one-piece leaves the chest empty: the best unequipped chest candidate
+    // refills it.
     refill := float64(0)
     for _, item := range equipment.Items {
         if item.Equipped {

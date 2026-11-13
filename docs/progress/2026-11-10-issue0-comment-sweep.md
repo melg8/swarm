@@ -1741,6 +1741,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the pathfind suite,
   `golangci-lint run ./internal/swarm/pathfind/...` 0 issues.
 
+### 2026-11-13 - gear/plan.go keeps the equip rules
+
+- 21 blocks compress: the planner keeps the use item toggle rule (a
+  direct slot replaces in one request, a pair needs the unequip of the
+  worse piece first because the server replaces the left slot
+  blindly), the one-piece chest plus legs family against the legs
+  armor chest refill, the two hand weapon against the shield drop, the
+  profile gated `HasWeapon` (a bow is no weapon for the melee fighter),
+  the pooled candidate slices with `slices.SortFunc` over
+  `sort.Slice` (the reflectlite allocation) and the winning-only reason
+  string that held 3.6 percent of all allocated bytes in the 40 bot
+  fleet profile. 106 comment lines of 476 become 75 of 445.
+- Verified: `task fmt`, `go build ./...`, the gear suite (0.4 s),
+  `golangci-lint run ./internal/swarm/gear/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
