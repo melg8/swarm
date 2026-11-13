@@ -1955,10 +1955,19 @@ The short form:
   engine: a spawn the pack serves (floor at the spawn height plus a
   verified route onto it) needs no row - the spawn fallback of
   merchantStandPoint answers it; every other spawn (the roofed shop
-  interiors, the counter fronts) derives its customer cell (the
-  heading push along the facing direction, then the ring scan that
-  prefers the facing sector) and the pass pins it only when the grid
-  route ends exactly on the cell with the line of sight of every leg.
+  interiors, the counter fronts) derives its customer cell: the
+  heading push 64 units along the facing direction, then the ring
+  scan over the 48..240 radius bands (16 units per band) that tries
+  the 60 degree facing sector first and then every direction,
+  keeping the candidate with the most verified ways. The derivation
+  keeps a stand within 250 units of the spawn and within 96 units of
+  its z (a roof deck or the flat zero layer is a foreign floor the
+  interaction distance can never serve), and the route verification
+  starts from a probed neighborhood cell 200 or 400 units out whose
+  height sits within 96 units of the spawn; two independent starting
+  directions is the cap - one proves the walk, the second only names
+  the redundant side. The pass pins a cell only when the grid route
+  ends exactly on it with the line of sight of every leg.
   The pass verified 58 spawn served (the five Talking Island traders
   sit in the flat placeholder regions of the pack - no geometry to
   derive from, the spawn fallback serves), 27 derived stands

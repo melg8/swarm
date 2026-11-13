@@ -703,6 +703,22 @@ corner probe is a length, not a leg at all.
   lint:new`. `click_validate.go` fell from 23.5 to 18.3 percent (59
   comment lines), no block above 8 lines.
 
+### 2026-11-12 - cmd/counterprobe/world.go keeps the derivation rules
+
+- 17 blocks compress: the 24 line world derivation header, the curated
+  stand map, the scan radii, the region cache, the flat region table,
+  the stand struct, the verifier header and its two gates, the segment
+  check, the derivation entry and its three stages, the candidate
+  resolver, the run loop header, the report routing and the merchant
+  row. The `docs/hunting.md` world stand round bullet now carries the
+  concrete rules: the 64 unit heading push, the 48..240 ring bands in
+  16 unit steps, the 60 degree facing sector first, the 250 unit
+  distance and 96 unit z gates, the 200/400 unit neighborhood starts
+  and the two way cap.
+- Verified: `task fmt`, `go build ./...`, `go vet
+  ./cmd/counterprobe/`, `task lint:new`. `world.go` fell from 21.5 to
+  14.8 percent (61 comment lines of 412), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -723,8 +739,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/stagnation.go`, `hunt/quest_walker.go`, `hunt/click_frame.go`,
 `hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go`,
 `gear/shopping_candidates.go`, `hunt/town_segment.go`,
-`acceptance/plaza_herbiel.go` and `pathfind/click_validate.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
-`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
-their fragments are active); the share and the block count are
-re-measured at the end.
+`acceptance/plaza_herbiel.go`, `pathfind/click_validate.go` and
+`cmd/counterprobe/world.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the `proxy/game.go` and
+`hunt/loop_state.go` entries stay untouched while their fragments are
+active); the share and the block count are re-measured at the end.

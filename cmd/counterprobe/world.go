@@ -13,35 +13,17 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
-// The world stand derivation. The counter round pinned the customer
-// stands of the eight elven and Dion counter traders by hand; the
-// world carries ninety three merchant spawns (the generated
-// npcdata.merchantSpawns table). This pass derives and verifies an
-// approach point for every one of them on the grid engine (the world
-// wide geodata authority - the mesh pack tiles only a few regions):
-//
-//   - The spawn cell is probed first: a spawn the pack can serve (a
-//     floor layer at the spawn height AND a verified route onto it)
-//     needs no table row - the spawn fallback of merchantStandPoint
-//     already answers it.
-//   - Every other spawn (the roofed stall interiors, the disconnected
-//     decks) derives its customer cell: the heading push first (the
-//     counter sits on the facing side of the merchant, one cell band
-//     beyond it), then the ring scan around the spawn - the candidates
-//     along the facing heading win, the closest radius wins among
-//     them. A candidate is table ready only when the pack holds a
-//     floor at it, the grid route from a probed walkable neighborhood
-//     start ends exactly on it and every route leg holds the grid
-//     line of sight (the same bar the counter round pinned).
-//
-// The emit mode prints the verified rows as the Go map source of the
-// hunt package (the curated counter round rows stay out - the curated
-// table keeps owning them and this pass cross-checks them instead).
+// The world stand derivation: the counter round pinned the eight counter
+// trader stands by hand, the world pass derives an approach point for every
+// one of the 93 merchant spawns on the grid engine (the world wide geodata
+// authority). The spawn cell serves when the pack holds a floor at the spawn
+// height and a verified route onto it; otherwise the heading push and the
+// ring scan derive the customer cell and the pass pins it only when the grid
+// route ends exactly on the cell with the line of sight of every leg
+// (docs/hunting.md). The emit mode prints the rows as the hunt map source.
 
-// curatedStands are the hand verified customer stands of the counter
-// round (the merchantStands rows of internal/swarm/hunt/town.go): the
-// world pass cross-checks them with the grid verifier and the emit
-// leaves them to the curated table.
+// curatedStands are the hand verified counter round stands (town.go): the
+// world pass cross-checks them and the emit leaves them to the curated table.
 var curatedStands = map[int32]pathfind.Vec3{
     7147: {X: 44584, Y: 46944, Z: -2984},
     7148: {X: 44584, Y: 46952, Z: -2984},
@@ -53,29 +35,24 @@ var curatedStands = map[int32]pathfind.Vec3{
     7063: {X: 19224, Y: 146168, Z: -3064},
 }
 
-// worldScanRadii is the ring scan order of the stand derivation: the
-// heading push (64 units) rides first, the scan then walks outward
-// one cell band per step up to the interaction distance bound.
+// worldScanRadii is the ring scan order: the heading push (64 units) rides
+// first, then one cell band per step up to the interaction distance bound.
 var worldScanRadii = []float64{48, 64, 80, 96, 112, 128, 144, 160,
     176, 192, 208, 224, 240}
 
-// worldRegionCache lazily parses the geodata regions the world pass
-// touches (one file per 32768 x 32768 square, shared across queries).
+// worldRegionCache lazily parses the touched geodata regions, one file per
+// 32768 x 32768 square, shared across queries.
 var worldRegionCache = map[string]*pathfind.Region{}
 
-// worldFlatRegions records the flat placeholder regions of the pack
-// (the 196608 byte files: every cell is the flat zero z layer, the
-// pack models no geometry there). The five Talking Island traders sit
-// in such a region: no customer cell can be derived from the pack,
-// the spawn fallback serves them and the pass says so.
+// worldFlatRegions records the flat placeholder regions of the pack (the
+// 196608 byte files, every cell the flat zero layer): no geometry to derive
+// from, the five Talking Island traders take the spawn fallback.
 var worldFlatRegions = map[string]bool{}
 
-// flatRegionBytes is the size of the flat placeholder region file
-// (256 x 256 cells of the 3 byte flat zero layer).
+// flatRegionBytes is the size of a flat placeholder region file.
 const flatRegionBytes = 196608
 
-// worldGeodata is the geodata directory of the running world pass
-// (the region loader rides it).
+// worldGeodata is the geodata directory of the running world pass.
 var worldGeodata string
 
 // worldRegionOf resolves (and caches) the region of a world position.
@@ -120,34 +97,28 @@ type worldStand struct {
     id      int32
     name    string
     x, y, z float64
-    // from is the derivation source ("spawn", "heading push",
-    // "ring 96 SW") and ways counts the verified neighborhood
-    // directions that route onto the cell.
+    // from names the derivation source ("spawn", "heading push",
+    // "ring 96 SW"); ways counts the verified neighborhood directions.
     from string
     ways int
 }
 
-// verifyWorldStand routes the walk from the probed neighborhood
-// starts to the candidate stand over the grid engine and verifies
-// every route leg with the grid line of sight. It returns the number
-// of the compass directions that verified (the independent approach
-// sides the cell serves), bounded at two - one proves the walk, the
-// second one only names the redundant side. The cheap line of sight
-// pre-gates every start: a failed exact search exhausts its whole
-// connected component (the Herbiel freeze class the
-// exactSegmentMaxDistance gate of the trip machinery bounds for the
-// same reason), so the routes only run for a start that sees the
-// stand.
+// verifyWorldStand routes the walk from the probed neighborhood starts to
+// the candidate stand and checks every leg with the grid line of sight,
+// answering the number of compass directions that verified, bounded at two -
+// one proves the walk, the second names the redundant side. The cheap line of
+// sight pre-gates every start: a failed exact search exhausts its whole
+// connected component (the Herbiel freeze class the trip
+// exactSegmentMaxDistance gate bounds for the same reason).
 func verifyWorldStand(
     engine *pathfind.Engine, m merchant, x, y, z float64,
 ) int {
     if math.Hypot(x-m.x, y-m.y) > 250 {
         return 0
     }
-    // The stand must sit on the merchant's own floor scale: a pack
-    // deck hundreds above or below the spawn (a roof, the flat
-    // placeholder zero layer) is a foreign deck the interaction
-    // distance can never serve.
+    // The stand must sit on the merchant's own floor scale: a deck hundreds
+    // of units away (a roof, the flat zero layer) is a foreign deck the
+    // interaction distance can never serve.
     if math.Abs(z-m.z) > 96 {
         return 0
     }
@@ -194,9 +165,9 @@ func verifyWorldStand(
     return ways
 }
 
-// worldSegmentsVerified checks the grid line of sight of every route leg
-// (the mesh link truth the grid walls off is the frozen corridor
-// class - the stand entry serves only a walk the grid walks too).
+// worldSegmentsVerified checks the grid line of sight of every route leg: the
+// stand entry serves only a walk the grid walks too (the mesh link truth the
+// grid walls off is the frozen corridor class).
 func worldSegmentsVerified(
     engine *pathfind.Engine, result *pathfind.Result,
 ) bool {
@@ -216,16 +187,14 @@ func worldSegmentsVerified(
     return true
 }
 
-// deriveWorldStand picks the customer cell of one merchant spawn: the
-// spawn cell when the pack serves it, otherwise the verified push or
-// ring candidate.
+// deriveWorldStand picks the customer cell of one merchant spawn: the spawn
+// cell when the pack serves it, otherwise the verified push or ring candidate.
 func deriveWorldStand(
     engine *pathfind.Engine, m merchant,
 ) (worldStand, bool) {
     refZ := int16(m.z)
-    // The flat placeholder regions (the pack models no geometry
-    // there): no customer cell can be derived from a flat plane, the
-    // spawn fallback serves the trader and the pass reports it.
+    // A flat plane carries no customer cell: the spawn fallback serves the
+    // trader and the pass reports it.
     region := worldRegionOf(m.x, m.y)
     if region != nil &&
         worldFlatRegions[regionPath(worldGeodata, m.x, m.y)] {
@@ -249,8 +218,8 @@ func deriveWorldStand(
             }
         }
     }
-    // The heading push: the counter sits on the facing side of the
-    // merchant, the customer cell one band beyond it.
+    // The heading push: the counter sits on the facing side of the merchant,
+    // the customer cell one band beyond it.
     angle := m.heading / 65536 * 2 * math.Pi
     px := m.x + 64*math.Cos(angle)
     py := m.y + 64*math.Sin(angle)
@@ -258,10 +227,9 @@ func deriveWorldStand(
         "heading push"); ok {
         return stand, true
     }
-    // The ring scan, two stages: the candidates along the facing
-    // heading first (the counter front), then every direction - the
-    // interior shops whose heading sector holds only roof decks still
-    // find the customer floor by the counter side or the entrance.
+    // The ring scan, two stages: the facing sector first (the counter
+    // front), then every direction - the interior shops whose heading sector
+    // holds only roof decks still find the floor by the counter side.
     for _, sectorOnly := range []bool{true, false} {
         for _, radius := range worldScanRadii {
             best := worldStand{
@@ -293,8 +261,8 @@ func deriveWorldStand(
     }, false
 }
 
-// verifyWorldCandidate resolves the pack floor of one candidate cell
-// and runs the route verification on it.
+// verifyWorldCandidate resolves the pack floor of one candidate cell and runs
+// the route verification on it.
 func verifyWorldCandidate(
     engine *pathfind.Engine, m merchant, x, y float64, from string,
 ) (worldStand, bool) {
@@ -324,11 +292,10 @@ func verifyWorldCandidate(
     }, true
 }
 
-// runWorld derives and verifies the approach point of every world
-// merchant spawn (npcdata.MerchantTemplateIDs in the sorted order),
-// cross-checks the curated counter round rows and prints the verdict
-// table; with emit the verified non curated rows print as the Go map
-// source of the hunt package world table.
+// runWorld derives and verifies the approach point of every world merchant
+// spawn (npcdata.MerchantTemplateIDs order), cross-checks the curated rows and
+// prints the verdict table; with emit the verified non curated rows print as
+// the Go map source of the hunt package world table.
 func runWorld(geodata string, emit bool) {
     worldGeodata = geodata
     engine := pathfind.NewEngine(geodata)
@@ -405,9 +372,8 @@ func runWorld(geodata string, emit bool) {
         npcdata.MerchantSpawnCount())
 }
 
-// worldReportf prints the per merchant verdict line to stdout (the
-// report mode); the emit mode routes it to stderr so the stdout
-// redirect captures the clean Go source only.
+// worldReportf prints the per merchant verdict line to stdout; the emit mode
+// routes it to stderr so the redirect captures the clean Go source only.
 func worldReportf(emit bool, format string, args ...any) {
     if emit {
         fmt.Fprintf(os.Stderr, format, args...)
@@ -426,8 +392,7 @@ func worldVerdict(ways int) string {
     return "NOT VERIFIED"
 }
 
-// worldMerchantRow builds the probe merchant of one npcdata spawn row
-// (the id rides the shared merchant shape for the world pass).
+// worldMerchantRow builds the probe merchant of one npcdata spawn row.
 func worldMerchantRow(id int32) (merchant, bool) {
     spawn, ok := npcdata.MerchantSpawnOf(id)
     if !ok {
