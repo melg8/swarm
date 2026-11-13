@@ -2151,6 +2151,23 @@ corner probe is a length, not a leg at all.
   (10.7 s), `golangci-lint run ./internal/swarm/connection/...`
   0 issues.
 
+### 2026-11-13 - connection/game_move.go keeps the validation stream facts
+
+- 7 blocks compress: the file keeps the server half of the session view
+  the `ValidatePosition` stream builds (the clientZ of the z adoption
+  gate with its `< 800` branch, the door logout position and the
+  heading), the exact placement rule (the report carries what the server
+  broadcast), the cursor key arm (the origin adopted within the thousand
+  unit window and the latched flag), the click-refusing cell that only
+  the claimed stream walks off, the echo gate of `claimsOwnStream`, the
+  mouse-mode walk that clears it and the missing ground item click
+  handler of this build. The round dumps and the retold server code drop;
+  `docs/protocol_description.md` and the cursor key escape section of
+  `docs/hunting.md` carry the detail. 67 comment lines of 181 become 41
+  of 156, no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the connection suite (10.7 s),
+  `golangci-lint run ./internal/swarm/connection/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

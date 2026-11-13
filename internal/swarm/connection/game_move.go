@@ -12,12 +12,10 @@ import (
     togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
 )
 
-// positionValidation is the send state of the client position
-// validation loop: the placement of the last report and its moment,
-// so the ticker sends only what the official client sends - a
-// validation whenever the observed placement changed (the movement
-// rate) and a sparse heartbeat while the character stands still (see
-// validatePositionIdleGap).
+// positionValidation is the send state of the client position validation:
+// the placement of the last report and its moment, so the ticker answers a
+// changed placement and a sparse heartbeat while the character stands still
+// (see validatePositionIdleGap).
 type positionValidation struct {
     x, y, z  int32
     heading  int32
@@ -25,31 +23,21 @@ type positionValidation struct {
     at       time.Time
 }
 
-// validatePosition sends the client position validation of the
-// official client (ValidatePosition 0x48) when the observed placement
-// of the character changed since the last report, or when the idle
-// heartbeat elapsed while the character stood still. The official
-// client streams this packet from its own movement simulation and the
-// server builds half of its session view from it: the clientZ the z
-// adoption gate reads, the last server position the door logout
-// exploit check compares, the client heading. A bot that never
-// validates leaves that view frozen at its defaults - the C1
-// clientZ adoption branch (Math.abs(_z - player.getClientZ()) < 800)
-// can never run for a session whose client z the server still reads
-// as zero - and every deployment whose movement validation expects
-// the client liveness signal answers the silence its own way. The
-// report carries exactly the tracker placement the server itself
-// broadcast: nothing is claimed the server did not say.
+// validatePosition sends the client position validation of the official
+// client (ValidatePosition 0x48) when the observed placement changed or the
+// idle heartbeat elapsed. The server builds half of its session view from
+// this stream (the clientZ of the z adoption gate, the last position of the
+// door logout check, the heading), and a silent session leaves that view at
+// its defaults - the C1 adoption branch Math.abs(_z - player.getClientZ()) <
+// 800 needs a live client z. The report carries exactly the placement the
+// server itself broadcast (docs/protocol_description.md).
 func (gc *GameClient) validatePosition(validation *positionValidation) error {
     if gc.tracker == nil {
         return nil
     }
-    // The cursor key claims own the stream while the escape runs:
-    // the echo of the broadcast position would lag the claims by one
-    // broadcast and snap the character back a step each tick while
-    // the server's cursor key flag holds (the claimed placements
-    // move the character unconditionally, see
-    // ClaimValidatePosition).
+    // The cursor key claims own the stream while the escape runs: the echo
+    // of the broadcast position would lag them by one broadcast and snap
+    // the character back a step each tick (see ClaimValidatePosition).
     if gc.claimsOwnStream.Load() {
         return nil
     }
@@ -81,21 +69,18 @@ func (gc *GameClient) validatePosition(validation *positionValidation) error {
     return nil
 }
 
-// WalkTo makes the character walk to a world point, exactly like a
-// ground click of the official client (client MoveToLocation 0x01 in
-// mouse mode). The hunt loop uses it to run toward a drop: this build of
-// the Mobius C1 server has no click handler for ground items, so the
-// character would otherwise never move toward the loot by itself.
+// WalkTo makes the character walk to a world point like a ground click of
+// the official client (MoveToLocation 0x01 in mouse mode); this build of
+// the Mobius C1 server has no click handler for ground items, so a drop
+// never moves the character by itself.
 func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
     selfX, selfY, selfZ, ok := gc.tracker.SelfPosition()
     if !ok {
         return errors.New("failed to walk: own position is unknown")
     }
-    // The mouse click returns the session to the mouse movement
-    // mode: the server clears the cursor key flag the cursor key
-    // escape armed (MoveToLocation.runImpl), so the echo ticker of
-    // the client position validation owns the stream again (see
-    // claimsOwnStream).
+    // The mouse click returns the session to the mouse movement mode: the
+    // server clears the cursor key flag the escape armed
+    // (MoveToLocation.runImpl), so the echo ticker owns the stream again.
     gc.claimsOwnStream.Store(false)
     request := togameserver.NewMoveToLocationRequestPacket()
     request.TargetX = x
@@ -112,20 +97,14 @@ func (gc *GameClient) WalkTo(x int32, y int32, z int32) error {
     return nil
 }
 
-// CursorKeyWalkTo sends the keyboard-mode move request (MoveToLocation
-// 0x01 in cursor key mode, the arrow keys of the official client): the
-// server arms the cursor key movement of the session - the packet's
-// origin is adopted within the thousand unit window and the cursor key
-// flag latches - and every ValidatePosition the session streams
-// afterwards moves the character server-side without any click
-// validation (ValidatePosition.runImpl syncs the claimed placement
-// into the world and broadcasts it). The ground a click-refusing cell
-// owns answers no mouse click at all; the cursor key stream is the
-// movement that still walks it off (the 2026-09-14 15:10 report: even
-// the official client stood frozen on the village plaza cell until
-// the player walked the arrows). The hunt loop arms it only for the
-// cursor key escape of a click-refusing stuck (see
-// hunt.Loop.beginCursorKeyEscape).
+// CursorKeyWalkTo sends the keyboard-mode move request (MoveToLocation 0x01
+// in cursor key mode, the arrow keys of the official client): the server
+// arms the cursor key movement of the session (the origin is adopted within
+// the thousand unit window, the flag latches) and every later
+// ValidatePosition moves the character without any click validation. A
+// click-refusing cell answers no mouse click at all, so this stream is the
+// movement that still walks it off; the hunt loop arms it only for the
+// cursor key escape (hunt.Loop.beginCursorKeyEscape, docs/hunting.md).
 func (gc *GameClient) CursorKeyWalkTo(
     x int32, y int32, z int32,
 ) error {
@@ -150,19 +129,14 @@ func (gc *GameClient) CursorKeyWalkTo(
     return nil
 }
 
-// ClaimValidatePosition reports a CLAIMED client position of the
-// character (ValidatePosition 0x48): while the server's cursor key
-// movement is armed, the claimed placement is synced straight into
-// the world and broadcast (ValidatePosition.runImpl - the cursor key
-// branch), so the claims walk the character without any click
-// validation. This is the packet stream the official client drives
-// from its own movement simulation while the player walks with the
-// arrows - the arrow walk being the only movement a click-refusing
-// cell answers (the 2026-09-14 15:10 report). The claims gate the
-// echo ticker (see claimsOwnStream): the echo of the broadcast
-// position would otherwise lag the claims by one broadcast and snap
-// the character back a step each tick while the cursor key flag
-// holds. The first mouse-mode walk clears the gate (see WalkTo).
+// ClaimValidatePosition reports a claimed client position
+// (ValidatePosition 0x48): while the cursor key movement is armed the server
+// syncs the claimed placement straight into the world and broadcasts it, so
+// the claims walk the character without any click validation
+// (ValidatePosition.runImpl, the cursor key branch). The claims gate the
+// echo ticker: the echo of the broadcast position would lag them by one
+// broadcast and snap the character back a step each tick. The first
+// mouse-mode walk clears the gate (see WalkTo).
 func (gc *GameClient) ClaimValidatePosition(
     x int32, y int32, z int32, heading int32,
 ) error {
