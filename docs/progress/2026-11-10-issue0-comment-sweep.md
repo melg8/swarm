@@ -1389,6 +1389,19 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the navbuild suite (31.1 s),
   `golangci-lint run ./internal/swarm/pathfind/navbuild/...` 0 issues.
 
+### 2026-11-13 - webserver/navmesh_original.go keeps the encoder facts
+
+- 6 blocks compress: the original variant keeps the straight raw l2j
+  rendering (no sheet decomposition, smoothing or vertex field), the per
+  cell flat quad staircase with the height step walls closing the cracks,
+  the exact height merge with the 390k rectangles over 4.4M walkable
+  layers of 21_19, the east and north neighbor resolution, the bitset
+  reuse rule, the 2048 cell border strip and the ETag cache of the parsed
+  region. The owner quote and the "roof sheets" report story drop.
+  91 comment lines of 522 become 73 of 504.
+- Verified: `task fmt`, `go build ./...`, the webserver suite (8.2 s),
+  `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

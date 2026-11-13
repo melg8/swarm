@@ -16,24 +16,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// The original geometry encoder of the navmesh viewer (the comparison
-// variant the owner asked for): the NMV2 payload rendered straight
-// from the raw l2j geodata cells, no sheet decomposition, no rectangle
-// smoothing, no vertex field - the terrain exactly as the server sees
-// it. Every cell layer with at least one open wall direction renders
-// as its own flat quad at the exact layer height; adjacent cells of a
-// slope disagree at the shared edge and the same height step walls of
-// the mesh payload close the crack - the honest per cell staircase
-// that started the "roof sheets" report. The link portal block stays
-// empty: passability lives in the cell walls themselves, the viewer
-// draws it through the step geometry, not through the overlay.
-//
-// The only compression is the exact height merge: neighboring cells
-// of the SAME layer height merge into maximal rectangles, which
-// renders pixel identical to the per cell quads while keeping the
-// payload at the mesh tile scale (21_19: 390k rectangles over 4.4M
-// walkable layers). Anything else - heights, steps, layers, water -
-// stays untouched.
+// The original geometry encoder of the navmesh viewer (the comparison variant):
+// the NMV2 payload rendered straight from the raw l2j geodata cells, with no
+// sheet decomposition, rectangle smoothing or vertex field - the terrain
+// exactly as the server sees it. Every cell layer with at least one open wall
+// direction renders as its own flat quad at the exact layer height; adjacent
+// slope cells disagree at the shared edge and the height step walls close the
+// crack. The only compression is the exact height merge (21_19: 390k rectangles
+// over 4.4M walkable layers); the link portal block stays empty.
 
 // origWaterLevel is the C1 water surface (navbuild waterLevel): the
 // layers below it are the swim areas, rendered with the water ramp.
@@ -129,13 +119,11 @@ func origHas(bitset []uint64, cell int32) bool {
     return bitset[cell>>6]&(1<<uint(cell&63)) != 0
 }
 
-// origRectsOfHeight greedily merges one height's cell run into
-// maximal rectangles: the run's cells seed the bitset, every still
-// set cell starts a rectangle that extends along y while the cells
-// hold and then along x while whole rows hold, and clears its cells.
-// The bitset scratch stays dirty only with the current run's cells
-// (every emitted rect clears itself), so the caller reuses it across
-// runs.
+// origRectsOfHeight greedily merges one height's cell run into maximal
+// rectangles: every still set cell seeds one that extends along y while the
+// cells hold and along x while whole rows hold, then clears its cells. The
+// bitset scratch stays dirty only with the current run's cells, so the caller
+// reuses it.
 func origRectsOfHeight(run []origCell, bitset []uint64) []origPoly {
     height := run[0].height
     area := navmesh.AreaGround
@@ -186,13 +174,11 @@ func origRectsOfHeight(run []origCell, bitset []uint64) []origPoly {
     return polys
 }
 
-// encodeOriginalGeometry renders one region into the binary NMV2
-// payload the viewer draws for the original variant: the exact height
-// surface quads, no link portals and the height step walls that close
-// the cracks between the neighboring cells. The east and north region
-// borders resolve their targets through the neighbor regions (the
-// loader answers nil for a region that does not exist - the seam
-// stays open and merges with the void of the unloaded tile).
+// encodeOriginalGeometry renders one region into the binary NMV2 payload of the
+// original variant: the exact height surface quads without link portals plus
+// the height step walls that close the cracks between neighboring cells. The
+// east and north borders resolve through the neighbor regions (a missing one
+// answers nil, so the seam stays open).
 func encodeOriginalGeometry(key navmesh.RegionKey,
     region *pathfind.Region,
     neighbor func(navmesh.RegionKey) *pathfind.Region,
@@ -280,13 +266,12 @@ func origHeightRange(polys []origPoly) (int16, int16) {
     return minH, maxH
 }
 
-// encodeOriginalWalls renders the height step wall block of the
-// original geometry. The emission follows the mesh payload rules: the
-// walls leave through the MaxX and MaxY sides of the emitting
-// rectangle, every shared edge is walled exactly once, the subpixel
-// steps stay open and the over cap steps (the open air between two
-// separate worlds - the deck over the lake) stay void. The region
-// borders resolve through the east and north neighbor regions.
+// encodeOriginalWalls renders the height step wall block. The emission follows
+// the mesh payload rules: the walls leave through the MaxX and MaxY sides of
+// the emitting rectangle, every shared edge is walled exactly once, the
+// subpixel steps stay open and the over cap steps (the open air between two
+// separate worlds, the deck over the lake) stay void. The region borders
+// resolve through the east and north neighbor regions.
 func encodeOriginalWalls(key navmesh.RegionKey, polys []origPoly,
     neighbor func(navmesh.RegionKey) *pathfind.Region,
 ) []byte {
@@ -336,12 +321,10 @@ func encodeOriginalWalls(key navmesh.RegionKey, polys []origPoly,
     return writer
 }
 
-// origBorderStrip renders the border facing cell strip of one region
-// as one cell wide rectangles: the exact surface profile the region
-// border walls close onto (the east neighbor faces through its x 0
-// column, the north one through its y 0 row). The strip walk touches
-// 2048 cells - a fraction of the full region pass the emitter side
-// already paid.
+// origBorderStrip renders the border facing cell strip of one region as one
+// cell wide rectangles: the surface profile the border walls close onto (the
+// east neighbor faces through its x 0 column, the north one through its y 0
+// row). The walk touches 2048 cells, a fraction of the full region pass.
 func origBorderStrip(region *pathfind.Region, north bool) []*origPoly {
     buf := make([]pathfind.Layer, 0, origLayerStackBufSize)
     heights := map[int16][]int32{}
@@ -468,10 +451,9 @@ func loadGeodataRegion(dir string, key navmesh.RegionKey,
         Col: key.Col, Row: key.Row})
 }
 
-// navmeshOriginalGeometry returns the cached binary original payload
-// of one region together with its ETag. The first request pays the
-// region parse and the exact height merge (seconds for a real
-// region); every later request serves the cached bytes.
+// navmeshOriginalGeometry returns the cached binary original payload of one
+// region with its ETag. The first request pays the region parse and the height
+// merge (seconds for a real region), every later one serves the cached bytes.
 func (s *Server) navmeshOriginalGeometry(key navmesh.RegionKey,
 ) ([]byte, string, error) {
     s.navmeshGeoMu.Lock()
