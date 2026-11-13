@@ -11,10 +11,10 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
-// waypointDistanceAnchored measures the character to waypoint distance
-// with the waypoint height anchored into the server frame
-// (click_frame.go): the vintage shift explains only the pack
-// disagreement, a whole deck below still measures its true gap.
+// waypointDistanceAnchored measures the character to waypoint distance with the
+// waypoint height anchored into the server frame (click_frame.go): the vintage
+// shift explains only the pack disagreement, a whole deck below still measures
+// its gap.
 func waypointDistanceAnchored(
     wp pathfind.Vec3, selfX, selfY, selfZ int32, frameOffset float64,
 ) float64 {
@@ -25,10 +25,10 @@ func waypointDistanceAnchored(
     return math.Sqrt(dx*dx + dy*dy + dz*dz)
 }
 
-// waypointArrived reports whether the follower counts the waypoint as
-// reached: the 50 unit pass radius for the intermediate turns (a wide
-// radius cuts corners into railings), the final arrival radius of the
-// segment for the last one, both anchored into the server frame.
+// waypointArrived reports whether the follower reached the waypoint: the 50
+// unit pass radius for the intermediate turns (a wide radius cuts corners into
+// railings), the segment arrival radius for the last one, both anchored into
+// the server frame.
 func waypointArrived(
     waypoints []pathfind.Vec3, index int, selfX, selfY, selfZ int32,
     frameOffset, finalArrive float64,
@@ -42,10 +42,9 @@ func waypointArrived(
         selfZ, frameOffset) <= radius
 }
 
-// finalArriveRadius answers the arrival radius of the final waypoint:
-// the tight pass radius for the exact segments (the merchant customer
-// spot) and the close npc ring segments (the teacher hall rows), the
-// wide trip slack otherwise.
+// finalArriveRadius answers the arrival radius of the final waypoint: the tight
+// pass radius for the exact segments (the merchant customer spot) and the close
+// npc ring segments, the wide trip slack otherwise.
 func (l *Loop) finalArriveRadius() float64 {
     if l.segmentSearch != nil && l.segmentSearch.Approach == 0 {
         return waypointPassDist
@@ -57,10 +56,10 @@ func (l *Loop) finalArriveRadius() float64 {
     return waypointArriveDist
 }
 
-// waypointPassed reports whether the character moved past the waypoint
-// along the route: the projection beyond it and inside the 100 unit
-// corridor. A raw "next waypoint is closer" test skipped bridge entries
-// through the railing; the planar test never passes a vertical drop.
+// waypointPassed reports whether the character moved past the waypoint along
+// the route: the projection beyond it inside the 100 unit corridor. A raw "next
+// waypoint is closer" test skipped bridge entries through the railing; the
+// planar test never passes a drop.
 func waypointPassed(
     wp, next pathfind.Vec3, selfX, selfY int32,
 ) bool {
@@ -83,11 +82,10 @@ func waypointPassed(
     return lateral <= waypointCorridor
 }
 
-// waypointPassedAlongRoute reports whether the character already rides
-// the route at or beyond the aimed waypoint: past it on its own segment
-// or inside the corridor of ANY later segment, so a pinned cursor never
-// walks a covered bend back. A character inside the arrival radius
-// never counts - the caller gates on it.
+// waypointPassedAlongRoute reports whether the character already rides the
+// route at or beyond the aimed waypoint: past it on its own segment or inside
+// the corridor of any later segment, so a pinned cursor never walks a covered
+// bend back.
 func waypointPassedAlongRoute(
     waypoints []pathfind.Vec3, index int, selfX, selfY int32,
 ) bool {
@@ -111,9 +109,8 @@ func waypointPassedAlongRoute(
             continue
         }
         if j > index || along <= segLen {
-            // On a later segment (any point of it lies past the
-            // aimed waypoint along the walk) or past the aimed
-            // waypoint on its own segment.
+            // On a later segment (any of its points lies past the aimed
+            // waypoint) or past it on the own segment.
             return true
         }
     }
@@ -121,19 +118,18 @@ func waypointPassedAlongRoute(
     return false
 }
 
-// walkTownWaypoints follows the planned waypoints with ground clicks
-// and reports the final arrival. Long segments split at the move limit,
-// a waypoint passed ON THE ROUTE skips (walking back would loop), and a
-// standing walk re-paths within the trip budget. The plan prices the
-// water, so the wet segments walk like the dry ones.
+// walkTownWaypoints follows the planned waypoints with ground clicks and
+// reports the final arrival. Long segments split at the move limit, a waypoint
+// passed ON THE ROUTE skips (walking back would loop), and a standing walk
+// re-paths within the trip budget; the plan prices the water, so wet segments
+// walk like dry ones.
 func (l *Loop) walkTownWaypoints() bool {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
         return false
     }
-    // The cursor key escape owns the segment while it runs: the claim
-    // ladder drives the character (the escape arms from the follower
-    // recovery too - the refusing pocket branch of stuckTownWalk),
+    // The cursor key escape owns the segment while it runs (it arms from the
+    // follower recovery too, the refusing pocket branch of stuckTownWalk), so
     // the click machinery stays down until the escape ends.
     if l.cursorEscape.armed {
         l.driveCursorKeyEscape(l.now(), selfX, selfY)
@@ -144,10 +140,10 @@ func (l *Loop) walkTownWaypoints() bool {
     return l.followWaypoints(selfX, selfY, selfZ, l.now())
 }
 
-// advanceWaypoints walks the cursor forward: a waypoint counts as
-// passed when reached or bypassed along the route AND the line from the
-// standing cell to the successor is walkable. A gated waypoint stays
-// the target until walking onto it re-opens the line.
+// advanceWaypoints walks the cursor forward: a waypoint counts as passed when
+// reached or bypassed along the route and the line to the successor is
+// walkable. A gated waypoint stays the target until walking onto it re-opens
+// the line.
 func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
     next, moved := advanceWalkCursor(l.waypoints, l.wpIndex,
         selfX, selfY, selfZ, l.segmentFrameOffset, l.finalArriveRadius(),
@@ -161,8 +157,8 @@ func (l *Loop) advanceWaypoints(selfX, selfY, selfZ int32) {
 }
 
 // followWaypoints is the shared follower core: the arrival radii, the
-// passed-waypoint skip, the stuck tracking and the click pace. The
-// re-plan ladder owns the off-plan swims instead of a click guard.
+// passed-waypoint skip, the stuck tracking and the click pace. The re-plan
+// ladder owns the off-plan swims instead of a click guard.
 func (l *Loop) followWaypoints(
     selfX, selfY, selfZ int32, now time.Time,
 ) bool {
@@ -170,18 +166,18 @@ func (l *Loop) followWaypoints(
     if l.wpIndex >= len(l.waypoints) {
         return true
     }
-    // The move start watchdog: a click whose movement never started
-    // forces the stuck verdict below - the recovery ladder runs at
-    // once instead of standing out the full window on a dead click.
+    // The move start watchdog: a click whose movement never started forces the
+    // stuck verdict below, so the ladder runs at once instead of standing out
+    // the window.
     if l.noteMoveStart(now, selfX, selfY) {
         l.forceStuck = true
     }
     if l.walkStuck(now, selfX, selfY) {
         return false
     }
-    // The stuck handling may have re-planned the segment: re-run the
-    // cursor advance so the click aims the fresh plan's first real
-    // waypoint, never the self-click of its wp 0.
+    // The stuck handling may have re-planned the segment: the second advance
+    // aims the fresh plan's first real waypoint, never the self click of its wp
+    // 0.
     if l.cursorEscape.armed {
         return false
     }
@@ -189,18 +185,17 @@ func (l *Loop) followWaypoints(
     if l.wpIndex >= len(l.waypoints) {
         return true
     }
-    // The corner pre-click replaces the destination just before the
-    // character reaches the current one (see flowPreClick): the
-    // server keeps the move running instead of stopping the character
-    // on the arrival of a dense route point.
+    // The corner pre-click replaces the destination just before the character
+    // reaches the current one (flowPreClick), so the server keeps the move
+    // running instead of stopping on a dense route point.
     if l.flowPreClick(selfX, selfY, selfZ, now) {
         return false
     }
     if !l.moveAt.IsZero() && now.Sub(l.moveAt) < walkRequestPeriod {
         return false
     }
-    // The goal span of the click: the farthest waypoint the server
-    // delivers inside the aim window (flowAdvance).
+    // The goal span: the farthest waypoint the server delivers inside the aim
+    // window.
     l.wpIndex = l.flowAdvance(l.waypoints, l.wpIndex,
         l.segmentFrameOffset, selfX, selfY, selfZ)
     l.clickWaypoint(selfX, selfY, selfZ, now)
@@ -208,10 +203,10 @@ func (l *Loop) followWaypoints(
     return false
 }
 
-// waypointPassedBehind reports whether the aimed waypoint sits behind
-// the character along the route, so a click onto it walks backward. A
-// character inside the arrival radius never counts - the pull back is
-// the re-approach the ramp corner needs.
+// waypointPassedBehind reports whether the aimed waypoint sits behind the
+// character along the route, so a click onto it walks backward. A character
+// inside the arrival radius never counts: the pull back is the re-approach the
+// ramp corner needs.
 func (l *Loop) waypointPassedBehind(
     wp pathfind.Vec3, selfX, selfY, selfZ int32,
 ) bool {
@@ -225,29 +220,28 @@ func (l *Loop) waypointPassedBehind(
         selfX, selfY)
 }
 
-// clickWaypoint aims the current waypoint, bends the click around the
-// idle aggressive camps, guards the line against the server refusal and
-// sends it: the hold verdicts, the camp skip, the aggro steering and
-// the validation, in that order.
+// clickWaypoint aims the current waypoint, bends the click around the idle
+// aggressive camps, guards the line against the server refusal and sends it:
+// the hold verdicts, the camp skip, the aggro steering and the validation, in
+// that order.
 func (l *Loop) clickWaypoint(
     selfX, selfY, selfZ int32, now time.Time,
 ) {
     wp := l.waypoints[l.wpIndex]
     moveX, moveY, moveZ, dist := l.anchorWaypointClick(
         selfX, selfY, selfZ, wp)
-    // The backward walk guard: an aimed waypoint the character already
-    // moved past along the route would walk it back off the ground the
-    // route samples just covered.
+    // The backward walk guard: a waypoint the character already moved past
+    // would walk it back off the ground the route samples just covered.
     passedBehind := l.waypointPassedBehind(wp, selfX, selfY, selfZ)
     moveX, moveY, moveZ, send := l.resolveClickExtension(
         selfX, selfY, selfZ, dist, passedBehind, moveX, moveY, moveZ)
     if !send {
         return
     }
-    // A waypoint inside an idle mob's trigger circle cannot be reached
-    // by any tangent arc (the side flips at every re-issue), so it skips
-    // onto a clear successor. The verdict reads the WAYPOINT, never the
-    // clipped click target, and the successor must be clickable.
+    // A waypoint inside an idle mob's trigger circle cannot be reached by any
+    // tangent arc (the side flips at every re-issue), so it skips onto a clear
+    // successor: the verdict reads the waypoint, never the clipped click
+    // target.
     moveXI, moveYI := int32(math.Round(moveX)), int32(math.Round(moveY))
     moveZI := int32(math.Round(moveZ))
     wpXI, wpYI := int32(math.Round(wp.X)), int32(math.Round(wp.Y))
@@ -264,20 +258,20 @@ func (l *Loop) clickWaypoint(
 
             return
         }
-        // No clear successor or a repeat skip: the steered arc answers,
-        // the stuck window escalates the segment.
+        // No clear successor or a repeat skip: the steered arc answers, the
+        // stuck window escalates.
     }
-    // The aggro-aware steering: the camps of idle aggressive mobs on
-    // the segment bend it sideways (loop_avoid.go); the mobs at the
-    // destination stay exempt.
+    // The aggro-aware steering: the camps of idle aggressive mobs bend the
+    // segment sideways (loop_avoid.go); the mobs at the destination stay
+    // exempt.
     if ax, ay, dodged := l.steerClearOfAggro(
         selfX, selfY, selfZ, moveXI, moveYI, moveZI,
         int32(l.segmentDest.X), int32(l.segmentDest.Y), now); dodged {
         moveX, moveY = float64(ax), float64(ay)
     }
-    // The server click validation runs last: the server refuses
-    // whole lines its Bresenham raster walks into walled corners -
-    // a refused click never moves the character.
+    // The server click validation runs last: the Bresenham raster of the server
+    // refuses whole lines that walk into walled corners, and a refused click
+    // never moves.
     if l.navigator != nil && !l.clickServerValidated(
         selfX, selfY, selfZ, &moveX, &moveY, &moveZ, now) {
         return
@@ -289,10 +283,10 @@ func (l *Loop) clickWaypoint(
     }
 }
 
-// anchorWaypointClick resolves the click target of the aimed waypoint:
-// the z rides the server frame transport (click_frame.go), a far
-// waypoint clips to the move limit along the line, and the distance
-// comes back for the rescue floor of resolveClickExtension.
+// anchorWaypointClick resolves the click target of the aimed waypoint: the z
+// rides the server frame transport (click_frame.go), a far waypoint clips to
+// the move limit, and the distance comes back for the rescue floor of
+// resolveClickExtension.
 func (l *Loop) anchorWaypointClick(
     selfX, selfY, selfZ int32, wp pathfind.Vec3,
 ) (moveX, moveY, moveZ, dist float64) {
@@ -306,13 +300,11 @@ func (l *Loop) anchorWaypointClick(
     return moveX, moveY, moveZ, dist
 }
 
-// resolveClickExtension runs the extension ladder of the aimed waypoint
-// click: an under-floor target re-aims at the forward route samples
-// (no stuck verdict needed), a backward target of an armed stuck
-// segment re-aims the same way, and every other backward click holds -
-// the stuck window owns the answer. It returns the click target and
-// whether the click may leave the bot; the rescue floor arithmetic and
-// the sample march: docs/hunting.md (the short click extension).
+// resolveClickExtension runs the extension ladder of the aimed click: an
+// under-floor target re-aims at the forward route samples, a backward target of
+// an armed stuck segment re-aims the same way, and every other backward click
+// holds. It returns the click target and whether the click may leave; the
+// arithmetic is in docs/hunting.md.
 func (l *Loop) resolveClickExtension(
     selfX, selfY, selfZ int32,
     dist float64, passedBehind bool,
@@ -342,10 +334,10 @@ func (l *Loop) resolveClickExtension(
     return moveX, moveY, moveZ, true
 }
 
-// waypointBehindRoute reports whether the waypoint sits behind the
-// character relative to the segment leaving it; the extension takes
-// such clicks over. Only a waypoint the character stands NEAR counts,
-// so a V-shaped detour keeps its far climb targets.
+// waypointBehindRoute reports whether the waypoint sits behind the character
+// relative to the segment leaving it; the extension takes such clicks over.
+// Only a nearby waypoint counts, so a V-shaped detour keeps its far climb
+// targets.
 func waypointBehindRoute(
     waypoints []pathfind.Vec3, index int, selfX, selfY int32,
 ) bool {
@@ -361,18 +353,17 @@ func waypointBehindRoute(
     }
     if math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY)) >
         waypointPassDist {
-        // The waypoint sits far away: the character has not passed
-        // it, whatever the segment direction says.
+        // A far waypoint is never passed, whatever the segment direction says.
         return false
     }
 
     return (wp.X-float64(selfX))*fdx+(wp.Y-float64(selfY))*fdy < 0
 }
 
-// extendShortClick re-aims an under-floor click (minWalkClick) at the
-// forward route samples: the first sample the click transport
-// validates wins, so a server collapse hands the click to its
-// pathfinder. No candidate keeps the plain waypoint click.
+// extendShortClick re-aims an under-floor click (minWalkClick) at the forward
+// route samples: the first sample the transport validates wins, so a server
+// collapse hands the click to its pathfinder. No candidate keeps the plain
+// waypoint click.
 func (l *Loop) extendShortClick(
     selfX, selfY, selfZ int32,
     primX, primY, primZ float64,
@@ -397,10 +388,9 @@ func (l *Loop) extendShortClick(
     return primX, primY, primZ, false
 }
 
-// extendShortClickCandidates marches the forward route from the aimed
-// waypoint and collects the first samples past the rescue floor: only
-// FORWARD, because backward samples pull the walk back off the ground
-// the extension just covered.
+// extendShortClickCandidates marches the forward route from the aimed waypoint
+// and collects the first samples past the rescue floor: only forward, because a
+// backward sample pulls the walk back off the covered ground.
 func extendShortClickCandidates(
     selfX, selfY int32,
     waypoints []pathfind.Vec3, index int, frameOffset float64,
@@ -423,8 +413,7 @@ func extendShortClickCandidates(
             relX, relY := qx-px, qy-py
             if math.Hypot(relX, relY) < minWalkClick ||
                 relX*fdx+relY*fdy <= 0 {
-                // Under the rescue floor or backward along the
-                // route: such a sample pulls the walk back.
+                // Under the rescue floor or backward along the route.
                 continue
             }
             out[count] = pathfind.Vec3{
@@ -439,10 +428,9 @@ func extendShortClickCandidates(
     return out, count
 }
 
-// clickServerValidated gates a walk click through Navigator.
-// ValidateClick: a refused click shortens the line, then hops to the
-// nearest swallowed plan bend, then falls back to the re-path of the
-// stuck path.
+// clickServerValidated gates a walk click through Navigator.ValidateClick: a
+// refused click shortens the line, then hops to the nearest swallowed plan
+// bend, then falls back to the re-path of the stuck path.
 func (l *Loop) clickServerValidated(
     selfX, selfY, selfZ int32,
     moveX, moveY, moveZ *float64, now time.Time,
@@ -463,9 +451,9 @@ func (l *Loop) clickServerValidated(
     if l.clickEscapeHop(selfX, selfY, selfZ, moveX, moveY, moveZ) {
         return true
     }
-    // No local escape works: re-path from the current position like the
-    // stuck path does, bounded by the same budget; a second re-path from
-    // the same cell aborts the frozen trip.
+    // No local escape works: re-path from the current position like the stuck
+    // path, bounded by the same budget; a second re-path from the same cell
+    // aborts the trip.
     if l.noteRepathCell(selfX, selfY) {
         l.abortFrozenTrip(
             "the server refuses the walk click from this cell")
@@ -483,19 +471,18 @@ func (l *Loop) clickServerValidated(
         "%d %d, re-pathing (%d of %d)",
         int32(*moveX), int32(*moveY), l.rePaths, maxRePaths)
     if !l.replanTownWalkSegment(l.segmentDest) {
-        // The re-path found no route: the same freeze evidence the
-        // stuck path carries - the ladder owns it (see
-        // stuckTownWalk).
+        // The re-path found no route: the same freeze evidence the stuck path
+        // carries, owned by the ladder (stuckTownWalk).
         l.abortFrozenTrip("re-path failed")
     }
 
     return false
 }
 
-// clickForwardJump answers a refused corner click with the first later
-// plan waypoint the transport validates from the standing cell: the
-// corner band stops 8 to 50 units short of the turn pivot, and a
-// farther chord clears the corner at a wider angle.
+// clickForwardJump answers a refused corner click with the first later plan
+// waypoint the transport validates from the standing cell: the corner band
+// stops 8 to 50 units short of the turn pivot, and a farther chord clears the
+// corner at a wider angle.
 func (l *Loop) clickForwardJump(
     selfX, selfY, selfZ int32,
     moveX, moveY, moveZ *float64, now time.Time,
@@ -516,15 +503,14 @@ func (l *Loop) clickForwardJump(
         if !ok {
             continue
         }
-        // The jump must move a real step (one geodata cell): a
-        // correction landing on the standing cell would click the
-        // walker's own position.
+        // The jump must move one geodata cell: a correction on the standing
+        // cell would click the walker's own position.
         if math.Hypot(corrected.X-from.X, corrected.Y-from.Y) <
             extendMarchStep {
             continue
         }
-        // The jump rides the skip discipline: a jump that left the
-        // character on this cell proved the chord dead.
+        // The jump rides the skip discipline: one that left the character on
+        // this cell proved the chord dead.
         if !l.skipMoveFresh(selfX, selfY) {
             return false
         }
@@ -542,9 +528,9 @@ func (l *Loop) clickForwardJump(
     return false
 }
 
-// shortenClickSegment halves a refused click toward its target until a
-// prefix validates: a split segment rasterizes differently, so the far
-// half can fail where a shorter prefix passes.
+// shortenClickSegment halves a refused click toward its target until a prefix
+// validates: a split segment rasterizes differently, so the far half can fail
+// where a shorter prefix passes.
 func (l *Loop) shortenClickSegment(
     selfX, selfY, selfZ int32,
     moveX, moveY, moveZ *float64, from pathfind.Vec3,
@@ -570,10 +556,9 @@ func (l *Loop) shortenClickSegment(
     return false
 }
 
-// clickEscapeHop walks the nearest plan bend the arrival slack
-// swallowed: the geodata trap cells box the walker in, and the far
-// clicks keep leaving the boxed cell until the character stands on the
-// bend itself.
+// clickEscapeHop walks the nearest plan bend the arrival slack swallowed: the
+// geodata trap cells box the walker in, and the far clicks keep leaving the
+// boxed cell until the character stands on the bend itself.
 func (l *Loop) clickEscapeHop(
     selfX, selfY, selfZ int32,
     moveX, moveY, moveZ *float64,
@@ -583,8 +568,8 @@ func (l *Loop) clickEscapeHop(
     }
     for j := l.wpIndex - 1; j >= 0; j-- {
         wp := l.waypoints[j]
-        // The anchored distance: on a shifted deck the raw 3D distance
-        // to a bend the character stands on measures the shift alone.
+        // The anchored distance: on a shifted deck the raw 3D distance to a
+        // bend the character stands on measures the shift alone.
         dist := waypointDistanceAnchored(wp, selfX, selfY, selfZ,
             l.segmentFrameOffset)
         if dist > waypointPassDist {
@@ -612,10 +597,10 @@ func (l *Loop) clickEscapeHop(
     return false
 }
 
-// segmentAdvanceClear gates the advance past the waypoint whose
-// successor sits at the index: the line from the standing cell to that
-// successor must pass the click transport, the one oracle the click
-// itself faces. A refused line keeps the skipped-from waypoint targeted.
+// segmentAdvanceClear gates the advance past the waypoint whose successor sits
+// at the index: the line to that successor must pass the click transport, the
+// oracle the click itself faces. A refused line keeps the skipped-from waypoint
+// targeted.
 func (l *Loop) segmentAdvanceClear(
     selfX, selfY, selfZ int32, next int,
 ) bool {
@@ -623,10 +608,9 @@ func (l *Loop) segmentAdvanceClear(
         l.segmentFrameOffset, selfX, selfY, selfZ)
 }
 
-// routeAdvanceClear is the segmentAdvanceClear gate over a caller
-// supplied route and frame offset: the manual walk plan carries its
-// own waypoints and z transport, so the continuous flow scan of both
-// followers answers through one click transport semantics.
+// routeAdvanceClear is the segmentAdvanceClear gate over a caller supplied
+// route and frame offset: the manual walk plan carries its own waypoints and z
+// transport, so both followers answer through one click transport semantics.
 func (l *Loop) routeAdvanceClear(
     waypoints []pathfind.Vec3, next int, frameOffset float64,
     selfX, selfY, selfZ int32,
@@ -647,9 +631,8 @@ func (l *Loop) routeAdvanceClear(
     if !ok {
         return false
     }
-    // The delivery test: the server's correction must land within the
-    // waypoint pass radius of the asked target, else the cursor keeps
-    // the skipped-from waypoint.
+    // The delivery test: the server correction must land within the pass radius
+    // of the asked target, else the cursor keeps the skipped-from waypoint.
     return math.Hypot(corrected.X-targetX, corrected.Y-targetY) <=
         waypointPassDist
 }

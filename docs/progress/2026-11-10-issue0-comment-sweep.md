@@ -1512,6 +1512,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - hunt/town_walk.go keeps the follower rules
+
+- 40 blocks compress: the follower keeps the 50 unit pass radius and
+  the 100 unit corridor (a raw "next waypoint is closer" test skipped
+  bridge entries through the railing, the planar test never passes a
+  drop), the server frame anchoring (click_frame.go), the exact segment
+  tight radius, the corner pre-click, the goal span, the backward walk
+  guard, the idle camp skip (the verdict reads the waypoint, never the
+  clipped target), the Bresenham corner refusal, the 8 to 50 unit corner
+  band, the one geodata cell jump, the halving prefix split, the anchored
+  escape hop and the delivery test inside the pass radius.
+  148 comment lines of 655 become 131 of 638.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
