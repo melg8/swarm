@@ -19,10 +19,9 @@ func (b *Bot) SelfObjectID() int32 {
 }
 
 // SkillsListed reports whether the server skill list arrived: the learning
-// queue builds on it, and the first town trip of a session waits for it,
-// because the enter world burst (UserInfo, ItemList, SkillList) races the first
-// hunt ticks and a trip started between the ItemList and the SkillList would
-// plan without the learning stops.
+// queue builds on it and the first town trip of a session waits for it, since
+// the enter world burst (UserInfo, ItemList, SkillList) races the first hunt
+// ticks.
 func (b *Bot) SkillsListed() bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -61,13 +60,13 @@ func (b *Bot) SelfFighting(targetID int32) bool {
         b.char.fightingFresh(b.now())
 }
 
-// SelfEngagedBy reports whether the target is still a live engagement, counting
-// both sides: the own fresh swing or chase step, or the target holding the
-// character. The one-sided SelfFighting view reads a point-blank bow fight as a
-// stuck selection while the C1 bow reuse window refuses every attack
-// (Creature.canUseRangeWeapon answers ActionFailed and reschedules the retry)
-// and the mob keeps swinging. The object side needs no freshness window: a
-// switched target replaces TargetID and a dead one fails the attackable test.
+// SelfEngagedBy reports whether the target is still a live engagement,
+// counting both sides: the own fresh swing or chase step, or the target
+// holding the character. The one-sided SelfFighting view reads a point-blank
+// bow fight as a stuck selection while the C1 bow reuse window refuses every
+// attack (Creature.canUseRangeWeapon answers ActionFailed and reschedules).
+// The object side needs no freshness window: a switched target replaces
+// TargetID and a dead one fails the attackable test.
 func (b *Bot) SelfEngagedBy(targetID int32) bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -93,13 +92,13 @@ func (b *Bot) SelfCannotSeeTargetAt() time.Time {
     return b.char.CannotSeeTargetAt
 }
 
-// SelfCombatActiveAt returns when the last fight activity landed (a swing or a
-// chase step, zero when none ever), regardless of freshness. The hunt orders it
-// against SelfCannotSeeTargetAt: a refusal newer than the activity marks the
-// phantom chase, because the server keeps broadcasting the chase steps of an
-// attack it refuses behind an obstacle, so fresh activity alone is no running
-// fight (a dump showed the character standing 80 units off its target for over
-// a minute with only "Cannot see target" answers).
+// SelfCombatActiveAt returns when the last fight activity landed (a swing
+// or a chase step, zero when none ever), regardless of freshness. The hunt
+// orders it against SelfCannotSeeTargetAt: a refusal newer than the activity
+// marks the phantom chase, because the server keeps broadcasting the chase
+// steps of an attack it refuses behind an obstacle, so fresh activity alone is
+// no running fight (a dump showed the character standing 80 units off its
+// target for over a minute with only "Cannot see target" answers).
 func (b *Bot) SelfCombatActiveAt() time.Time {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -163,10 +162,9 @@ func (b *Bot) SelfPosition() (int32, int32, int32, bool) {
 
 // SelfProjectedPosition estimates where the server holds the character: a
 // standing one keeps its broadcast place, a moving one advances along the
-// segment at the live run speed. The proxy compares the attached client reports
-// against it, because the server snaps a character whose report is more than
-// one move speed away. The estimate is 3D like the server check; the object
-// scans use the 2D projectedPosition.
+// segment at the live run speed. The estimate is 3D like the server check
+// (the object scans use the 2D projectedPosition); the proxy compares the
+// client reports against it, and the server snaps a report a move speed away.
 func (b *Bot) SelfProjectedPosition() (float64, float64, float64, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -178,11 +176,10 @@ func (b *Bot) SelfProjectedPosition() (float64, float64, float64, bool) {
     return x, y, z, true
 }
 
-// projectedPosition estimates the place of the character from its movement
-// broadcast: the Mobius Creature.updatePosition loop steps a mover toward the
-// destination at the effective speed every game tick, so the segment
-// interpolates by the traveled 3D distance. The clamped fraction ends a lost
-// arrival broadcast at the destination instead of running past it.
+// projectedPosition estimates the place from the movement broadcast: the
+// Mobius Creature.updatePosition loop steps a mover toward the destination at
+// the effective speed every game tick, so the segment interpolates by the
+// traveled 3D distance. The clamps end a lost arrival at the destination.
 func (c CharacterState) projectedPosition(now time.Time) (
     float64, float64, float64,
 ) {
@@ -218,12 +215,11 @@ func (b *Bot) SelfHeading() int32 {
     return b.char.Heading
 }
 
-// ApplySelfFacing records the facing the client itself drives: the cursor key
-// escape claims the placement and the facing of the official movement
-// simulation (the arrow walk renders it locally), while the server echo of the
-// claimed placement carries the server side move heading (ValidateLocation
-// reads the location heading, the arm direction of the running move). The claim
-// owns the facing the web UI shows until the mouse clicks resume.
+// ApplySelfFacing records the facing the client itself drives: the cursor
+// key escape claims the placement and the facing of the official movement
+// simulation (the arrow walk renders it locally), while the server echo of
+// the claim carries the server side move heading (ValidateLocation reads the
+// location heading). The claim owns the shown facing until a mouse click.
 func (b *Bot) ApplySelfFacing(heading int32) {
     b.mu.Lock()
     defer b.mu.Unlock()

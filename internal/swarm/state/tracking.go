@@ -48,12 +48,11 @@ type WaitType struct {
 }
 
 // ApplyWaitType tracks the sit/stand state of the played character and
-// of every observed creature. The packet is broadcast through
+// every observed creature. The packet is broadcast through
 // Player.broadcastPacket, so the acting client receives its own
-// transitions (see Player.sitDown/standUp) and the transitions of every
-// player around: the own rest drives the hunt logic and the HUD, the
-// foreign ones draw the zZ rest icon of the map for every bot of the
-// fleet, not only the observed one.
+// transitions (see Player.sitDown/standUp) and the ones of every player
+// around: the own rest drives the hunt logic and the HUD, the foreign ones
+// draw the zZ rest icon for every bot of the fleet, not the observed one.
 func (b *Bot) ApplyWaitType(w WaitType) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -120,13 +119,11 @@ func (b *Bot) applyRotation(r Rotation, stop bool) {
 }
 
 // ApplySelfTarget records the target the server assigned to the played
-// character (MyTargetSelected). A selection of the own object is the
-// official unselect (the self click of ClearTarget) and a zero answer
-// is the explicit clear: the fight state stops tracking the abandoned
-// target with either, so a flight or a loot walk never reads as a
-// fight (the run-31 acceptance sampled a dropped target at 868 units
-// and the run-33 acceptance sampled a corpse at 781 units, both while
-// the character was not fighting).
+// character (MyTargetSelected). A selection of the own object is the official
+// unselect (the self click of ClearTarget) and a zero answer the explicit
+// clear: the fight state stops tracking the abandoned target with either, so a
+// flight or a loot walk never reads as a fight. Without that rule a sample read
+// a dropped target 868 units away and a corpse 781 units away as fights.
 func (b *Bot) ApplySelfTarget(objectID int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -164,10 +161,10 @@ func (b *Bot) ApplyObjectTarget(objectID int32, targetID int32) {
 }
 
 // ApplyTargetClear drops the target reference of a visible player. The
-// packet also arrives for the played character itself: the server
-// clears the character target (for example when the target object is
-// removed from the world) and notifies everyone including the actor,
-// while never sending MyTargetSelected for the removal.
+// packet also arrives for the played character itself: the server clears
+// the character target (for example when the target object leaves the
+// world) and notifies everyone including the actor, while MyTargetSelected
+// never reports the removal.
 func (b *Bot) ApplyTargetClear(objectID int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -244,11 +241,10 @@ func (b *Bot) ApplySpawnItem(info ItemInfo) {
 }
 
 // ApplyItemPickup removes a picked up ground item. The GetItem packet
-// carries the position of the item, not of the picker: the official
-// client only uses it to animate the item flying into the inventory. The
-// picker position is already tracked from the StopMove broadcast of the
-// arrival, so snapping the picker here teleported it across the map on
-// every pickup.
+// carries the position of the item, not of the picker (the official client
+// only animates the item flying into the inventory), and the picker
+// position already arrives through the StopMove broadcast, so snapping the
+// picker here teleported it across the map on every pickup.
 func (b *Bot) ApplyItemPickup(p ItemPickup) {
     b.mu.Lock()
     defer b.mu.Unlock()

@@ -69,8 +69,8 @@ const (
 // InventoryItem is one entry of the inventory packets. Type2 tells the family
 // (0 weapon, 1 armor, 2 jewel, 3 quest, 4 adena, 5 common), BodyPart the slot
 // mask of the template (0x80 right hand, 0x400 chest; an unequipped item
-// carries its slot mask), and Change the InventoryUpdate code (1 add, 2 modify,
-// 3 remove).
+// carries its slot mask) and Change the InventoryUpdate code (1 add, 2
+// modify, 3 remove).
 type InventoryItem struct {
     ObjectID int32
     ItemID   int32
@@ -240,9 +240,8 @@ func (b *Bot) DestroyableItems(limit int) []InventoryItem {
 // DestroyableItemsExcluding filters the candidates with a keep set of object
 // ids: the hunt loop passes the planned equips (the looted or bought upgrades
 // waiting for their use item request), and a kept item is never destroyed for
-// bag space, the bot wears it instead. The spellbooks of the unlocked queued
-// lessons stay out too: a book burned for bag space comes back as a full priced
-// buy.
+// bag space, the bot wears it instead. The spellbooks of the unlocked lessons
+// stay out too: a book burned for bag space comes back full priced.
 func (b *Bot) DestroyableItemsExcluding(
     keep map[int32]bool, limit int,
 ) []InventoryItem {
@@ -292,14 +291,14 @@ func (b *Bot) SellableItems() []InventoryItem {
     return b.SellableItemsExcluding(nil)
 }
 
-// SellableItemsExcluding returns the items a shop trip sells, sorted most junky
-// first: duplicate gear drops (all pieces of an item id but one), then the
-// lowest sell value per unit weight. Equipped gear, adena and quest items never
-// sell, and neither do the keep set object ids (the planned equips), so an item
-// the bot is about to wear is never sold for its instant adena. The spellbooks
-// of the queued lessons stay out too (demandedBooksLocked): a book feeds its
-// lesson, and selling it for referencePrice/2 only buys it back full priced.
-// The server silently skips the items it refuses to sell.
+// SellableItemsExcluding returns the items a shop trip sells, sorted most
+// junky first: duplicate gear drops (all pieces of an item id but one), then
+// the lowest sell value per unit weight. Equipped gear, adena and quest items
+// never sell, and neither do the keep set object ids (the planned equips), so
+// an item the bot is about to wear is never sold for its instant adena. The
+// spellbooks of the queued lessons stay out too (demandedBooksLocked), since
+// selling a book for referencePrice/2 buys it back full priced. The server
+// silently skips the items it refuses to sell.
 func (b *Bot) SellableItemsExcluding(keep map[int32]bool) []InventoryItem {
     b.mu.RLock()
     defer b.mu.RUnlock()

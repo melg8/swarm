@@ -45,14 +45,13 @@ func buildCharacterListFor(session *botSession) ([]byte, error) {
     return writer.Bytes(), nil
 }
 
-// characterInfoFor builds the char list entry of the played character
-// of the given session. The appearance fields (sex, race, class, hair,
-// face) come from the last recorded real char list of the session that
-// contains the played character, so the client renders the same look
-// the real server would; the vitals, the position and the paperdoll
-// come from the live tracker (they are fresher than anything recorded
-// at login time: the C1 client renders the selection screen model from
-// the paperdoll item ids, so the zeroed table showed a naked character).
+// characterInfoFor builds the char list entry of the played character of
+// a session. The appearance fields (sex, race, class, hair, face) come from
+// the last recorded real char list that contains the character, so the
+// client renders the same look the real server would; the vitals, the
+// position and the paperdoll come from the live tracker, fresher than the
+// login recording (the selection screen model renders from the paperdoll
+// item ids, so a zeroed table showed a naked character).
 func characterInfoFor(
     session *botSession, character state.CharacterSnapshot, account string,
 ) fromgameserver.CharacterInfo {
@@ -96,13 +95,12 @@ func characterInfoFor(
     return info
 }
 
-// fillLivePaperdoll resolves the equipped gear of the played character
-// of the given session from its live tracker: the paperdoll object ids
-// of the slots come from the last UserInfo broadcast the server sent
-// (it refreshes the block on every equip and unequip), and the item ids
-// are looked up in the tracked inventory. The two tables share the
-// Mobius wire slot order, so the mapping is index to index (the right
-// hand duplicate repeats in both).
+// fillLivePaperdoll resolves the equipped gear of the played character of
+// a session from its live tracker: the paperdoll object ids come from the
+// last UserInfo broadcast (it refreshes the block on every equip and
+// unequip) and the item ids are looked up in the tracked inventory. The two
+// tables share the Mobius wire slot order, so the mapping is index to index
+// (the right hand duplicate repeats in both).
 func fillLivePaperdoll(
     session *botSession, info *fromgameserver.CharacterInfo,
 ) {

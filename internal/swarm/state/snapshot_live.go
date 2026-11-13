@@ -14,14 +14,13 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// AppendSnapshotJSON appends the JSON encoding of the whole current bot state
-// to dst and returns the grown slice. The encoder walks the live state under
-// the read lock and materializes no intermediate Snapshot - the view structs
-// live on the stack - so the steady state of a watched stream allocates nothing
-// per event (the snapshot copy paid roughly 26 KB of garbage per event on a 100
-// npc bot). The output is byte identical to Snapshot().AppendJSON, pinned by
-// TestAppendSnapshotJSONMatchesSnapshot and the reflection golden suite of
-// snapshot_json_test.go.
+// AppendSnapshotJSON appends the JSON encoding of the whole current bot
+// state to dst and returns the grown slice. The encoder walks the live state
+// under the read lock and materializes no intermediate Snapshot - the view
+// structs live on the stack - so a watched stream allocates nothing per
+// event (the snapshot copy paid roughly 26 KB of garbage per event on a 100
+// npc bot). TestAppendSnapshotJSONMatchesSnapshot and the golden suite of
+// snapshot_json_test.go pin the output to Snapshot().AppendJSON.
 func (b *Bot) AppendSnapshotJSON(dst []byte) []byte {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -29,10 +28,10 @@ func (b *Bot) AppendSnapshotJSON(dst []byte) []byte {
     return b.appendSnapshotJSONLocked(dst, b.now())
 }
 
-// appendSnapshotJSONLocked is the direct live state walk of the encoding: the
-// always present collections encode as empty arrays, only the optional walk
-// plan and hunting zone fall back to null. Splitting the linear field walk only
-// obscures the wire format.
+// appendSnapshotJSONLocked is the direct live state walk of the encoding:
+// the always present collections encode as empty arrays and only the
+// optional walk plan and hunting zone fall back to null. Splitting the
+// linear field walk would obscure the wire format.
 //
 //nolint:funlen // linear field order
 func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
@@ -456,14 +455,13 @@ func (b *Bot) characterSnapshotLocked(
     }
 }
 
-// clanMaskString renders the clan bitmask of the view: a decimal string for a
-// clan carrier, an empty string for the clan less npcs (most objects carry no
-// clans, and the empty string doubles as the falsy check of the web layer). The
-// renderings come from a package level cache: the mask space is tiny (a few
-// dozen distinct masks a fleet ever sees) while the encode path calls here once
-// per object per tick, and an uncached strconv.FormatUint was 98% of the
-// encoder allocations on the 100 bot fleet (BenchmarkFleetLiveEncodePressure).
-// The cache pays one allocation per distinct mask.
+// clanMaskString renders the clan bitmask of the view: a decimal string for
+// a clan carrier, an empty string for the clan less npcs (most objects carry
+// none, and the empty string doubles as the falsy check of the web layer).
+// The mask space is tiny (a few dozen distinct masks a fleet ever sees) while
+// the encode path calls here once per object per tick, and an uncached
+// strconv.FormatUint was 98% of the encoder allocations on the 100 bot fleet
+// (BenchmarkFleetLiveEncodePressure).
 func clanMaskString(mask uint64) string {
     if mask == 0 {
         return ""

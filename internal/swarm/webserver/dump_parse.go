@@ -4,11 +4,10 @@
 
 // The dump parser reverses BuildStateDump (dump.go): it reads the plain text
 // dump of a long-lived user server (tools/dump_state.sh) back into the
-// state.Snapshot view structs, so a captured dump reconstructs the world a
-// misbehaving bot saw (the dump-state-repro skill holds the workflow).
-//
-// The parser is tolerant: unknown lines and missing sections stay at their zero
-// value, and only a known field that fails to parse returns an error. The goal
+// state.Snapshot views, so a captured dump reconstructs the world a
+// misbehaving bot saw (the dump-state-repro skill holds the workflow). It is
+// tolerant - unknown lines and missing sections stay at their zero value, and
+// only a known field that fails to parse returns an error - because the goal
 // is a behavior repro, not a byte exact round trip.
 package webserver
 
@@ -33,12 +32,11 @@ func ParseDump(dump string) (state.Snapshot, error) {
 
 // ApplyDump replays a parsed snapshot into a fresh state.Bot through the Apply
 // API, so the storage invariants (the SoA split, the id index, the version
-// counter) hold like a live session built them. Use it when the repro needs the
-// real dense layout; ParseDump alone suffices for view assertions.
-//
-// The replay covers the character, the objects, the hunting zone, the walk plan
-// and the events. The inventory, the combat events and the chat stay on the
-// snapshot: the Apply API does not take their presentation fields.
+// counter) hold like a live session built them; ParseDump alone suffices for
+// view assertions. The replay covers the character, the objects, the hunting
+// zone, the walk plan and the events; the inventory, the combat events and the
+// chat stay on the snapshot, since the Apply API does not take their
+// presentation fields.
 func ApplyDump(bot *state.Bot, snap state.Snapshot) {
     applyDumpCharacter(bot, snap.Character)
     applyDumpObjects(bot, snap.Objects)

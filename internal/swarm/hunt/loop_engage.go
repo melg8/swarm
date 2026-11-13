@@ -11,12 +11,10 @@ import (
 
 // engage attacks the nearest attackable npc while the current target lives,
 // then switches to the loot phase. The Mobius AttackRequest has double click
-// semantics: the first request selects the target, the repeated request
-// triggers the forced attack. The loop re-requests until the
-// MoveToPawn/Attack/AutoAttackStart broadcasts confirm the fight. The gate
-// order is the behavior: the ground gate, the mana rest, the server target
-// adoption, the safety verdicts, the pick, the kite machinery and the attack
-// request.
+// semantics: the first request selects the target and the repeated one
+// triggers the forced attack, until the MoveToPawn/Attack/AutoAttackStart
+// broadcasts confirm the fight. The gate order is the behavior: ground, mana
+// rest, target adoption, safety verdicts, pick, kite machinery, attack.
 func (l *Loop) engage() {
     now := l.now()
     l.syncLure()
@@ -64,9 +62,8 @@ func (l *Loop) syncLure() {
 
 // guardGround answers the ground gate: a character outside its ground with
 // nothing pickable in sight walks back. A hurt character under attack flees
-// even outside the ground, a fight that crossed the ground line is finished
-// where it stands, and a pickable enemy visible from here keeps the hunt
-// running.
+// even outside the ground, a fight that crossed the line is finished where it
+// stands, and a pickable enemy visible from here keeps the hunt running.
 func (l *Loop) guardGround(now time.Time) bool {
     if !l.onHeldGround() {
         if l.tracker.SelfUnderAttack() &&
@@ -116,12 +113,12 @@ func (l *Loop) restOnLowMana() bool {
     return manaHeld
 }
 
-// adoptServerTarget prefers the server view of the target while it lives: the
+// adoptServerTarget prefers the server view of the target while it lives (the
 // MyTargetSelected answer arrives asynchronously, so the fresh value is read
-// every tick. A stale id is not re-adopted - the server never clears the
+// every tick). A stale id is not re-adopted - the server never clears the
 // selection of a corpse, and trusting it locked the loop into an engage/loot
-// ping-pong. The adoption requires a living attackable npc; a mana held caster
-// re-adopts nothing. A dead target switches into looting.
+// ping-pong. A dead target switches into looting and a mana held caster
+// re-adopts nothing.
 func (l *Loop) adoptServerTarget(now time.Time, manaHeld bool) bool {
     serverTarget := l.tracker.SelfTargetID()
     if serverTarget != 0 && !manaHeld &&
@@ -149,10 +146,10 @@ func (l *Loop) adoptServerTarget(now time.Time, manaHeld bool) bool {
     return false
 }
 
-// answerApproachAggro answers a mob that aggros on the walk to a pick: the walk
-// would drag the chase into a second opponent. It runs ahead of the stuck
-// timeout, the losing-fight verdict and the blind recovery. A live kite fight
-// keeps its pick, an attacker the kite can answer joins the train, an attacker
+// answerApproachAggro answers a mob that aggros on the walk to a pick, since
+// the walk would drag the chase into a second opponent. It runs ahead of the
+// stuck timeout, the losing-fight verdict and the blind recovery: a live kite
+// fight keeps its pick, an attacker the kite can answer joins the train, one
 // above the level ceiling hands the tick to the flee, everything else is
 // adopted.
 func (l *Loop) answerApproachAggro(now time.Time) bool {
@@ -189,13 +186,13 @@ func (l *Loop) answerApproachAggro(now time.Time) bool {
     return false
 }
 
-// switchStaleEngage drops a target whose repeated requests never started a real
-// fight: the selection points at an object that refuses the forced attack (the
-// corpse of an abruptly disconnected session), or the armed stance went stale
-// behind an obstacle. The gate is the fresh fight view: SelfEngaged stays true
-// forever there, because the server arms the stance without a line of sight
-// check and no swing lands to disarm it. An attacker counts as engaged through
-// the same call (the bow reuse window refuses attacks while the mob swings).
+// switchStaleEngage drops a target whose repeated requests never started a
+// real fight: the selection points at an object that refuses the forced attack
+// (the corpse of an abruptly disconnected session), or the armed stance went
+// stale behind an obstacle. The gate is the fresh fight view: SelfEngaged stays
+// true there forever, because the server arms the stance without a line of
+// sight check and no swing lands to disarm it. An attacker counts as engaged
+// through the same call (the bow reuse window refuses while the mob swings).
 func (l *Loop) switchStaleEngage(now time.Time) bool {
     if l.target == 0 || l.tracker.SelfEngagedBy(l.target) ||
         l.engageAt.IsZero() || now.Sub(l.engageAt) <= engageStuckTimeout ||
@@ -219,8 +216,8 @@ func (l *Loop) switchStaleEngage(now time.Time) bool {
 // respondLosingFight drops a fight that turned into a death risk and flees. It
 // stays ahead of the blind recovery: an add grinding a repositioning character
 // escalates into the flee, not into another detour segment. The kite answers
-// with the straight flight once the target is dropped; the critical health
-// logout stays armed above both.
+// with the straight flight once the target drops; the critical health logout
+// stays armed above both.
 func (l *Loop) respondLosingFight(now time.Time) bool {
     if l.target == 0 || !l.losingFight() {
         return false
@@ -336,11 +333,11 @@ func (l *Loop) restBeforePick(now time.Time) bool {
     return false
 }
 
-// pickNearestAttacker answers a mob that already holds the character: walking
-// to a fresh mob only drags the chase into a second opponent. The defensive
-// flow owns an attacker the kite flight holds, one above the level ceiling, a
-// skipped one and a bow add still firing; a healthy character adopts a winnable
-// attacker where it stands.
+// pickNearestAttacker answers a mob that already holds the character, since
+// walking to a fresh mob only drags the chase into a second opponent. The
+// defensive flow owns an attacker the kite flight holds, one above the level
+// ceiling, a skipped one and a bow add still firing; a healthy character
+// adopts a winnable attacker where it stands.
 func (l *Loop) pickNearestAttacker(now time.Time) bool {
     attacker, ok := l.tracker.NearestAttacker()
     if !ok {
@@ -490,13 +487,14 @@ func (l *Loop) requestAttack(now time.Time) {
     l.lastActionAt = now
 }
 
-// losingFight reports whether the fight turned into a death risk: the character
-// fell under the escape threshold, a bow-wielding add joined, or a running
-// fight dropped below the re-engage health while the target keeps a clear lead.
-// The percent-gap rule needs the confirmed fight: the untouched bar of an
-// unswung target fled winnable mobs. A nearly finished target does not count -
-// the kill is one swing away. The bow add is the exception: it outranges the
-// straight retreat, so the reload tails are free damage.
+// losingFight reports whether the fight turned into a death risk: the
+// character fell under the escape threshold, a bow-wielding add joined, or a
+// running fight dropped below the re-engage health while the target keeps a
+// clear lead. The percent-gap rule needs the confirmed fight, since the
+// untouched bar of an unswung target fled winnable mobs, and a nearly finished
+// target does not count - the kill is one swing away. The bow add is the
+// exception: it outranges the straight retreat, so the reload tails are free
+// damage.
 func (l *Loop) losingFight() bool {
     selfHP := l.tracker.SelfHealthPercent()
     targetHP := l.tracker.ObjectHealthPercent(l.target)

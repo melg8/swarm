@@ -19,10 +19,9 @@ import (
 )
 
 // Journal tuning: the flush period bounds the loss of a crashed run, the
-// channel depth rides out a slow disk burst, the rotation size keeps a
-// runaway loop from filling the disk (the segment gzips to roughly a tenth)
-// and the story cap mutes a flood (a healthy bot writes well under thirty
-// lines a minute, so the cap sits at four times that).
+// channel depth rides out a slow disk burst, the rotation size keeps a runaway
+// loop from filling the disk (a segment gzips to a tenth) and the story cap
+// mutes a flood (a healthy bot writes well under thirty lines a minute).
 const (
     flushPeriod     = 2 * time.Second
     eventQueueDepth = 4096
@@ -37,14 +36,14 @@ var (
     errUnknownBot = errors.New("bot has no session journal aggregate")
 )
 
-// Journal is the append-only session journal of one process: every bot writes
-// into one JSONL file, each record carrying its bot id. A single writer
-// goroutine owns the file (the callers never block, so the hunt tick and the
-// tracker locks never wait on disk), the aggregator rides it so the report sees
-// the flushed truth, and the file rotates at rotateBytes with the copy gzipped
-// in the background. The first record flushes at once, so a run killed inside
-// the first flush period still leaves the build identity line. A nil *Journal
-// is a no-op everywhere (the -session-dir "" mode turns it off).
+// Journal is the append-only session journal of one process: every bot
+// writes into one JSONL file, each record carrying its bot id. A single
+// writer goroutine owns the file (the callers never block, so neither the hunt
+// tick nor the tracker locks wait on disk) and rotates it at rotateBytes with
+// the copy gzipped in the background; the aggregator rides it so the report
+// sees the flushed truth. The first record flushes at once, so a run killed
+// inside the first flush period keeps the build identity line. A nil *Journal
+// is a no-op everywhere (-session-dir "" turns it off).
 type Journal struct {
     dir         string
     path        string
@@ -252,11 +251,11 @@ func (j *Journal) flushFile() {
     }
 }
 
-// rotate gzips the filled segment in the background and opens the next one; the
-// sequence numbers order the segments lexically after the base file. The next
-// segment opens before the old one closes, so a failed open keeps the writer on
-// the still-open file and the size cap re-arms the attempt on every later
-// flush (closing first would strand every later record on a closed handle).
+// rotate gzips the filled segment in the background and opens the next one;
+// the sequence numbers order the segments lexically after the base file. The
+// next segment opens before the old one closes, so a failed open keeps the
+// writer on the still-open file and the size cap re-arms the attempt on each
+// later flush (closing first would strand the later records).
 func (j *Journal) rotate() {
     rotated := j.path
     if j.seq > 0 {
@@ -518,11 +517,11 @@ func (c *countingWriter) Write(p []byte) (int, error) {
     return n, err //nolint:wrapcheck // passthrough writer
 }
 
-// gzipFile compresses a rotated segment to path.gz and removes the original on
-// success. A failure keeps the original (the data survives, the compression is
-// lost) and drops the partial archive, so a truncated .gz never shadows the
-// intact original. Both handles close before the remove: Windows refuses to
-// unlink a file another handle holds.
+// gzipFile compresses a rotated segment to path.gz and removes the original
+// on success. A failure keeps the original (the data survives, the compression
+// is lost) and drops the partial archive, so a truncated .gz never shadows the
+// intact one. Both handles close before the remove: Windows refuses to unlink
+// a file another handle holds.
 func gzipFile(path string, wg *sync.WaitGroup, logger *log.Logger) {
     defer wg.Done()
     source, err := os.Open(path)

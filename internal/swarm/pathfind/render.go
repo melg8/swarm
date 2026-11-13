@@ -12,14 +12,12 @@ import (
 // RenderMode selects what the geodata visualization paints per cell.
 type RenderMode string
 
-// Render modes of the geodata tiles:
-//   - height: grayscale terrain with a blue tint below the typical sea
-//     level, red over cells whose walk surface has a closed wall and a
-//     green tint on multilayer cells (bridges, interiors);
-//   - walls: white for open cells, red for walled ones - the pure
-//     connectivity view;
-//   - layers: the count of walkable layers per cell, one gray, two
-//     yellow, three orange, four or more red.
+// Render modes of the geodata tiles: height draws grayscale terrain with
+// a blue tint below the typical sea level, red over cells whose walk
+// surface has a closed wall and green on multilayer cells (bridges,
+// interiors); walls draws open cells white and walled ones red, the pure
+// connectivity view; layers colors the walkable layer count per cell, one
+// gray, two yellow, three orange, four or more red.
 const (
     RenderHeight RenderMode = "height"
     RenderWalls  RenderMode = "walls"
@@ -102,10 +100,9 @@ func mix(
 }
 
 // RenderRegion renders one geodata region into a square image of size x
-// size pixels (size must divide the 2048 cells of a region side, so
-// every pixel covers an exact block of cells). The rendered view follows
-// the walk surface the pathfinder sees at the default height: the layer
-// closest to zero.
+// size pixels (size must divide the 2048 cells of a region side, so every
+// pixel covers an exact block of cells). The view follows the walk surface
+// the pathfinder sees at the default height: the layer closest to zero.
 func (e *Engine) RenderRegion(
     key RegionKey, size int, mode RenderMode,
 ) (*image.RGBA, error) {

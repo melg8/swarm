@@ -2439,6 +2439,36 @@ corner probe is a length, not a leg at all.
   huntaudit (0.3 s) and benchdiff (0.3 s) suites, `golangci-lint run`
   on the seven paths 0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the state, session and webserver views
+
+- `state/skills.go` keeps the spellbook referencePrice/2 rule, the
+  atomic cache pointer and the warrior priority order; 78 of 349
+  become 70 of 341.
+- `state/bot_self.go` keeps the enter world burst race, the bow reuse
+  refusal, the 80 unit phantom chase, the 3D server check and the
+  cursor key facing claim; 110 of 395 become 106 of 391.
+- `state/tracking.go` keeps the broadcast WaitType rule, the 868/781
+  unit fight samples, the GetItem position fact and the
+  MyTargetSelected self unselect; 48 of 290 become 44 of 286.
+- `state/snapshot_live.go` keeps the 26 KB per event figure and the 98
+  percent encoder allocation share with its benchmark name,
+  `state/inventory.go` the junk sort order and the demanded book rule;
+  69/95 become 67/94.
+- `session/journal.go` keeps the flush, rotation and story cap tuning,
+  the first record flush and the Windows unlink rule; 99 of 593 become
+  98 of 592.
+- `webserver/dump_parse.go` keeps the dump-state-repro workflow and the
+  Apply API coverage, `proxy/chars.go` the selection screen paperdoll
+  fact and the index to index slot mapping, `pathfind/render.go` the
+  three render modes; 123/29/36 become 121/27/33.
+- `hunt/loop_engage.go` keeps the AttackRequest double click
+  semantics, the gate order, the stale id rule and the bow add
+  exception; 134 of 537 become 132 of 535.
+- Verified: `task fmt`, `go build ./...`, the state (1.2 s), session
+  (0.4 s), proxy (6.8 s), pathfind (51.4 s), hunt (29.4 s) and
+  webserver (8.8 s) suites, `golangci-lint run` on the six paths
+  0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
