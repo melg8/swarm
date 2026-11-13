@@ -1877,6 +1877,25 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite,
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - state/bot_events.go keeps the refusal channel
+
+- 16 blocks compress: the file keeps the ActionFailed (0x35) contract
+  (no request identity, so only the arrival time is recorded and the
+  hunt loop correlates it through `refusalEvidence`; a click answered
+  while the character stood still is a server side refusal the offline
+  validation cannot see), the non walk request exclusion with its
+  inclusive window bounds (a coarse host clock stamps the click, the
+  request and the arrival inside one timer tick), the `EventSink`
+  contract (called under the write lock, no re-entry, no blocking, the
+  journal drops on overflow), the deeper dump event window, the dense
+  object array helpers, the position sample re-anchoring (an old anchor
+  made the projection run ahead and snap back), the corpus target that
+  survived its death and made the bot sample it 781 units away, and the
+  sink re-entry rule of `recordLocked`. 97 comment lines of 230 become
+  69 of 202.
+- Verified: `task fmt`, `go build ./...`, the state suite,
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
