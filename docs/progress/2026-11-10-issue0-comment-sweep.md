@@ -2015,6 +2015,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the gear suite (0.4 s),
   `golangci-lint run ./internal/swarm/gear/...` 0 issues.
 
+### 2026-11-13 - gear/shopping_phases.go keeps the phase order
+
+- 15 blocks compress: the file keeps the spending rule order (the
+  weapon milestone first and never an intermediate rung, the pdef
+  maximizing armor set next, the jewel floor behind a real weapon since
+  the starting locations barely attack with magic, the shield with the
+  leftover against the two hand weapon), the top-tier guard, the
+  overflow safe `unboundedBudget` (half the int64 range), the pair
+  family copy count of the planned map, the 261 adena basic jewel
+  outfit reserved ahead of the armor maximization, the cheapest first
+  armor emission, and the tail budget contraction of `emit` and
+  `tailDone`. 85 comment lines of 262 become 69 of 246.
+- Verified: `task fmt`, `go build ./...`, the gear suite (0.4 s),
+  `golangci-lint run ./internal/swarm/gear/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
