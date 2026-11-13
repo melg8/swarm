@@ -8,22 +8,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// Voronoi cell hunting: the spawn ground partition of a region into
-// convex cells (see docs/hunting_cells.md). Every cell is the set of
-// ground points closer to its seed than to any other - the half-plane
-// intersection - so every spawn point of the region belongs to
-// EXACTLY ONE cell and no respawn area is ever half-covered (the
-// depletion/oversaturation failure of the circle geometry: a circle
-// that farms half a respawn ground starves its half while the other
-// accumulates). The cell extent from the focus stays inside the
-// guaranteed knownlist circle of the Mobius world grid (~2048
-// units), so a bot standing anywhere in its patrol square sees the
-// whole cell: the emptiness reading of the wait-or-switch economy is
-// the truth, never a load boundary artifact. The target leash is the
-// exact convex polygon; the movement machinery keeps the patrol
-// square inscribed in it. The hunt rotates through the adjacency
-// graph of the partition paced by the respawn ripeness - see the
-// hunt package cell_policy.go.
+// Voronoi cell hunting: the spawn ground of a region splits into convex cells
+// (docs/hunting_cells.md). A cell holds the points closer to its seed than any
+// other, so every spawn point belongs to exactly one cell and no respawn area
+// is half-covered (the depletion of a circle that farms half a ground). The
+// extent stays inside the guaranteed knownlist circle of the Mobius grid (~2048
+// units), so a bot anywhere in its patrol square sees the whole cell. The leash
+// is the exact polygon with the patrol square inscribed; the hunt rotates over
+// the adjacency graph paced by respawn ripeness (cell_policy.go).
 
 // CellVertex is one vertex of the convex cell polygon (world
 // coordinates, counter-clockwise; the generator normalizes the

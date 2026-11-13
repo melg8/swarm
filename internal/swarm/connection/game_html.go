@@ -84,22 +84,14 @@ func (gc *GameClient) LastHTMLDialog() (npcObjID int32, html string) {
     return msg.NpcObjID, msg.HTML
 }
 
-// LastHTMLDialogArrival returns the last html dialog page together
-// with its arrival generation: the count of NpcHTMLMessage packets
-// the connection had received at the moment that page arrived (the
-// store holds one slot only, the generation is what tells a fresh
-// arrival from a page left over by an earlier conversation). The
-// dialog walker of the hunt loop gates its page waits on the
-// generation: a talk that starts at generation N accepts only pages
-// that arrived past N, so a stale page of the same npc - the
-// recurring Newbie Guide stop would read its own yesterday page
-// otherwise - never satisfies the wait and never sends its bypass
-// before the server opened the fresh dialog (the server validates
-// every bypass against the links of the page it last SENT, an early
-// bypass hits a stale cache and is dropped silently; see the
-// DriveDialog arrival gate). One locked read, one consistent
-// snapshot: the id, the html and the generation always belong to the
-// same arrival.
+// LastHTMLDialogArrival returns the last html dialog page with its arrival
+// generation: the count of NpcHTMLMessage packets received when that page
+// arrived. The store holds one slot, so the generation tells a fresh arrival
+// from a page of an earlier conversation: the dialog walker gates its waits on
+// it, a talk starting at generation N accepting only later pages. The server
+// validates every bypass against the links of the page it last SENT, so an
+// early bypass hits a stale cache and is dropped silently (DriveDialog). One
+// locked read keeps the id, the html and the generation of the same arrival.
 func (gc *GameClient) LastHTMLDialogArrival() (
     npcObjID int32, html string, gen uint64,
 ) {

@@ -34,23 +34,14 @@ const (
     pocketPassword = "temp12"
 )
 
-// Scenario timeouts: the farm readiness runs the one town visit
-// round - the weapon, the pdef maximizing armor set, the basic jewel
-// set, the spellbooks and the lessons all land in a single village
-// walk, then the bot crosses to its farm zone and kills its first
-// mob under the auras. The measured duration of the fixed flow was
-// ~8 minutes (472 s and 481 s on the local stack) under the early
-// generous pacing - the lessons pacing dominated it; the 2026-09-20
-// server window pacing (the lesson requests ride the SkillList
-// answer round trip, the buy and sell lists share the 1 s
-// transaction window - hunt/learning.go, hunt/shopping.go) cut the
-// shop and the teaching minutes shorter, and the bound keeps its
-// two and a half times margin of the measured flow so a live run
-// whose mob positions, walk retries or road fights drift slower
-// still fits - the aggressive mobs on the village road interrupt the
-// trips (the emergency logout reconnects and retries) and the zone
-// kill may wait out a respawn. The lifetime and relay scenarios are
-// short hops.
+// Scenario timeouts: the farm readiness runs the one town visit round - the
+// weapon, the pdef armor set, the basic jewels, the spellbooks and the lessons
+// in a single village walk - then crosses to the farm zone and kills its first
+// mob under the auras. The measured flow took ~8 minutes (472 s and 481 s on
+// the local stack) and the bound keeps a two and a half times margin for the
+// mob position drift, the walk retries and the road fights: the aggressive mobs
+// interrupt the trips (emergency logout, reconnect, retry) and the zone kill
+// may wait out a respawn. The lifetime and relay scenarios are short hops.
 const (
     farmTimeout = 20 * time.Minute
     lifeTimeout = 4 * time.Minute
@@ -106,14 +97,12 @@ const villageEscapeTimeout = 5 * time.Minute
 // session prologue comfortable.
 const fullDressTimeout = 5 * time.Minute
 
-// Definitions returns the acceptance scenario list: the scroll escape
-// of the newest round owns the head of the list the web UI serves,
-// then the city shopping errand, the world entry burst round of the
-// auto equipment, the village escape of the refused-click dump, the
-// farm readiness round of the user, plus the in-process mirrors of the
-// two existing e2e harnesses (tools/mobius_e2e.sh and
-// tools/proxy_e2e.sh) so the whole acceptance suite runs from one
-// place.
+// Definitions returns the acceptance scenario list the web UI serves: the
+// scroll escape, the city shopping errand, the world entry burst of the auto
+// equipment, the village escape of the refused-click dump, the farm readiness
+// round, plus the in-process mirrors of the two e2e harnesses
+// (tools/mobius_e2e.sh and tools/proxy_e2e.sh), so the whole suite runs from
+// one place.
 //
 //nolint:funlen,maintidx // the scenario registry is one linear table by design
 func Definitions() []TestDef {

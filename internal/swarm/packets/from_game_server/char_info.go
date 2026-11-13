@@ -12,23 +12,8 @@ import (
 
 const CharInfoPacketID = 0x03
 
-// CharInfoPacket describes another player around the character.
-// Wire format (see CharInfo.writeImpl): [opcode 0x03][x: 4][y: 4][z: 4]
-// [vehicleId: 4][objectId: 4][name: str][race: 4][female: 4]
-// [baseClass: 4][paperdoll and combat ints: 68][runSpd: 4][walkSpd: 4]
-// [swim and fly speeds: 24][moveMultiplier: 8][attack speed multiplier,
-// collision and hair fields: 36][title: str][clan and ally ids: 16]
-// [relation: 4][7 state bytes: standing, running, inCombat, alikeDead,
-// invisible, mountType, privateStore]. The standing byte tells a new
-// observer whether the player sits (0) or stands (1); the own
-// ChangeWaitType broadcasts keep it current afterwards.
-//
-// The transmitted runSpd and walkSpd are base values: the server divides
-// the real speeds by the move multiplier before writing them (see
-// CharInfo.writeImpl), so the effective speed is runSpd * moveMultiplier.
-// CharInfo carries no heading; the server announces the facing of a
-// standing player through the StartRotation and StopRotation packets (see
-// Player.sendInfo).
+// CharInfoPacket describes another player around the character: the layout, the
+// state bytes and the base speed rule are in docs/protocol_description.md.
 type CharInfoPacket struct {
     ObjectID        int32
     Name            string

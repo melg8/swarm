@@ -1571,6 +1571,33 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the navmesh suite (27.1 s),
   `golangci-lint run ./internal/swarm/pathfind/navmesh/...` 0 issues.
 
+### 2026-11-13 - the long comment blocks drop under the eight line ceiling
+
+- `huntdata/cell.go`: the Voronoi cell rules stay (one cell per spawn
+  point, the half-covered depletion, the ~2048 unit knownlist circle,
+  the polygon leash with the inscribed patrol square, the ripeness
+  paced rotation); 16 lines become 8.
+- `gear/shopping_equip.go`: the virtual paperdoll decides which slots,
+  the real one what is sold, the `referencePrice/2` sell value, the
+  `is_sellable=false` server skip with `gear.IsStarterItem` and the
+  phantom budget rule; 16 lines become 8.
+- `connection/game_html.go`: the `NpcHTMLMessage` arrival generation
+  against the one slot store, the later-page gate of the dialog walker
+  and the server bypass validation against the last SENT page;
+  16 lines become 8.
+- `acceptance/scenarios.go`: the one town visit round list, the
+  measured ~8 minutes (472 s and 481 s) with the two and a half times
+  margin, the road interrupts and the respawn wait; the dated pacing
+  note drops. The `Definitions` list loses the "newest round" marker.
+- `packets/from_game_server/char_info.go`: the 17 line wire layout moves
+  into the new CharInfo (0x03) section of
+  `docs/protocol_description.md` (the layout, the standing byte, the
+  base speed rule and the missing heading with StartRotation), and the
+  comment points there. 17 lines become 2.
+- Verified: `task fmt`, `go build ./...`, the huntdata, gear,
+  connection, acceptance and packets suites, `golangci-lint run` over
+  the same packages.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

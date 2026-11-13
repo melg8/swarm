@@ -602,6 +602,24 @@ right finger, left finger, head, right hand, left hand, gloves, chest,
 legs, feet, back and a C1 duplicate right hand. The server broadcasts
 UserInfo after every equip and unequip.
 
+### CharInfo (0x03) wire format
+
+`[opcode 0x03][x: 4][y: 4][z: 4][vehicleId: 4][objectId: 4][name: str]`
+`[race: 4][female: 4][baseClass: 4][paperdoll and combat ints: 68]`
+`[runSpd: 4][walkSpd: 4][swim and fly speeds: 24][moveMultiplier: 8]`
+`[attack speed multiplier, collision and hair fields: 36][title: str]`
+`[clan and ally ids: 16][relation: 4][7 state bytes: standing, running,`
+`inCombat, alikeDead, invisible, mountType, privateStore]`, matching
+`CharInfo.writeImpl` of the Mobius C1 sources. The standing byte tells a
+new observer whether the player sits (0) or stands (1); the own
+ChangeWaitType broadcasts keep it current afterwards.
+
+The transmitted `runSpd` and `walkSpd` are base values: the server
+divides the real speeds by the move multiplier before writing them, so
+the effective speed is `runSpd * moveMultiplier`. CharInfo carries no
+heading; the server announces the facing of a standing player through
+the StartRotation and StopRotation packets (`Player.sendInfo`).
+
 # The proxy emulation (swarm -> C1 client)
 
 The emulated servers of the client proxy (`internal/swarm/proxy`, see

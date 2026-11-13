@@ -185,22 +185,14 @@ func SellCreditOf(purchases []Purchase) int64 {
     return total
 }
 
-// displacedValue prices the equipped pieces the purchase displaces:
-// the real paperdoll occupants of the affected slots (the virtual
-// paperdoll decides WHICH slots a purchase writes to, the real
-// paperdoll decides WHAT is sold), each at its sell value of
-// referencePrice/2. Empty slots contribute nothing - the empty slot
-// fillers replace no one - and the newbie kit items contribute
-// nothing too: the server silently skips every unsellable entry of a
-// sell request (is_sellable=false in the Mobius item xml, see
-// gear.IsStarterItem), so their credit never lands and counting it
-// once armed a phantom budget - the reported bot wearing the starter
-// dagger planned its sword replacement against 69 adena no shop would
-// ever pay, walked to town for it and walked back empty every trip.
-// The returned sellFirst slice is allocated with a capacity of 2 (the
-// maximum number of affected slots) so the common case of 0-2
-// displaced items pays one small allocation instead of a growable
-// slice.
+// displacedValue prices the equipped pieces the purchase displaces: the real
+// paperdoll occupants of the affected slots (the virtual paperdoll decides
+// WHICH slots a purchase writes to, the real one decides WHAT is sold), each at
+// its sell value of referencePrice/2. Empty slots and the newbie kit items
+// contribute nothing: the server silently skips every unsellable sell entry
+// (is_sellable=false in the Mobius item xml, gear.IsStarterItem), so counting
+// their credit armed a phantom budget. The returned sellFirst slice starts with
+// room for two affected slots, so 0-2 displaced items pay one allocation.
 func displacedValue(equipment Equipment, slots []Slot) (int64, []int32) {
     var credit int64
     ids := make([]int32, 0, len(slots))
