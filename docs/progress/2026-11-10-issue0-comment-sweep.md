@@ -2254,6 +2254,19 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - the two packet docs keep their wire format line
+
+- `RequestAcquireSkill` (15 lines to 8): the trainer resolution, the
+  250 unit interaction distance, the SP and book checks with the silent
+  refusal, the CLASS-only type and the wire line stay; the chronicle
+  comparison drops. `NpcHtmlMessage` (15 lines to 7): the teleport
+  buttons, the `RequestBypassToServer` answer, the item id scope and the
+  wire layout stay, the.java reference becomes the write in the docs.
+  request_acquire_skill.go reads 13 comment lines of 55,
+  npc_html_message.go 14 of 58, no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the packets suite (0.3 s),
+  `golangci-lint run ./internal/swarm/packets/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

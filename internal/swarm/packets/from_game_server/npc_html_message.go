@@ -12,21 +12,14 @@ import (
 
 const NpcHTMLMessagePacketID = 0x1B
 
-// NpcHTMLMessage is the server html dialog packet a gatekeeper (or any
-// npc) sends in response to a bypass or a talk. The bot reads the html
-// to find the bypass buttons of the teleport list (the
-// "npc_<objId>_teleport <list> <index>" commands the H-002 verification
-// drives), then sends RequestBypassToServer with the chosen command.
+// NpcHTMLMessage is the server html dialog a gatekeeper (or any npc) sends
+// in response to a talk or a bypass: the bot reads the teleport buttons (the
+// "npc_<objId>_teleport <list> <index>" commands) and answers with
+// RequestBypassToServer. A non-zero item id marks the item html scope
+// (NpcItemHtml), zero the npc html scope of the gatekeeper.
+// Wire format (NpcHtmlMessage.writeImpl):
 //
-// Wire format:
-//
-//    [opcode 0x1B][npcObjId: 4][html: null-terminated UTF-16LE]
-//    [itemId: 4]
-//
-// The itemId is non-zero when the dialog is an item html (the
-// HtmlActionScope NpcItemHtml); zero for the npc html scope the
-// gatekeeper uses. Reference: org/l2jmobius/gameserver/network/
-// serverpackets/NpcHtmlMessage.java (writeImpl).
+//    [opcode 0x1B][npcObjId: 4][html: null-terminated UTF-16LE][itemId: 4]
 type NpcHTMLMessage struct {
     NpcObjID int32
     HTML     string
