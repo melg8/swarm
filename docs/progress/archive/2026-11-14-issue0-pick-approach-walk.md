@@ -1,4 +1,4 @@
-# The delayed approach walk of a fresh pick (status: in progress)
+# The delayed approach walk of a fresh pick (status: done)
 
 Started 2026-11-14, branch main, issue0 (owner report: the target
 switching is fast now, but the movement toward the new target starts
