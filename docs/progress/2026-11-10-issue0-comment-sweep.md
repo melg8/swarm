@@ -733,6 +733,19 @@ corner probe is a length, not a leg at all.
   lint:new`. `lure.go` fell from 21.6 to 15.5 percent (72 comment
   lines of 465), no block above 8 lines.
 
+### 2026-11-12 - hunt/town_sell.go keeps the transaction rules
+
+- 23 blocks compress: the phase entry, the trip tick with the teacher,
+  guide, sell and buy branches, the merchant handler, the approach walk
+  with the 3D gate, the deck window, the pull ladder, the selection,
+  the junk filter and the batch seller. The docs gained `The merchant
+  approach gates` bullet: the 200 unit ring around the npc approach
+  point, the 250 unit 3D interaction distance and the bounded deck
+  window.
+- Verified: `task fmt`, `go build ./...`, the merchant and sell tests,
+  `task lint:new`. `town_sell.go` fell from 35.6 to 24.2 percent (90
+  comment lines of 372), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -754,7 +767,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go`,
 `gear/shopping_candidates.go`, `hunt/town_segment.go`,
 `acceptance/plaza_herbiel.go`, `pathfind/click_validate.go`,
-`cmd/counterprobe/world.go` and `hunt/lure.go` (second passes). Next: a
-fresh `task comment:audit --top 10` pick (the `proxy/game.go` and
-`hunt/loop_state.go` entries stay untouched while their fragments are
-active); the share and the block count are re-measured at the end.
+`cmd/counterprobe/world.go`, `hunt/lure.go` and `hunt/town_sell.go`
+(second passes). Next: a fresh `task comment:audit --top 10` pick (the
+`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
+their fragments are active); the share and the block count are
+re-measured at the end.

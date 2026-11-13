@@ -1919,6 +1919,18 @@ The short form:
   (UserInfo, ItemList, SkillList) races the first hunt ticks, and a
   trip that starts between the ItemList and the SkillList plans
   without the learning stops.
+- **The merchant approach gates**: the walk stops on the 200 unit
+  approach ring around the npc approach point, never on the merchant
+  cell - a click on an interior cell steps the server Bresenham line
+  onto the roof layer (the 2026-09-11 roof teleport). The select
+  fires from the ring inside the 250 unit interaction distance, which
+  the server measures in 3D: x, y and z count together, so a small z
+  gap can keep the distance above the 200 approach gate while the
+  ring already stands within 250 (the 05:45 dump looped on the ring
+  without that early return). A merchant on a foreign deck hands the
+  last stretch to the select + attack analog pull ladder for the
+  bounded deck window; when that window burns out the stop gives up
+  (the sells work without the merchant, its buys are skipped).
 - The live verified cycle (2026-09-07): trigger at 55 slots/73% weight,
   walk to the trader ~18k units in ~60 s, one batch of 25 items sold
   (55 -> 30 slots, 73% -> 36% weight), walk back and hunting resumed;
