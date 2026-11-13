@@ -9,19 +9,17 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// Profile scores equipment for one combat class. A profile decides
-// which weapons the class fights with and which stats matter: the
-// melee fighter ranks weapons by their physical damage output, a
-// future mage profile would rank staves by magical damage and value
-// robes over leather. Implementing the interface for a new class is
-// the extension point of the whole gear stack: the equip planner, the
-// shop strategy and the zone gear gates all dispatch through it.
+// Profile scores equipment for one combat class: it decides which weapons the
+// class fights with and which stats matter. The melee fighter ranks weapons by
+// physical damage output, a mage profile would rank staves by magical damage
+// and value robes over leather. Implementing the interface is the extension
+// point of the gear stack: the equip planner, the shop strategy and the zone
+// gear gates all dispatch through it.
 type Profile interface {
     // Name is the log name of the profile.
     Name() string
-    // WeaponScore ranks a weapon for the class; zero means the class
-    // cannot fight with it (bows for a melee fighter, swords for a
-    // mage).
+    // WeaponScore ranks a weapon for the class; zero means the class cannot
+    // fight with it (bows for a melee fighter, swords for a mage).
     WeaponScore(stats npcdata.GearStats) float64
     // ArmorScore ranks an armor piece for the class.
     ArmorScore(stats npcdata.GearStats) float64
@@ -34,10 +32,9 @@ type Profile interface {
     WeaponPoints(stats npcdata.GearStats) int32
 }
 
-// MeleeFighter is the profile of a melee damage class: swords,
-// blunts, daggers, poles and fist weapons ranked by their physical
-// damage output, armor by pDef, jewels by mDef and shields by the
-// expected block value.
+// MeleeFighter is the profile of a melee damage class: swords, blunts, daggers,
+// poles and fist weapons ranked by physical damage output, armor by pDef,
+// jewels by mDef and shields by the expected block value.
 type MeleeFighter struct{}
 
 // Name of the melee fighter profile.
@@ -45,9 +42,9 @@ func (MeleeFighter) Name() string {
     return "melee fighter"
 }
 
-// meleeWeaponTypes lists the weapon families a melee fighter swings
-// in close combat; bows and the odd types (fishing rods, magic
-// implements without physical damage) are excluded and score zero.
+// meleeWeaponTypes lists the weapon families a melee fighter swings in close
+// combat; bows and the odd types (fishing rods, magic implements) are excluded
+// and score zero.
 var meleeWeaponTypes = map[string]bool{
     "SWORD":      true,
     "BLUNT":      true,
@@ -61,9 +58,8 @@ var meleeWeaponTypes = map[string]bool{
     "FISHINGROD": false,
 }
 
-// WeaponScore ranks melee weapons by their damage output proxy: the
-// damage per hit scales with pAtk and the hit rate with the attack
-// speed.
+// WeaponScore ranks melee weapons by a damage output proxy: the damage per hit
+// scales with pAtk and the hit rate with the attack speed.
 func (MeleeFighter) WeaponScore(stats npcdata.GearStats) float64 {
     if !meleeWeaponTypes[stats.WeaponType] {
         return 0
@@ -82,8 +78,8 @@ func (MeleeFighter) JewelScore(stats npcdata.GearStats) float64 {
     return float64(stats.MDef)
 }
 
-// ShieldScore ranks shields by their expected block value: the block
-// power hits on the block rate share of the incoming swings.
+// ShieldScore ranks shields by the expected block value on the block rate
+// share.
 func (MeleeFighter) ShieldScore(stats npcdata.GearStats) float64 {
     return float64(stats.SDef) * float64(stats.RShld) / 100
 }
@@ -97,11 +93,10 @@ func (MeleeFighter) WeaponPoints(stats npcdata.GearStats) int32 {
     return stats.PAtk
 }
 
-// MysticFighter is the profile of a caster class: magic implements
-// (the staves) ranked by their magical damage output, armor by pDef,
-// jewels by mDef and shields by the expected block value. The melee
-// weapons of the fighter families score zero - a caster swings the
-// staff only when the mana runs dry.
+// MysticFighter is the profile of a caster class: the magic implements ranked
+// by magical damage output, armor by pDef, jewels by mDef and shields by the
+// expected block value. The melee weapons of the fighter families score zero: a
+// caster swings the staff only when the mana runs dry.
 type MysticFighter struct{}
 
 // Name of the mystic fighter profile.
@@ -109,9 +104,9 @@ func (MysticFighter) Name() string {
     return "mystic fighter"
 }
 
-// WeaponScore ranks caster weapons by their magical damage output:
-// the magic attack of the implement scaled by its attack speed (the
-// casting itself is instant, the number only orders the purchases).
+// WeaponScore ranks caster weapons by magical damage output: the magic attack
+// of the implement scaled by its attack speed (the casting is instant, the
+// number only orders the purchases).
 func (MysticFighter) WeaponScore(stats npcdata.GearStats) float64 {
     return float64(stats.MAtk) * float64(stats.PAtkSpd)
 }
@@ -131,22 +126,18 @@ func (MysticFighter) ShieldScore(stats npcdata.GearStats) float64 {
     return float64(stats.SDef) * float64(stats.RShld) / 100
 }
 
-// WeaponPoints is the zone gating value of a caster weapon: the
-// magical damage.
+// WeaponPoints is the zone gating value of a caster weapon: the magic attack.
 func (MysticFighter) WeaponPoints(stats npcdata.GearStats) int32 {
     return stats.MAtk
 }
 
-// Archer is the profile of the ranged class (the archer bot type of
-// the launch config, issue #17): bows ranked by their ranged output,
-// the melee families score zero - the archetype never swaps to a
-// melee weapon, the bow is the always-weapon (the owner spec of
-// #21). Armor ranks by pDef and jewels by mDef like the fighter; the
-// shield scores zero because the left hand carries the quiver (the
-// arrow stack), never a shield. The ammo itself is NOT planner
-// managed - the arrows are a consumable that scores zero under every
-// profile, the quiver restock and the arming are the shop strategy's
-// and the loop's own steps (see bow.go and hunt/equip.go).
+// Archer is the profile of the ranged class: bows ranked by ranged output,
+// the melee families scoring zero, because the archetype never swaps to a
+// melee weapon (the bow is the always weapon). Armor ranks by pDef and jewels
+// by mDef like the fighter; the shield scores zero, the left hand carrying the
+// quiver. The ammo is not planner managed: the arrows score zero under every
+// profile, and the quiver restock is the shop strategy's and the loop's own
+// step (see bow.go and hunt/equip.go).
 type Archer struct{}
 
 // Name of the archer profile.
@@ -154,10 +145,9 @@ func (Archer) Name() string {
     return "archer"
 }
 
-// WeaponScore ranks bows by their ranged damage output proxy: the
-// damage per shot scales with pAtk and the shot rate with the attack
-// speed - the same proxy the melee fighter uses, restricted to the
-// bow family.
+// WeaponScore ranks bows by a ranged damage output proxy: the damage per shot
+// scales with pAtk and the shot rate with the attack speed, the proxy of the
+// melee fighter restricted to the bow family.
 func (Archer) WeaponScore(stats npcdata.GearStats) float64 {
     if stats.WeaponType != weaponTypeBow {
         return 0
@@ -166,8 +156,8 @@ func (Archer) WeaponScore(stats npcdata.GearStats) float64 {
     return float64(stats.PAtk) * float64(stats.PAtkSpd)
 }
 
-// ArmorScore ranks armor by its physical defense (the archer wears
-// the same leather set the fighter does).
+// ArmorScore ranks armor by pDef (the archer wears the same leather set as the
+// fighter).
 func (Archer) ArmorScore(stats npcdata.GearStats) float64 {
     return float64(stats.PDef)
 }
@@ -177,16 +167,16 @@ func (Archer) JewelScore(stats npcdata.GearStats) float64 {
     return float64(stats.MDef)
 }
 
-// ShieldScore is zero for everything: the left hand of a bow user
-// carries the quiver, and a two hand weapon drops a shield anyway -
-// the planner must never place one (the virtual paperdoll keeps the
-// left hand free for the ammo the loop arms).
+// ShieldScore is zero for everything: the left hand of a bow user carries the
+// quiver, and a two hand weapon drops a shield anyway, so the planner must
+// never place one (the virtual paperdoll keeps the left hand free for the ammo
+// the loop arms).
 func (Archer) ShieldScore(_ npcdata.GearStats) float64 {
     return 0
 }
 
-// WeaponPoints is the damage per shot of the bow (the zone gating
-// value of the ranged weapon).
+// WeaponPoints is the damage per shot of the bow, the zone gating value of the
+// ranged weapon.
 func (Archer) WeaponPoints(stats npcdata.GearStats) int32 {
     if stats.WeaponType != weaponTypeBow {
         return 0
@@ -214,9 +204,9 @@ func scoreStats(profile Profile, stats npcdata.GearStats) float64 {
     }
 }
 
-// Score returns the profile value of the inventory item for its gear
-// family; zero for items the profile cannot use and items without
-// gear stats (consumables, materials, quest items).
+// Score returns the profile value of the item for its gear family; zero for
+// what the profile cannot use and for items without gear stats (consumables,
+// materials, quest items).
 func Score(profile Profile, item state.InventoryItem) float64 {
     stats, ok := npcdata.ItemGearStats(item.ItemID)
     if !ok {
@@ -226,9 +216,9 @@ func Score(profile Profile, item state.InventoryItem) float64 {
     return scoreStats(profile, stats)
 }
 
-// GearPoints returns the zone gating points of the item: the weapon
-// value on the character stat scale plus the defenses. A zero score
-// (an unusable item) always returns zero points.
+// gearPoints returns the zone gating points of the item: the weapon value on
+// the character stat scale plus the defenses. A zero score (an unusable item)
+// always returns zero points.
 func gearPoints(profile Profile, item state.InventoryItem) int32 {
     stats, ok := npcdata.ItemGearStats(item.ItemID)
     if !ok || scoreStats(profile, stats) <= 0 {
@@ -250,11 +240,10 @@ func gearPoints(profile Profile, item state.InventoryItem) int32 {
     }
 }
 
-// TotalGearPoints summarizes the equipped gear in intuitive points
-// for the hunting zone gates: the weapon damage per hit plus the
-// defenses of the armor, jewels and shield. A gate reads like "the
-// kaboo woods need 120 points: a broadsword (11) and the wooden set
-// (108)".
+// TotalGearPoints summarizes the equipped gear in intuitive points for the
+// hunting zone gates: the weapon damage per hit plus the defenses of the armor,
+// jewels and shield. A gate reads like "the kaboo woods need 120 points: a
+// broadsword (11) and the wooden set (108)".
 func TotalGearPoints(profile Profile, equipment Equipment) int32 {
     paperdoll := equipment.Paperdoll(profile)
     total := int32(0)

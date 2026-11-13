@@ -1998,6 +1998,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - gear/profile.go keeps the scoring contract
+
+- 17 blocks compress: the profile keeps the extension point role (the
+  equip planner, the shop strategy and the zone gear gates all dispatch
+  through it), the zero score meaning "the class cannot fight with it",
+  the melee weapon family table and the `pAtk * pAtkSpd` damage proxy,
+  the shield block value on the block rate share, the caster
+  `MAtk * pAtkSpd` proxy, the archer rules (the bow is the always
+  weapon, the shield scores zero because the left hand carries the
+  quiver, the arrows are not planner managed), the `TotalGearPoints`
+  gate example (the kaboo woods need 120 points: a broadsword 11 and the
+  wooden set 108). Two stale doc references fixed (`GearPoints` to
+  `gearPoints`, "physical defense" to pDef). 86 comment lines of 270
+  become 75 of 259.
+- Verified: `task fmt`, `go build ./...`, the gear suite (0.4 s),
+  `golangci-lint run ./internal/swarm/gear/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
