@@ -1240,6 +1240,17 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - webserver/server.go keeps the stream contract only
+
+- 31 blocks compress: the server keeps the zero allocation SSE frame
+  and payload reuse (the fresh 64 KB frame and payload per version
+  change would be megabytes of garbage per second), the per frame 15 s
+  write deadline, the 6x direct writer over json.Marshal, the build id
+  reload and the dual pack cache split. The issue ids drop. 150 comment
+  lines of 563 become 110 of 522.
+- Verified: `task fmt`, `go build ./...`, the webserver suite (8.3 s),
+  `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

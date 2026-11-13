@@ -2,11 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package webserver serves the embedded web interface of the swarm bot:
-// static files, JSON snapshot endpoints and a server sent event stream
-// of the observed bot states. It also hosts the bot less pathfind test
-// mode (NewPathfindServer) that exposes the map path search of the
-// pathfind package.
+// Package webserver serves the embedded web interface of the swarm bot: static
+// files, JSON snapshot endpoints, a server sent event stream and the botless
+// pathfind test mode (NewPathfindServer).
 package webserver
 
 import (
@@ -34,36 +32,28 @@ var webContent embed.FS
 const (
     modeBot      = "bot"
     modePathfind = "pathfind"
-    // modeTestFight is the fight FX comparison gallery mode
-    // (NewTestFightServer): the static cells of the -test-fight-ui flag.
+    // modeTestFight is the fight FX gallery of -test-fight-ui.
     modeTestFight = "test-fight"
-    // modeTestPath is the walk plan visualization gallery mode
-    // (NewTestPathServer): the animated cells of the -test-path-ui flag.
+    // modeTestPath is the walk plan gallery of -test-path-ui.
     modeTestPath = "test-path"
-    // modeTestPathV2 is the smooth curve animation lab mode
-    // (NewTestPathCurveServer): the thirty animated variants of the
-    // -test-path-ui-v2 flag.
+    // modeTestPathV2 is the smooth curve lab of -test-path-ui-v2 (thirty
+    // animated variants).
     modeTestPathV2 = "test-path-v2"
-    // modeTestPathV3 is the flow and snake speed lab mode
-    // (NewTestPathFlowServer): the forty rainbow flow and pulse snake
-    // variants of the -test-path-ui-v3 flag.
+    // modeTestPathV3 is the flow and snake speed lab of -test-path-ui-v3
+    // (forty rainbow variants).
     modeTestPathV3 = "test-path-v3"
-    // modeFight is the combat animation variant showcase of the
-    // -test-fight-ui-v1 run: a looping demo fight on every variant.
+    // modeFight is the combat variant showcase of -test-fight-ui-v1.
     modeFight = "fight"
-    // modeNavmesh is the 3D navmesh viewer mode (NewNavmeshServer):
-    // the interactive mesh inspection of the -show-navmesh flag.
+    // modeNavmesh is the 3D mesh viewer of -show-navmesh.
     modeNavmesh = "navmesh"
 
     // defaultPathfindScale is the initial map zoom of the pathfind
     // test, a bit closer than the bot map default.
     defaultPathfindScale = 0.06
 
-    // fleetKillMarkLimit bounds the fleet kill ring served by
-    // /api/fleet/kills: the map draws the marks as the session death
-    // statistics (nothing expires by time, issue #6), so the bound
-    // is the count cap of the merged per bot logs - the oldest marks
-    // drop only when the fleet outgrows it.
+    // fleetKillMarkLimit bounds the fleet kill ring of /api/fleet/kills: the
+    // marks are session death statistics (nothing expires by time), so the
+    // oldest drop only when the fleet outgrows the cap.
     fleetKillMarkLimit = 2000
 )
 
@@ -76,24 +66,18 @@ const (
 // ssePingComment is the constant keepalive comment of the stream.
 var ssePingComment = []byte(": ping\n\n")
 
-// sseStream writes the SSE events of one open connection. It owns
-// the reusable frame and payload buffers, so the steady state of a
-// long lived stream costs zero allocations per event: the frame
-// assembly and the JSON encoding both write into buffers sized by
-// the first (largest) snapshot and reused by every later one (a
-// watched 100 npc bot used to pay a fresh 64 KB frame plus a fresh
-// payload buffer on every version change - with a fleet of
-// streams that is megabytes of garbage per second).
+// sseStream writes the SSE events of one connection. The reusable frame and
+// payload buffers keep the steady state allocation free: both grow to the first
+// (largest) snapshot and serve every later one (a fresh 64 KB frame and payload
+// per version change would be megabytes of garbage per second).
 type sseStream struct {
     frame   []byte
     payload []byte
 }
 
-// snapshotEvent encodes the current bot state into the payload
-// buffer, assembles the SSE frame over it and writes both out. The
-// encode walks the live state under the read lock and allocates
-// nothing: the view structs of the elements stay on the call stack
-// (see Bot.AppendSnapshotJSON).
+// snapshotEvent encodes the bot state into the payload buffer, assembles the
+// frame over it and writes both out. The encode allocates nothing: the view
+// structs stay on the stack (see Bot.AppendSnapshotJSON).
 func (s *sseStream) snapshotEvent(
     w http.ResponseWriter, flusher http.Flusher, bot *state.Bot,
 ) {
@@ -106,12 +90,9 @@ func (s *sseStream) snapshotEvent(
     flusher.Flush()
 }
 
-// sseWriteTimeout bounds one SSE frame write: a half-open client (a
-// phone asleep, a dead NAT binding) otherwise parks the handler
-// goroutine in a blocked Write forever - the shutdown then waits out
-// the whole handler budget and eventsDone cannot interrupt a blocked
-// write. The deadline refreshes per frame, so a live slow reader
-// keeps streaming.
+// sseWriteTimeout bounds one SSE frame write: a half-open client otherwise
+// parks the handler in a blocked Write forever, and eventsDone cannot interrupt
+// it. The deadline refreshes per frame, so a live slow reader keeps streaming.
 const sseWriteTimeout = 15 * time.Second
 
 // armSSEWrite sets the per frame write deadline of the SSE streams.
@@ -135,9 +116,8 @@ func appendEventFrame(dst, data []byte) []byte {
 // httpReadHeaderTimeout bounds the header read of the web server.
 const httpReadHeaderTimeout = 5 * time.Second
 
-// Server serves the web interface for a bot registry. In pathfind test
-// mode the registry is empty and the pathfinder answers the map
-// requests instead.
+// Server serves the web interface for a bot registry; in pathfind test mode the
+// registry is empty and the pathfinder answers the map requests.
 type Server struct {
     registry     *state.Registry
     pathfinder   *pathfind.Engine
@@ -151,50 +131,38 @@ type Server struct {
     httpServer   *http.Server
     eventsDone   chan struct{}
     shutdown     func()
-    // stats is the bot statistics collector (nil in the bot less
-    // modes): the sampler goroutine of the statistics endpoints.
+    // stats is the bot statistics collector (nil in the botless modes).
     stats *statsCollector
-    // navmeshMesh serves the navmesh viewer mode (nil in every other
-    // mode): the tile mesh of the -show-navmesh run.
+    // navmeshMesh is the tile mesh of the -show-navmesh run.
     navmeshMesh *navmesh.Mesh
-    // navmeshTiles are the flag selected tiles of the viewer (nil or
-    // empty means every tile of the directory - the stitched world).
+    // navmeshTiles are the flag selected tiles (nil or empty means every tile,
+    // the stitched world).
     navmeshTiles []navmesh.RegionKey
-    // navmeshEngine is the geodata engine of the viewer mode (nil in
-    // the tests): the original geometry source and the clearance
-    // radius holder.
+    // navmeshEngine is the geodata engine (nil in the tests): the original
+    // geometry source and the clearance radius holder.
     navmeshEngine *pathfind.Engine
-    // navmeshCapsule answers the wall clearance questions of the
-    // route answers (nil when the engine is nil or unarmed).
+    // navmeshCapsule answers the wall clearance of the route answers.
     navmeshCapsule *pathfind.Capsule
-    // navmeshGeo caches the encoded geometry payloads of the served
-    // tiles; navmeshGeoMu guards the lazy fills.
+    // navmeshGeo caches the encoded geometry; navmeshGeoMu guards the fills.
     navmeshGeo   map[navmesh.RegionKey][]byte
     navmeshGeoMu sync.Mutex
-    // navmeshCompare is the second mesh of the dual pack view (nil
-    // when the viewer runs single pack) and navmeshCompareGeo caches
-    // its geometry payloads - issue #59, the visual counterpart of
-    // the navpack-verify corpus.
+    // navmeshCompare is the second mesh of the dual pack view (nil for the
+    // single pack viewer); navmeshCompareGeo caches its geometry.
     navmeshCompare    *navmesh.Mesh
     navmeshCompareGeo map[navmesh.RegionKey][]byte
-    // navmeshOriginal caches the encoded ORIGINAL geometry payloads
-    // (the raw l2j cell render of the comparison toggle);
-    // navmeshRegions loads and parses one raw geodata region on
-    // demand (nil when no engine backs the viewer).
+    // navmeshOriginal caches the raw l2j cell render of the comparison toggle;
+    // navmeshRegions loads one geodata region on demand.
     navmeshOriginal map[navmesh.RegionKey][]byte
     navmeshRegions  func(navmesh.RegionKey) (*pathfind.Region, error)
-    // webBuild is the content hash of the embedded web interface and
-    // indexPage is the index.html bytes with the build meta injected
-    // (both prepared once at startup, issue #48: the page and the
-    // /api/bots poll carry the id, a stale tab reloads itself when
-    // the binary - and with it the UI - moved on).
+    // webBuild is the content hash of the embedded UI and indexPage the
+    // index.html with the build meta injected: the page and the /api/bots poll
+    // carry the id, so a stale tab reloads itself when the UI moved on.
     webBuild  string
     indexPage []byte
 }
 
 // ProxyController drives the client proxy from the web UI: which bot a
-// connecting game client attaches to. The proxy server of the swarm
-// process implements it; without a proxy the endpoints stay absent and
+// connecting client attaches to. Without a proxy the endpoints stay absent and
 // the UI hides the selection.
 type ProxyController interface {
     // SelectBot marks the bot the next connecting client attaches to.
@@ -229,9 +197,8 @@ func NewServer(
     mux.HandleFunc("GET /api/stats", server.handleStats)
     mux.HandleFunc("GET /api/stats/{id}", server.handleBotStats)
 
-    // The statistics sampler starts with the server: the history of
-    // the statistics tab collects from the first minute of the
-    // process, not from the first visit of the tab.
+    // The sampler starts with the server, so the history collects from the
+    // first minute of the process, not from the first visit of the tab.
     server.stats = newStatsCollector(registry, logger)
     go server.stats.run()
 
@@ -311,8 +278,8 @@ func (s *Server) handleProxySelect(w http.ResponseWriter, r *http.Request) {
 // newServer builds the shared server shell with the static files.
 func newServer(address string, logger *log.Logger) *Server {
     mux := http.NewServeMux()
-    // The build identity of the embedded UI and the index page with
-    // the meta injected: both are constants of the binary (issue #48).
+    // The build identity and the index page with the meta injected: both are
+    // constants of the binary.
     build := webBuildID(webContent)
     var indexPage []byte
     raw, readErr := fs.ReadFile(webContent, "web/index.html")
@@ -346,9 +313,8 @@ func newServer(address string, logger *log.Logger) *Server {
         webBuild:          build,
         indexPage:         indexPage,
     }
-    // The geometry caches start ready: the dual view endpoints share
-    // the mutex and the same cached contract, the lazy make moved
-    // into the constructor (issue #59).
+    // The geometry caches start ready: the dual view endpoints share the
+    // mutex and the cached contract.
     server.navmeshGeo = make(map[navmesh.RegionKey][]byte)
     server.navmeshCompareGeo = make(map[navmesh.RegionKey][]byte)
     //nolint:exhaustruct_v5 // the zero defaults of http.Server are intended
@@ -406,33 +372,29 @@ func (s *Server) Shutdown(ctx context.Context) error {
     return s.httpServer.Shutdown(ctx)
 }
 
-// handleBotList responds with the compact info of all bots. The
-// response carries the build id of the binary (X-Swarm-Build): the
-// web app reads it on every poll and reloads the page when the
-// running server moved to a new UI build (issue #48).
+// handleBotList responds with the compact info of all bots and carries the
+// build id (X-Swarm-Build): the web app reloads the page when the UI build
+// moved on.
 func (s *Server) handleBotList(w http.ResponseWriter, _ *http.Request) {
     w.Header().Set("X-Swarm-Build", s.webBuild)
     writeJSON(w, s.logger, s.registry.List())
 }
 
-// handleFleetKills responds with the recent kill marks of every bot
-// of the registry: the web map polls it for the fleet wide cross
-// layer, so the kills stay on the map across the bot switches (the
-// observed bot's snapshot alone would only carry its own kills). An
-// empty registry answers an empty array.
+// handleFleetKills responds with the recent kill marks of every bot: the web
+// map polls it for the fleet cross layer, so the kills stay across the bot
+// switches. An empty registry answers an empty array.
 func (s *Server) handleFleetKills(w http.ResponseWriter, _ *http.Request) {
     marks := s.registry.FleetKillMarks(fleetKillMarkLimit)
     if marks == nil {
-        // An idle fleet serves an empty array, not a null: the web
-        // layer feeds the array straight into the map layer.
+        // An idle fleet serves an empty array: the map layer feeds it
+        // directly.
         marks = []state.KillMarkView{}
     }
     writeJSON(w, s.logger, marks)
 }
 
-// handleBotState responds with the full snapshot of one bot. The
-// snapshot encodes through the direct append writer - the reflection
-// and compacting walk of json.Marshal costs 6x the direct write.
+// handleBotState responds with the full snapshot of one bot through the direct
+// append writer: json.Marshal costs 6x the direct write.
 func (s *Server) handleBotState(w http.ResponseWriter, r *http.Request) {
     bot, ok := s.lookupBot(w, r)
     if !ok {
@@ -441,17 +403,15 @@ func (s *Server) handleBotState(w http.ResponseWriter, r *http.Request) {
     w.Header().Set("Content-Type", "application/json")
     data := bot.AppendSnapshotJSON(nil)
     data = append(data, '\n')
-    // The direct writer HTML escapes the payload exactly like
-    // json.Marshal, and the JSON content type never executes in
-    // a browser - the taint report is a false positive.
+    // The direct writer HTML escapes like json.Marshal, and the JSON content
+    // type never executes in a browser.
     //nolint:gosec // escaped json, see above
     if _, err := w.Write(data); err != nil {
         s.logger.Printf("Error writing json response: %v", err)
     }
 }
 
-// handleBotEvents streams snapshot events of one bot over SSE whenever the
-// bot state version changes.
+// handleBotEvents streams the snapshot events of one bot over SSE.
 func (s *Server) handleBotEvents(w http.ResponseWriter, r *http.Request) {
     bot, ok := s.lookupBot(w, r)
     if !ok {
