@@ -1287,6 +1287,19 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the navmesh suite (32.6 s),
   `golangci-lint run ./internal/swarm/pathfind/navmesh/...` 0 issues.
 
+### 2026-11-13 - state/bot_self.go keeps the server verdicts only
+
+- 22 blocks compress: the self view keeps the enter world burst race of
+  the SkillList, the strict fresh engagement against the lingering auto
+  attack flag, the both sided engagement with the C1 bow reuse refusal
+  (Creature.canUseRangeWeapon), the phantom chase of a newer refusal,
+  the 80 unit stuck dump, the server snap of a report more than one move
+  speed away, the 2.5 s stand window and the unknown max HP rule (100
+  percent). The dates and issue ids drop. 142 comment lines of 427
+  become 110 of 395.
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
