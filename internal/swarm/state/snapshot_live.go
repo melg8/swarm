@@ -14,18 +14,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// AppendSnapshotJSON appends the JSON encoding of the whole current
-// bot state to dst and returns the grown slice. The event stream and
-// the state endpoint call it on their reusable payload buffers: the
-// encoder walks the live state under the read lock and materializes
-// no intermediate Snapshot - the per element view structs live on the
-// stack of this call, so the steady state of a watched stream
-// allocates nothing per event (the snapshot copy used to pay the
-// object, combat, event and chat slice allocations on every version
-// change, roughly 26 KB of garbage per event on a 100 npc bot). The
-// output is byte identical to Snapshot().AppendJSON, pinned by
-// TestAppendSnapshotJSONMatchesSnapshot and the reflection golden
-// suite of snapshot_json_test.go.
+// AppendSnapshotJSON appends the JSON encoding of the whole current bot state
+// to dst and returns the grown slice. The encoder walks the live state under
+// the read lock and materializes no intermediate Snapshot - the view structs
+// live on the stack - so the steady state of a watched stream allocates nothing
+// per event (the snapshot copy paid roughly 26 KB of garbage per event on a 100
+// npc bot). The output is byte identical to Snapshot().AppendJSON, pinned by
+// TestAppendSnapshotJSONMatchesSnapshot and the reflection golden suite of
+// snapshot_json_test.go.
 func (b *Bot) AppendSnapshotJSON(dst []byte) []byte {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -33,12 +29,10 @@ func (b *Bot) AppendSnapshotJSON(dst []byte) []byte {
     return b.appendSnapshotJSONLocked(dst, b.now())
 }
 
-// appendSnapshotJSONLocked is the direct live state walk of the
-// snapshot encoding. The caller must hold a lock; the arrays keep the
-// exact nil semantics of the Snapshot view (the always present
-// collections encode as empty arrays, only the optional walk plan and
-// hunting zone fall back to null). Splitting the linear field walk
-// only obscures the wire format (see appendSnapshotJSON).
+// appendSnapshotJSONLocked is the direct live state walk of the encoding: the
+// always present collections encode as empty arrays, only the optional walk
+// plan and hunting zone fall back to null. Splitting the linear field walk only
+// obscures the wire format.
 //
 //nolint:funlen // linear field order
 func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
@@ -98,10 +92,8 @@ func (b *Bot) appendSnapshotJSONLocked(dst []byte, now time.Time) []byte {
     return append(dst, '}')
 }
 
-// appendLiveInventoryJSON writes the equipment widget array opened
-// by the caller (the live view never falls back to null - the
-// snapshot copy always materialized the collection). The caller must
-// hold a lock.
+// appendLiveInventoryJSON writes the equipment widget array; the live view
+// never falls back to null.
 func (b *Bot) appendLiveInventoryJSON(dst []byte) []byte {
     for i := range b.inventory.items {
         if i > 0 {
@@ -144,10 +136,9 @@ func (b *Bot) appendLiveInventoryJSON(dst []byte) []byte {
     return dst
 }
 
-// appendLiveObjectsJSON writes the world object array opened by the
-// caller and folds the records into the counts tally of the
-// diagnostics view (one walk, no second pass over the hot records).
-// The caller must hold a lock.
+// appendLiveObjectsJSON writes the world object array and folds the records
+// into the counts tally of the diagnostics view: one walk, no second pass over
+// the hot records.
 func (b *Bot) appendLiveObjectsJSON(
     dst []byte, now time.Time, counts *worldCounts,
 ) []byte {
@@ -163,9 +154,8 @@ func (b *Bot) appendLiveObjectsJSON(
     return dst
 }
 
-// appendLiveEventsJSON writes the newest snapshotEvents rolling log
-// entries opened by the caller, in chronological order exactly like
-// eventLog.appendNewest. The caller must hold a lock.
+// appendLiveEventsJSON writes the newest snapshotEvents rolling log entries, in
+// chronological order like eventLog.appendNewest.
 func (b *Bot) appendLiveEventsJSON(dst []byte) []byte {
     count := min(b.log.length, snapshotEvents)
     for i := count; i > 0; i-- {
@@ -179,9 +169,8 @@ func (b *Bot) appendLiveEventsJSON(dst []byte) []byte {
     return dst
 }
 
-// appendLiveChatJSON writes the whole chat window opened by the
-// caller, in chronological order exactly like chatLog.appendAll. The
-// caller must hold a lock.
+// appendLiveChatJSON writes the whole chat window, in chronological order like
+// chatLog.appendAll.
 func (b *Bot) appendLiveChatJSON(dst []byte) []byte {
     for i := range b.chat.length {
         if i > 0 {
@@ -195,10 +184,9 @@ func (b *Bot) appendLiveChatJSON(dst []byte) []byte {
     return dst
 }
 
-// appendLiveWalkPathJSON writes the published walk plan (null when
-// none is fresh) exactly like the Snapshot view: the full waypoint
-// array plus the origin, the current target index, the final
-// destination and the search contract. The caller must hold a lock.
+// appendLiveWalkPathJSON writes the published walk plan (null when none is
+// fresh): the waypoints plus the origin, the target index, the destination and
+// the search contract.
 func (b *Bot) appendLiveWalkPathJSON(dst []byte) []byte {
     if b.walkPlan != nil && b.now().Sub(b.walkPlanAt) <= walkPlanTTL {
         return appendWalkPlanFieldsJSON(dst, b.walkPlan.Points,
@@ -209,9 +197,8 @@ func (b *Bot) appendLiveWalkPathJSON(dst []byte) []byte {
     return appendWalkPlanFieldsJSON(dst, nil, nil, 0, nil, nil)
 }
 
-// appendLiveShoppingJSON writes the published shopping plan (null
-// when none is fresh) exactly like the Snapshot view. The caller
-// must hold a lock.
+// appendLiveShoppingJSON writes the published shopping plan, null when none is
+// fresh.
 func (b *Bot) appendLiveShoppingJSON(dst []byte, now time.Time) []byte {
     if !b.shoppingPlanLive(now) {
         return append(dst, `null`...)
@@ -220,9 +207,8 @@ func (b *Bot) appendLiveShoppingJSON(dst []byte, now time.Time) []byte {
     return appendShoppingPlanJSON(dst, b.shopping)
 }
 
-// appendLiveSkillBlockJSON writes the learning queue, the active
-// effect list and the live skill windows that follow the learned
-// skills in the live view. The caller must hold a lock.
+// appendLiveSkillBlockJSON writes the learning queue, the effect list and the
+// live skill windows that follow the learned skills.
 func (b *Bot) appendLiveSkillBlockJSON(dst []byte, now time.Time) []byte {
     dst = append(dst, `,"skillPlan":`...)
     dst = b.appendLiveSkillPlanJSON(dst)
@@ -233,9 +219,8 @@ func (b *Bot) appendLiveSkillBlockJSON(dst []byte, now time.Time) []byte {
     return b.appendLiveSkillStatesJSON(dst, now)
 }
 
-// appendLiveSkillsJSON writes the learned skill list (null when the
-// character knows no skills, the nil semantics of the Snapshot view).
-// The caller must hold a lock.
+// appendLiveSkillsJSON writes the learned skill list, null when the character
+// knows none.
 func (b *Bot) appendLiveSkillsJSON(dst []byte) []byte {
     if len(b.skills) == 0 {
         return append(dst, `null`...)
@@ -270,8 +255,7 @@ func (b *Bot) appendLiveSkillsJSON(dst []byte) []byte {
     return append(dst, ']')
 }
 
-// sortedSkillIDsLocked returns the learned skill ids in ascending
-// order (the Snapshot view order). The caller must hold a lock.
+// sortedSkillIDsLocked returns the learned skill ids in ascending order.
 func (b *Bot) sortedSkillIDsLocked() []int32 {
     ids := make([]int32, 0, len(b.skills))
     for id := range b.skills {
@@ -282,11 +266,10 @@ func (b *Bot) sortedSkillIDsLocked() []int32 {
     return ids
 }
 
-// appendLiveSkillPlanJSON writes the learning queue (null when the
-// class is unknown or nothing is left to learn) exactly like the
-// Snapshot view. The affordability flag is computed inline against
-// the SP read under the same lock - the queue never carries a valid
-// flag. The caller must hold a lock.
+// appendLiveSkillPlanJSON writes the learning queue, null when the class is
+// unknown or nothing is left to learn. The affordability flag is computed
+// inline against the SP read under the same lock: the queue never carries a
+// valid flag.
 func (b *Bot) appendLiveSkillPlanJSON(dst []byte) []byte {
     queue := b.skillQueueLocked()
     if len(queue) == 0 {
@@ -314,9 +297,8 @@ func (b *Bot) appendLiveSkillPlanJSON(dst []byte) []byte {
     return dst
 }
 
-// appendLiveSkillStatesJSON writes the live cast and reuse windows
-// (null when no window runs, the nil semantics of the Snapshot view).
-// The caller must hold a lock.
+// appendLiveSkillStatesJSON writes the live cast and reuse windows, null when
+// none runs.
 func (b *Bot) appendLiveSkillStatesJSON(
     dst []byte, now time.Time,
 ) []byte {
@@ -335,10 +317,9 @@ func (b *Bot) appendLiveSkillStatesJSON(
     return append(dst, ']')
 }
 
-// appendLiveBuffsJSON writes the active effect list (null when the
-// character runs no effects, the nil semantics of the Snapshot
-// view) with the remaining seconds counted down from the arrival
-// of the last server list. The caller must hold a lock.
+// appendLiveBuffsJSON writes the active effect list, null when the character
+// runs none, with the remaining seconds counted down from the arrival of the
+// last server list.
 func (b *Bot) appendLiveBuffsJSON(
     dst []byte, now time.Time,
 ) []byte {
@@ -374,9 +355,7 @@ func (b *Bot) appendLiveBuffsJSON(
     return append(dst, ']')
 }
 
-// sortedBuffIDsLocked returns the active effect skill ids in
-// ascending order (the Snapshot view order). The caller must hold a
-// lock.
+// sortedBuffIDsLocked returns the active effect skill ids in ascending order.
 func (b *Bot) sortedBuffIDsLocked() []int32 {
     ids := make([]int32, 0, len(b.buffs))
     for id := range b.buffs {
@@ -387,9 +366,8 @@ func (b *Bot) sortedBuffIDsLocked() []int32 {
     return ids
 }
 
-// appendLiveCombatJSON writes the combat animation beats of the TTL
-// window opened by the caller, in chronological order exactly like
-// combatFeed.appendView. The caller must hold a lock.
+// appendLiveCombatJSON writes the combat animation beats of the TTL window, in
+// chronological order like combatFeed.appendView.
 func (b *Bot) appendLiveCombatJSON(dst []byte, now time.Time) []byte {
     cut := now.Add(-combatEventTTL)
     first := true
@@ -419,8 +397,7 @@ func (b *Bot) appendLiveCombatJSON(dst []byte, now time.Time) []byte {
     return dst
 }
 
-// appendLiveZoneViewsJSON writes the zone registry array opened by
-// the caller. The caller must hold a lock.
+// appendLiveZoneViewsJSON writes the zone registry array.
 func (b *Bot) appendLiveZoneViewsJSON(dst []byte) []byte {
     for i := range b.zoneViews {
         if i > 0 {
@@ -432,10 +409,8 @@ func (b *Bot) appendLiveZoneViewsJSON(dst []byte) []byte {
     return dst
 }
 
-// characterSnapshotLocked builds the character view of the snapshot
-// from the live state. The value stays on the stack of the caller
-// (the append functions read it by value). The caller must hold a
-// lock.
+// characterSnapshotLocked builds the character view from the live state; the
+// value stays on the stack of the caller.
 func (b *Bot) characterSnapshotLocked(
     now time.Time, adena int32, inventorySlots int,
 ) CharacterSnapshot {
@@ -481,19 +456,14 @@ func (b *Bot) characterSnapshotLocked(
     }
 }
 
-// clanMaskString renders the clan bitmask for the snapshot view: a
-// decimal string for a clan carrier, an empty string for the clan
-// less npcs (most objects carry no clans, the empty string keeps the
-// wire lean and doubles as the falsy check of the web layer).
-//
-// The rendered strings come from a package level cache: the clan
-// mask space is tiny (the npcdata clan alphabet plus the ALL bit -
-// a few dozen distinct masks a fleet ever sees), while the live
-// snapshot encode path calls here once per world object per tick,
-// and an uncached strconv.FormatUint per object was 98% of the
-// encoder's allocations on the 100 bot fleet (see
-// BenchmarkFleetLiveEncodePressure). The cache turns that into one
-// allocation per DISTINCT mask for the whole process lifetime.
+// clanMaskString renders the clan bitmask of the view: a decimal string for a
+// clan carrier, an empty string for the clan less npcs (most objects carry no
+// clans, and the empty string doubles as the falsy check of the web layer). The
+// renderings come from a package level cache: the mask space is tiny (a few
+// dozen distinct masks a fleet ever sees) while the encode path calls here once
+// per object per tick, and an uncached strconv.FormatUint was 98% of the
+// encoder allocations on the 100 bot fleet (BenchmarkFleetLiveEncodePressure).
+// The cache pays one allocation per distinct mask.
 func clanMaskString(mask uint64) string {
     if mask == 0 {
         return ""
@@ -507,14 +477,13 @@ func clanMaskString(mask uint64) string {
     return rendered
 }
 
-// clanMaskCache memoizes the decimal renderings of the clan masks
-// (see clanMaskString). Keyed by the mask itself - the value space
-// is bounded by the clan alphabet, no eviction needed.
+// clanMaskCache memoizes the decimal renderings of the clan masks, keyed by the
+// mask itself: the value space is bounded by the clan alphabet, no eviction
+// needed.
 var clanMaskCache sync.Map
 
-// objectSnapshotLocked builds the object view of the snapshot from
-// the live hot and cold records. The value stays on the stack of the
-// caller. The caller must hold a lock.
+// objectSnapshotLocked builds the object view from the live hot and cold
+// records; the value stays on the stack of the caller.
 func (b *Bot) objectSnapshotLocked(slot int, nowNano int64) ObjectSnapshot {
     hot := &b.world.hot[slot]
     cold := &b.world.cold[slot]
@@ -556,9 +525,8 @@ func (b *Bot) objectSnapshotLocked(slot int, nowNano int64) ObjectSnapshot {
     }
 }
 
-// inventoryTotalsLocked returns the adena sum and the slot count of
-// the dense inventory store: the two aggregate fields of the
-// character view. The caller must hold a lock.
+// inventoryTotalsLocked returns the adena sum and the slot count of the dense
+// inventory store, the two aggregate fields of the character view.
 func (b *Bot) inventoryTotalsLocked() (adena int32, slots int) {
     for _, item := range b.inventory.items {
         if item.Type2 == itemType2Adena {
@@ -569,10 +537,9 @@ func (b *Bot) inventoryTotalsLocked() (adena int32, slots int) {
     return adena, len(b.inventory.items)
 }
 
-// snapshotJSONSizeLocked estimates the encoded length of the live
-// state (the same rough per entry costs as snapshotJSONSize), so a
-// one shot encode keeps everything in one allocation. The caller must
-// hold a lock.
+// snapshotJSONSizeLocked estimates the encoded length (the same rough per entry
+// costs as snapshotJSONSize), so a one shot encode keeps everything in one
+// allocation.
 func (b *Bot) snapshotJSONSizeLocked() int {
     size := 640 + len(b.id) + len(b.phase) + len(b.status) +
         len(b.char.Name)

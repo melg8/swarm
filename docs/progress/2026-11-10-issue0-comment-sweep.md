@@ -1790,6 +1790,25 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite,
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - state/snapshot_live.go keeps the encode contract
+
+- 23 blocks compress: the encoder keeps the zero allocation steady
+  state (the view structs live on the stack, the snapshot copy paid
+  roughly 26 KB of garbage per event on a 100 npc bot), the byte
+  identity with `Snapshot().AppendJSON` pinned by
+  `TestAppendSnapshotJSONMatchesSnapshot` and the reflection golden
+  suite, the null semantics (the always present collections encode as
+  empty arrays, only the walk plan and the hunting zone fall back to
+  null), the one walk counts fold, the inline affordability flag of the
+  skill plan, the countdown of the buff seconds from the last server
+  list and the clan mask cache (a few dozen distinct masks, an uncached
+  `strconv.FormatUint` was 98 percent of the encoder allocations on the
+  fleet). The per writer "The caller must hold a lock" lines drop: the
+  `Locked` suffix carries them. 102 comment lines of 617 become 69 of
+  584.
+- Verified: `task fmt`, `go build ./...`, the state suite,
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
