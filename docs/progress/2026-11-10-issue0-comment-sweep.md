@@ -1082,6 +1082,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - shopping.go, the frozen plan contracts
+
+- 77 blocks compress, the file falls from 212 comment lines of 1171
+  (18.1 percent) to 165 of 1124 (14.7 percent): the timing constants
+  keep their number and the server rule behind it (the 1 s plus 250 ms
+  transaction window with punishment limit 0, the 15 and 20 percent
+  buy taxes, the spellbook reserve), and the trip notes keep the frozen
+  plan, the sell-first credit, the arrival baseline and the gear debt
+  relations. The strategy prose stays in docs/shopping_strategy.md.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
