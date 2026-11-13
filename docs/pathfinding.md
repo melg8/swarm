@@ -64,6 +64,17 @@ paid to route around (the 2026-09-10 elven lake regression,
 `TestSmoothedLegsStayDry`). Segments that start or end in the water are
 exempt: they belong to the swim escape below.
 
+Each expanded step is also multiplied by the wall proximity of its
+neighbourhood (the 7x7 ring around the cell, `obstacleMultiplier`):
+`ring/obstacles`, so a corridor prices dearer than open ground and the
+search prefers the middle of a passage.
+
+Before the A* runs, `directOrAstar` tries the straight raster line
+between the endpoints: it answers alone when it lands on the target,
+stays dry, crosses no ban and survives the server click validation. A
+dry line walks the minimum step rate the grid allows, so no detour
+beats it and the direct answer needs no smoothing (the two endpoints).
+
 The A* also routes around the recovery bans (`AvoidArea`, the hunt
 recovery's memory of ground the live server refused although the pack
 models it open): a banned cell is impassable to the expansions, the

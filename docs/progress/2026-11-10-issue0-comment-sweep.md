@@ -975,6 +975,21 @@ corner probe is a length, not a leg at all.
   package, `task lint:new`. `user_info.go` fell from 23.4 to 11.9
   percent (19 comment lines of 160), no block above 8 lines.
 
+### 2026-11-13 - pathfind/search.go hands the step rules to the pathfinding doc
+
+- 50 blocks compress: the score constants, the water and escape
+  prices, the node key and the search struct field registry, the layer
+  and node resolution, the run and the A*, the direct line and its
+  three dry forms, the goal test, the cost and obstacle prices, the
+  step and wall rules with the diagonal flanks, the heuristic, the
+  neighbours and the raster, the server segment port, the smoothing,
+  the avoid helpers and the heap notes.
+- `docs/pathfinding.md` gains the wall proximity price (`ring/obstacles`
+  over the 7x7 ring) and the direct dry line rule of `directOrAstar`.
+- Verified: `task fmt`, `go build ./...`, the full pathfind package,
+  `task lint:new`. `search.go` fell from 21.7 to 16.9 percent (141
+  comment lines of 832), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -1005,8 +1020,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go`,
 `acceptance/botlog/botlog.go`, `cmd/counterprobe/detect.go` and
 `hunt/recovery_heal.go`, `hunt/navmesh_navigator.go`, `hunt/equip.go`
-and `from_game_server/user_info.go` (second passes). Next: a fresh
-`task comment:audit --top 10` pick (the
+`from_game_server/user_info.go` and `pathfind/search.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
