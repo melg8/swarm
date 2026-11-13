@@ -10,11 +10,10 @@ import (
     "strings"
 )
 
-// The bypass command kinds the gatekeeper flow drives. The server
-// NpcHtmlMessage carries <a action="bypass ..."> or
-// <a action="bypass -h ..."> buttons; the client strips the prefix and
-// sends the rest as a RequestBypassToServer command (see
-// docs/protocol_description.md and the H-002 verification).
+// The bypass command kinds the gatekeeper flow drives: the NpcHtmlMessage
+// carries <a action="bypass ..."> or <a action="bypass -h ..."> buttons, and
+// the client strips the prefix and sends the rest as a RequestBypassToServer
+// command (docs/protocol_description.md).
 const (
     bypassKindShowTeleports = "showTeleports"
     bypassKindTeleport      = "teleport"
@@ -39,21 +38,12 @@ type BypassButton struct {
     LocID int
 }
 
-// ParseGatekeeperHTML extracts the bypass buttons from a gatekeeper
-// NpcHTMLMessage body. The html is the raw string the server sent
-// (the teleports.htm template with the %locations% replaced, or the
-// initial npc dialog). The parser finds every
-// <a action="bypass [(-h )]<command>"> tag, strips the bypass prefix
-// and classifies the command:
-//
-//   - "npc_<objId>_showTeleports [<list>]" opens the teleport list.
-//   - "npc_<objId>_teleport <list> <locId>" teleports to the
-//     destination.
-//   - "npc_<objId>_chat <val>" opens the next dialog page.
-//
-// The %objectId% placeholder the html template carries is already
-// replaced by the server with the real npc object id before the
-// NpcHTMLMessage is sent, so the bot never sees it.
+// ParseGatekeeperHTML extracts the bypass buttons of a gatekeeper html body
+// (the teleports.htm template or the initial npc dialog): every
+// <a action="bypass [(-h )]<command>"> tag loses the prefix and classifies as
+// "npc_<objId>_showTeleports [<list>]" (the list), "npc_<objId>_teleport
+// <list> <locId>" (a destination) or "npc_<objId>_chat <val>" (the next page).
+// The server replaces %objectId% before sending, so the bot never sees it.
 func ParseGatekeeperHTML(html string) []BypassButton {
     var buttons []BypassButton
     cursor := 0

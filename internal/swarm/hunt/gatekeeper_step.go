@@ -18,25 +18,17 @@ import (
 // timeout case under a second.
 var gatekeeperDialogWait = 5 * time.Second
 
-// gatekeeperPollPeriod paces the html arrival wait: the loop reads the
-// last dialog every tick until the npc object id changes or the wait
-// lapses.
+// gatekeeperPollPeriod paces the html arrival wait until the npc object id
+// changes or the wait lapses.
 const gatekeeperPollPeriod = 250 * time.Millisecond
 
-// DriveGatekeeperTeleport drives one segment of the H-002 gatekeeper flow:
-// the bot already stands within the interaction distance of the
-// teleporter npc. The step sends the showTeleports bypass, waits for
-// the teleport list html, finds the destination button whose label
-// contains destLabel, and sends the teleport bypass. The connection
-// layer handles the arrival TeleportToLocation and the Appearing
-// answer (the village revive and the teleport share the same path).
-//
-// The step is a blocking call bounded by gatekeeperDialogWait per
-// dialog reply; the hunt loop calls it from a gatekeeper trip phase
-// (not yet wired into the tick machine - the resume notes name the
-// integration as the next agent's work). The listName is "NORMAL" for
-// the standard teleport list; destLabel is a substring of the
-// destination button label (for example "The Town of Gludio").
+// DriveGatekeeperTeleport drives one gatekeeper segment from within the
+// interaction distance: it sends the showTeleports bypass, waits for the
+// teleport list html, finds the destination button whose label contains
+// destLabel and sends the teleport bypass; the connection layer answers the
+// arrival TeleportToLocation with Appearing. The blocking call is bounded by
+// gatekeeperDialogWait per dialog reply, and the tick machine does not call
+// it yet. The listName is "NORMAL" for the standard list.
 func (l *Loop) DriveGatekeeperTeleport(
     npcObjID int32, listName, destLabel string,
 ) error {

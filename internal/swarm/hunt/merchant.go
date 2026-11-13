@@ -12,24 +12,16 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// The merchant wares knowledge of the town trips: the shop merchants
-// specialize and the server enforces the specialization - the
-// RequestBuyItem resolves the transaction through the targeted folk
-// npc and refuses every line of a list the npc does not trade (the
-// answer is silent: the flood refusal is a chat message, the range
-// and the foreign list refusals are bare ActionFailed, neither
-// references the request), so a buy aimed at the wrong trader burns
-// the whole retry budget for nothing. The bot carries the same
-// knowledge: every purchase rides the stop of the merchant whose
-// buylist carries the item (a weapon buys only at the weapon trader,
-// an armor piece only at the armor trader), while the sells stay
-// universal - every vendor accepts the sale of any sellable item
-// through the standard inventory sell list, so the junk sells at the
-// nearest merchant of the region whatever the trip buys afterwards.
+// The merchant wares knowledge of the town trips: the server resolves
+// RequestBuyItem through the targeted folk npc and refuses every line of a
+// list the npc does not trade, silently (a chat message for the flood, a
+// bare ActionFailed for the range and foreign list refusals), so a buy aimed
+// at the wrong trader burns the retry budget. Every purchase therefore rides
+// the merchant whose buylist carries the item, while the sells stay universal
+// through the standard inventory sell list.
 
-// MerchantWares is the set of goods families a town merchant trades.
-// The classification derives from the generated buylist catalogs at
-// runtime - no hardcoded table to drift from the server data.
+// MerchantWares is the set of goods families a town merchant trades, derived
+// from the generated buylist catalogs at runtime.
 type MerchantWares uint8
 
 const (

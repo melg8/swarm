@@ -2267,6 +2267,26 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the packets suite (0.3 s),
   `golangci-lint run ./internal/swarm/packets/...` 0 issues.
 
+### 2026-11-13 - the merchant, gatekeeper and Dion catalog comments
+
+- `gear/dion_catalog.go`: 3 blocks keep the 20 percent tax formula
+  (`baseItemPrice * (1 + taxRate)`), the template ids and the buylist
+  range and drop the elven comparison prose; 27 comment lines of 64
+  become 16 of 53.
+- `hunt/merchant.go`: 2 blocks keep the server rule (RequestBuyItem
+  resolves through the targeted folk npc and refuses a foreign list
+  silently, a chat message for the flood and a bare ActionFailed for
+  the rest) and the universal sell list; 55 comment lines of 173 become
+  47 of 165.
+- `hunt/gatekeeper_step.go` and `hunt/gatekeeper_html.go` keep the
+  segment flow, the dialog bound, the three bypass command forms and
+  the replaced `%objectId%`; the stale "the next agent wires it" note
+  becomes the current fact that the tick machine does not call it.
+  34 of 92 become 26 of 84 and 63 of 250 become 53 of 240.
+- Verified: `task fmt`, `go build ./...`, the gear suite (0.5 s) and
+  the hunt suite (27.7 s), `golangci-lint run` on both packages 0
+  issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
