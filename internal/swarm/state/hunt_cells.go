@@ -8,20 +8,17 @@ import (
     "strconv"
 )
 
-// The Voronoi hunt mesh of the cell hunting: the static partition
-// payload (the registry the hunt loops rotate through) and the live
-// record of the cell the bot holds. The mesh is the SAME for every
-// bot of the process (the registry installs once), so the web layer
-// serves it from a dedicated endpoint keyed by the version - it
-// never rides the per second live snapshot. The live record (the
-// active cell, its respawn clock, its measured income) changes every
-// second and stays in the snapshot.
+// The Voronoi hunt mesh of the cell hunting: the static partition payload
+// (the registry the hunt loops rotate through) and the live record of the
+// cell the bot holds. The mesh is the same for every bot of the process, so
+// the web layer serves it from a dedicated endpoint keyed by the version,
+// never through the per second live snapshot; the live record (the active
+// cell, its respawn clock, its measured income) rides the snapshot.
 
-// CellMeshView is one cell of the hunting mesh wire form: the
-// registry identity, the level band, the focus (the patrol
-// destination), the expected mass and the convex polygon as a flat
-// counter-clockwise x,y pair list (the map draws the edges, the hit
-// tests resolve the hovered cell).
+// CellMeshView is one cell of the hunting mesh wire form: the registry
+// identity, the level band, the focus (the patrol destination), the expected
+// mass and the convex polygon as a flat counter-clockwise x,y pair list (the
+// map draws the edges, the hit tests resolve the hovered cell).
 type CellMeshView struct {
     ID       string  `json:"id"`
     Name     string  `json:"name"`
@@ -33,12 +30,11 @@ type CellMeshView struct {
     Verts    []int32 `json:"verts"`
 }
 
-// CellLiveView is the live economy record of the cell the bot hunts:
-// the identity, the state ("farming" the bot works the ground,
-// "moving" the bot walks to it), the respawn clock, the measured
-// income, the death heat, the fleet occupancy and the kill centroid
-// EMA. This is the MINIMAL live payload of the map view - the mesh
-// geometry rides the version keyed endpoint.
+// CellLiveView is the live economy record of the cell the bot hunts: the
+// identity, the state ("farming" the bot works the ground, "moving" the bot
+// walks to it), the respawn clock, the measured income, the death heat, the
+// fleet occupancy and the kill centroid EMA. This is the minimal live payload
+// of the map view; the mesh geometry rides the version keyed endpoint.
 type CellLiveView struct {
     ID       string `json:"id"`
     Name     string `json:"name"`
@@ -67,14 +63,13 @@ type CellLiveView struct {
     KillY int32 `json:"killY"`
 }
 
-// SetHuntingCells installs the hunting mesh of the deployment
-// together with its version: the web layer serves the encoded
-// payload from the version keyed endpoint (see HuntMesh), the live
-// snapshot only carries the version string so a registry change is
-// detectable without paying the mesh bytes per second. A repeated
-// install of the same version keeps the cached payload as is. The
-// mesh survives the session resets like the zone policy: it is the
-// registry, not the observed world.
+// SetHuntingCells installs the hunting mesh of the deployment together with
+// its version: the web layer serves the encoded payload from the version keyed
+// endpoint (see HuntMesh) and the live snapshot carries only the version
+// string, so a registry change is detectable without paying the mesh bytes per
+// second. A repeated install of the same version keeps the cache. The mesh
+// survives the session resets like the zone policy: it is the registry, not
+// the observed world.
 func (b *Bot) SetHuntingCells(version string, cells []CellMeshView) {
     payload := appendHuntMeshJSON(nil, version, cells)
     b.mu.Lock()

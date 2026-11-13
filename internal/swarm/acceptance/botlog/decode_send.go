@@ -2,12 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The client-to-server packet decoder of the run log: one readable
-// line (plus continuation lines for the batch packets) per packet
-// the session sends. The decode reads the serialized plaintext with
-// a bounds-checked cursor - a malformed or short payload falls back
-// to the size and the hex tail instead of panicking on the session
-// goroutine.
+// The client-to-server packet decoder of the run log: one readable line (plus
+// continuation lines for the batch packets) per packet the session sends. The
+// decode reads the serialized plaintext with a bounds-checked cursor, so a
+// malformed or short payload falls back to the size and the hex tail instead
+// of panicking on the session goroutine.
 
 package botlog
 
@@ -68,11 +67,10 @@ func (c *cursor) utf16() (string, bool) {
 // shiftFlagSuffix is the shift marker of the request lines.
 const shiftFlagSuffix = " shift"
 
-// decodeSend renders one client packet into its log lines. The
-// first line carries the fields, the batch packets (the buy and
-// sell requests) append one indented line per entry. The session
-// family answers directly, the world and inventory families ride
-// their dispatchers.
+// decodeSend renders one client packet into its log lines: the first line
+// carries the fields, the batch packets (the buy and sell requests) append one
+// indented line per entry. The session family answers directly, the world and
+// inventory families ride their dispatchers.
 func decodeSend(payload []byte) []string {
     if len(payload) == 0 {
         return nil

@@ -11,12 +11,11 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// SkillCast is one skill cast broadcast of the server (the Mobius C1
-// MagicSkillUse packet): the caster opens a cast window of HitTimeMs
-// (the skill resolves when it elapses) and a reuse window of
-// ReuseDelayMs (the cooldown). The web view fills the skill icon
-// while the cast window runs and shows the cooldown countdown while
-// the reuse window runs.
+// SkillCast is one skill cast broadcast of the server (the C1 MagicSkillUse
+// packet): the caster opens a cast window of HitTimeMs (the skill resolves when
+// it elapses) and a reuse window of ReuseDelayMs (the cooldown). The web view
+// fills the skill icon while the cast window runs and shows the cooldown
+// countdown while the reuse window runs.
 type SkillCast struct {
     CasterID   int32
     TargetID   int32
@@ -38,14 +37,12 @@ type skillCastWindow struct {
     reuseTotal time.Duration
 }
 
-// SkillStateView is the live cast and reuse state of one skill of the
-// played character in the snapshot: the milliseconds left of each
-// window at the snapshot moment plus the window totals. A window that
-// already elapsed reads zero; a skill with both windows elapsed drops
-// out of the section entirely. Icon is the display art of the skill,
-// so the map cast icon draws the casting skill whatever its source -
-// a learned skill or an item skill of the bag like the Scroll of
-// Escape (never a learned skill).
+// SkillStateView is the live cast and reuse state of one skill of the played
+// character: the milliseconds left of each window at the snapshot moment plus
+// the window totals. A window that already elapsed reads zero, and a skill with
+// both elapsed drops out of the section. Icon is the display art of the skill,
+// so the map cast icon draws the casting skill whatever its source - a learned
+// skill or an item skill of the bag like the Scroll of Escape.
 type SkillStateView struct {
     SkillID      int32  `json:"skillId"`
     Icon         string `json:"icon"`
@@ -55,10 +52,9 @@ type SkillStateView struct {
     ReuseTotalMs int64  `json:"reuseTotalMs"`
 }
 
-// ApplySkillCast records the skill cast broadcast of the played
-// character: the hit time opens the cast window and the reuse delay
-// the cooldown window of the skill. The broadcasts of the other
-// creatures open nothing - the cast icon of the map and the skills
+// ApplySkillCast records the skill cast broadcast of the played character: the
+// hit time opens the cast window and the reuse delay the cooldown window. The
+// broadcasts of other creatures open nothing - the map cast icon and the skills
 // widget show the played character's own casting.
 func (b *Bot) ApplySkillCast(cast SkillCast) {
     b.mu.Lock()

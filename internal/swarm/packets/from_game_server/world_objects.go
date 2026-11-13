@@ -67,11 +67,10 @@ func ParseMoveToLocationPacket(p *MoveToLocationPacket, data []byte) error {
     return nil
 }
 
-// MoveToPawnPacket announces a creature chasing a target to a stop
-// distance, used instead of MoveToLocation by attacking mobs.
-// Wire format (see MoveToPawn.writeImpl): [opcode 0x75][objectId: 4]
-// [targetId: 4][distance: 4][x: 4][y: 4][z: 4][targetX: 4][targetY: 4]
-// [targetZ: 4].
+// MoveToPawnPacket announces a creature chasing a target to a stop distance,
+// used instead of MoveToLocation by attacking mobs. Wire
+// (MoveToPawn.writeImpl): [opcode 0x75][objectId][targetId][distance][x][y]
+// [z][targetX][targetY][targetZ], 4 bytes each.
 type MoveToPawnPacket struct {
     ObjectID int32
     TargetID int32
@@ -268,12 +267,11 @@ func ParseDropItemPacket(p *DropItemPacket, data []byte) error {
     return nil
 }
 
-// SpawnItemPacket announces an item that already lies on the ground when
-// it enters the known list of the character, unlike the DropItem packet
-// for freshly dropped items. Without it, items that existed before the
-// bot logged in would stay invisible.
-// Wire format (see SpawnItem.writeImpl): [opcode 0x15][objectId: 4]
-// [displayId: 4][x: 4][y: 4][z: 4][stackable: 4][count: 4].
+// SpawnItemPacket announces an item that already lies on the ground when it
+// enters the known list, unlike DropItem for freshly dropped items; without it
+// items that existed before the bot logged in would stay invisible. Wire
+// (SpawnItem.writeImpl): [opcode 0x15][objectId][displayId][x][y][z]
+// [stackable][count], 4 bytes each.
 type SpawnItemPacket struct {
     ObjectID   int32
     TemplateID int32

@@ -2469,6 +2469,33 @@ corner probe is a length, not a leg at all.
   webserver (8.8 s) suites, `golangci-lint run` on the six paths
   0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the object, mesh and login view docs
+
+- `state/bot_objects.go` keeps the 512 unit raw gap against an actual
+  256, the archer engagement rule and the exact-vitals fact; 72 of 298
+  become 63 of 289.
+- `state/hunt_cells.go` keeps the mesh endpoint split and the minimal
+  live payload, `session/aggregator.go` the 3 000 sample / 5 000 kill
+  footprint; 60/72 become 55/71.
+- `connection/game_login.go` keeps the one select per 3 seconds (30
+  game ticks of 100 ms) flood rule, the pre-world read bound and the
+  97 versus ~170 units per second walk speed; 59 of 301 become 54 of
+  296.
+- `packets/from_game_server/char_select_info.go` keeps the paperdoll
+  write order, `world_objects.go` the SpawnItem and MoveToPawn wire
+  layouts; 58/53 become 57/51.
+- `acceptance/botlog/decode_send.go` keeps the bounds-checked cursor
+  fallback, `acceptance/church_entry.go` the plaza and Asterios cells
+  with the proxy refusal, `state/skill_cast.go` the cast and reuse
+  windows; 47/46/37 become 45/42/33.
+- The 927 history markers the audit prints are dominated by the
+  mandatory SPDX header of every file (two all-caps hits per file, 686
+  of them); the real dated, round and issue mentions are about 241.
+- Verified: `task fmt`, `go build ./...`, the state (1.2 s), session
+  (0.4 s), connection (10.6 s), packets (0.3 s), acceptance (8.9 s)
+  and botlog (0.6 s) suites, `golangci-lint run` on the five paths
+  0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

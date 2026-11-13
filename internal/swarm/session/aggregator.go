@@ -40,11 +40,10 @@ func phaseGroup(ph string) string {
 }
 
 // botAgg is the in-memory aggregate of one bot the report renders: the
-// session timeline, the per-hour buckets of the sampled state, the
-// kill and death statistics, the money trail of the purchases and the
-// tail of the story. One struct, no maps beyond the mobs and the
-// buckets, so a 24 hour run (roughly 3 000 samples, 5 000 kills) costs
-// a few kilobytes.
+// session timeline, the per-hour buckets of the sampled state, the kill and
+// death statistics, the money trail and the tail of the story. One struct, no
+// maps beyond the mobs and the buckets, so a 24 hour run (roughly 3 000
+// samples, 5 000 kills) costs a few kilobytes.
 type botAgg struct {
     id    string
     first int64

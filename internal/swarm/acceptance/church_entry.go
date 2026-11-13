@@ -13,14 +13,12 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The church entry round: the owner report of 2026-09-19 - the walk
-// from the village plaza cell in front of the temple (44694 51921
-// -2808) toward the temple interior cell next to the hierarch
-// Asterios (44718 52291 -2792) stops at the entrance, and the same
-// click from the real client attached through the swarm proxy refuses
-// to enter too, so the refusal is a systemic one. The scenario pins
-// the owner contract: the plain manual walk into the temple reaches
-// the interior cell at the NPC.
+// The church entry round: the walk from the village plaza cell in front of
+// the temple (44694 51921 -2808) toward the interior cell next to the hierarch
+// Asterios (44718 52291 -2792) stopped at the entrance, and a real client
+// attached through the proxy refuses to enter too, so the refusal is systemic.
+// The scenario pins the owner contract: a plain manual walk into the temple
+// reaches the interior cell at the NPC.
 const (
     // churchSpawnX/Y/Z is the plaza cell in front of the temple
     // entrance (the walk start of the owner report).
@@ -106,11 +104,10 @@ func churchEntryChecks() []Check {
     }
 }
 
-// startChurchSession launches the manual only bot session of the
-// temple scenario: the hunt loop consumes the web commands and never
-// arms its own trips, so the walk of this scenario is the exact
-// manual walk the owner drives. The goroutine reports the session
-// end on the channel, the caller owns the cancel.
+// startChurchSession launches the manual only bot session of the temple
+// scenario: the hunt loop consumes the web commands and never arms its own
+// trips, so the walk here is the exact manual walk the owner drives. The
+// goroutine reports the session end on the channel, the caller owns the cancel.
 func startChurchSession(
     ctx context.Context, m *Manager, test *Test,
 ) (context.CancelFunc, chan error) {
@@ -142,12 +139,11 @@ func pushChurchWalk(tracker *state.Bot) {
     })
 }
 
-// churchEntryScenario runs the temple entrance round: the temp
-// character wakes on the plaza cell of the report, the manual walk
-// command aims the interior cell next to the hierarch Asterios and
-// the hunt loop (manual only mode) plans and clicks the walk. Pass:
-// the character left the plaza, crossed the temple entrance and
-// stands on the interior cell within the NPC ring.
+// churchEntryScenario runs the temple entrance round: the temp character
+// wakes on the plaza cell, the manual walk command aims the interior cell next
+// to the hierarch Asterios and the hunt loop (manual only mode) plans and
+// clicks the walk. Pass: the character left the plaza, crossed the temple
+// entrance and stands on the interior cell within the NPC ring.
 func churchEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(churchEntryChecks())

@@ -58,10 +58,9 @@ type CharacterInfo struct {
     MaxMP       float64
     DeleteTimer int32
     // PaperdollObjectIDs carries the equipped item object id of every
-    // paperdoll slot in the Mobius write order (underwear, right ear,
-    // left ear, neck, right finger, left finger, head, right hand,
-    // left hand, gloves, chest, legs, feet, cloak and the C1 right
-    // hand duplicate; 0 = empty slot).
+    // paperdoll slot in the Mobius write order (underwear, right ear, left ear,
+    // neck, right finger, left finger, head, right hand, left hand, gloves,
+    // chest, legs, feet, cloak and the C1 right hand duplicate; 0 = empty).
     PaperdollObjectIDs [charInfoPaperdollSlots]int32
     // PaperdollItemIDs carries the item id of every paperdoll slot in
     // the same order: the C1 client renders the selection screen

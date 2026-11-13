@@ -15,25 +15,23 @@ import (
     togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
 )
 
-// Character selection constants. The server drops a CharacterSelect
-// silently when it races the creation flow: the updated char list is
-// written before the server side char selection cache is updated, so a
-// select that arrives in that window finds no character and is ignored
-// without any answer. The wait for the CharSelected answer is therefore
-// bounded and the selection retransmitted; the server flood protector
-// allows one select per 3 seconds (30 game ticks of 100 ms), which the
-// 5 second wait between attempts respects.
+// Character selection constants. The server drops a CharacterSelect silently
+// when it races the creation flow: the updated char list is written before the
+// server side selection cache is updated, so a select in that window finds no
+// character and is ignored without an answer. The wait for CharSelected is
+// therefore bounded and the selection retransmitted; the flood protector allows
+// one select per 3 seconds (30 game ticks of 100 ms), which the 5 second wait
+// between attempts respects.
 const (
     charSelectWait     = 5 * time.Second
     charSelectAttempts = 3
     charCreateOkWait   = 2 * time.Second
-    // charListWait bounds one pre-world read outside the bounded
-    // selection dance: the character list answer of the AuthLogin
-    // exchange and each packet of the creation exchange (see
-    // EnsureCharacter). These reads sit before the in-world silence
-    // watchdog exists, so an unbounded read here parks the bot
-    // goroutine forever on a stalled or half-open server while the
-    // supervisor waits for a session that never returns.
+    // charListWait bounds one pre-world read outside the bounded selection
+    // dance: the character list answer of the AuthLogin exchange and each
+    // packet of the creation exchange (see EnsureCharacter). These reads run
+    // before the in-world silence watchdog exists, so an unbounded read parks
+    // the bot goroutine forever on a half-open server while the supervisor
+    // waits for a session that never returns.
     charListWait = 30 * time.Second
 )
 
@@ -126,12 +124,11 @@ func (gc *GameClient) EnsureCharacter(
             return nil, err
         }
         if done {
-            // The updated list precedes the trailing CharCreateOk on the
-            // wire (the server writes the list from inside the creation
-            // handler and the ok after it returns). Draining the ok with a
-            // bounded wait guarantees the server side char selection cache
-            // is populated before the next packet selection runs, which
-            // closes the silent drop race of a fast client.
+            // The updated list precedes the trailing CharCreateOk on the wire
+            // (the server writes the list from inside the creation handler and
+            // the ok after it returns). Draining the ok with a bounded wait
+            // guarantees the server side selection cache is populated before
+            // the next packet select, closing the silent drop race.
             gc.drainCharCreateOk()
 
             return updated, nil
@@ -181,11 +178,11 @@ func (gc *GameClient) drainCharCreateOk() {
     }
 }
 
-// awaitCharacterCreation reads packets until the creation result resolves.
-// The first return value reports completion, the second carries the updated
+// awaitCharacterCreation reads packets until the creation result resolves:
+// the first return value reports completion, the second carries the updated
 // character list when the requested character appeared in it. Every read
-// bounds by charListWait: the creation exchange sits before the in-world
-// silence watchdog exists.
+// bounds by charListWait, since the exchange sits before the in-world silence
+// watchdog exists.
 func (gc *GameClient) awaitCharacterCreation(
     name string,
 ) (bool, *fromgameserver.CharSelectInfoPacket, error) {
@@ -299,12 +296,10 @@ func (gc *GameClient) EnterWorld(slot int32) error {
     }
     gc.logger.Println("Sent enter world request")
 
-    // The movement toggle of the official client entry: the server
-    // starts every session walking (Creature._isRunning defaults to
-    // false), and a bot that never flips it crosses the world at the
-    // walk speed - every hunt run of the project moved at 97 instead
-    // of ~170 units per second until the 2026-09-12 class transfer
-    // rounds pinned it.
+    // The movement toggle of the official client entry: the server starts
+    // every session walking (Creature._isRunning defaults to false), so a bot
+    // that never flips it crosses the world at 97 instead of ~170 units per
+    // second.
     run := togameserver.NewChangeMoveTypePacket()
     run.TypeRun = 1
     if err := gc.sendPacket(run); err != nil {
