@@ -1188,6 +1188,17 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - acceptance/manager.go keeps the run lifecycle only
+
+- 31 blocks compress: the manager keeps the load-bearing numbers (the
+  40 line log ring, the 90 s restart wait, the 2 s launch stagger, the
+  12 check cap, the "Hunt:" prefix, the 350 ms flood window and the 15
+  quick connect burst), the one bot per account partition, the
+  collected parallel failures and the injection trail. 159 comment
+  lines of 786 become 115 of 742.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
