@@ -1,6 +1,6 @@
 # PROGRESS
 
-Generated: 2026-11-10 12:49:26Z
+Generated: 2026-11-13 16:25:45Z
 
 ## Milestone ladder
 
@@ -38,24 +38,24 @@ Generated: 2026-11-10 12:49:26Z
 ## Recent commits
 
 ```
-5a864952 pin golangci-lint 2.15 and clear the new errcheck findings
-0db06a18 bump the toolchain and the dependency set
-cb10996f untrack the fleet logs and ignore the run artifacts
-de39912e drop the machine specific geodata fallback
-cc910961 fix the journal gzip handle lifecycle
-52b0a01e docs: refresh AGENTS.md and follow the prompt language
-0ab4e07d docs: close the archer kite flight authority task
-82e69c2b docs: record the run-35 confirmation of the final build
-ffd3bfef hunt: keep the flight ladder inside the lint budgets
-8f7bbc2c docs: record the dead target clear of the fight state
-df4b036b state: drop the fight target with the dead target
-3e2a677d docs: record the archer flight authority and the contact answer
-a66a77f0 hunt: clear the abandoned selection with the dropped fight
-8ce62db0 hunt: fly the contact chaser instead of standing in it
-59854ed0 hunt: hold the archer flight until the aggro clears
-8cf827a9 docs: close the pile-up ceiling follow-up
-7177d674 hunt: judge the archer pile up by the kite ceiling
-13f5b422 docs: close the kite shot-cycle fragment
-4b2ebad4 docs: describe the archer flight holds and the kill window
-b3d1efce hunt: hold the walled flight and finish the kill window
+e26d4c19 drop the restating session proxy and connection docs
+1dcb52fb drop the restating acceptance and botlog docs
+19a7d28a drop the dated and numbered comment references
+5ddab3ba drop the restating path and web docs
+24315296 drop the restating state and hunt docs
+af2bae57 drop the packet boilerplate docs
+6e7fe8d1 reflow the comment wrapping of the acceptance and tool layers
+a147c325 reflow the comment wrapping of the path and packet layers
+9e1ab832 reflow the comment wrapping of the hunt layer
+0333df5a reflow the comment wrapping of the state session proxy and web layers
+fefb063d compress the gear planner cell view and wire docs
+d1e20e2c compress the small packet npcdata and test UI docs
+e745cfd4 compress the object mesh and login view docs
+91555d4a compress the state session and webserver view docs
+2662d2bb compress the last nine line blocks around the builder
+b4c5d122 compress the ten line blocks across the hot packages
+c841d37c compress the twelve line blocks and drop the stray doc
+e5aa73f9 compress the worst comment blocks under the eight line rule
+83f70d8e compress the buy move and bypass docs to the wire line
+4679e381 trim the remaining long section headers
 ```

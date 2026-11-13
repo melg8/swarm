@@ -1,4 +1,4 @@
-# The comment sweep: one concept one word, the fact not the story (status: in progress)
+# The comment sweep: one concept one word, the fact not the story (status: complete)
 
 Started 2026-11-10, branch main, issue0 (owner instruction: the code
 carries too many long and stale comments, `leg` names things it does
@@ -2731,7 +2731,18 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/recovery_heal.go`, `hunt/navmesh_navigator.go`, `hunt/equip.go`
 `from_game_server/user_info.go`, `pathfind/search.go`,
 `pathfind/navmesh/tile.go` and `state/diagnostics.go` (second passes).
-Next: a fresh `task comment:audit --top 10` pick (the
-`proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
-their fragments are active); the share and the block count are
-re-measured at the end.
+The closing rounds were the pure restatement deletions (the accessor,
+`Apply*`, `append*JSON`, `push*`, `write*`, `send*`, `decode*` and
+`*Checks` docs whose signature already says the same), which took the
+share from 10.1 to 9.8 percent.
+
+Final measurement (`python tools/comment_audit.py`): 16 657 comment
+lines of 170 192 (9.8 percent) against the 25 958 of 177 062 (14.7)
+baseline; 5 blocks above 8 lines, all generated files except the
+`cmd/navmesh-build` package doc; 900 history markers, 877 of them the
+shout class the SPDX headers and the server constants
+(`MAX_ATTACK_TIMEOUT`) make unavoidable, the rest the live pack and zone
+modes. `--gate` exits 0 and keeps the share under the target for the
+next rounds; the remaining high-density files (`loop_params.go`,
+`walk_params.go`) are constant registries where every line is a number
+and its rule, so the sweep stops at the floor rather than the target.
