@@ -18,20 +18,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// Default listen addresses of the proxy. The login listeners cover every
-// combination a C1 client can dial: the classic executable hardcodes the
-// auth port 2106 (the [URL] Port line of l2.ini is an Unreal Engine
-// leftover the auth connection ignores - the stock C1 l2.ini ships
-// Port=7777), and l2.ini ServerAddr decides the loopback address. So the
-// proxy answers 2106 and 2107 on both 127.0.0.1 and 127.0.0.2: a client
-// honoring the ini port reaches 127.0.0.1:2107, a hardcoded-port client
-// with ServerAddr=127.0.0.1 reaches 127.0.0.1:2106, and ServerAddr
-// =127.0.0.2 variants reach the second loopback pair. The game listeners
-// mirror the same addresses on port 7778 because the emulated login
-// server advertises the address family the client used for the login
-// connection. Only the first login address is mandatory; the rest are
-// optional (127.0.0.1:2106 is normally owned by the real Mobius login
-// server, see the bind diagnostics in Listen).
+// Default listen addresses of the proxy: the four login listeners cover every
+// combination a C1 client can dial, because the classic executable hardcodes
+// the auth port 2106 (the l2.ini [URL] Port line is an Unreal Engine leftover
+// the auth connection ignores) while ServerAddr picks the loopback address, so
+// an ini port client reaches 2107 and a hardcoded one 2106 on either loopback.
+// The game listeners mirror those addresses on 7778 because the emulated login
+// server advertises the address family the client dialed. Only the first login
+// address is mandatory (docs/proxy.md).
 const (
     DefaultLoginAddress   = "127.0.0.1:2107"
     LoginInterceptAddress = "127.0.0.1:2106"
@@ -39,15 +33,13 @@ const (
     LoginAltPortAddress   = "127.0.0.2:2107"
     DefaultGameAddress    = "127.0.0.1:7778"
     GameFallbackAddress   = "127.0.0.2:7778"
-    // acceptRetryDelay paces the accept loop over a transient accept
-    // failure (the fd drought of a loaded fleet, an aborted inbound
-    // connection): the bound port stays advertised and the loop
-    // retries instead of dying on the first hiccup.
+    // acceptRetryDelay paces the accept loop over a transient failure (an fd
+    // drought, an aborted inbound connection): the bound port stays advertised
+    // and the loop retries instead of dying on the first hiccup.
     acceptRetryDelay = time.Second
 )
 
-// DefaultLoginAddresses is the login listener set of the default
-// configuration (see the const block comment for the routing rationale).
+// DefaultLoginAddresses is the login listener set of the default configuration.
 func DefaultLoginAddresses() []string {
     return []string{
         DefaultLoginAddress, LoginInterceptAddress,
@@ -61,20 +53,17 @@ func DefaultGameAddresses() []string {
     return []string{DefaultGameAddress, GameFallbackAddress}
 }
 
-// gameProxyPort is the game server port the emulated login server
-// advertises in its server list.
+// gameProxyPort is the game port the emulated login server advertises.
 const gameProxyPort = 7778
 
-// RawSender sends a raw decrypted client packet to the real game
-// server through a live bot session (connection.GameClient implements
-// it with SendRaw).
+// RawSender sends a decrypted client packet to the real game server through a
+// live bot session (connection.GameClient implements it with SendRaw).
 type RawSender interface {
     SendRaw(payload []byte) error
 }
 
-// Server is the MITM proxy: it emulates the login and game servers for
-// real C1 clients and relays their traffic through the bot sessions of
-// the process.
+// Server is the MITM proxy: it emulates the login and game servers for real C1
+// clients and relays their traffic through the bot sessions of the process.
 type Server struct {
     loginAddrs  []string
     gameAddrs   []string
@@ -84,11 +73,9 @@ type Server struct {
     mu       sync.Mutex
     sessions []*botSession
     selected string
-    // selectionCh is closed and replaced whenever SelectBot changes the
-    // selection to a different id: the live relay goroutines select on
-    // the current channel so they wake up immediately and resync the
-    // connected client onto the newly selected bot without waiting for
-    // a reconnect.
+    // selectionCh is closed and replaced whenever SelectBot picks a different
+    // id: the live relay goroutines select on it to resync the connected client
+    // onto the new bot without a reconnect.
     selectionCh chan struct{}
 
     rsaModulus     atomic.Value // []byte
@@ -100,9 +87,8 @@ type Server struct {
     stopOnce       sync.Once
 }
 
-// botSession couples the live pieces of one bot the proxy serves: the
-// recorded server packet history, the raw send path to the real game
-// server and the state tracker with the played character.
+// botSession couples the live pieces of one bot: the recorded server packet
+// history, the raw send path to the real game server and the state tracker.
 type botSession struct {
     id       string
     recorder *Recorder
@@ -113,9 +99,9 @@ type botSession struct {
 // Option configures a proxy Server.
 type Option func(*Server)
 
-// WithLoginAddresses overrides the login listen addresses. The first
-// entry is mandatory (a bind failure there is fatal), the rest are
-// optional fallbacks whose bind failures are only logged.
+// WithLoginAddresses overrides the login listen addresses: the first entry is
+// mandatory (a bind failure there is fatal), the rest are optional fallbacks
+// whose bind failures are only logged.
 func WithLoginAddresses(addrs ...string) Option {
     return func(s *Server) { s.loginAddrs = addrs }
 }
@@ -126,8 +112,7 @@ func WithGameAddresses(addrs ...string) Option {
     return func(s *Server) { s.gameAddrs = addrs }
 }
 
-// WithTransformer installs a packet transformer; the default is the
-// transparent passthrough.
+// WithTransformer installs a packet transformer; the default passes through.
 func WithTransformer(t Transformer) Option {
     return func(s *Server) { s.transformer = t }
 }
@@ -158,9 +143,9 @@ func NewServer(logger *log.Logger, opts ...Option) *Server {
     return server
 }
 
-// SetRsaModulus publishes the scrambled RSA modulus of the real
-// login server so the emulated Init packet mirrors it (captured by
-// the bot's own login flow, see connection.Authenticate).
+// SetRsaModulus publishes the scrambled RSA modulus of the real login server so
+// the emulated Init packet mirrors it (captured by the bot login flow, see
+// connection.Authenticate).
 func (s *Server) SetRsaModulus(modulus []byte) {
     s.rsaModulus.Store(modulus)
 }
@@ -174,10 +159,9 @@ func (s *Server) rsaModulusBytes() []byte {
     return make([]byte, 128)
 }
 
-// RegisterSession publishes one live bot session. The recorder it
-// returns feeds the GameClient tap; the same GameClient must implement
-// the RawSender of the session. Registering an id again replaces its
-// previous session (the reconnect supervisor cycles sessions).
+// RegisterSession publishes one live bot session and returns the recorder that
+// feeds its tap; the client must implement RawSender. Registering an id again
+// replaces the previous session (the reconnect supervisor cycles them).
 func (s *Server) RegisterSession(
     id string, client RawSender, tracker *state.Bot,
 ) *Recorder {
@@ -206,10 +190,9 @@ func (s *Server) RegisterSession(
     return recorder
 }
 
-// UnregisterSession removes the bot session and ends its history, which
-// also disconnects the game clients attached to it. The recorder
-// argument guards the reconnect cycle: only the session that still owns
-// the id is removed, a replaced session unregisters nothing.
+// UnregisterSession removes the session and ends its history, which also
+// disconnects the game clients attached to it. The recorder guards the
+// reconnect cycle: only the session that still owns the id is removed.
 func (s *Server) UnregisterSession(id string, recorder *Recorder) {
     s.mu.Lock()
     defer s.mu.Unlock()
@@ -227,12 +210,10 @@ func (s *Server) UnregisterSession(id string, recorder *Recorder) {
     }
 }
 
-// SelectBot marks the bot the next connecting client attaches to, and
-// when the id differs from the current selection it wakes every live
-// relay goroutine so a connected C1 client resyncs onto the newly
-// selected bot immediately (no reconnect needed). An unknown id is
-// stored anyway (the client falls back to the first session until
-// that bot registers).
+// SelectBot marks the bot the next connecting client attaches to and wakes
+// every live relay goroutine on a change, so a connected client resyncs onto it
+// without a reconnect. An unknown id is stored anyway (the client falls back to
+// the first session until that bot registers).
 func (s *Server) SelectBot(id string) {
     s.mu.Lock()
     if s.selected == id {
@@ -249,10 +230,9 @@ func (s *Server) SelectBot(id string) {
     s.logger.Printf("Proxy selection switched to bot %q", id)
 }
 
-// selectionChannel returns the current selection notification channel.
-// The caller uses it to detect a selection change: the returned channel
-// is closed when SelectBot picks a different id. A snapshot read under
-// the mutex keeps the channel stable for the select call.
+// selectionChannel returns the current selection notification channel, closed
+// when SelectBot picks a different id. A snapshot read under the mutex keeps it
+// stable for the select call.
 func (s *Server) selectionChannel() chan struct{} {
     s.mu.Lock()
     defer s.mu.Unlock()
@@ -268,9 +248,9 @@ func (s *Server) SelectedBot() string {
     return s.selected
 }
 
-// currentSessionLocked resolves the session a connecting client should
-// attach to: the web UI selection when it is registered, otherwise the
-// first registered session. The caller holds the lock.
+// currentSessionLocked resolves the session a connecting client attaches to:
+// the selection when it is registered, otherwise the first session. The caller
+// holds the lock.
 func (s *Server) currentSessionLocked() *botSession {
     if s.selected != "" {
         for i := range s.sessions {
@@ -286,13 +266,12 @@ func (s *Server) currentSessionLocked() *botSession {
     return nil
 }
 
-// SessionWait bounds how long a connecting client waits for a bot
-// session to appear (the bot may still be logging in when the client
-// arrives).
+// SessionWait bounds how long a connecting client waits for the bot session (it
+// may still be logging in when the client arrives).
 const SessionWait = 8 * time.Second
 
-// resolveSession returns the session to serve, waiting up to
-// SessionWait for a session whose character entered the world.
+// resolveSession returns the session to serve, waiting up to SessionWait for
+// one whose character entered the world.
 func (s *Server) resolveSession() *botSession {
     deadline := time.Now().Add(SessionWait)
     for {
@@ -309,11 +288,10 @@ func (s *Server) resolveSession() *botSession {
     }
 }
 
-// tryResolveSelectedSession returns the online session of the currently
-// selected bot, or nil when the selection is empty, unregistered or not
-// in the world yet. A char selected answer served right after a
-// selection change re-resolves through it, so the client always enters
-// the newest WebUI selection even when it fired mid dance or mid load.
+// tryResolveSelectedSession returns the online session of the selected bot, nil
+// when the selection is empty, unregistered or not in the world yet. A char
+// selected answer served right after a change re-resolves through it, so the
+// client enters the newest selection even when it fired mid dance or mid load.
 func (s *Server) tryResolveSelectedSession() *botSession {
     s.mu.Lock()
     defer s.mu.Unlock()
@@ -342,9 +320,8 @@ func (s *Server) SessionIDs() []string {
     return ids
 }
 
-// sessionByID returns the currently registered session of the given bot
-// id, nil when the id is not registered. The relogin handoff of a held
-// client polls it to notice the replacement session of the same bot.
+// sessionByID returns the registered session of the bot, nil when absent. The
+// relogin handoff of a held client polls it to notice the replacement session.
 func (s *Server) sessionByID(id string) *botSession {
     s.mu.Lock()
     defer s.mu.Unlock()
@@ -362,9 +339,8 @@ func (s *Server) ClientCount() int {
     return int(s.clients.Load())
 }
 
-// gamePort returns the game port advertised to clients: the port of
-// the primary game listener (the default 7778, custom ports follow the
-// -proxy-game flag).
+// gamePort returns the advertised game port: the port of the primary game
+// listener (a custom -proxy-game port follows it).
 func (s *Server) gamePort() int32 {
     if len(s.gameListeners) > 0 {
         addr := s.gameListeners[0].Addr().String()
@@ -383,12 +359,10 @@ func (s *Server) nextConnID() int64 {
     return s.connSeq.Add(1)
 }
 
-// Listen binds the login and game listeners. The first address of each
-// family is mandatory (a bind failure there returns the error), the
-// fallback listeners only log their failures together with the likely
-// causes and remedies (a busy 127.0.0.1:2106 or 127.0.0.2:2106 means the
-// real login server still owns the auth port, see data/client/Readme.txt
-// and docs/proxy.md).
+// Listen binds the login and game listeners. The first address of each family
+// is mandatory (a bind failure returns the error); a fallback listener only
+// logs its failure plus the likely remedy (a busy 127.0.0.1:2106 means the real
+// login server still owns the auth port, docs/proxy.md).
 func (s *Server) Listen() error {
     err := s.listenFamily(true, s.loginAddrs, s.serveLoginListener)
     if err != nil {
@@ -469,10 +443,9 @@ func (s *Server) Serve() error {
     return nil
 }
 
-// serve accepts connections of one listener until the server stops.
-// A transient accept failure (an fd drought of a loaded fleet, an
-// aborted inbound connection) backs off and retries - the old order
-// returned on the first error and left the bound listener dead but
+// serve accepts connections of one listener until the server stops. A transient
+// accept failure (an fd drought, an aborted inbound connection) backs off and
+// retries: returning on the first error would leave the bound listener dead but
 // still advertised.
 func (s *Server) serve(listener net.Listener, handle func(net.Conn)) {
     for {
@@ -499,10 +472,9 @@ func (s *Server) serve(listener net.Listener, handle func(net.Conn)) {
     }
 }
 
-// listenFamily binds every address of one family and starts accepting.
-// The listener bookkeeping is family specific: gamePort and the primary
-// address accessors read the first listener of their own family, so
-// extra login listeners must not interleave into the game slice.
+// listenFamily binds every address of one family and starts accepting. The
+// bookkeeping is family specific, because gamePort and the address accessors
+// read the first listener of their own family.
 func (s *Server) listenFamily(
     login bool, addrs []string, serve func(net.Listener),
 ) error {
@@ -530,12 +502,12 @@ func (s *Server) listenFamily(
     return nil
 }
 
-// logBindHint explains why an optional listener could not bind and how
-// to free it. The interesting case is the hardcoded auth port 2106: the
-// real Mobius login server owns it by default (a wildcard 0.0.0.0:2106
-// bind also blocks 127.0.0.2:2106 on Windows with the access permissions
-// error), and Windows itself can reserve the port range through Hyper-V
-// or WinNAT. The hint mirrors the two recipes of docs/proxy.md.
+// logBindHint explains why an optional listener could not bind and how to free
+// it. The interesting case is the hardcoded auth port 2106: the real Mobius
+// login server owns it by default (a wildcard 0.0.0.0:2106 bind also blocks
+// 127.0.0.2:2106 on Windows with an access permissions error), and Windows
+// itself can reserve the range through Hyper-V or WinNAT. The hint mirrors the
+// recipes of docs/proxy.md.
 func (s *Server) logBindHint(login bool, addr string) {
     if !login {
         return // a busy custom game port has no generic remedy

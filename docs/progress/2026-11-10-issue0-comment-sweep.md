@@ -1311,6 +1311,17 @@ corner probe is a length, not a leg at all.
   click z layer gate. The dated session dump and the issue id drop.
   141 comment lines of 414 become 103 of 376.
 
+### 2026-11-13 - proxy/server.go keeps the listener contracts only
+
+- 26 blocks compress: the proxy keeps the 2106 hardcode of the classic
+  client against the l2.ini ServerAddr dial, the 7778 advertisement of
+  the emulated login, the mandatory first listener, the 8 s SessionWait,
+  the 128 byte zero modulus, the selection channel wake rule, the
+  recorder guard of the reconnect cycle, the accept backoff (a dead but
+  advertised listener), the family specific listener slices and the
+  0.0.0.0:2106 wildcard blocking 127.0.0.2 on Windows plus the
+  Hyper-V/WinNAT reservation. 135 comment lines of 583 become 107 of 555.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
