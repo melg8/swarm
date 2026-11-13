@@ -13,13 +13,11 @@ import (
 
 // The stagnation thresholds of the soak scenario: the guard fails the
 // run when the character gains no experience for stagnationNoXpMinutes
-// or holds the same position for stagnationNoMoveMinutes. The two
-// constants are the M and K of the M1 acceptance ("no XP gain for M
-// minutes, no position change for K minutes"). The elven lands hunt
-// loop kills a mob every 10-30 seconds at level 1, so ten minutes with
-// no XP is a real livelock, not a slow patch; the position window is
-// tighter because a healthy bot walks between kills and a stuck cell
-// freezes the coordinates first.
+// or holds the same position for stagnationNoMoveMinutes. The elven
+// lands hunt loop kills a mob every 10-30 seconds at level 1, so ten
+// minutes with no XP is a real livelock, not a slow patch; the
+// position window is tighter because a healthy bot walks between
+// kills and a stuck cell freezes the coordinates first.
 const (
     stagnationNoXpMinutes   = 10
     stagnationNoMoveMinutes = 5
@@ -27,14 +25,12 @@ const (
 )
 
 // stagnationGuard watches the tracker for the two soak livelock
-// signatures: no experience gain for M minutes and no position change
-// for K minutes. The guard is a tracker-public-API read inside the
-// acceptance package (T-001 scope); T-002 will later surface the same
-// events from the hunt loop and the soak scenario can consume them.
-//
-// The now seam lets the unit tests drive the clock; the production
-// path uses time.Now. The guard is single-goroutine: the soak monitor
-// loop owns it and calls update on every tick.
+// signatures: no experience gain for stagnationNoXpMinutes and no
+// position change for stagnationNoMoveMinutes. The guard reads the
+// tracker public API only; the hunt loop later surfaces the same
+// events for the scenario to consume. The now seam lets the unit tests
+// drive the clock (production uses time.Now), and the soak monitor
+// loop owns the guard and calls update on every tick.
 type stagnationGuard struct {
     now         func() time.Time
     bootTime    time.Time

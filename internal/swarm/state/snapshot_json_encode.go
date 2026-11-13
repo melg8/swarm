@@ -92,16 +92,13 @@ func appendJSONString(dst []byte, s string) []byte {
     return dst
 }
 
-// jsonInvalidUTF8Replacement is the byte sequence the running
-// stdlib writes for one invalid UTF-8 byte inside a JSON string: the
-// classic encoding/json appends the \ufffd escape sequence while the
-// v2 backed encoder (GOEXPERIMENT=jsonv2 and the toolchains that
-// ship it by default) appends the literal U+FFFD replacement rune.
-// The init time probe mirrors json.Marshal of the same process so
-// the hand rolled writer stays byte identical to the reflection
-// encoder on every toolchain: the parity is pinned by the reflection
-// tests and both replacement forms by
-// TestAppendJSONStringInvalidUTF8Modes.
+// jsonInvalidUTF8Replacement is the byte sequence the running stdlib
+// writes for one invalid UTF-8 byte inside a JSON string: the classic
+// encoding/json appends the \ufffd escape, the v2 backed encoder
+// (GOEXPERIMENT=jsonv2 and the toolchains that ship it) the literal
+// U+FFFD rune. The init time probe mirrors json.Marshal of the same
+// process so the hand rolled writer stays byte identical on every
+// toolchain; TestAppendJSONStringInvalidUTF8Modes pins both forms.
 var jsonInvalidUTF8Replacement = func() []byte {
     probe, err := json.Marshal("\xff")
     if err == nil && string(probe) == "\"\uFFFD\"" {

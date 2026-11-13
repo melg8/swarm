@@ -20,15 +20,12 @@ import (
 )
 
 // DefaultMeshCapacity bounds how many tiles stay loaded. The exact
-// square port inflated the dense region tiles into the hundreds of
-// megabytes of heap (the 2.6M polygon region holds 230 MB of polys
-// and links, whole map 100M polys), so the default keeps the working
-// set of a route (the current region and its neighbours) resident
-// without risking the memory; the loads are cheap (the whole tile
-// decodes in well under a second, the hop corridors cache across
-// evictions) so an eviction is not a stall. A capacity of zero or
-// less means unlimited (fine for the sparse tiles, a memory hazard on
-// the dense whole map pack).
+// square port inflated the dense region tiles into hundreds of
+// megabytes of heap (the 2.6M polygon region holds 230 MB of polys and
+// links, the whole map 100M polys), so the default keeps the working
+// set of a route (the current region and its neighbours) resident; a
+// tile decodes well under a second and the hop corridors cache across
+// evictions, so an eviction is not a stall. Zero or less is unlimited.
 const DefaultMeshCapacity = 4
 
 // maxPrefetchWorkers caps the parallel tile decode pool of the

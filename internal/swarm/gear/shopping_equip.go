@@ -121,15 +121,13 @@ func SimulateInventory(
     return virtual
 }
 
-// PlannedEquips lists the object ids of the inventory items the auto
-// equipment will wear: the unequipped pieces SimulateInventory places
-// on the virtual paperdoll (the free upgrades - the very drops and
-// buys the shop plan treats as already owned). The junk flows of the
-// hunt loop consult the set before selling or destroying: an item
-// scheduled for wearing is never offered for its instant adena or
-// destroyed for bag space, the bot puts it on and uses it instead.
-// Pieces the simulation leaves off the paperdoll (duplicates, downgrades,
-// the displaced halves of pair swaps) stay plain junk.
+// PlannedEquips lists the object ids the auto equipment will wear: the
+// unequipped pieces SimulateInventory places on the virtual paperdoll,
+// the free upgrades the shop plan treats as already owned. The junk
+// flows consult the set before selling or destroying - an item
+// scheduled for wearing is never sold for instant adena or destroyed
+// for bag space. Pieces the simulation leaves off (duplicates,
+// downgrades, the displaced halves of pair swaps) stay plain junk.
 func PlannedEquips(
     profile Profile, equipment Equipment,
 ) map[int32]bool {

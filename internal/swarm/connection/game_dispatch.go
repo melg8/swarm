@@ -253,14 +253,12 @@ func (gc *GameClient) logUnknownPacket(payload []byte) {
 }
 
 // handleNetPing validates the server net ping response and stays
-// silent on the happy path. The reply itself is only the proof the
-// connection is alive (the game time it carries is used nowhere), and
-// a C1 client behind the proxy pings continuously - the client's own
-// RequestNetPing (0xA8) packets are relayed through this bot session,
-// so the server answers at the client's ping rate, several replies
-// per second observed live. One log line per answer flooded the
-// process log. A malformed packet still logs: it flags a cipher or
-// protocol desync worth noticing.
+// silent on the happy path: the reply only proves the connection is
+// alive (the game time it carries is used nowhere), and a C1 client
+// behind the proxy pings continuously (its RequestNetPing 0xA8 packets
+// relay through this session, several replies per second live), so one
+// line per answer flooded the log. A malformed packet still logs: it
+// flags a cipher or protocol desync.
 func (gc *GameClient) handleNetPing(payload []byte) {
     ping := fromgameserver.NewNetPingPacket()
     if err := fromgameserver.ParseNetPingPacket(ping, payload); err != nil {

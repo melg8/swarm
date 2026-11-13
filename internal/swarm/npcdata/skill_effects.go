@@ -16,16 +16,13 @@ type SkillEffect struct {
     Text  string
 }
 
-// skillEffects maps the skill id to the level effect summary runs
-// (the run semantics of skillDescs: a run covers its level up to the
-// next one). Sources: the skill stat XMLs of
-// L2J_Mobius_C1_HarbingersOfWar, files 00000-00099, 01000-01099,
-// 01200-01299 and 04000-04099 of dist/game/data/stats/skills; the
-// mob provenance of the debuffs cites the spawn file. The set covers
-// the effects the bot actually runs (the self auras, the Newbie
-// Guide support magic and the mob debuffs of the hunting grounds) -
-// an absent skill answers empty and the web UI drops the line
-// instead of guessing.
+// skillEffects maps the skill id to the level effect summary runs (a
+// run covers its level up to the next one). Sources: the skill stat
+// XMLs of L2J_Mobius_C1_HarbingersOfWar files 00000-00099,
+// 01000-01099, 01200-01299 and 04000-04099 of
+// dist/game/data/stats/skills, plus the spawn file for the mob
+// provenance of the debuffs. An absent skill answers empty and the web
+// UI drops the line instead of guessing.
 var skillEffects = map[int32][]SkillEffect{
     // Self-cast auras, 00000-00099.xml: the mul tables of the buff
     // effect elements.
@@ -153,15 +150,13 @@ var skillEffects = map[int32][]SkillEffect{
     },
 }
 
-// SkillEffectOf returns the numeric effect summary of one level of a
-// skill: the run that covers the level (the run semantics of
-// SkillDescription - each run covers its level up to the next one, a
-// level beyond the last run clamps to it, a level below the first
-// one answers the first run). The texts carry the real per-level
-// values of the deployed Mobius C1 skill stats, so the web UI
-// tooltip answers how the buff really bites, e.g. Wind Walk level 2
-// answers "+33 Speed". A skill outside the table answers empty (the
-// tooltip drops the line instead of guessing).
+// SkillEffectOf returns the numeric effect summary of one level: the
+// run that covers the level (a level beyond the last run clamps to it,
+// a level below the first answers the first run). The texts carry the
+// real per-level values of the deployed Mobius C1 skill stats, so the
+// web UI tooltip answers how the buff really bites (Wind Walk level 2
+// answers "+33 Speed"); a skill outside the table answers empty and
+// the tooltip drops the line instead of guessing.
 func SkillEffectOf(id, level int32) string {
     runs := skillEffects[id]
     if len(runs) == 0 {

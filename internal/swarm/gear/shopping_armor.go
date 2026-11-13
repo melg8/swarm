@@ -132,12 +132,10 @@ func pruneArmorFrontier(options []armorOption) []armorOption {
 // enumerateArmorSet walks the cross product of the family frontiers
 // and returns the set with the maximum summed pdef gain inside the
 // budget: ties prefer the cheaper set, then the earlier traversal
-// order (the plan stays deterministic). The skip choice of every
+// order, so the plan stays deterministic. The skip choice of every
 // family participates, so a family whose every upgrade overflows the
-// shared budget stays unpurchased. The frontier sizes of the real
-// catalogs are tiny (four to six options per family); the
-// enumerateArmorSetCap guard trims pathological frontiers to their
-// top options by gain before the walk.
+// shared budget stays unpurchased. The real catalogs carry four to six
+// options per family; capArmorFrontiers trims pathological frontiers.
 func enumerateArmorSet(
     options [][]armorOption, budget int64,
 ) []armorOption {

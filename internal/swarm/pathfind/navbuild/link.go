@@ -57,14 +57,11 @@ func (a *linkAccumulator) add(poly int32, side uint8, to int32,
 
 // emit turns the accumulated spans into links: per key the sorted
 // coordinates merge into maximal runs, every run is one portal. The
-// answer is sorted by (poly, side, t0, t1, to) - a total order over
-// the emitted specs. The comparator must resolve every field: two
-// keys can tie on (poly, side, t0) with a different target (the
-// stacked layer columns pair one polygon with two neighbours on the
-// same span) and sort.Slice is unstable, so a partial key let the
-// map iteration order leak into the wire - two rebuilds of the same
-// region produced differently ordered link arrays and the corpus
-// replay jitters on the A* tie-breaking (issue #63).
+// answer sorts by (poly, side, t0, t1, to), a total order: two keys
+// can tie on (poly, side, t0) with a different target (the stacked
+// layer columns pair one polygon with two neighbours on the same
+// span), so a partial key leaks the map iteration order into the wire
+// and the corpus replay jitters on the A* tie-breaking.
 func (a *linkAccumulator) emit() []linkSpec {
     specs := make([]linkSpec, 0, len(a.spans))
     for key, coords := range a.spans {
@@ -330,13 +327,12 @@ func (s *borderStrips) finalize() {
 
 // stitchBorders computes the external links of one region against the
 // border strips of its neighbours: every position of a shared edge
-// pairs the kept layers of both sides, the open and height-compatible
+// pairs the kept layers of both sides, and the open height-compatible
 // pairs accumulate portal spans into links that target the neighbour
 // region polygons. The neighbours array is indexed by the own side:
-// neighbors[stripWest] holds the strips of the region to the west and
-// its EAST strip pairs with the own west strip. The own links are
-// appended to the tile and the ExtLinks array grows accordingly; the
-// caller re-encodes the tile.
+// neighbors[stripWest] holds the west region's strips, whose EAST
+// strip pairs with the own west strip. The own links append to the
+// tile and the caller re-encodes it.
 func stitchBorders(tile *navmesh.Tile, own borderStrips,
     neighbors [4]*borderStrips, climb int32,
 ) int {

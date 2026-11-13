@@ -241,15 +241,14 @@ func (l *Loop) tickHunt() {
     }
 }
 
-// handleTownTrip drives the town trip start and the running trip tick.
-// It reports true when the tick was consumed by a town trip (already
-// running or just started), so the caller skips the engage/loot logic.
-// The town walk plan view publishes here too: while the trip walks to
-// or from the merchant, the remaining geodata waypoints publish so the
-// map draws the planned path. A real fight still holds the start (the
-// loot of the kill is the point of the fight, the blows landing now
-// need the answer), but a merely held engage target drops: the trip
-// owns the target register the moment it starts (see dropAttackTarget).
+// handleTownTrip drives the town trip start and the running trip
+// tick, and reports true when the tick was consumed by a town trip so
+// the caller skips the engage and loot logic. The walk plan publishes
+// here too: while the trip walks to or from the merchant the remaining
+// geodata waypoints publish for the map. A real fight still holds the
+// start (the loot needs the answer), but a merely held engage target
+// drops: the trip owns the target register from the start (see
+// dropAttackTarget).
 func (l *Loop) handleTownTrip() bool {
     if l.tripActive() {
         l.tickTownTrip()

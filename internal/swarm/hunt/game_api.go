@@ -60,15 +60,13 @@ type GameAPI interface {
     // the teacher the lesson requests resolve their trainer
     // through.
     ClickObject(objectID int32) error
-    // InteractPull fires the attack analog of the npc interaction:
-    // the second plain click on an already selected npc (the client
-    // double click). The Mobius NpcClick handler resolves it to the
-    // interact branch: out of the interaction distance the player AI
-    // takes the INTERACT intention and walks the character to the
-    // npc along the straight line, so the distance is met however
-    // the geometry between them sits. It is not the real attack
-    // request (AttackTarget): no forced attack intention, no swings,
-    // the folk npc never takes damage.
+    // InteractPull fires the attack analog of the npc interaction: the
+    // second plain click on an already selected npc. The Mobius NpcClick
+    // handler resolves it to the interact branch: out of the interaction
+    // distance the player AI takes the INTERACT intention and walks the
+    // character to the npc along the straight line. It is not the attack
+    // request (AttackTarget): no forced attack intention, no swings, the
+    // folk npc never takes damage.
     InteractPull(objectID int32) error
     // ClearTarget drops the npc selection a conversation left
     // behind: the self click replaces the server side selection

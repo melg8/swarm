@@ -39,16 +39,14 @@ type buffRecord struct {
 // read as a fresh cast.
 const buffTotalGraceSeconds = 2
 
-// BuffSnapshot is one active effect of the snapshot: the skill the
-// effect comes from with its level, the remaining seconds and the
-// duration the remaining time percent rides against (Total - the full
-// abnormal time of the skill stats when the server data carries it,
-// else the seconds the effect had when the process first saw it),
-// plus the resolved display data (name, icon, the tooltip texts). The
-// web UI buffs widget renders the list; Desc is the generic client
-// tooltip line of the level (empty when the skill stats carry none)
-// and Effect is the numeric effect summary the server data bites with
-// (empty for the skills outside the effect table).
+// BuffSnapshot is one active effect: the skill and level, the
+// remaining seconds and the duration the remaining percent rides
+// against (Total - the full abnormal time of the skill stats when the
+// server carries it, else the seconds the effect had when the process
+// first saw it), plus the display data. Desc is the generic client
+// tooltip line of the level and Effect the numeric effect summary,
+// both empty when the server data carries none; the web UI buffs
+// widget renders the list.
 type BuffSnapshot struct {
     SkillID int32  `json:"skillId"`
     Level   int32  `json:"level"`

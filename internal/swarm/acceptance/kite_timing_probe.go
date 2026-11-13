@@ -17,16 +17,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The kite timing probe: a raw wire experiment that measures how the Mobius
-// C1 server answers a retreat click issued at a controlled delay after the own
-// bow shot started. The bow cycle has three phases (the windup before the hit
-// task lands, the hit itself and the reuse tail), and the improved kite asks
-// which phase admits a MoveToLocation without deferring it. The probe walks a
-// delay ladder of retreat clicks on one temp character with the bow kit and
-// reports per delay whether the movement started immediately, was deferred to
-// the cycle end or never ran, plus a cursor key (WASD) round that asks whether
-// the claims stream moves the character through the windup while the arrow
-// still lands.
+// The kite timing probe: a raw wire experiment that measures how the
+// server answers a retreat click at a controlled delay after the own
+// bow shot started. The bow cycle has three phases (the windup before
+// the hit task lands, the hit and the reuse tail), and the improved
+// kite asks which phase admits a MoveToLocation without deferring it.
+// The delay ladder reports per click whether the movement started
+// immediately, was deferred to the cycle end or never ran; a cursor
+// key round asks whether the claims stream moves through the windup.
 
 // kiteProbeScenarioID is the scenario registry id.
 const kiteProbeScenarioID = "kite-timing-probe"

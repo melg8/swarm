@@ -29,14 +29,12 @@ const (
 )
 
 // InventoryItem is one entry of the inventory packets. Type2 tells the
-// item family: 0 weapon, 1 armor, 2 jewel, 3 quest item, 4 adena,
-// 5 common item. BodyPart is the slot mask of the item template (see
-// BodyPart: 0x1 underwear, 0x2/0x4/0x6 ears, 0x8 neck, 0x10/0x20/0x30
-// fingers, 0x40 head, 0x80 right hand, 0x100 left hand, 0x200 gloves,
-// 0x400 chest, 0x800 legs, 0x1000 feet, 0x2000 back, 0x4000 two
-// handed weapon, 0x8000 full armor); an unequipped item carries the
-// mask of the slot it would occupy. Enchant is the enchant level.
-// Change carries the InventoryUpdate code: 1 add, 2 modify, 3 remove.
+// item family (0 weapon, 1 armor, 2 jewel, 3 quest item, 4 adena, 5
+// common) and BodyPart the slot mask of the template (0x1 underwear,
+// 0x2/0x4/0x6 ears, 0x8 neck, 0x10/0x20/0x30 fingers, 0x40 head,
+// 0x80 right hand, 0x100 left hand, 0x200 gloves, 0x400 chest, 0x800
+// legs, 0x1000 feet, 0x2000 back, 0x4000 two handed, 0x8000 full);
+// an unequipped item carries the mask of its slot. Enchant is level.
 type InventoryItem struct {
     ObjectID int32
     ItemID   int32

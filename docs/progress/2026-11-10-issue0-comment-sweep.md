@@ -2386,6 +2386,35 @@ corner probe is a length, not a leg at all.
   state (1.0 s) and proxy (6.8 s) suites, `golangci-lint run` on the
   eight paths 0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the ten line blocks across the hot packages
+
+- `state/snapshot_json_encode.go` keeps the stdlib replacement forms
+  and the init probe parity test, `state/buffs.go` the Total fallback
+  rule; 31/75 become 28/73.
+- `pathfind/navbuild/link.go` keeps the total order and the stacked
+  layer tie, `pathfind/region.go` the file order indexing and the refs
+  dedup, `pathfind/navmesh/mesh.go` the 230 MB dense region and the
+  100M whole map figures; 78/49/103 become 74/47/100.
+- `connection/game_dispatch.go` keeps the 0xA8 relay ping rate,
+  `hunt/loop_phase.go` the fight hold and the target register,
+  `hunt/delevel.go` the archer-only rule and the level 10/16 bounds,
+  `hunt/game_api.go` the interact intention, `hunt/loop_diagnostics.go`
+  the single ring entry; 58/83/126/82/82 become 56/82/124/80/80.
+- `npcdata/skill_effects.go` keeps the stat XML file ranges and the
+  Wind Walk example, `gear` keeps the four to six option frontier and
+  the planned equip contract, `packets` keeps the slot mask table and
+  the 97 unit run speed, `proxy/replay.go` the stale self-state reason;
+  69/48/49/47/57 become 64/46/47/45/55.
+- `acceptance/soak_guard.go` drops the M1 quote and keeps the 10/5
+  minute windows with the 10-30 second kill cadence; 38 of 139 become
+  34 of 135.
+- Verified: `task fmt`, `go build ./...`, the connection (10.8 s),
+  hunt (30.5 s), npcdata (0.4 s), gear (0.3 s), packets (0.3 s),
+  acceptance (8.9 s), state (1.1 s), navbuild (36.5 s), navmesh
+  (36.7 s), pathfind (54.1 s) and proxy (6.9 s) suites,
+  `golangci-lint run` on the nine paths 0 issues, `task fmt:check`
+  clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

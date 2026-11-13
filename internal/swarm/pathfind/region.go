@@ -23,15 +23,13 @@ const (
 )
 
 // Region is one parsed X_Y.l2j geodata region: 2048x2048 cells, each
-// holding one or more walkable layers.
-//
-// The cells are stored in file order: span index = block*64 + cell where
-// block = (localX/8)*256 + localY/8 and cell = (localX%8)*8 + localY%8,
-// exactly the indexing of the Mobius Region.getBlock/ComplexBlock. Every
-// span packs a refs offset (low 24 bits) and a layer count (high 8
-// bits). The refs slice is deduplicated for single layer cells, so it
-// holds only the distinct layers of the region plus the multilayer
-// stacks.
+// holding one or more walkable layers. The cells are stored in file
+// order: span index = block*64 + cell where block = (localX/8)*256 +
+// localY/8 and cell = (localX%8)*8 + localY%8, the Mobius
+// Region.getBlock/ComplexBlock indexing. Every span packs a refs
+// offset (low 24 bits) and a layer count (high 8); the refs slice is
+// deduplicated for single layer cells, holding only the distinct
+// layers plus the multilayer stacks.
 type Region struct {
     col, row int16
     kinds    [blocksPerRegion]blockKind

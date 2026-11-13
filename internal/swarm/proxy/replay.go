@@ -11,16 +11,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The replayed history describes the world as the bot saw it, and the
-// kept packets of the world objects stay valid for a reconnecting
-// client (the objects converge through the prologue and the tail). The
-// self-state packets do not: the recorded CharSelected and UserInfo
-// carry the login-time place, so a client that reconnects after the bot
-// walked away spawns at the stale spot, runs against the server-side
-// geometry and crashes. The patchers below rewrite the recorded
-// self-state with the live tracker snapshot instead, and the replay
-// filter drops the stale self movement packets (keeping only the newest
-// one, which matches the live tracker position by construction).
+// The replayed history describes the world as the bot saw it: the
+// kept world object packets stay valid for a reconnecting client (the
+// objects converge through the prologue and the tail), but the
+// self-state packets do not - the recorded CharSelected and UserInfo
+// carry the login-time place, so a client that reconnects after the
+// bot walked away spawns at the stale spot and crashes. The patchers
+// rewrite them with the live tracker snapshot and the filter drops the
+// stale self movement packets, keeping the newest one.
 
 // Server packet opcodes the replay patching understands. Every movement
 // family packet carries the moved object id in its first int32.

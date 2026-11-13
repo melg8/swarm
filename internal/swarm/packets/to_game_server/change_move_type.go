@@ -12,16 +12,12 @@ import (
 
 const changeMoveTypePacketID = 0x1C
 
-// ChangeMoveTypePacket asks the game server to switch the character
-// between walking and running, exactly like the client movement
-// toggle of the official UI. The server starts every session in the
-// WALK state (Creature._isRunning defaults to false), so the first
-// long walk of a bot that never sends this packet moves at the walk
-// speed - the live class transfer run of 2026-09-12 spent four
-// rounds dying in the Ruins of Agony before the 97 unit run speed
-// read for what it was.
-// Wire format (see ChangeMoveType2.readImpl): [opcode 0x1C]
-// [typeRun: 4] (1 runs, 0 walks).
+// ChangeMoveTypePacket asks the server to switch the character between
+// walking and running, like the official UI toggle. The server starts
+// every session in the WALK state (Creature._isRunning defaults to
+// false), so a bot that never sends this walks the first long walk at
+// the walk speed; the elven fighter run speed reads 97 units. Wire
+// (ChangeMoveType2.readImpl): [opcode 0x1C][typeRun: 4] (1 run).
 type ChangeMoveTypePacket struct {
     TypeRun int32
 }

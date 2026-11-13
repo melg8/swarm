@@ -2,16 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Deleveling of the hunt loop: when the hunting ground holds only mobs far
-// below the character level, the drop chance collapses (the Mobius level gap
-// rules), so the bot provokes the town guards and dies until the level returns
-// to the rewarding range. Only archer guards are provoked, and always in melee:
-// an archer guard in the attack intention shoots at anything inside its bow
-// range, while a melee guard only follows and the chase dies in the checkTarget
-// karma gate. The penalty applies from level 10 up (the Lucky newbie skill
-// absorbs it below), and a Life Cubic character (16) never aims under 16; the
-// free death counter aborts a server that stops penalizing. The measured
-// numbers: docs/hunting.md.
+// Deleveling of the hunt loop: when the hunting ground holds only mobs
+// far below the character level the drop chance collapses (the Mobius
+// level gap rules), so the bot provokes the town guards and dies until
+// the level returns to the rewarding range. Only archer guards are
+// provoked, always in melee: a provoked archer shoots at anything in
+// its bow range, while a melee guard only follows and the chase dies
+// in the checkTarget karma gate. The penalty applies from level 10 up
+// (Lucky newbie absorbs it below; Life Cubic aims no lower than 16).
 package hunt
 
 import (
