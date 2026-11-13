@@ -46,7 +46,6 @@ type botMetrics struct {
     tickCount    int64
 }
 
-// newBotMetrics creates the zeroed counters of a fresh tracker.
 func newBotMetrics() botMetrics {
     return botMetrics{
         kills:        0,
@@ -126,7 +125,6 @@ func (b *Bot) NoteHuntTick(d time.Duration) {
     }
 }
 
-// noteDeathLocked counts one death of the played character.
 func (b *Bot) noteDeathLocked(now time.Time) {
     b.metrics.deaths++
     b.metrics.lastDeathAt = now

@@ -84,33 +84,28 @@ func (e engineNavigator) FindPathApproachAvoiding(
         start, end, approachRadius, e.engine.MaxPassableHeight(), avoid)
 }
 
-// FindPath searches the walkable path with the engine settings.
 func (e engineNavigator) FindPath(
     start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {
     return e.engine.FindPath(start, end, e.engine.MaxPassableHeight())
 }
 
-// ClosestHeight resolves the destination deck height with the engine.
 func (e engineNavigator) ClosestHeight(
     x, y float64, refZ int16,
 ) (int16, error) {
     return e.engine.ClosestHeight(x, y, refZ)
 }
 
-// LineOfSight answers the geodata sight line with the engine settings.
 func (e engineNavigator) LineOfSight(
     start, end pathfind.Vec3,
 ) (bool, error) {
     return e.engine.LineOfSight(start, end, e.engine.MaxPassableHeight())
 }
 
-// OverWater answers the geodata water surface check with the engine.
 func (e engineNavigator) OverWater(x, y float64, refZ int16) bool {
     return e.engine.OverWater(x, y, refZ)
 }
 
-// ValidateClick mirrors the server move validation with the engine.
 func (e engineNavigator) ValidateClick(
     from, to pathfind.Vec3,
 ) (pathfind.Vec3, bool) {

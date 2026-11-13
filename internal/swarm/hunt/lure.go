@@ -75,7 +75,6 @@ type lureState struct {
     armedArrow bool
 }
 
-// lureArmed reports whether a lure owns the current pick.
 func (l *Loop) lureArmed() bool {
     return l.lure != nil
 }
@@ -454,7 +453,6 @@ func segmentDistance(
     return math.Hypot(px-(ax+dx*t), py-(ay+dy*t))
 }
 
-// targetName resolves the display name of the object id for the log.
 func (l *Loop) targetName(objectID int32) string {
     if name := l.tracker.ObjectName(objectID); name != "" {
         return name

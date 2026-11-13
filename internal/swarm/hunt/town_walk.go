@@ -12,9 +12,8 @@ import (
 )
 
 // waypointDistanceAnchored measures the character to waypoint distance with the
-// waypoint height anchored into the server frame (click_frame.go): the vintage
-// shift explains only the pack disagreement, a whole deck below still measures
-// its gap.
+// waypoint height anchored into the server frame (click_frame.go): the shift
+// explains only the pack disagreement, a whole deck below still shows a gap.
 func waypointDistanceAnchored(
     wp pathfind.Vec3, selfX, selfY, selfZ int32, frameOffset float64,
 ) float64 {
@@ -27,8 +26,8 @@ func waypointDistanceAnchored(
 
 // waypointArrived reports whether the follower reached the waypoint: the 50
 // unit pass radius for the intermediate turns (a wide radius cuts corners into
-// railings), the segment arrival radius for the last one, both anchored into
-// the server frame.
+// railings), the segment arrival radius for the last one, both in the server
+// frame.
 func waypointArrived(
     waypoints []pathfind.Vec3, index int, selfX, selfY, selfZ int32,
     frameOffset, finalArrive float64,
@@ -58,7 +57,7 @@ func (l *Loop) finalArriveRadius() float64 {
 
 // waypointPassed reports whether the character moved past the waypoint along
 // the route: the projection beyond it inside the 100 unit corridor. A raw "next
-// waypoint is closer" test skipped bridge entries through the railing; the
+// waypoint is closer" test skipped bridge entries through the railing, and the
 // planar test never passes a drop.
 func waypointPassed(
     wp, next pathfind.Vec3, selfX, selfY int32,
@@ -74,7 +73,6 @@ func waypointPassed(
     selfDY := float64(selfY) - wp.Y
     along := (selfDX*segX + selfDY*segY) / segLen
     if along <= 0 {
-        // Still before the waypoint: nothing passed yet.
         return false
     }
     lateral := math.Abs(selfDX*segY-selfDY*segX) / segLen
@@ -120,7 +118,7 @@ func waypointPassedAlongRoute(
 
 // walkTownWaypoints follows the planned waypoints with ground clicks and
 // reports the final arrival. Long segments split at the move limit, a waypoint
-// passed ON THE ROUTE skips (walking back would loop), and a standing walk
+// passed on the route skips (walking back would loop), and a standing walk
 // re-paths within the trip budget; the plan prices the water, so wet segments
 // walk like dry ones.
 func (l *Loop) walkTownWaypoints() bool {
@@ -285,8 +283,7 @@ func (l *Loop) clickWaypoint(
 
 // anchorWaypointClick resolves the click target of the aimed waypoint: the z
 // rides the server frame transport (click_frame.go), a far waypoint clips to
-// the move limit, and the distance comes back for the rescue floor of
-// resolveClickExtension.
+// the move limit, and the distance comes back for the rescue floor.
 func (l *Loop) anchorWaypointClick(
     selfX, selfY, selfZ int32, wp pathfind.Vec3,
 ) (moveX, moveY, moveZ, dist float64) {
@@ -303,8 +300,8 @@ func (l *Loop) anchorWaypointClick(
 // resolveClickExtension runs the extension ladder of the aimed click: an
 // under-floor target re-aims at the forward route samples, a backward target of
 // an armed stuck segment re-aims the same way, and every other backward click
-// holds. It returns the click target and whether the click may leave; the
-// arithmetic is in docs/hunting.md.
+// holds. It returns the target and whether the click may leave; the arithmetic
+// is in docs/hunting.md.
 func (l *Loop) resolveClickExtension(
     selfX, selfY, selfZ int32,
     dist float64, passedBehind bool,
@@ -353,7 +350,6 @@ func waypointBehindRoute(
     }
     if math.Hypot(wp.X-float64(selfX), wp.Y-float64(selfY)) >
         waypointPassDist {
-        // A far waypoint is never passed, whatever the segment direction says.
         return false
     }
 
@@ -577,7 +573,6 @@ func (l *Loop) clickEscapeHop(
             break
         }
         if dist <= hopCoincideDist {
-            // Stood on it: no hop needed.
             continue
         }
         if _, ok := l.navigator.ValidateClick(from, pathfind.Vec3{
@@ -599,7 +594,7 @@ func (l *Loop) clickEscapeHop(
 
 // segmentAdvanceClear gates the advance past the waypoint whose successor sits
 // at the index: the line to that successor must pass the click transport, the
-// oracle the click itself faces. A refused line keeps the skipped-from waypoint
+// very oracle the click faces. A refused line keeps the skipped-from waypoint
 // targeted.
 func (l *Loop) segmentAdvanceClear(
     selfX, selfY, selfZ int32, next int,

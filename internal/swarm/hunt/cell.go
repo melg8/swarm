@@ -29,7 +29,6 @@ func CellLeash(cell Cell) *state.CellZone {
     return cell.TargetZone()
 }
 
-// ElvenHuntingCells returns the hunting cells of the elven lands.
 func ElvenHuntingCells() []Cell {
     return huntdata.ElvenHuntingCells()
 }

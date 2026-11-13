@@ -20,7 +20,7 @@ import (
 // gear, and the loop rotates between the grounds of one band when a square
 // clears faster than the respawn refills it. A rotated-away square keeps an
 // empty cooldown, so the sweep moves A to B to C; the death regression demotes
-// a band, and tools/generate_hunt_zones.py builds the registry.
+// a band.
 
 // ZoneMob is one mob species of a hunting zone (huntdata).
 type ZoneMob = huntdata.ZoneMob
@@ -96,8 +96,8 @@ func sameBand(zone HuntingZone, other HuntingZone) bool {
 // opens a band above its top mob plus the lead, the gear gate waits for the
 // equipment). Among the zones of the winning band the current one keeps its
 // post and the nearest one wins an open contest; maxMinLevel caps the ladder
-// for the death regression. A character below every band hunts the starter band
-// through the fallback contest.
+// for the death regression, and a character below every band hunts the starter
+// band.
 func PickHuntingZone(
     zones []HuntingZone, level int32, gearPoints int32,
     currentID string, fromX int32, fromY int32, maxMinLevel int32,
@@ -190,7 +190,6 @@ func starterZone(
 // var).
 var noZone HuntingZone
 
-// zoneByID resolves a zone of the registry by its id.
 func (l *Loop) zoneByID(id string) (HuntingZone, bool) {
     if id == "" {
         return noZone, false
@@ -318,7 +317,7 @@ func (l *Loop) selfZoneAnchor() (int32, int32) {
 // maybeRotateEmptyZone rotates the ground of a cleared-out square: a hunter
 // that stands central in a mob-less square for the rotate window moves to the
 // nearest ground of the same band that is not cooling down. The emptiness
-// reading counts the mobs the character can actually PICK (the level filter,
+// reading counts the mobs the character can actually pick (the level filter,
 // the skip list, the social clan fence), so a square whose only survivors sit
 // in mutually fenced packs reads empty. The loot, the trip, the landing blows
 // and the rest reset the timer; a held fight of a stuck engage does not.
@@ -584,8 +583,8 @@ func (l *Loop) applyHuntingZone(zone HuntingZone) {
 // zoneMobPriority builds the template id to priority map (nil when no mob
 // carries a priority). The registries carry the Mobius CT0 xml template ids
 // (20471 for the Kaboo Orc Fighter) while NpcInfo identifies the npc by the C4
-// display id plus the 1000000 offset (1000471), so every id translates onto its
-// wire key.
+// display id plus the 1000000 offset (1000471), so every id needs the
+// translation.
 func zoneMobPriority(zone HuntingZone) map[int32]int32 {
     var priorities map[int32]int32
     for index := range zone.Mobs {
@@ -630,12 +629,10 @@ func (l *Loop) publishZoneView() {
     l.tracker.SetHuntingZones(views)
 }
 
-// ElvenHuntingZones returns the hunting grounds of the elven lands.
 func ElvenHuntingZones() []HuntingZone {
     return huntdata.ElvenHuntingZones()
 }
 
-// DionHuntingZones returns the hunting grounds of the Dion 20-25 band.
 func DionHuntingZones() []HuntingZone {
     return huntdata.DionHuntingZones()
 }

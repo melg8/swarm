@@ -17,7 +17,6 @@ type objectStore struct {
     index map[int32]int32
 }
 
-// newObjectStore creates the empty store.
 func newObjectStore() objectStore {
     return objectStore{
         hot:   nil,

@@ -267,7 +267,6 @@ func (l *Loop) merchantStop(templateID int32) *tripStop {
     return nil
 }
 
-// spTotal sums the SP cost of the lessons.
 func spTotal(lessons []lessonTarget) int64 {
     var total int64
     for _, lesson := range lessons {
@@ -346,7 +345,6 @@ func shopTaxPercent(shop gear.Shop) int32 {
 // bookReason marks the spellbook purchases in the trip stop buys.
 const bookReason = "spellbook"
 
-// teachStop reports whether the current trip stop teaches the lessons.
 func (l *Loop) teachStop() bool {
     return len(l.tripStops) > 0 && l.tripStops[0].teach
 }
@@ -557,7 +555,6 @@ func (l *Loop) sendLearnRequest(lesson lessonTarget) bool {
     return true
 }
 
-// skillDisplayName resolves the display name of a skill id for the logs.
 func skillDisplayName(skillID int32) string {
     if info, ok := npcdata.SkillInfoOf(skillID); ok {
         return info.Name

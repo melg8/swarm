@@ -176,7 +176,6 @@ func (b *Bot) NoteLastAction(message string) {
     b.huntLastActionAt = b.now()
 }
 
-// SetHuntErrand publishes the status of the blocking hunt errand.
 func (b *Bot) SetHuntErrand(errand HuntErrand) {
     b.mu.Lock()
     defer b.mu.Unlock()

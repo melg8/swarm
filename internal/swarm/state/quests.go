@@ -52,7 +52,6 @@ func (b *Bot) QuestCond(questID int32) (int32, bool) {
     return cond, active
 }
 
-// QuestCount returns the number of active quests of the journal.
 func (b *Bot) QuestCount() int {
     b.mu.RLock()
     defer b.mu.RUnlock()

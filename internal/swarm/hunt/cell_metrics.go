@@ -93,7 +93,6 @@ func (m *cellMetric) adenaPerMin() float64 {
     return 0
 }
 
-// trusted reports whether the measured rate earned the trust horizon.
 func (m *cellMetric) trusted() bool {
     return m.activeMin+m.visitActiveMin >= cellMetricsTrustMin
 }
@@ -130,7 +129,6 @@ func (h *cellHub) enter(cellID string) func() {
     }
 }
 
-// occupancy returns the number of hunters holding the cell.
 func (h *cellHub) occupancy(cellID string) int {
     h.mu.Lock()
     count := h.hunters[cellID]

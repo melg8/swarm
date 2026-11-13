@@ -185,7 +185,6 @@ type chatLog struct {
     head   int
 }
 
-// newChatLog creates the empty log.
 func newChatLog() chatLog {
     return chatLog{ring: nil, length: 0, head: 0}
 }

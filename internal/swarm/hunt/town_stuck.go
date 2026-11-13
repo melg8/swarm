@@ -264,7 +264,6 @@ func (l *Loop) pocketRefused(selfX int32, selfY int32) bool {
         selfX == l.segmentRefusedX && selfY == l.segmentRefusedY
 }
 
-// currentWaypoint returns the waypoint the follower cursor aims at.
 func (l *Loop) currentWaypoint() (pathfind.Vec3, bool) {
     if l.wpIndex < 0 || l.wpIndex >= len(l.waypoints) {
         return pathfind.Vec3{X: 0, Y: 0, Z: 0}, false

@@ -8,7 +8,6 @@ import (
     "time"
 )
 
-// CountPacket accounts one received packet.
 func (b *Bot) CountPacket() {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -16,7 +15,6 @@ func (b *Bot) CountPacket() {
     b.packetWindow.note(b.now().Unix())
 }
 
-// RecordEvent appends a message to the rolling event log.
 func (b *Bot) RecordEvent(message string) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -138,7 +136,6 @@ func (b *Bot) touch() {
     b.updated = b.now()
 }
 
-// clearCharMovement resets the self movement tracking.
 func (b *Bot) clearCharMovement() {
     b.char.Moving = false
     b.char.DestX = b.char.X
@@ -196,7 +193,6 @@ func (b *Bot) recordLocked(message string) {
     }
 }
 
-// recordCombatEventLocked appends one combat animation beat.
 func (b *Bot) recordCombatEventLocked(e CombatEvent) {
     b.combat.record(e, b.now())
 }

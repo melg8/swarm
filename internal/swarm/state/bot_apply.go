@@ -59,7 +59,6 @@ type UserInfo struct {
     PaperdollObjectIDs [PaperdollSlots]int32
 }
 
-// ApplyUserInfo updates the character state from a UserInfo packet.
 func (b *Bot) ApplyUserInfo(info UserInfo) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -90,7 +89,6 @@ func (b *Bot) ApplyUserInfo(info UserInfo) {
     b.touch()
 }
 
-// ApplyPlacement updates the position and heading of self or an object.
 func (b *Bot) ApplyPlacement(p Placement) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -430,7 +428,6 @@ func (b *Bot) critHintLocked(victimID int32, now time.Time) bool {
     return true
 }
 
-// ApplyAutoAttackStart marks an object as auto attacking.
 func (b *Bot) ApplyAutoAttackStart(objectID int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -452,7 +449,6 @@ func (b *Bot) ApplyAutoAttackStart(objectID int32) {
     b.touch()
 }
 
-// ApplyAutoAttackStop clears the auto attack flag of an object.
 func (b *Bot) ApplyAutoAttackStop(objectID int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -471,7 +467,6 @@ func (b *Bot) ApplyAutoAttackStop(objectID int32) {
     b.touch()
 }
 
-// ApplyNpcInfo upserts an observed npc object.
 func (b *Bot) ApplyNpcInfo(info NpcInfo) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -512,7 +507,6 @@ func (b *Bot) ApplyNpcInfo(info NpcInfo) {
     b.recordLocked("npc spawned: " + cold.Name)
 }
 
-// ApplyPlayerInfo upserts an observed player object.
 func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -543,7 +537,6 @@ func (b *Bot) ApplyPlayerInfo(info PlayerInfo) {
     b.recordLocked("player appeared: " + info.Name)
 }
 
-// ApplyItemInfo upserts an observed ground item object.
 func (b *Bot) ApplyItemInfo(info ItemInfo) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -593,7 +586,6 @@ const (
     AttrAtkSpd = 0x12
 )
 
-// ApplyStatusUpdate applies vitals attribute changes to self or an object.
 func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -634,7 +626,6 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
     b.touch()
 }
 
-// applyCharAttr applies a single attribute to the played character.
 func (b *Bot) applyCharAttr(attr Attribute) {
     switch attr.ID {
     case AttrCurHP:

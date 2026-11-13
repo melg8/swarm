@@ -28,7 +28,6 @@ func (b *Bot) SessionStartedAt() time.Time {
     return b.sessionAt
 }
 
-// ID returns the session id of the bot.
 func (b *Bot) ID() string {
     return b.id
 }
@@ -50,7 +49,6 @@ func (b *Bot) Packets() int64 {
     return b.packets
 }
 
-// Status returns the current session status.
 func (b *Bot) Status() Status {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -91,7 +89,6 @@ func (b *Bot) SetKind(kind string) {
     b.kind = kind
 }
 
-// SetOnline marks the character as being inside the world.
 func (b *Bot) SetOnline(name string) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -101,7 +98,6 @@ func (b *Bot) SetOnline(name string) {
     b.recordLocked("entered the world as " + name)
 }
 
-// SetOffline marks the session as ended.
 func (b *Bot) SetOffline() {
     b.mu.Lock()
     defer b.mu.Unlock()

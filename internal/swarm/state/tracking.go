@@ -85,12 +85,10 @@ func (b *Bot) ApplyRotationStart(r Rotation) {
     b.applyRotation(r, false)
 }
 
-// ApplyRotationStop turns an object to the final heading of its rotation.
 func (b *Bot) ApplyRotationStop(r Rotation) {
     b.applyRotation(r, true)
 }
 
-// applyRotation updates the heading of self or an object.
 func (b *Bot) applyRotation(r Rotation, stop bool) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -148,7 +146,6 @@ func (b *Bot) ApplySelfTarget(objectID int32) {
     b.recordLocked("target selected: " + name)
 }
 
-// ApplyObjectTarget records the target another visible player selected.
 func (b *Bot) ApplyObjectTarget(objectID int32, targetID int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -181,7 +178,6 @@ func (b *Bot) ApplyTargetClear(objectID int32) {
     b.touch()
 }
 
-// ApplyMoveType tracks a creature switching between walking and running.
 func (b *Bot) ApplyMoveType(mt MoveType) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -193,7 +189,6 @@ func (b *Bot) ApplyMoveType(mt MoveType) {
     b.touch()
 }
 
-// ApplyTeleport snaps an object or the played character to a new place.
 func (b *Bot) ApplyTeleport(t Teleport) {
     b.mu.Lock()
     defer b.mu.Unlock()

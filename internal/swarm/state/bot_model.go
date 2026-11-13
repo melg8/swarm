@@ -116,7 +116,6 @@ type CharacterState struct {
     MaxLoad     int32
 }
 
-// newCharacterState creates a zero valued character state.
 func newCharacterState() CharacterState {
     return CharacterState{
         Name:                "",

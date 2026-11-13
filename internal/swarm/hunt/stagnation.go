@@ -49,7 +49,6 @@ func (l *Loop) observeStagnation(now time.Time) {
     l.observeStagnationPosition(now)
 }
 
-// observeStagnationXP arms, refreshes and reports the experience stall timer.
 func (l *Loop) observeStagnationXP(now time.Time) {
     xp := l.tracker.SelfExp()
     if l.stagXPAt.IsZero() || xp != l.stagXP {

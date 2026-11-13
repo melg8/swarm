@@ -4,10 +4,9 @@
 
 // Town trips of the hunt loop: a full inventory walks the character to the
 // nearest town shop over the geodata (Navigator), sells the junk and walks back
-// to the farm spot. The sell request uses the standard inventory sell list of
-// the official client: the Mobius server prices every item itself at
-// referencePrice/2, so no shop window flow is needed, only the merchant
-// interaction distance (docs/hunting.md).
+// to the farm spot. The sell request uses the standard inventory sell list: the
+// Mobius server prices every item itself at referencePrice/2, so no shop window
+// flow is needed, only the merchant interaction distance (docs/hunting.md).
 package hunt
 
 import (
@@ -19,7 +18,6 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
-// tripActive reports whether a town trip is running.
 func (l *Loop) tripActive() bool {
     switch l.phase {
     case phaseTownWalk, phaseTownSell, phaseTownReturn:
@@ -30,10 +28,10 @@ func (l *Loop) tripActive() bool {
 }
 
 // tripCooldownOver reports whether a new town trip may start. The bare handed
-// weapon run, the armed gear debt and the guide refill (a slot the last trip
-// stranded) retry on the short weaponRunCooldown (45 s) instead of the five
-// minute trip cooldown: punching mobs or farming without the armor the merchant
-// sold is the wound those runs prevent.
+// weapon run, the armed gear debt and the guide refill retry on the short
+// weaponRunCooldown (45 s) instead of the five minute trip cooldown: punching
+// mobs or farming without the armor the merchant sold is the wound those runs
+// prevent.
 func (l *Loop) tripCooldownOver() bool {
     if l.tripEndedAt.IsZero() {
         return true
@@ -172,8 +170,7 @@ func (l *Loop) maybeStartTownTrip() {
     // The first stop walks the exact mesh search when the merchant is near
     // enough: it lands on the customer cell across the counter, where a wide
     // approach radius would stop outside the shop. The npc segment fallback
-    // covers the foreign deck plans (startWalkExactSegment); a far merchant
-    // walks the npc approach.
+    // covers the foreign deck plans; a far merchant walks the npc approach.
     planned := false
     if l.merchantWithinExactRange(merchant) {
         var ringFallback bool
@@ -259,7 +256,6 @@ func (l *Loop) rememberFarmSpot() {
     l.farmX, l.farmY, l.farmZ = zone.CX, zone.CY, selfZ
 }
 
-// tickTownTrip advances the running town trip by one decision.
 func (l *Loop) tickTownTrip() {
     if l.now().Sub(l.tripStart) > tripTimeout {
         l.abortTownTrip("trip timed out")
@@ -367,10 +363,9 @@ func (l *Loop) engagesOnZoneEntry() bool {
 // startReturnSegment plans the walk back to the spot the trip left (the farm
 // spot, the zone center it fell back to). The segment is a fresh logical unit:
 // the frozen re-path cell of the previous walk dies here, or the first refused
-// click would end it. The destination z resolves onto its actual deck first - a
-// remembered z of another area misses the destination polygon in the
-// nearestHalfZ window and answers no navmesh. A lookup failure keeps the
-// remembered z (the zoneReturnDestination mirror).
+// click would end it. The destination z resolves onto its actual deck first (a
+// remembered z of another area misses the polygon in the nearestHalfZ window
+// and answers no navmesh); a lookup failure keeps the remembered z.
 func (l *Loop) startReturnSegment() {
     l.phase = phaseTownReturn
     l.repathX, l.repathY = 0, 0
@@ -506,10 +501,10 @@ func (l *Loop) abortTownTrip(reason string) {
     l.endTownTrip("aborted, " + reason)
 }
 
-// resetTownTrip drops the trip state after a death. The village restart lands
+// resetTownTrip drops the trip state after a death: the village restart lands
 // next to the shops and the cooldown clears, so a full inventory sells right
-// after the revival. The gear debt check runs here too: a slot the sell first
-// step emptied stays a debt even though the trip never ended.
+// after the revival. The gear debt check runs here too, since a slot the sell
+// first step emptied stays a debt even though the trip never ended.
 func (l *Loop) resetTownTrip() {
     if !l.tripActive() {
         return

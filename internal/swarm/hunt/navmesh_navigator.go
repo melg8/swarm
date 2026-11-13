@@ -88,7 +88,6 @@ func (n navmeshNavigator) FindPathApproachAvoiding(
     return n.meshQuery(start, end, approachRadius, filter)
 }
 
-// FindPath plans the exact destination walk through the mesh corridor search.
 func (n navmeshNavigator) FindPath(
     start, end pathfind.Vec3,
 ) (*pathfind.Result, error) {
@@ -104,14 +103,12 @@ func (n navmeshNavigator) ClosestHeight(
     return n.engine.ClosestHeight(x, y, refZ)
 }
 
-// LineOfSight answers the geodata sight line with the engine.
 func (n navmeshNavigator) LineOfSight(
     start, end pathfind.Vec3,
 ) (bool, error) {
     return n.engine.LineOfSight(start, end, n.engine.MaxPassableHeight())
 }
 
-// OverWater answers the geodata water surface check with the engine.
 func (n navmeshNavigator) OverWater(x, y float64, refZ int16) bool {
     return n.engine.OverWater(x, y, refZ)
 }
@@ -209,7 +206,6 @@ func (n navmeshNavigator) meshWaypoints(
     return waypoints, length
 }
 
-// meshPos converts a pathfind vector into the mesh position.
 func meshPos(v pathfind.Vec3) navmesh.Pos {
     return navmesh.Pos{X: v.X, Y: v.Y, Z: v.Z}
 }
@@ -259,7 +255,6 @@ func (n navmeshNavigator) refinePocketExit(
     return aim
 }
 
-// avoidCircles converts the avoid areas into the mesh ban disks.
 func avoidCircles(avoid []pathfind.AvoidArea) []navmesh.AvoidCircle {
     if len(avoid) == 0 {
         return nil

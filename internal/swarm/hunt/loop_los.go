@@ -300,7 +300,6 @@ func (l *Loop) switchBlindTarget(now time.Time) {
     l.noTargetSince = time.Time{}
 }
 
-// clearBlindRecovery resets the reposition bookkeeping.
 func (l *Loop) clearBlindRecovery() {
     l.losAt = time.Time{}
     l.losWaypoints = nil

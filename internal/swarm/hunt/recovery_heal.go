@@ -116,7 +116,6 @@ func (l *Loop) castSelfHeal(skillID int32, now time.Time) {
     }
 }
 
-// learnedLevelOf returns the learned level of a skill id.
 func (l *Loop) learnedLevelOf(skillID int32) (int32, bool) {
     for _, skill := range l.tracker.ActiveSkills() {
         if skill.SkillID == skillID {

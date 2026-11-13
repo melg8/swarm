@@ -2625,6 +2625,23 @@ corner probe is a length, not a leg at all.
   (0.4 s, 0.4 s, cached, cached, 0.2 s), `golangci-lint run` on the
   package 0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the restating state and hunt docs
+
+- The rule says a comment states a fact the code cannot say; the
+  accessor, apply, serializer and wrapper docs that restate their own
+  signature state nothing, so they go: the state `Apply*` family, the
+  `append*JSON` writers, the `new*` store constructors and the hunt
+  `FindPath`/`SellItems`/`newEquipManager` mirrors.
+- 46 files, 117 comment lines fewer (55 in the state package, 62 in
+  the hunt package); the audit reads 17 114 of 170 649 (10.0
+  percent).
+- The town walk, town trip and zone docs keep their measured numbers
+  (the 45 s weapon cooldown, the 15-20 s respawn, the 100 unit
+  corridor) and drop the redundant half sentences.
+- Verified: `task fmt`, `go build ./...`, the state (cached) and hunt
+  (30.3 s) suites, `golangci-lint run` on the two paths 0 issues,
+  `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

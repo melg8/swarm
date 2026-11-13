@@ -10,7 +10,6 @@ import (
     "time"
 )
 
-// SelfObjectID returns the object id of the played character.
 func (b *Bot) SelfObjectID() int32 {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -148,7 +147,6 @@ func (b *Bot) SelfWalking() bool {
     return b.char.Moving && b.now().Sub(b.char.MoveAt) <= walkingFreshWindow
 }
 
-// SelfPosition returns the last observed placement of the played character.
 func (b *Bot) SelfPosition() (int32, int32, int32, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()

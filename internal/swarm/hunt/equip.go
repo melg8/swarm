@@ -61,7 +61,6 @@ const equipActionPeriod = 2 * time.Second
 // request does not re-log every pacing period.
 const starterRetryDelay = 10 * time.Second
 
-// newEquipManager creates the manager for the gear profile.
 func newEquipManager(profile gear.Profile) *equipManager {
     return &equipManager{
         profile:            profile,
@@ -140,7 +139,6 @@ func (l *Loop) addLureToolKeeps(
     }
 }
 
-// equipment builds the planner working set from the tracker.
 func (l *Loop) equipment() gear.Equipment {
     return gear.NewEquipment(
         l.tracker.InventoryItems(),
@@ -322,7 +320,6 @@ func (l *Loop) maybeDestroyReplacedStarters() {
     }
 }
 
-// gearPoints reports the zone gating points of the equipped gear.
 func (l *Loop) gearPoints() int32 {
     if l.equip == nil {
         return 0

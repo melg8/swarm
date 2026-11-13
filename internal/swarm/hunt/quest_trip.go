@@ -520,7 +520,6 @@ func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
     }
 }
 
-// questItemCount sums the journal counters of a kill stage.
 func questItemCount(tracker *state.Bot, itemIDs []int32) int32 {
     total := int32(0)
     for _, itemID := range itemIDs {
@@ -1073,7 +1072,6 @@ func (l *Loop) EquipBaggedGear() error {
     return errors.New("the equip loop reached the action budget")
 }
 
-// awaitInventoryMutation waits for a new inventory version.
 func (l *Loop) awaitInventoryMutation(
     before uint64, wait time.Duration,
 ) bool {

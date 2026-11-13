@@ -34,7 +34,6 @@ const (
     kindItem
 )
 
-// kindCode maps the public kind to the compact code.
 func kindCode(kind ObjectKind) int8 {
     switch kind {
     case KindNPC:
@@ -48,7 +47,6 @@ func kindCode(kind ObjectKind) int8 {
     }
 }
 
-// kindString maps the compact code back to the public kind of the wire string.
 func kindString(code int8) ObjectKind {
     switch code {
     case kindNPC:

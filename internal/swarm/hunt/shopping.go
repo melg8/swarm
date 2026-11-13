@@ -88,7 +88,6 @@ func dionShopCatalogBuild(merchants []townNpc) gear.Catalog {
     return gear.Catalog{Shops: shops}
 }
 
-// shopCatalogForRegion returns the catalog of the town the loop farms near.
 func shopCatalogForRegion(region string) gear.Catalog {
     if region == regionDion {
         return dionShopCatalog
@@ -458,7 +457,6 @@ func (l *Loop) replaceHeadOff(head int32, now time.Time) bool {
     return false
 }
 
-// dropReplacementHead drops the head of the replacement queue.
 func (l *Loop) dropReplacementHead() {
     l.replaceQueue = l.replaceQueue[1:]
     l.replaceTried = 0
@@ -640,7 +638,6 @@ func (l *Loop) planShoppingStops() {
     }
 }
 
-// merchantByTemplate finds the town merchant of the packet template id.
 func merchantByTemplate(templateID int32) (townNpc, bool) {
     for _, merchant := range townMerchants {
         if merchant.TemplateID == templateID {
@@ -1008,7 +1005,6 @@ func (l *Loop) weaponlessRunWanted() bool {
     return ok
 }
 
-// snapshotTripGear records the paperdoll the trip starts with.
 func (l *Loop) snapshotTripGear() {
     l.tripGearStart = l.tracker.PaperdollSlotObjectIDs()
     for index, objectID := range l.tripGearStart {
@@ -1075,7 +1071,6 @@ func (l *Loop) gearDebtRunWanted() bool {
     return len(l.gearDebt) > 0
 }
 
-// clearRefilledDebt drops the debt entries whose slot is dressed again.
 func (l *Loop) clearRefilledDebt() {
     current := l.tracker.PaperdollSlotObjectIDs()
     for index := range l.gearDebt {
@@ -1118,7 +1113,6 @@ func (l *Loop) resetStopBuys(reason string) {
     l.tripStops[0].buys = nil
 }
 
-// sellableStop reports whether the current stop sells the junk.
 func (l *Loop) sellableStop() bool {
     return len(l.tripStops) > 0 && l.tripStops[0].sell
 }

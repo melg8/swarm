@@ -40,7 +40,6 @@ func (b *Bot) KnownNpcCount() int {
     return count
 }
 
-// ObjectPosition returns the last observed placement of a known object.
 func (b *Bot) ObjectPosition(objectID int32) (int32, int32, int32, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()

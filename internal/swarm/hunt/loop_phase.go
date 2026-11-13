@@ -38,7 +38,6 @@ const (
     phaseIdle phase = "idle"
 )
 
-// Run drives the hunt loop until the context is done.
 func (l *Loop) Run(ctx context.Context) {
     ticker := time.NewTicker(tickPeriod)
     defer ticker.Stop()

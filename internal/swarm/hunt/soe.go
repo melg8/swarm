@@ -56,7 +56,6 @@ func SOEItemID() int32 {
     return soeItemID
 }
 
-// soeCount returns the number of scrolls in the inventory.
 func (l *Loop) soeCount() int {
     count := 0
     for _, item := range l.tracker.InventoryItems() {

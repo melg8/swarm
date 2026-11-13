@@ -21,7 +21,6 @@ type combatFeed struct {
     seq    uint64
 }
 
-// newCombatFeed creates the empty feed.
 func newCombatFeed() combatFeed {
     return combatFeed{
         events: [combatEventMax]CombatEvent{},

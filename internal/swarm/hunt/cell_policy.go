@@ -125,7 +125,6 @@ type cellHunter struct {
     clearedAt map[string]time.Time
 }
 
-// newCellHunter creates the cell mode state for a registry.
 func newCellHunter(cells []Cell, hub *cellHub) *cellHunter {
     hunter := &cellHunter{ //nolint:exhaustruct_v5 // session fields start zero
         cells:   cells,
@@ -180,7 +179,6 @@ func (l *Loop) SetCellPin(cellID string) {
     }
 }
 
-// SetHuntingCellRegion installs the cell registry of one region by name.
 func (l *Loop) SetHuntingCellRegion(region string) {
     switch region {
     case regionElven, "":
@@ -264,7 +262,6 @@ func (l *Loop) cellEvaluate(now time.Time) {
     hunter.waitOrRotate(l, now)
 }
 
-// applyPinnedCell serves the ground lock on the first evaluation.
 func (h *cellHunter) applyPinnedCell(
     l *Loop, level int32, now time.Time,
 ) bool {
@@ -304,7 +301,6 @@ func (h *cellHunter) indexOf(cellID string) int {
     return -1
 }
 
-// readSelf caches the character position of the tick.
 func (h *cellHunter) readSelf(l *Loop) {
     if x, y, _, ok := l.tracker.SelfPosition(); ok {
         h.selfX, h.selfY, h.selfKnown = x, y, true
@@ -444,7 +440,6 @@ func (h *cellHunter) ripenessFactor(index int, now time.Time) float64 {
     return cellUnripeDiscount
 }
 
-// respawnDuration converts the respawn seconds into the duration.
 func respawnDuration(seconds int32) time.Duration {
     return time.Duration(seconds) * time.Second
 }
@@ -967,7 +962,6 @@ func (h *cellHunter) logRotation(
         current, h.cells[best].Name)
 }
 
-// etaRound renders the pending respawn ETA for the starved logs.
 func etaRound(pending bool, eta time.Duration) string {
     if !pending {
         return "unknown"

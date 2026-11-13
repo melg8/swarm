@@ -92,7 +92,6 @@ type KiteParams struct {
     ReengageDelay time.Duration
 }
 
-// DefaultKiteParams returns the shipped tuning.
 func DefaultKiteParams() KiteParams {
     return KiteParams{
         Enabled:       true,
@@ -696,7 +695,6 @@ func (l *Loop) kiteClickWalk(now time.Time) bool {
     return true
 }
 
-// kiteClickClear stands the deferred click schedule down.
 func (l *Loop) kiteClickClear() {
     l.kiteClickAt = time.Time{}
     l.kiteClickFor = 0
@@ -965,7 +963,6 @@ func (l *Loop) kiteHoldGround(now time.Time, surrounded bool) {
     l.kiteHeldAt = now
 }
 
-// rotatePlanar rotates a planar unit direction counterclockwise.
 func rotatePlanar(x, y, angle float64) (float64, float64) {
     cos, sin := math.Cos(angle), math.Sin(angle)
 

@@ -477,7 +477,6 @@ func (l *Loop) cityShopOpen(stop cityShopStop) {
     l.resetBuyRequest()
 }
 
-// cityShopClose clears the stop state of the visit.
 func (l *Loop) cityShopClose() {
     l.tripStops = nil
     l.tripPlan = nil

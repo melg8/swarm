@@ -24,7 +24,6 @@ type inventoryStore struct {
     orderDirty bool
 }
 
-// newInventoryStore creates the empty store.
 func newInventoryStore() inventoryStore {
     return inventoryStore{
         items:      nil,

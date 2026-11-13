@@ -395,7 +395,6 @@ func appendInventoryItemJSON(dst []byte, item InventoryItemSnapshot) []byte {
     return append(dst, '}')
 }
 
-// appendEventsJSON writes the rolling event log array.
 func appendEventsJSON(dst []byte, events []Event) []byte {
     if events == nil {
         return append(dst, `null`...)
@@ -412,7 +411,6 @@ func appendEventsJSON(dst []byte, events []Event) []byte {
     return dst
 }
 
-// appendEventJSON writes one rolling event log entry.
 func appendEventJSON(dst []byte, event Event) []byte {
     dst = append(dst, `{"time":`...)
     dst = appendJSONTime(dst, event.Time)
@@ -422,7 +420,6 @@ func appendEventJSON(dst []byte, event Event) []byte {
     return append(dst, '}')
 }
 
-// appendChatJSON writes the chat window array.
 func appendChatJSON(dst []byte, chat []ChatEvent) []byte {
     if chat == nil {
         return append(dst, `null`...)
@@ -439,7 +436,6 @@ func appendChatJSON(dst []byte, chat []ChatEvent) []byte {
     return dst
 }
 
-// appendChatEventJSON writes one chat window line.
 func appendChatEventJSON(dst []byte, line ChatEvent) []byte {
     dst = append(dst, `{"time":`...)
     dst = appendJSONTime(dst, line.Time)
@@ -503,7 +499,6 @@ func appendWalkSearchJSON(dst []byte, search *WalkSearch) []byte {
     return append(dst, '}')
 }
 
-// appendWalkPathJSON writes the walk plan array.
 func appendWalkPathJSON(dst []byte, points []WalkPoint) []byte {
     if points == nil {
         return append(dst, `null`...)
@@ -529,7 +524,6 @@ func appendWalkPointPtrJSON(dst []byte, point *WalkPoint) []byte {
     return appendWalkPointJSON(dst, *point)
 }
 
-// appendWalkPointJSON writes one walk plan waypoint.
 func appendWalkPointJSON(dst []byte, point WalkPoint) []byte {
     dst = append(dst, `{"x":`...)
     dst = strconv.AppendInt(dst, int64(point.X), 10)
@@ -809,7 +803,6 @@ func appendSkillStateViewJSON(dst []byte, state SkillStateView) []byte {
     return dst
 }
 
-// appendCombatEventsJSON writes the combat animation feed array.
 func appendCombatEventsJSON(dst []byte, events []CombatEventView) []byte {
     if events == nil {
         return append(dst, `null`...)
@@ -826,7 +819,6 @@ func appendCombatEventsJSON(dst []byte, events []CombatEventView) []byte {
     return dst
 }
 
-// appendCombatEventViewJSON writes one combat animation beat.
 func appendCombatEventViewJSON(dst []byte, view CombatEventView) []byte {
     dst = append(dst, `{"seq":`...)
     dst = strconv.AppendUint(dst, view.Seq, 10)
@@ -870,7 +862,6 @@ func appendZoneJSON(dst []byte, zone *Zone) []byte {
     return dst
 }
 
-// appendZoneViewsJSON writes the zone registry array of the map view.
 func appendZoneViewsJSON(dst []byte, zones []ZoneView) []byte {
     if zones == nil {
         return append(dst, `null`...)
@@ -978,7 +969,6 @@ func appendDiagnosticsJSON(dst []byte, d Diagnostics) []byte {
     return append(dst, '}')
 }
 
-// appendObjectCountsJSON writes the known list summary object.
 func appendObjectCountsJSON(dst []byte, c ObjectCounts) []byte {
     dst = append(dst, `{"npcs":`...)
     dst = strconv.AppendInt(dst, int64(c.NPCs), 10)
@@ -992,7 +982,6 @@ func appendObjectCountsJSON(dst []byte, c ObjectCounts) []byte {
     return append(dst, '}')
 }
 
-// appendHuntDiagnosticsJSON writes the hunt internals object.
 func appendHuntDiagnosticsJSON(dst []byte, h HuntDiagnostics) []byte {
     dst = append(dst, `{"targetId":`...)
     dst = strconv.AppendInt(dst, int64(h.TargetID), 10)

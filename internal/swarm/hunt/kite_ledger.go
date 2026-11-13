@@ -119,7 +119,6 @@ func (l *Loop) kiteLedgerClose() {
     l.kiteLedgerReset()
 }
 
-// kiteLedgerReset clears the ledger state.
 func (l *Loop) kiteLedgerReset() {
     l.kiteMotionFor = 0
     l.kiteMotionAt = time.Time{}

@@ -18,7 +18,6 @@ type eventLog struct {
     head   int
 }
 
-// newEventLog creates the empty log.
 func newEventLog() eventLog {
     return eventLog{ring: nil, length: 0, head: 0}
 }

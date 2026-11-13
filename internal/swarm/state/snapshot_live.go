@@ -254,7 +254,6 @@ func (b *Bot) appendLiveSkillsJSON(dst []byte) []byte {
     return append(dst, ']')
 }
 
-// sortedSkillIDsLocked returns the learned skill ids in ascending order.
 func (b *Bot) sortedSkillIDsLocked() []int32 {
     ids := make([]int32, 0, len(b.skills))
     for id := range b.skills {
@@ -354,7 +353,6 @@ func (b *Bot) appendLiveBuffsJSON(
     return append(dst, ']')
 }
 
-// sortedBuffIDsLocked returns the active effect skill ids in ascending order.
 func (b *Bot) sortedBuffIDsLocked() []int32 {
     ids := make([]int32, 0, len(b.buffs))
     for id := range b.buffs {
@@ -396,7 +394,6 @@ func (b *Bot) appendLiveCombatJSON(dst []byte, now time.Time) []byte {
     return dst
 }
 
-// appendLiveZoneViewsJSON writes the zone registry array.
 func (b *Bot) appendLiveZoneViewsJSON(dst []byte) []byte {
     for i := range b.zoneViews {
         if i > 0 {

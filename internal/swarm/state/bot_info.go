@@ -60,7 +60,6 @@ func (b *Bot) delevelTarget() int32 {
     return b.hunt.DelevelTarget
 }
 
-// Info returns the compact bot description.
 func (b *Bot) Info() BotInfo {
     b.mu.RLock()
     defer b.mu.RUnlock()

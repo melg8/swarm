@@ -31,7 +31,6 @@ type Zone struct {
     Half int32 `json:"half"`
 }
 
-// Contains reports whether the world point lies inside the zone.
 func (z *Zone) Contains(x int32, y int32) bool {
     if z == nil {
         return true

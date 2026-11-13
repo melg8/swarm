@@ -33,15 +33,10 @@ type GameAPI interface {
     // the character - the arrow-key movement stream of the official
     // client, the only movement a click-refusing cell answers.
     ClaimValidatePosition(x int32, y int32, z int32, heading int32) error
-    // PickupItem clicks a ground item to walk to it and pick it up.
     PickupItem(item state.LootItem) error
-    // ActionSitStand toggles between sitting and standing.
     ActionSitStand() error
-    // RestartAtVillage revives a dead character at the nearest village.
     RestartAtVillage() error
-    // DestroyItem destroys inventory items.
     DestroyItem(objectID int32, count int32) error
-    // SellItems sells inventory items to the shop merchant.
     SellItems(items []state.InventoryItem) error
     // BuyItems buys items from the buylist of the selected merchant (one list
     // per request, paced by the transaction flood protector).

@@ -142,7 +142,6 @@ func townMerchantTemplates(merchants []townNpc) []int32 {
     return templates
 }
 
-// townNpcPosition returns the spawn point of the npc.
 func townNpcPosition(npc townNpc) pathfind.Vec3 {
     return pathfind.Vec3{
         X: float64(npc.X),

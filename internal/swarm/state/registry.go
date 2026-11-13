@@ -22,7 +22,6 @@ type Registry struct {
     index map[string]int32
 }
 
-// NewRegistry creates an empty bot registry.
 func NewRegistry() *Registry {
     return &Registry{
         mu:    sync.RWMutex{},
@@ -45,7 +44,6 @@ func (r *Registry) Add(bot *Bot) {
     r.bots = append(r.bots, bot)
 }
 
-// Get returns the bot with the given id.
 func (r *Registry) Get(id string) (*Bot, bool) {
     r.mu.RLock()
     defer r.mu.RUnlock()

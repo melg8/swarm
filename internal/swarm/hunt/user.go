@@ -162,7 +162,6 @@ func (l *Loop) pendingInventoryConfirmed(
 ) bool {
     item, ok := l.tracker.InventoryItemState(objectID)
     if !ok {
-        // Vanished: consumed by the request.
         return true
     }
 
@@ -170,7 +169,6 @@ func (l *Loop) pendingInventoryConfirmed(
         item.Count != pending.count
 }
 
-// applyUserCommand turns one queued web command into world action.
 func (l *Loop) applyUserCommand(cmd state.Command) {
     if l.gateInventoryCommand(cmd) {
         return
