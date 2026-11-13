@@ -106,17 +106,41 @@ const villageEscapeTimeout = 5 * time.Minute
 // session prologue comfortable.
 const fullDressTimeout = 5 * time.Minute
 
-// Definitions returns the acceptance scenario list: the city shopping
-// errand of the newest round owns the head of the list the web UI
-// serves, then the world entry burst round of the auto equipment, the
-// village escape of the refused-click dump, the farm readiness round
-// of the user, plus the in-process mirrors of the two existing e2e
-// harnesses (tools/mobius_e2e.sh and tools/proxy_e2e.sh) so the whole
-// acceptance suite runs from one place.
+// Definitions returns the acceptance scenario list: the scroll escape
+// of the newest round owns the head of the list the web UI serves,
+// then the city shopping errand, the world entry burst round of the
+// auto equipment, the village escape of the refused-click dump, the
+// farm readiness round of the user, plus the in-process mirrors of the
+// two existing e2e harnesses (tools/mobius_e2e.sh and
+// tools/proxy_e2e.sh) so the whole acceptance suite runs from one
+// place.
 //
 //nolint:funlen,maintidx // the scenario registry is one linear table by design
 func Definitions() []TestDef {
     return []TestDef{
+        {
+            ID:      scrollEscapeScenarioID,
+            Title:   "scroll escape · the town teleport",
+            Account: scrollEscapeAccount,
+            Timeout: scrollEscapeTimeout,
+            Description: "Start: the elven fighter temp26 resets onto " +
+                "the Mothertree Glade creation spawn (46045 41251 " +
+                "-3440) as the level 15 character with one Scroll of " +
+                "Escape in the bag and nothing else. Flow: the session " +
+                "runs without autonomy so no hunt or town trip " +
+                "competes with the scroll, the acceptance seam fires " +
+                "the scroll (skill 2013, the 20 second stationary " +
+                "cast), the server consumes the item and the " +
+                "TeleportToLocation lands the character on the elven " +
+                "town respawn ring (the twelve elf_town points of the " +
+                "map region data). Pass: the cast window reached the " +
+                "snapshot, the cast state carried the blue-white " +
+                "vortex art of the C1 client (skill0000), the scroll " +
+                "left the bag and the character stood on the town " +
+                "ring - the same icon the web UI draws during the " +
+                "cast (the map cast plate).",
+            Scenario: scrollEscapeScenario,
+        },
         {
             ID:      cityShoppingScenarioID,
             Title:   "city shopping · the Gludio top grade kit run",

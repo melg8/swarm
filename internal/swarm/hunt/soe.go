@@ -55,6 +55,13 @@ const (
     soeRunSpeedFallback = 120.0
 )
 
+// SOEItemID returns the display id of the Scroll of Escape the
+// economy keeps in the bag; the acceptance scenario injects one and
+// verifies its consumption.
+func SOEItemID() int32 {
+    return soeItemID
+}
+
 // soeCount returns the number of scrolls in the inventory.
 func (l *Loop) soeCount() int {
     count := 0
@@ -162,6 +169,15 @@ func (l *Loop) escapeWithSOE() bool {
     l.logf("Hunt: the scroll of escape never landed, walking on")
 
     return false
+}
+
+// EscapeWithSOE runs the scroll escape sequence of the town trips:
+// the UseItem of the carried scroll, the arrival wait and the landing
+// report. The acceptance scenario drives this entry because the
+// profitability gate of maybeEscapeTo needs the five minute income
+// trust horizon a short run never earns.
+func (l *Loop) EscapeWithSOE() bool {
+    return l.escapeWithSOE()
 }
 
 // maybeEscapeWithSOE arms the scroll leg of the town trip start: the

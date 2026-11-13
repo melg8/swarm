@@ -41,25 +41,25 @@ func newVillageEscapeBot() *state.Bot {
     return bot
 }
 
-// TestVillageEscapeLeadsTheWebUIList pins the ninth slot of the
+// TestVillageEscapeLeadsTheWebUIList pins the tenth slot of the
 // scenario list: the user contract of the 2026-09-14 report - the
 // acceptance test of the refused-click dump shows right behind the
-// eight newest rounds (the city shopping errand, the kite timing
-// probe and the archer fleet audit own the head now, the newest
-// rounds always do) and ahead of every older scenario.
+// nine newest rounds (the scroll escape, the city shopping errand,
+// the kite timing probe and the archer fleet audit own the head now,
+// the newest rounds always do) and ahead of every older scenario.
 func TestVillageEscapeLeadsTheWebUIList(t *testing.T) {
     defs := Definitions()
     require.NotEmpty(t, defs)
-    require.Equal(t, "village-escape", defs[8].ID,
-        "the village escape scenario owns the ninth list slot")
-    require.Equal(t, escapeAccount, defs[8].Account)
-    require.Equal(t, villageEscapeTimeout, defs[8].Timeout)
-    require.NotNil(t, defs[8].Scenario)
+    require.Equal(t, "village-escape", defs[9].ID,
+        "the village escape scenario owns the tenth list slot")
+    require.Equal(t, escapeAccount, defs[9].Account)
+    require.Equal(t, villageEscapeTimeout, defs[9].Timeout)
+    require.NotNil(t, defs[9].Scenario)
     for _, needle := range []string{
         "45768 49848 -3056", "level 15", "Brandish",
         "1312 adena", "two minutes", "3000+ units",
     } {
-        require.Contains(t, defs[8].Description, needle)
+        require.Contains(t, defs[9].Description, needle)
     }
 }
 

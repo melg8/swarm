@@ -153,6 +153,10 @@ linters:
         # visit, the sale and the dress) starts at its not-yet state,
         # so the empty literal is the documented start.
         - .*acceptance\.cityShoppingWatch$
+        # The scroll escape watch: the cast, the icon, the consumption
+        # and the landing latches all start at their not-yet state, so
+        # the empty literal is the documented start.
+        - .*acceptance\.scrollEscapeWatch$
         # The archer kite telemetry aggregates: the log counter, the
         # monitor watch, the verdict view and the observation sample
         # all carry documented zero starts (the counters, the
