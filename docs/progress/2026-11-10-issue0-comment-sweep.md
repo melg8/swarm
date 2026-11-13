@@ -1131,6 +1131,19 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - loop_engage.go, the gate order
+
+- 35 blocks compress, the file falls from 182 comment lines of 585
+  (31.1 percent) to 134 of 537 (24.9 percent): the header keeps the
+  Mobius double click semantics and the gate order, and each gate keeps
+  the server rule it exists for (the corpse selection the server never
+  clears, the stance armed without a line of sight check, the
+  attack-window refusal of the bow, the percent-gap rule needing the
+  confirmed fight, the bow add out-ranging the retreat). The block scan
+  shows no run above 8 lines besides the package doc.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
