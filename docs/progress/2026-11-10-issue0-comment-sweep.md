@@ -1322,6 +1322,17 @@ corner probe is a length, not a leg at all.
   0.0.0.0:2106 wildcard blocking 127.0.0.2 on Windows plus the
   Hyper-V/WinNAT reservation. 135 comment lines of 583 become 107 of 555.
 
+### 2026-11-13 - acceptance/setup.go keeps the dump state facts only
+
+- 25 blocks compress: the setup keeps the ElvenFighter creation point
+  with the level 15 vitals (280/111/112) and the 254327 start
+  experience, the injection block below FIRST_OBJECT_ID (268435456)
+  with the modulus collision rule, the 15 s combat logout store and the
+  45 s poll, the leg slot word restored from `segments`, the two ring
+  rows of the non stackable jewelry a finger each and the reset wipe
+  list. The report dates, build hashes and the duplicate key drop.
+  134 comment lines of 484 become 98 of 448.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

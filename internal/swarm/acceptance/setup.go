@@ -10,13 +10,11 @@ import (
     "time"
 )
 
-// The injected elven fighter start state of the farm readiness
-// scenario: the first creation node of the ElvenFighter player
-// template (dist/game/data/stats/players/templates/StartingClass/
-// ElvenFighter.xml creationPoints) so every run starts exactly where
-// a freshly created elven fighter would, with the vitals of the level
-// table (280 hp / 111 mp / 112 cp at level 15) and the level start
-// experience of the C1 table (254327, see state/experience.go).
+// The injected elven fighter start state of the farm readiness scenario: the
+// first creation point of the ElvenFighter template
+// (dist/game/data/stats/players/templates/StartingClass/ElvenFighter.xml) with
+// the vitals of the level table (280 hp / 111 mp / 112 cp at level 15) and the
+// C1 level start experience (254327, see state/experience.go).
 const (
     elvenSpawnX = 46045
     elvenSpawnY = 41251
@@ -37,45 +35,33 @@ type ResetItem struct {
     Count  int32
 }
 
-// The injected object id block of one character: the base sits in
-// the band the server IdManager never allocates from (every world
-// object id starts at FIRST_OBJECT_ID 268435456, so the band below
-// it is permanently factory free), the modulus spreads the blocks
-// by the character id and the stride keeps every block wider than
-// the injected kit (the adena stack plus the item list). The old
-// scheme charID+100000000 landed ABOVE the first object id (the
-// character ids themselves start just past 268435456), collided
-// with the sibling temp characters' blocks whenever two creations
-// sat closer than the kit length (temp12 at 268450853 vs temp13 at
-// 268450866: the bow of one was the adena of the other, the
-// duplicate key 1062 of the 2026-09-20 church entry run) and pushed
-// the server's restart scan past the injected band. The modulus
-// makes two blocks collide only for character ids exactly modulus
-// apart, which no temp ladder reaches.
+// The injected object id block of one character: the base sits below
+// FIRST_OBJECT_ID (268435456), where the server IdManager never allocates, the
+// modulus spreads the blocks by the character id and the stride keeps every
+// block wider than the injected kit (the adena stack plus the item list). A
+// fixed charID+100000000 offset landed above that floor and collided across
+// sibling temp characters closer than the kit length; the modulus collides only
+// ids exactly modulus apart, which no temp ladder reaches.
 const (
     injectObjectIDBase    = 150000000
     injectObjectIDModulus = 1000000
     injectObjectIDStride  = 32
 )
 
-// injectObjectID derives the object id of the injected inventory row
-// i (0 names the adena stack) of the character: the per character
-// block at base+(charID mod modulus)*stride, the rows inside it
-// sequential. The block stays disjoint from every other character's
-// block and below the FIRST_OBJECT_ID range the server allocates
-// from, and the wipe of the owned rows keeps the numbering
-// idempotent on a re-run.
+// injectObjectID derives the object id of the injected inventory row i (0 names
+// the adena stack): the per character block at base+(charID mod modulus)*stride
+// with sequential rows, disjoint from every other block and below the server
+// allocation range; the wipe of the owned rows keeps a re-run idempotent.
 func injectObjectID(charID int64, i int) int64 {
     return injectObjectIDBase +
         (charID%injectObjectIDModulus)*injectObjectIDStride +
         int64(i)
 }
 
-// onlinePollPeriod and onlinePollTimeout bound the wait for the
-// server side flush after a session stops: the logout store runs
-// immediately for a calm character, but a character that left in
-// combat is stored fifteen seconds after the combat ends, and the
-// reset must not race that flush (it would overwrite the injection).
+// onlinePollPeriod and onlinePollTimeout bound the wait for the server side
+// flush after a session stops: a calm logout stores immediately, but a
+// character that left in combat is stored fifteen seconds after the combat
+// ends, and the reset must not race that flush.
 const (
     onlinePollPeriod  = time.Second
     onlinePollTimeout = 45 * time.Second
@@ -89,10 +75,9 @@ type characterReset struct {
     Exp     int64
     SP      int64
     Adena   int64
-    // Items are the injected inventory stacks (no object ids of their
-    // own: the reset derives stable ones below the server range). The
-    // character equips the wearable pieces through the auto equipment
-    // of the hunt loop - the injection lands everything in the bag.
+    // Items are the inventory stacks (no object ids of their own: the reset
+    // derives stable ones below the server range). The hunt auto equipment
+    // dresses the character, so the injection lands everything in the bag.
     Items []ResetItem
     X     int32
     Y     int32
@@ -102,8 +87,8 @@ type characterReset struct {
     MaxCP int32
 }
 
-// farmReadinessReset returns the level 15 start state of the user
-// scenario: 20,000 SP, 100,000 adena, the creation spawn point.
+// farmReadinessReset returns the level 15 start state of the user scenario:
+// 20,000 SP, 100,000 adena and the creation point.
 func farmReadinessReset(account string) characterReset {
     return characterReset{
         Account: account,
@@ -121,14 +106,12 @@ func farmReadinessReset(account string) characterReset {
     }
 }
 
-// The dump start state of the zone return scenario (the 2026-09-12
-// 01:50 stuck report, build 2149ad1): the character woke at the elven
-// village main street cell next to Herbiel - the position the frozen
-// return left it standing on for over an hour - as the level 14
-// fighter of the report with the exact inventory the dump carried.
+// The dump start state of the zone return scenario: the character wakes at the
+// elven village main street cell next to Herbiel as the level 14 fighter with
+// the exact inventory of the report.
 const (
-    // zoneReturnSpawnX/Y/Z is the reported stuck position (the dump of
-    // 2026-09-12 01:50, the village respawn cell of test1).
+    // zoneReturnSpawnX/Y/Z is the reported stuck position (the village respawn
+    // cell of test1).
     zoneReturnSpawnX = 43048
     zoneReturnSpawnY = 50312
     zoneReturnSpawnZ = -2992
@@ -141,12 +124,10 @@ const (
     zoneReturnCP    = 105
 )
 
-// zoneReturnItems is the exact item set of the dump: the equipped
-// paperdoll (the Brandish two hander, the wooden armor set, the
-// starter jewels) and the bag of the report (the arrows, the potions,
-// the recipes and the crafting materials). The injection lands every
-// stack in the bag - the auto equipment of the hunt loop dresses the
-// character from it, the wearable pieces are the ones the dump wore.
+// zoneReturnItems is the item set of the dump: the equipped paperdoll (the
+// Brandish two hander, the wooden armor set, the starter jewels) plus the bag
+// (arrows, potions, recipes, crafting materials). The injection lands every
+// stack in the bag and the hunt auto equipment dresses the wearable pieces.
 var zoneReturnItems = []ResetItem{
     {ItemID: 1333, Count: 1}, // Brandish (the two hand sword of the dump)
     {ItemID: 23, Count: 1},   // Wooden Breastplate
@@ -175,9 +156,8 @@ var zoneReturnItems = []ResetItem{
     {ItemID: 2010, Count: 1}, // Brandish Blade
 }
 
-// zoneReturnReset returns the dump start state of the zone return
-// scenario: the reported stuck cell, the reported level and vitals,
-// the reported wallet and the reported item set.
+// zoneReturnReset returns the dump start state of the zone return scenario: the
+// reported cell, level, vitals, wallet and item set.
 func zoneReturnReset(account string) characterReset {
     return characterReset{
         Account: account,
@@ -196,16 +176,14 @@ func zoneReturnReset(account string) characterReset {
     }
 }
 
-// The dump start state of the gear gap scenario (the 2026-09-12
-// 04:58 pantsless report, build 4deb888): the level 14 fighter test2
-// stood at its Spore Fungus SW farm spot wearing every slot EXCEPT
-// the segments - the town trip had sold the piece for a replacement that
-// never landed - with the 13162 adena of the report and nothing in
-// the bag. The scenario verifies the recovery invariant: the hunt
-// loop detects the hole, shops and dresses it.
+// The dump start state of the gear gap scenario: the level 14 fighter test2 at
+// its Spore Fungus SW farm spot wearing every slot EXCEPT the legs - the town
+// trip had sold the piece for a replacement that never landed - with the 13162
+// adena of the report and an empty bag. The scenario verifies the recovery
+// invariant: the hunt detects the hole and shops and dresses it.
 const (
-    // gearGapSpawnX/Y/Z is the reported farm spot position (the dump
-    // of 2026-09-12 04:58, inside the Spore Fungus SW zone).
+    // gearGapSpawnX/Y/Z is the reported farm spot (inside the Spore Fungus SW
+    // zone).
     gearGapSpawnX = 38344
     gearGapSpawnY = 46248
     gearGapSpawnZ = -3592
@@ -218,11 +196,9 @@ const (
     gearGapCP    = 105
 )
 
-// gearGapItems is the exact item set of the dump: the equipped
-// paperdoll minus the legs piece the trip stranded (the injection
-// lands every stack in the bag - the auto equipment of the hunt loop
-// dresses the character from it, the wearable pieces are the ones the
-// dump wore).
+// gearGapItems is the item set of the dump: the paperdoll minus the legs piece
+// the trip stranded. The injection lands every stack in the bag and the hunt
+// auto equipment dresses the wearable pieces.
 var gearGapItems = []ResetItem{
     {ItemID: 20, Count: 1},  // Buckler
     {ItemID: 22, Count: 1},  // Leather Shirt
@@ -237,9 +213,8 @@ var gearGapItems = []ResetItem{
     {ItemID: 153, Count: 1}, // Sickle
 }
 
-// gearGapReset returns the dump start state of the gear gap
-// scenario: the reported farm spot, the reported level and vitals,
-// the reported wallet and the reported pantsless item set.
+// gearGapReset returns the dump start state of the gear gap scenario: the farm
+// spot, level, vitals, wallet and the pantsless item set.
 func gearGapReset(account string) characterReset {
     return characterReset{
         Account: account,
@@ -258,24 +233,20 @@ func gearGapReset(account string) characterReset {
     }
 }
 
-// The start state of the building entry scenario (the character of
-// the 2026-09-12 03:56 trainer hall freeze dump, standing at its walk
-// plan origin): the level 15 elven fighter wakes at the west aisle
-// entrance of the trainer hall with the wallet and the empty bag the
-// dump character carried when its town visit began - the weapon run
-// trip arms at once (the dump's own first trip: "no weapon in hand,
-// the weapon run comes first, 33 lessons worth 18690 sp wait at the
-// teacher"), buys the gear and the spellbooks across the village
-// merchants and then walks the teacher segment from the last stop into
-// the trainer hall - the exact segment the dump froze on.
+// The start state of the building entry scenario: the level 15 elven fighter
+// wakes at the west aisle entrance of the trainer hall with the wallet and the
+// empty bag of a town visit start. The weapon run trip arms at once (no weapon
+// in hand first, 33 lessons worth 18690 sp wait at the teacher), buys the gear
+// and the spellbooks across the village merchants and walks the teacher segment
+// into the trainer hall.
 const (
-    // entrySpawnX/Y/Z is the dump walk plan origin: the aisle
-    // entrance of the elven village trainer hall.
+    // entrySpawnX/Y/Z is the walk plan origin: the aisle entrance of the elven
+    // village trainer hall.
     entrySpawnX = 44744
     entrySpawnY = 51992
     entrySpawnZ = -2792
-    // The wallet and the vitals of the dump character at its town
-    // visit start: the shopping budget of the weapon run round.
+    // The wallet and vitals of the dump character at its town visit start, the
+    // shopping budget of the weapon run round.
     entrySP    = 20000
     entryAdena = 100000
     entryHP    = 358
@@ -283,9 +254,8 @@ const (
     entryCP    = 178
 )
 
-// buildingEntryReset returns the dump start state of the building
-// entry scenario: the aisle entrance position, the reported level and
-// vitals, the reported wallet and the reported item set.
+// buildingEntryReset returns the dump start state of the building entry
+// scenario: the aisle entrance, level, vitals, wallet and the empty bag.
 func buildingEntryReset(account string) characterReset {
     return characterReset{
         Account: account,
@@ -304,12 +274,11 @@ func buildingEntryReset(account string) characterReset {
     }
 }
 
-// fullDressItems is the complete outfit of the world entry burst
-// scenario: eleven wearable pieces covering every slot the bot wears
-// (the weapon, the armor, the jewels), all injected into the bag -
-// the paperdoll starts empty and the burst planner dresses the whole
-// set in one tick. The rings ride as two separate stacks: the C1 item
-// data marks the jewelry non stackable, one row per finger.
+// fullDressItems is the complete outfit of the world entry burst scenario: the
+// eleven wearable pieces covering every slot (weapon, armor, jewels), all in
+// the bag with an empty paperdoll, so the burst planner dresses the whole set
+// in one tick. The rings ride as two stacks: the C1 item data marks the jewelry
+// non stackable, one row per finger.
 var fullDressItems = []ResetItem{
     {ItemID: 1333, Count: 1}, // Brandish (the two hand sword)
     {ItemID: 23, Count: 1},   // Wooden Breastplate
@@ -324,10 +293,9 @@ var fullDressItems = []ResetItem{
     {ItemID: 907, Count: 1},  // Necklace of Anguish
 }
 
-// fullDressReset returns the start state of the world entry burst
-// scenario: the creation spawn point, the level 15 vitals, a bare
-// wallet (no lessons wait on this run) and the whole outfit in the
-// bag with nothing worn.
+// fullDressReset returns the start state of the world entry burst scenario: the
+// creation point, the level 15 vitals, a bare wallet (no lessons wait) and the
+// whole outfit in the bag with nothing worn.
 func fullDressReset(account string) characterReset {
     return characterReset{
         Account: account,
@@ -346,11 +314,10 @@ func fullDressReset(account string) characterReset {
     }
 }
 
-// waitCharacterOffline polls the characters row until the server
-// flushed the session state (the online flag drops with the store on
-// logout). The timeout case continues with a warning instead of
-// failing the run: a crashed server leaves the flag set, and the
-// reset UPDATE itself clears it.
+// waitCharacterOffline polls the characters row until the server flushed the
+// session state (the online flag drops with the store on logout). A timeout
+// continues with a warning: a crashed server leaves the flag set, and the reset
+// UPDATE clears it anyway.
 func waitCharacterOffline(db *DB, charID int64, log func(string)) {
     deadline := time.Now().Add(onlinePollTimeout)
     query := "SELECT online FROM characters WHERE charId=" +
@@ -370,13 +337,12 @@ func waitCharacterOffline(db *DB, charID int64, log func(string)) {
     log("acceptance: the character stayed marked online, resetting anyway")
 }
 
-// resetCharacter wipes the temp character back to the injected start
-// state. The character must exist and be offline: the caller creates
-// it through the game protocol first (a level 1 elven fighter with
-// the starter gear) and waits for the server flush. The reset clears
-// the inventory, the learned skills, the saved effects, the shortcuts
-// and the reuse stamps, injects the adena stack and rewrites the
-// vitals, the level, the experience, the SP and the spawn position.
+// resetCharacter wipes the temp character to the injected start state. The
+// character must exist and be offline (the caller creates it through the game
+// protocol and waits for the server flush). The reset clears the inventory, the
+// learned skills, the saved effects, the shortcuts and the reuse stamps, then
+// injects the adena and item stacks and rewrites the vitals, level, experience,
+// SP and position.
 //
 //nolint:funlen // the reset walks the inventory steps in order
 func resetCharacter(db *DB, reset characterReset, log func(string)) error {
@@ -386,10 +352,10 @@ func resetCharacter(db *DB, reset characterReset, log func(string)) error {
     }
     waitCharacterOffline(db, charID, log)
 
-    // The owned rows: the inventory (with the adena restack), the
-    // learned skills, the saved effects, the shortcuts and the item
-    // reuse stamps. A character that never entered the world has none
-    // of them, the deletes stay idempotent.
+    // The owned rows: the inventory (with the adena restack), the learned
+    // skills, the saved effects, the shortcuts and the item reuse stamps. A
+    // character that never entered the world has none, the deletes stay
+    // idempotent.
     if _, err := db.Exec("DELETE FROM items WHERE owner_id=" +
         strconv.FormatInt(charID, 10)); err != nil {
         return fmt.Errorf("wipe items: %w", err)
@@ -412,8 +378,8 @@ func resetCharacter(db *DB, reset characterReset, log func(string)) error {
         return fmt.Errorf("wipe item reuse: %w", err)
     }
 
-    // The injected adena stack: the derived object id keeps the
-    // insert idempotent (a re-run deletes the rows above first).
+    // The injected adena stack: the derived object id keeps the insert
+    // idempotent (a re-run deletes the rows above first).
     adena := strconv.FormatInt(reset.Adena, 10)
     objectID := strconv.FormatInt(injectObjectID(charID, 0), 10)
     if _, err := db.Exec(
@@ -424,10 +390,8 @@ func resetCharacter(db *DB, reset characterReset, log func(string)) error {
         return fmt.Errorf("inject adena: %w", err)
     }
 
-    // The injected inventory stacks: the derived object ids ride the
-    // same per character block as the adena stack (see
-    // injectObjectID - disjoint blocks, below the server allocation
-    // range, idempotent on a re-run).
+    // The injected stacks: the derived object ids ride the same per character
+    // block as the adena stack (see injectObjectID).
     for i, item := range reset.Items {
         itemObjectID := strconv.FormatInt(
             injectObjectID(charID, i+1), 10)
