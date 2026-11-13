@@ -1558,6 +1558,19 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the pathfind suite,
   `golangci-lint run ./internal/swarm/pathfind/...`.
 
+### 2026-11-13 - pathfind/navmesh/hierarchy.go keeps the HPA* rules
+
+- 31 blocks compress: the file keeps the coarse cluster A* against the
+  hop refinement split, the HNA* intra-edge cache, the 165 region map
+  with 42240 cluster nodes (so the 65536 bound never binds first), the
+  32768 hop budget, three coarse attempts, the 4096 gated pops, the
+  1048576 confined expansions over the half million town polygons, the
+  4096 cached portal corridors, the 128 cell cluster granularity, the
+  24 region line prefetch cap, the one cluster dilation and the
+  quadrupled hop retry. 187 comment lines of 1163 become 178 of 1154.
+- Verified: `task fmt`, `go build ./...`, the navmesh suite (27.1 s),
+  `golangci-lint run ./internal/swarm/pathfind/navmesh/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
