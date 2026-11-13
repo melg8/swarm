@@ -16,8 +16,8 @@ import (
 const (
     commonScore   = float32(10)
     diagonalScore = commonScore * 1.41421356
-    // impassableScore marks a wall hit; half of the float32 maximum keeps the
-    // additions overflow free.
+    // impassableScore marks a wall hit; half of the float32 maximum keeps sums
+    // finite.
     impassableScore = float32(math.MaxFloat32 / 2)
 )
 
@@ -74,18 +74,16 @@ type search struct {
     // approachRadius terminates the search on the first node within this 3D
     // distance; zero keeps the plain cell arrival semantics.
     approachRadius float64
-    // avoid holds the ground the search must route around (the hunt recovery
-    // ban): a step onto it is impassable, and neither the direct line nor the
-    // smoothing may cross it.
+    // avoid holds the ground the search routes around (the hunt recovery ban):
+    // a step onto it is impassable, and neither the line nor the smoothing may
+    // cross it.
     avoid []AvoidArea
-    // escapeIdx is the index of the avoid area holding the start (-1 for
-    // none): its cells within avoidEscapeRadius stay plannable at the escape
-    // price.
+    // escapeIdx is the avoid area holding the start (-1 for none): its cells
+    // within avoidEscapeRadius stay plannable at the escape price.
     escapeIdx int
     // startWorld is the world position of the start (the escape ring center).
     startWorld Vec3
-    // neighborScratch and ringScratch are the reusable neighbor buffers of the
-    // expansion loop.
+    // neighborScratch and ringScratch are the reusable neighbor buffers.
     neighborScratch []*node
     ringScratch     []*node
     region          *Region
@@ -122,9 +120,9 @@ func newSearch(engine *Engine, maxPassableHeight uint16) *search {
     }
 }
 
-// closestLayer returns the layer of a cell closest to z, through the cached
-// region when possible: the walk is local, so one pointer check replaces the
-// engine cache lock on almost every access.
+// closestLayer returns the layer of a cell closest to z through the cached
+// region: the walk is local, so one pointer check replaces the engine cache
+// lock.
 func (s *search) closestLayer(p Point, z int16) (Layer, bool) {
     key := CellToRegion(p)
     if s.region == nil || s.regionKey != key {
@@ -140,8 +138,8 @@ func (s *search) closestLayer(p Point, z int16) (Layer, bool) {
     return s.region.ClosestLayer(LocalCell(p), z)
 }
 
-// nodeAtWorld resolves a world position to its cell node; a position without
-// geodata is a hard error.
+// nodeAtWorld resolves a world position to its cell node; no geodata is an
+// error.
 func (s *search) nodeAtWorld(position Vec3) (*node, error) {
     coords := WorldToCell(position.X, position.Y)
     node := s.node(coords, int16(position.Z))
@@ -191,9 +189,9 @@ func (s *search) nextSeq() uint64 {
     return s.seq
 }
 
-// run executes the whole search and fills the result statistics; a positive
+// run executes the search and fills the result statistics; a positive
 // approachRadius ends it on the first node within that 3D distance, zero on the
-// first arrival on the target cell.
+// target cell arrival.
 func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
     began := time.Now()
     from, err := s.nodeAtWorld(start)
@@ -242,8 +240,8 @@ func (s *search) run(start, end Vec3, approachRadius float64) (*Result, error) {
     return result, nil
 }
 
-// astar searches the cell grid and returns the raw node path, or nil when the
-// target is unreachable.
+// astar searches the cell grid and returns the raw node path, nil when
+// unreachable.
 func (s *search) astar(from *node) []*node {
     from.g = 0
     from.h = s.heuristic(from, s.target)
@@ -261,8 +259,8 @@ func (s *search) astar(from *node) []*node {
         }
         s.closed[current.key] = current
         s.explored++
-        // The wall proximity multiplier reads the 7x7 ring around the
-        // expanded cell: one ring serves all eight neighbours.
+        // The wall proximity multiplier reads one 7x7 ring for all eight
+        // neighbours.
         ring := s.neighbors(current, 3)
         for _, next := range s.neighbors(current, 1) {
             if _, done := s.closed[next.key]; done {
@@ -270,8 +268,7 @@ func (s *search) astar(from *node) []*node {
             }
             step := current.g + s.costTo(current, next, ring)
             if step >= impassableScore {
-                // A wall hit: unreachable targets report not found, never a
-                // wall crossing path.
+                // A wall hit: report not found, never a wall crossing path.
                 continue
             }
             if existing, inOpen := s.openSet[next.key]; inOpen {
@@ -295,10 +292,10 @@ func (s *search) astar(from *node) []*node {
     return nil
 }
 
-// directOrAstar answers the straight raster line when it is a clean dry walk,
-// and runs the cost aware A* otherwise (returning the raw path and its smoothed
-// form). A dry line walks the minimum step rate the grid allows, so no detour
-// beats it and the answer is its own smoothing (the two endpoints).
+// directOrAstar answers the straight raster line when it is a clean dry walk
+// and runs the cost aware A* otherwise. A dry line walks the minimum step rate
+// the grid allows, so no detour beats it and its own smoothing is the two
+// endpoints.
 func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
     direct := s.straightPath(from, to)
     if len(direct) > 0 && direct[len(direct)-1].coords == to.coords &&
@@ -316,7 +313,7 @@ func (s *search) directOrAstar(from, to *node) ([]*node, []*node) {
 }
 
 // directLineDry reports whether every step of a raster line is walkable and
-// lands on dry ground: water is the one cost a detour can beat.
+// dry: water is the one cost a detour can beat.
 func (s *search) directLineDry(direct []*node) bool {
     for i := 0; i+1 < len(direct); i++ {
         if !s.canStep(direct[i], direct[i+1]) {
@@ -331,7 +328,7 @@ func (s *search) directLineDry(direct []*node) bool {
 }
 
 // dryLine reports whether the whole raster line stays above the water level: a
-// line touching a lake or sea bed anywhere is wet, whatever its endpoints name.
+// line touching a lake or sea bed is wet, whatever its endpoints name.
 func (s *search) dryLine(from, to *node) bool {
     for _, step := range s.straightPath(from, to) {
         if step.layer.Height < WaterLevel {
@@ -343,8 +340,8 @@ func (s *search) dryLine(from, to *node) bool {
 }
 
 // segmentDry reports whether the smoothing may replace the walk with a straight
-// segment: between two dry points it must stay above the water surface. A
-// segment that starts or ends in the water is exempt (docs/pathfinding.md).
+// segment between two dry points; one starting or ending in the water is exempt
+// (docs/pathfinding.md).
 func (s *search) segmentDry(from, to *node) bool {
     if from.layer.Height < WaterLevel || to.layer.Height < WaterLevel {
         return true
@@ -390,17 +387,16 @@ func (s *search) reconstruct(target *node) []*node {
     return path
 }
 
-// costTo returns the movement cost between neighbouring cells: the step score,
-// the water penalty of the destination, the ban price and the wall proximity
-// multiplier of the 7x7 ring (the more walled cells, the dearer the step).
+// costTo returns the movement cost between neighbours: the step score, the
+// destination water penalty, the ban price and the wall proximity multiplier of
+// the 7x7 ring.
 func (s *search) costTo(current, next *node, ring []*node) float32 {
     if !s.canStep(current, next) {
         return impassableScore
     }
     escape, avoided := s.cellAvoidedEscape(next.coords)
     if avoided && !escape {
-        // The recovery ban: the live server proved this ground unwalkable,
-        // so the detour is the only plan worth planning.
+        // The recovery ban: the live server proved this ground unwalkable.
         return impassableScore
     }
     cost := commonScore
@@ -410,20 +406,20 @@ func (s *search) costTo(current, next *node, ring []*node) float32 {
     }
     if next.layer.Height < WaterLevel {
         // The swim price keeps bridges and shores ahead unless the water cut
-        // is genuinely the faster walk.
+        // wins.
         cost *= waterCostMultiplier
     }
     if escape {
         // The ban around the start: the only honest route out crosses its own
-        // ground - expensive, never sealed.
+        // ground.
         cost *= avoidEscapeMultiplier
     }
 
     return cost * s.obstacleMultiplier(ring)
 }
 
-// obstacleMultiplier counts the walled cells of the ring: an open neighbourhood
-// multiplies by 1, a corridor by ring/obstacles.
+// obstacleMultiplier counts the walled cells of the ring: a corridor grows
+// dearer.
 func (s *search) obstacleMultiplier(ring []*node) float32 {
     if len(ring) == 0 {
         return 1
@@ -442,10 +438,10 @@ func (s *search) obstacleMultiplier(ring []*node) float32 {
 }
 
 // canStep mirrors the walkable surface rule of one step: the source walls open
-// for the direction, the target walls open in reverse, and the height
-// difference stays within the climb limit in both directions. The server
-// accepts any downward step, a plan does not: the world stacks terraces whose
-// only connections are the 8..24 unit ramps (docs/pathfinding.md).
+// for the direction, the target walls in reverse, and the height delta stays
+// within the climb limit. The server accepts any downward step, a plan does
+// not: the terraces connect only through 8..24 unit ramps
+// (docs/pathfinding.md).
 func (s *search) canStep(from, to *node) bool {
     if !s.wallsOpen(from, to) {
         return false
@@ -525,8 +521,7 @@ func (s *search) diagonalFlanksOpen(from, to *node) bool {
     return true
 }
 
-// canMoveTo reports whether the walk between two adjacent cells stays on the
-// walkable surface (the strict symmetric canStep rule).
+// canMoveTo reports whether the walk between two adjacent cells stays walkable.
 func (s *search) canMoveTo(from, to *node) bool {
     return s.canStep(from, to)
 }
@@ -576,8 +571,8 @@ func (s *search) neighbors(center *node, radius int) []*node {
     return scratch
 }
 
-// lineOfSight rasterizes the straight cell line and requires every step to be
-// walkable and the server to walk the segment.
+// lineOfSight requires every step of the raster line to be walkable and server
+// walked.
 func (s *search) lineOfSight(from, to *node) bool {
     path := s.straightPath(from, to)
     for i := 0; i+1 < len(path); i++ {
@@ -601,8 +596,8 @@ func (s *search) serverSegmentVerified(from, to *node) bool {
     return vx == toX && vy == toY && vz == toZ
 }
 
-// nodeClickWorld returns the world position of a node the way the server names
-// a click target: the cell center with the layer height.
+// nodeClickWorld returns the world position the way the server names a click
+// target.
 func nodeClickWorld(node *node) (int32, int32, int32) {
     return node.coords.X*cellSize + worldMinX + cellSize/2,
         node.coords.Y*cellSize + worldMinY + cellSize/2,
@@ -642,10 +637,9 @@ func (s *search) straightPath(from, to *node) []*node {
     return path
 }
 
-// smoothPath pulls the raw path straight: it keeps the last node that still
-// sees the candidate ahead and commits a turning point where the sight, the dry
-// or the ban test breaks. The anchor stays on the committed point, so every
-// kept segment was verified.
+// smoothPath pulls the raw path straight: it commits a turning point where the
+// sight, the dry or the ban test breaks, and the anchor stays on the committed
+// node, so every kept segment was verified.
 func (s *search) smoothPath(path []*node) []*node {
     if len(path) == 0 {
         return nil
@@ -667,8 +661,8 @@ func (s *search) smoothPath(path []*node) []*node {
     return result
 }
 
-// cellAvoided reports whether the cell falls inside one of the avoid areas (the
-// recovery ban of the hunt loop, in world coordinates).
+// cellAvoided reports whether the cell falls inside an avoid area of the hunt
+// loop.
 func (s *search) cellAvoided(p Point) bool {
     if len(s.avoid) == 0 {
         return false
@@ -684,10 +678,9 @@ func (s *search) cellAvoided(p Point) bool {
     return false
 }
 
-// cellAvoidedEscape splits the avoid answer: a cell of the area holding the
-// start within avoidEscapeRadius is an escape (passable at the escape price),
-// while any other area and the own ban beyond the start neighborhood stay
-// walls.
+// cellAvoidedEscape splits the avoid answer: a cell of the start area within
+// avoidEscapeRadius is an escape (passable at the escape price), while any
+// other area and the own ban beyond the start neighborhood stay walls.
 func (s *search) cellAvoidedEscape(p Point) (escape bool, avoided bool) {
     if len(s.avoid) == 0 {
         return false, false
@@ -712,9 +705,8 @@ func (s *search) cellAvoidedEscape(p Point) (escape bool, avoided bool) {
     return escapeOnly, escapeOnly
 }
 
-// startAvoidIndex answers the index of the first avoid area containing the
-// start cell (-1 when the start sits on no ban); the escape exemption keys on
-// it.
+// startAvoidIndex answers the index of the first area containing the start cell
+// (-1 for none); the escape exemption keys on it.
 func (s *search) startAvoidIndex(from *node) int {
     center := CellToWorldCenter(from.coords)
     for i, area := range s.avoid {
@@ -728,7 +720,7 @@ func (s *search) startAvoidIndex(from *node) int {
 }
 
 // segmentAllowed reports whether the straight segment stays outside every avoid
-// area: the direct line and the smoothing may only collapse clean segments.
+// area.
 func (s *search) segmentAllowed(from, to *node) bool {
     if len(s.avoid) == 0 {
         return true
@@ -784,9 +776,8 @@ func pathLength(waypoints []Vec3) float64 {
     return length
 }
 
-// nodeQueue is the A* open set: a binary heap ordered by the f score, ties
-// broken by the remaining distance and then by insertion order, so runs stay
-// deterministic.
+// nodeQueue is the A* open set: a binary heap by f score, ties broken by the
+// remaining distance and then by insertion order, so runs stay deterministic.
 type nodeQueue []*node
 
 // Len returns the heap length.

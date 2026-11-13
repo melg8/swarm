@@ -1542,6 +1542,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite,
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - pathfind/search.go keeps the search rules
+
+- 33 blocks compress: the file keeps the movement scores (10 / 10*sqrt2,
+  the Manhattan heuristic times 10, the half float32 maximum wall mark),
+  the water surface -3780 with the 115/50 run to swim price of 2.3, the
+  escape ban price 6 within 256 units, the cell plus layer height node
+  key against the water deck seal, the cached region pointer against the
+  engine cache lock, the approach radius against the half diagonal cell
+  center flood, the terrace rule (the server accepts any downward step,
+  a plan only through the 8..24 unit ramps), the source-height resolved
+  diagonal flanks, the Bresenham against supercover click validation and
+  the `GetStraightPath` t/k supercover test. 141 comment lines of 831
+  become 132 of 822; no block above 5 lines.
+- Verified: `task fmt`, `go build ./...`, the pathfind suite,
+  `golangci-lint run ./internal/swarm/pathfind/...`.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
