@@ -1859,6 +1859,24 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the navmesh suite (28.6 s),
   `golangci-lint run ./internal/swarm/pathfind/navmesh/...` 0 issues.
 
+### 2026-11-13 - state/object.go keeps the record layout
+
+- 18 blocks compress: the file keeps the compact int8 kind codes of the
+  hot records (a one byte load against a string header walk per tick),
+  the zero time sentinel -62135596800000, the 88 byte hot block against
+  the 240 byte full record (a 200 npc world drops from 48 KB of scan
+  traffic to 17.6 KB), the `BowWielding` hot placement (read every fight
+  tick by the anti-archer gate), the cold half holding only what the
+  snapshot polls read, the `ChaseSpeed` rule (the faster of run and walk
+  wins, a conservative distance never assumes a slower chase), the
+  server dividing the real speeds by the spawn multiplier so the
+  observed movement is `speed * multiplier` (UserInfo, CharInfo,
+  AbstractNpcInfo writeImpl) and the 0..65535 `HeadingFromDelta`
+  mirroring `LocationUtil.calculateHeadingFrom`. 84 comment lines of
+  254 become 72 of 242.
+- Verified: `task fmt`, `go build ./...`, the state suite,
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
