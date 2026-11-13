@@ -1300,6 +1300,17 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - pathfind/engine.go keeps the grid facts only
+
+- 16 blocks compress: the engine keeps the 40 unit HEIGHT_INCREASE_LIMIT
+  climb gate, the 20 MB parsed region against the capacity of 4, the 4.2M
+  cell grid and the million expansion cap, the 8..24 unit ramp step
+  against a terrace jump, the getHeight(tx, ty, tz) target layer
+  selection, the single region fast path, the read locked cache hit, the
+  start cell escape ring rule with its avoidEscapeMultiplier and the
+  click z layer gate. The dated session dump and the issue id drop.
+  141 comment lines of 414 become 103 of 376.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

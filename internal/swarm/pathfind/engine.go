@@ -16,23 +16,20 @@ import (
     "time"
 )
 
-// DefaultMaxPassableHeight is the default maximum height the search
-// accepts climbing between two neighbouring cells. It mirrors the
-// Mobius GeoEngine HEIGHT_INCREASE_LIMIT (40) - the upward step gate
-// of the server movement validation the planned walks must pass.
+// DefaultMaxPassableHeight is the default climb between two neighbouring cells:
+// the Mobius GeoEngine HEIGHT_INCREASE_LIMIT (40), the upward step gate the
+// planned walks must pass.
 const DefaultMaxPassableHeight = uint16(40)
 
-// DefaultCacheCapacity bounds how many parsed regions stay in memory.
-// One multilayer region costs roughly 20 MB parsed, so the default keeps
-// the working set of a pathfind session comfortably small; the cache
-// evicts the least recently used regions when it overflows.
+// DefaultCacheCapacity bounds the parsed regions in memory: one multilayer
+// region costs roughly 20 MB parsed, and the cache evicts the least recently
+// used entry when it overflows.
 const DefaultCacheCapacity = 4
 
-// MaxSearchExpansions caps the node expansions of one search. An
-// unreachable target in open terrain would otherwise explore the whole
-// region grid (4.2M cells, tens of seconds); the cap stops the search
-// early and reports it through Result.Aborted. Long real world paths
-// stay two orders of magnitude below the cap.
+// MaxSearchExpansions caps the node expansions of one search: an unreachable
+// target in open terrain would otherwise explore the whole region grid (4.2M
+// cells, tens of seconds). The cap stops the search and reports Result.Aborted;
+// long real world paths stay two orders of magnitude below it.
 const MaxSearchExpansions = 1000000
 
 // ErrMissingCell reports that a requested start or target position has
@@ -49,24 +46,22 @@ type Stats struct {
     Center        Vec3   `json:"center"`
 }
 
-// Engine reads geodata region files lazily and answers cell layer
-// queries for the search. It is safe for concurrent use.
+// Engine reads geodata region files lazily and answers cell layer queries; it
+// is safe for concurrent use.
 type Engine struct {
     dir      string
     capacity int
     maxPass  uint16
-    // capsuleRadius arms the capsule clearance post-pass of the
-    // smoothed waypoints (capsule.go); zero (the default) keeps the
-    // raw smoothing. Set once at construction time (SetCapsuleClearance).
+    // capsuleRadius arms the capsule clearance post-pass of the smoothed
+    // waypoints (capsule.go); zero keeps the raw smoothing. It is set once.
     capsuleRadius float64
 
     mu    sync.RWMutex
     cache map[RegionKey]*cacheEntry
     lru   []*cacheEntry
-    // last is the single region fast path of entry: the region
-    // queries are highly local (the walks, the click lines probe the
-    // same region thousands of cells in a row), one pointer and key
-    // check replaces the lock and the map hash on nearly every call.
+    // last is the single region fast path: the queries are highly local (a walk
+    // probes the same region thousands of cells in a row), so one pointer and
+    // key check replaces the lock and the map hash on nearly every call.
     last     atomic.Pointer[regionSlotEntry]
     pool     *layerPool
     files    int
@@ -138,9 +133,9 @@ func (e *Engine) Stats() Stats {
     }
 }
 
-// scanFiles counts the region files in the directory and computes the
-// world center of the covered area (the mean of the region centers),
-// which the web UI uses as the initial camera position.
+// scanFiles counts the region files and computes the world center of the
+// covered area (the mean of the region centers), the initial camera of the web
+// UI.
 func (e *Engine) scanFiles() {
     entries, err := os.ReadDir(e.dir)
     if err != nil {
@@ -189,15 +184,12 @@ func parseRegionFileName(name string) (int, int, bool) {
     return col, row, true
 }
 
-// entry returns the cache entry of a region, loading it on demand and
-// evicting the least recently inserted entry when the cache is full.
-// The hit path shares the read lock (the parallel guard probes of the
-// smooth pass hit the same four region keys millions of times - the
-// exclusive lock was the serialization point), the parse path takes
-// the exclusive lock and re-checks. The eviction order is the insert
-// order: the parsed regions are immutable, the read path cannot
-// refresh the queue without dropping back to an exclusive lock, and
-// the working set of one route fits the capacity anyway.
+// entry returns the cache entry of a region, loading it on demand and evicting
+// the least recently inserted one when the cache is full. The hit path shares
+// the read lock (the parallel guard probes hit the same four region keys
+// millions of times) and the parse path takes the exclusive lock and re-checks.
+// The eviction order is the insert order: the parsed regions are immutable and
+// a route working set fits the capacity.
 func (e *Engine) entry(key RegionKey) (*cacheEntry, error) {
     if slot := e.last.Load(); slot != nil && slot.key == key {
         return slot.entry, slot.entry.err
@@ -247,14 +239,11 @@ func (e *Engine) entry(key RegionKey) (*cacheEntry, error) {
 type Result struct {
     Found bool
     // Partial reports the closest-reachable answer of a search whose
-    // destination is unreachable under its filter: the waypoints then
-    // end at the closest reachable point instead of the destination.
-    // The grid engine itself never answers one (its searches report
-    // the bare not found); the navmesh hybrid serves the mesh partial
-    // corridors through this flag once the engine has confirmed the
-    // destination truly unreachable - the consumer can walk the
-    // waypoints toward the closest reachable point instead of
-    // aborting the segment at the start position.
+    // destination is unreachable under its filter: the waypoints end at the
+    // closest reachable point. The grid engine never answers one; the navmesh
+    // hybrid serves the mesh partial corridors once the engine confirmed the
+    // destination truly unreachable, so the consumer walks toward that point
+    // instead of aborting at the start position.
     Partial   bool
     Aborted   bool
     Waypoints []Vec3
@@ -265,21 +254,14 @@ type Result struct {
     Length    float64
 }
 
-// FindPath searches the walkable path from start to end. The max
-// passable height bounds the height difference the walker can step
-// between neighbouring cells in BOTH directions: the climb gate is
-// the Mobius HEIGHT_INCREASE_LIMIT (40) and the drop uses the same
-// bound, because a walkable surface connects its cells gradually -
-// ramps, bridges and shores step 8..24 units per cell - while a
-// height jump of hundreds of units is a terrace boundary (the lake
-// bed under the floating elven city deck, a cliff behind a railing
-// the geodata does not model), not a walkable connection. The target
-// layer is selected as the layer of the target cell closest to the
-// target z, like the server's own pathfinder does
-// (getHeight(tx, ty, tz)), and the search succeeds on the first
-// arrival on the target cell at any layer. A search that exhausts
-// the grid returns Found=false with a nil error; hard failures (no
-// geodata at the start or target, corrupt regions) return an error.
+// FindPath searches the walkable path from start to end. The passable height
+// bounds the step in both directions: ramps, bridges and shores connect their
+// cells gradually (8..24 units per cell), while a jump of hundreds is a terrace
+// boundary (the lake bed under the floating elven city deck, a cliff behind a
+// railing), not a walkable connection. The target layer is the one closest to
+// the target z, like the server's own pathfinder (getHeight(tx, ty, tz)), and
+// the search succeeds on the first arrival at any layer. An exhausted grid
+// returns Found=false with a nil error; hard failures return an error.
 func (e *Engine) FindPath(
     start, end Vec3, maxPassableHeight uint16,
 ) (*Result, error) {
@@ -288,16 +270,13 @@ func (e *Engine) FindPath(
     return search.run(start, end, 0)
 }
 
-// FindPathApproach searches the walkable path from start to end and
-// succeeds as soon as the walk reaches a cell within the approach
-// radius (the 3D distance) of the end point - preferring the exact
-// target whenever it is reachable. The town trips navigate with it:
-// a merchant standing behind a counter or on a floor layer the
-// geodata does not model (the elven village shops hold no deck layer
-// at their real floor z) is still reached correctly, because the walk
-// ends on the deck ring within the merchant interaction distance
-// while the water deck below the shop - close in x and y but far in
-// z - never satisfies the radius.
+// FindPathApproach searches the walkable path and succeeds as soon as the walk
+// reaches a cell within the 3D approach radius of the end, preferring the exact
+// target whenever it is reachable. The town trips navigate with it: a merchant
+// behind a counter or on a floor layer the geodata does not model (the elven
+// village shops hold no deck layer at their real floor z) is still reached on
+// the deck ring inside the interaction distance, while the water deck below the
+// shop - close in x and y but far in z - never satisfies the radius.
 func (e *Engine) FindPathApproach(
     start, end Vec3, approachRadius float64, maxPassableHeight uint16,
 ) (*Result, error) {
@@ -306,18 +285,12 @@ func (e *Engine) FindPathApproach(
     return search.run(start, end, approachRadius)
 }
 
-// FindPathApproachAvoiding plans the walk around the avoid areas of
-// the caller: the search treats every cell inside an area as
-// impassable, so the A* detours around the patch (the start cell
-// itself stays allowed wherever it sits - the walker standing inside
-// a patch must be able to plan its way OUT of it, the escape ring
-// cells cost avoidEscapeMultiplier instead). The zone return and the
-// quest segments navigate with it: the search around the accumulated
-// bans must hand the bot a route that still respects them - the
-// ban-less fallback reproduced the very corridor the bans exist to
-// detour (the 2026-09-14 08:42 dump: the widened bans made every
-// search fail, the fallback re-planned the frozen corridor route and
-// the bot cycled through it for the rest of the session).
+// FindPathApproachAvoiding plans the walk around the caller avoid areas: every
+// cell inside one is impassable, so the A* detours around the patch. The start
+// cell stays allowed, because the walker standing inside a patch must plan its
+// way out (its escape ring cells cost avoidEscapeMultiplier instead). The
+// ban-less fallback once re-planned the very corridor the bans exist to detour,
+// so the zone return and the quest segments always search with the bans.
 func (e *Engine) FindPathApproachAvoiding(
     start, end Vec3, approachRadius float64, maxPassableHeight uint16,
     avoid []AvoidArea,
@@ -328,24 +301,22 @@ func (e *Engine) FindPathApproachAvoiding(
     return search.run(start, end, approachRadius)
 }
 
-// AvoidArea names one world patch the recovery searches route around:
-// a circle over the ground the live server refused to walk although
-// the geodata pack modeled it as open. The hunt loop derives the
-// patches from its freeze reports (the aimed waypoint of a segment whose
-// re-path produced no movement at all) and keeps them for the session,
-// so every later plan detours around the frozen corridor instead of
-// re-planning the identical deterministic route into it.
+// AvoidArea names one world patch the recovery searches route around: a circle
+// over ground the live server refused although the geodata pack models it as
+// open. The hunt derives the patches from its freeze reports (the aimed
+// waypoint of a segment whose re-path produced no movement) and keeps them for
+// the session, so every later plan detours instead of re-planning the identical
+// deterministic route into it.
 type AvoidArea struct {
     Center Vec3
     Radius float64
 }
 
-// OverWater reports whether the walkable surface under a world
-// position lies below the C1 water level: the character stands (or
-// swims) over a lake or sea bed. The layer is the one closest to the
-// reference z - the deck the character itself is on. A position
-// without geodata answers false (never over water) so a broken pack
-// cannot trap the walker in an endless escape.
+// OverWater reports whether the walkable surface lies below the C1 water level:
+// the character stands on (or swims over) a lake or sea bed. The layer is the
+// one closest to the reference z, the deck the character is on. A position
+// without geodata answers false, so a broken pack cannot trap the walker in an
+// endless escape.
 func (e *Engine) OverWater(x, y float64, refZ int16) bool {
     coords := WorldToCell(x, y)
     entry, err := e.entry(CellToRegion(coords))
@@ -360,35 +331,26 @@ func (e *Engine) OverWater(x, y float64, refZ int16) bool {
     return layer.Height < WaterLevel
 }
 
-// CellBlockedAtZ mirrors the packet level isCompletelyBlocked check
-// of the Mobius MoveToLocation handler: the click validation port
-// (ValidateClick) walks the terrain-following z along its Bresenham
-// line the way the server AI correction does, but the PACKET handler
-// asks the destination cell directly at the CLICK's own z - the
-// layer nearest to that z decides, and an upper layer (a tree
-// canopy, a cliff band) whose walls are all closed refuses the whole
-// click with an instant ActionFailed even though the ground under it
-// is walkable (the issue #60 acceptance dump: the kite endpoints on
-// the hill deck bounce instantly while the rotated fan lanes a few
-// cells aside walk fine). The fight steps that click straight lines
-// (the kite retreat) read this gate BEFORE sending: a refused
-// endpoint never starts a walk, clicking it only burns the movement
-// window.
+// CellBlockedAtZ mirrors the packet level isCompletelyBlocked check of the
+// Mobius MoveToLocation handler: the click validation port (ValidateClick)
+// walks the terrain-following z along its Bresenham line like the server AI
+// correction, but the packet handler asks the destination cell at the click z -
+// the nearest layer decides, and a closed upper layer (a tree canopy, a cliff
+// band) refuses the click with an instant ActionFailed although the ground
+// below is walkable (the kite endpoints on the hill deck bounce while the
+// rotated fan lanes walk fine). The straight line fight steps read this gate.
 func (e *Engine) CellBlockedAtZ(x, y float64, z int16) bool {
     return e.cellBlocked(WorldToCell(x, y), z)
 }
 
-// ClosestHeight resolves the height of the geodata layer at the world
-// position that is closest to refZ: the deck the server itself would
-// pick for a destination at (x, y) named with z = refZ (its own
-// pathfinder resolves the target cell by the destination z, not by
-// the deck the walker stands on). Planning code uses it to put a
-// search goal on real ground before FindPathApproach - a fabricated
-// height at the target puts the 3D approach goal mid air whenever the
-// destination sits on another deck than the walker, and the search
-// then can never match the goal. A position with no region file
-// under it answers the region load error, a cell without layers
-// ErrMissingCell; either way the caller stays on its fallback height.
+// ClosestHeight resolves the height of the layer closest to refZ: the deck the
+// server itself would pick for a destination at (x, y) named with z = refZ (its
+// pathfinder resolves the target cell by the destination z, not by the deck the
+// walker stands on). Planning uses it to put a search goal on real ground
+// before FindPathApproach, because a fabricated height puts the 3D approach
+// goal mid air and the search can never match it. A missing region answers the
+// load error, a cell without layers ErrMissingCell; the caller stays on its
+// fallback height.
 func (e *Engine) ClosestHeight(
     x, y float64, refZ int16,
 ) (int16, error) {
