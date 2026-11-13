@@ -17,50 +17,44 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The kite timing probe (issue #70 research vehicle): a raw wire
-// experiment that measures how the Mobius C1 server answers a retreat
-// click issued at a controlled delay after the own bow shot started.
-// The bow cycle on the server has three phases (the windup before the
-// hit task lands, the hit itself and the reuse tail), and the question
-// of the improved kite is which phase admits a MoveToLocation without
-// deferring it - the answer paces the retreat click of the archer.
-// The probe runs one temp character with the bow kit on the Kaboo Orc
-// cell, walks a delay ladder of retreat clicks and reports per delay
-// whether the movement started immediately, was deferred to the cycle
-// end or never ran, plus a cursor key (WASD) round that asks whether
-// the claims stream moves the character through the windup while the
-// arrow still lands.
+// The kite timing probe: a raw wire experiment that measures how the Mobius
+// C1 server answers a retreat click issued at a controlled delay after the own
+// bow shot started. The bow cycle has three phases (the windup before the hit
+// task lands, the hit itself and the reuse tail), and the improved kite asks
+// which phase admits a MoveToLocation without deferring it. The probe walks a
+// delay ladder of retreat clicks on one temp character with the bow kit and
+// reports per delay whether the movement started immediately, was deferred to
+// the cycle end or never ran, plus a cursor key (WASD) round that asks whether
+// the claims stream moves the character through the windup while the arrow
+// still lands.
 
 // kiteProbeScenarioID is the scenario registry id.
 const kiteProbeScenarioID = "kite-timing-probe"
 
-// kiteProbeAccount is the temp account of the probe: temp19 keeps it
-// clear of the fleet spread of the archer fleet scenario (temp20+).
+// kiteProbeAccount is the temp account: temp19 stays clear of the archer fleet
+// spread (temp20+).
 const (
     kiteProbeAccount  = "temp19"
     kiteProbePassword = "temp19"
 )
 
-// kiteProbePotions is the injected Lesser Healing Potion count: the
-// raw session has no hunt loop to drink them, the probe drains one
-// whenever the health dips under the floor (the Kaboo Orc Grunt of the
-// cell hits a level 7 character hard enough to matter over the probe
-// window).
+// kiteProbePotions is the injected potion count: the raw session has no hunt
+// loop to drink them, the probe drains one whenever the health dips under the
+// floor (a Kaboo Orc Grunt hurts a level 7 character over the probe window).
 const kiteProbePotions = 20
 
-// kiteProbeHealFloor is the health percentage under which the probe
-// drinks a potion between the ladder rounds.
+// kiteProbeHealFloor is the health share under which the probe drinks a potion
+// between the ladder rounds.
 const kiteProbeHealFloor = 60.0
 
-// kiteProbeEquipPace separates the UseItem calls of the manual dress:
-// the server flood protector gates the item use at roughly one per
-// second, so a faster pace silently drops equips.
+// kiteProbeEquipPace separates the UseItem calls of the manual dress: the flood
+// protector gates the item use near one per second, a faster pace drops
+// equips silently.
 const kiteProbeEquipPace = 1200 * time.Millisecond
 
-// kiteProbeLadder is the delay grid of the retreat click: from the
-// same instant as the shot (0 ms) past the expected windup end
-// (~1.5 s for the Short Bow) to past the full disable window (~3 s),
-// the boundary the probe hunts sits inside the grid.
+// kiteProbeLadder is the delay grid of the retreat click: from the shot instant
+// (0 ms) past the Short Bow windup end (~1.5 s) to past the full disable
+// window (~3 s).
 var kiteProbeLadder = []time.Duration{
     0, 300 * time.Millisecond, 600 * time.Millisecond,
     900 * time.Millisecond, 1200 * time.Millisecond,
@@ -69,12 +63,9 @@ var kiteProbeLadder = []time.Duration{
     3000 * time.Millisecond,
 }
 
-// The probe observation constants: the window one round watches for
-// the own movement broadcast after the retreat click, the round trip
-// the anchor wait allows for the own Attack broadcast after a forced
-// attack request (the AI engage walks the bow range first when the
-// target sits near the outer band, so the window tolerates the walk),
-// and the retreat click length (the hunt kite step).
+// The probe observation constants: the movement watch window of one round, the
+// anchor wait for the own Attack broadcast (the AI walks the bow range first
+// when the target sits near the outer band) and the retreat click length.
 const (
     kiteProbeObserveWindow = 5 * time.Second
     kiteProbeAnswerWindow  = 3500 * time.Millisecond
@@ -84,11 +75,10 @@ const (
     kiteProbeMaxMobLevel   = 12
 )
 
-// The cursor key probe constants: the claim stream cadence of the
-// official client walk simulation (five claims a second), the run
-// speed unit step one claim advances (the ~170 units per second of
-// the level 7 elven fighter) and the windup length the probe assumes
-// when the live pAtkSpd answer is missing (the Short Bow value).
+// The cursor key probe constants: the claim cadence of the official client walk
+// simulation (five claims a second), the run speed unit step one claim
+// advances (~170 units per second at level 7) and the windup assumed without
+// a live pAtkSpd answer (the Short Bow value).
 const (
     kiteProbeClaimPeriod = 200 * time.Millisecond
     kiteProbeClaimStep   = 34.0
@@ -96,15 +86,13 @@ const (
     kiteProbeWindupFall  = 1500 * time.Millisecond
 )
 
-// kiteProbeTimeout bounds the whole probe: the dress, the ladder of
-// ten rounds and the cursor key round land well inside four minutes
-// on the live stack; the budget keeps the session prologue and the
-// teardown comfortable while staying under the 6 minute process cap.
+// kiteProbeTimeout bounds the whole probe: the dress, the ten round ladder and
+// the cursor key round land inside four minutes, under the 6 minute process
+// cap.
 const kiteProbeTimeout = 5 * time.Minute
 
-// The probe check ids: the target engagement, the delay ladder, the
-// measured retreat window, the cursor key motion and the shot that
-// lands while the character moves.
+// The probe check ids: the engagement, the ladder, the retreat window, the
+// cursor key motion and the shot that lands while moving.
 const (
     checkKiteProbeTarget = "target"
     checkKiteProbeLadder = "ladder"
@@ -148,10 +136,9 @@ func kiteProbeChecks() []Check {
     }
 }
 
-// The wire opcodes the probe recorder watches (the from-game-server
-// ids of the connection dispatch): the Attack broadcast, the
-// MoveToLocation and StopMove broadcasts, the ValidateLocation
-// adoption broadcast and the ActionFailed refusal.
+// The wire opcodes the probe recorder watches: the Attack broadcast, the
+// MoveToLocation and StopMove broadcasts, the ValidateLocation adoption and
+// the ActionFailed refusal.
 const (
     probeOpMove     = 0x01
     probeOpAttack   = 0x06
@@ -162,11 +149,10 @@ const (
     probeIDWidth    = 4
 )
 
-// probeRecorder timestamps the self-relevant wire events of the probe
-// session: every own Attack broadcast, every own movement-family
-// broadcast and every ActionFailed. The recorder hangs on the receive
-// tap of the raw session next to the run log mirror, so the rounds
-// read exact arrival times without polling the tracker.
+// probeRecorder timestamps the self-relevant wire events: every own Attack
+// broadcast, every own movement-family broadcast and every ActionFailed. It
+// hangs on the receive tap next to the run log mirror, so the rounds read exact
+// arrival times without polling the tracker.
 type probeRecorder struct {
     mu      sync.Mutex
     selfID  func() int32
@@ -176,9 +162,8 @@ type probeRecorder struct {
     fails   []time.Time
 }
 
-// newProbeRecorder arms the recorder with the self object id getter
-// (the id only settles after the world entry, so the getter defers
-// the read to every event).
+// newProbeRecorder arms the recorder with the self object id getter: the id
+// only settles after the world entry, so every event reads it anew.
 func newProbeRecorder(selfID func() int32) *probeRecorder {
     return &probeRecorder{selfID: selfID}
 }
@@ -242,10 +227,9 @@ func (r *probeRecorder) firstMoveAfter(
     }
     fails := 0
     for _, at := range r.fails {
-        // The failure may carry the SAME coarse clock stamp as the
-        // move (the Windows timer granularity - the live server
-        // answers inside one millisecond), so the window closes
-        // inclusively at the first move.
+        // The failure may carry the same coarse clock stamp as the move (the
+        // Windows timer granularity, the server answers inside a millisecond),
+        // so the window closes inclusively at the first move.
         if at.After(mark) && (first.IsZero() || !at.After(first)) {
             fails++
         }
@@ -269,10 +253,9 @@ func (r *probeRecorder) claimCountAfter(mark time.Time) int {
     return count
 }
 
-// probeRound is one measured ladder round: the delay the retreat
-// click waited after the own Attack broadcast, the timestamps of the
-// anchor shot, the click and the first movement broadcast, the
-// refusal count before the movement and the classified verdict.
+// probeRound is one measured ladder round: the delay after the own Attack
+// broadcast, the stamps of the shot, the click and the first movement, the
+// refusal count and the verdict.
 type probeRound struct {
     delay       time.Duration
     shotAt      time.Time
@@ -283,11 +266,9 @@ type probeRound struct {
     lagFromShot time.Duration
 }
 
-// classifyProbeRound reads the round timing into the verdict name:
-// the movement broadcast inside the immediate cap after the click is
-// an immediate acceptance, a later broadcast is a deferred one (the
-// server held the click back to the cycle end) and no broadcast at
-// all inside the observation window means the click never ran.
+// classifyProbeRound reads the round timing into the verdict: a movement
+// broadcast inside the immediate cap is an immediate acceptance, a later one is
+// deferred (the server held the click to the cycle end), none is no-move.
 func classifyProbeRound(r probeRound) string {
     if r.movedAt.IsZero() {
         return "no-move"
@@ -299,9 +280,8 @@ func classifyProbeRound(r probeRound) string {
     return "deferred"
 }
 
-// probeLadderSummary folds the ladder rounds into the headline: the
-// minimal delay whose click the server accepted immediately (the
-// boundary of the move window) and the per-round verdict list.
+// probeLadderSummary folds the ladder rounds into the headline: the minimal
+// delay accepted immediately (the move window boundary) and the verdicts.
 type probeLadderSummary struct {
     Rounds      int
     ImmediateAt time.Duration
@@ -309,9 +289,8 @@ type probeLadderSummary struct {
     Verdicts    []string
 }
 
-// summarizeLadder folds the classified rounds: the boundary is the
-// smallest delay with an immediate verdict among the rounds that got
-// a shot at all.
+// summarizeLadder folds the classified rounds: the boundary is the smallest
+// delay with an immediate verdict.
 func summarizeLadder(rounds []probeRound) probeLadderSummary {
     summary := probeLadderSummary{
         Rounds:      len(rounds),
@@ -329,9 +308,8 @@ func summarizeLadder(rounds []probeRound) probeLadderSummary {
     return summary
 }
 
-// kiteProbeReset returns the start state of the probe: the level 7
-// archer kit of the archer scenario plus the potion belt, waking on
-// the same Kaboo Orc cell focus (the proven spawn).
+// kiteProbeReset returns the start state: the level 7 archer kit plus the
+// potion belt, waking on the same Kaboo Orc cell focus.
 func kiteProbeReset(account string) characterReset {
     items := append([]ResetItem{}, archerKiteItems...)
     items = append(items, ResetItem{ItemID: 1060, Count: kiteProbePotions})
@@ -341,11 +319,10 @@ func kiteProbeReset(account string) characterReset {
     return reset
 }
 
-// kiteProbeScenario runs the raw wire probe: dress the kit, walk the
-// retreat delay ladder against a live mob, run the cursor key round
-// and fold the measurements into the checks. The scenario passes when
-// every measurement landed - the values themselves are the data the
-// improved kite paces itself with, not a pass or fail contract.
+// kiteProbeScenario runs the raw wire probe: dress the kit, walk the retreat
+// delay ladder against a live mob, run the cursor key round and fold the
+// measurements into the checks. The scenario passes when every measurement
+// landed; the values are the data the improved kite paces itself with.
 func kiteProbeScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(kiteProbeChecks())
@@ -386,10 +363,9 @@ func kiteProbeScenario(ctx context.Context, m *Manager, t *Test) error {
     return probeVerdict(rounds, wasd)
 }
 
-// summarizeAndMarkLadder folds the ladder rounds into the checks and
-// the test log: one line per round (the delay, the verdict, the
-// refusal count and the observed movement lag after the shot) plus
-// the boundary headline.
+// summarizeAndMarkLadder folds the ladder rounds into the checks and the log:
+// one line per round (delay, verdict, refusals, movement lag from the shot)
+// plus the boundary headline.
 func summarizeAndMarkLadder(test *Test, rounds []probeRound) {
     if len(rounds) == 0 {
         test.updateCheck(checkKiteProbeLadder, false,
@@ -418,10 +394,9 @@ func summarizeAndMarkLadder(test *Test, rounds []probeRound) {
     test.appendLog("probe: " + detail)
 }
 
-// probeWASDResult is the cursor key round measurement: whether the
-// claims moved the character inside the windup, how far, how many
-// claim adoptions the server broadcast and whether the target lost
-// health while the character moved (the arrow landed).
+// probeWASDResult is the cursor key round measurement: whether the claims moved
+// the character inside the windup, how far, how many adoptions the server
+// broadcast and whether the arrow landed while the character moved.
 type probeWASDResult struct {
     anchor            time.Time
     movedDuringWindup bool
@@ -449,8 +424,8 @@ func markWASD(test *Test, result probeWASDResult) {
 }
 
 // probeVerdict reads the measurements into the scenario answer: the
-// infrastructure failures (no round, no anchor) are errors, the
-// measured values never are - the probe reports what the server does.
+// infrastructure failures (no round, no anchor) are errors, the measured
+// values never are.
 func probeVerdict(rounds []probeRound, wasd probeWASDResult) error {
     if len(rounds) == 0 {
         return errors.New("the probe completed no ladder round")
@@ -462,10 +437,9 @@ func probeVerdict(rounds []probeRound, wasd probeWASDResult) error {
     return nil
 }
 
-// kiteProbeSession is the raw wire session of the probe: the login,
-// the world entry and the game client driven directly (no hunt loop),
-// with the probe recorder tapped into the receive stream next to the
-// run log mirror.
+// kiteProbeSession is the raw wire session: the login, the world entry and the
+// game client driven directly (no hunt loop), with the probe recorder tapped
+// into the receive stream.
 type kiteProbeSession struct {
     manager  *Manager
     game     *connection.GameClient
@@ -473,16 +447,14 @@ type kiteProbeSession struct {
     recorder *probeRecorder
     runDone  chan error
     cancel   context.CancelFunc
-    // done is the Done channel of the session's run context: the
-    // long-lived session polls it instead of carrying the context
-    // itself, so the waits across the ladder share one stop signal.
+    // done is the Done channel of the run context: the long-lived session polls
+    // it instead of carrying the context, so the ladder waits share one stop
+    // signal.
     done <-chan struct{}
 }
 
-// newKiteProbeSession logs the temp character in, enters the world
-// and starts the read loop of the game client. The session owns the
-// world from here on: the dress, the ladder and the cursor key round
-// drive the client directly.
+// newKiteProbeSession logs the temp character in, enters the world and starts
+// the read loop; the session owns the world from here on.
 func newKiteProbeSession(
     ctx context.Context, m *Manager, test *Test,
 ) (*kiteProbeSession, error) {
@@ -536,8 +508,8 @@ func newKiteProbeSession(
     return session, nil
 }
 
-// wireTaps wires the recorder next to the run log mirror on the
-// receive stream and the run log on the send stream.
+// wireTaps wires the recorder next to the run log mirror on the receive stream
+// and the run log on the send stream.
 func (s *kiteProbeSession) wireTaps() {
     runLog := s.manager.runLogFor(kiteProbeAccount)
     s.game.SetTap(func(payload []byte) {
@@ -551,8 +523,8 @@ func (s *kiteProbeSession) wireTaps() {
     }
 }
 
-// waitWorld blocks until the tracker knows the own position and the
-// inventory (the world entry burst) or the budget lapses.
+// waitWorld blocks until the tracker knows the own position and the inventory
+// or the budget lapses.
 func (s *kiteProbeSession) waitWorld() error {
     deadline := time.Now().Add(onlineWait)
     for time.Now().Before(deadline) {
@@ -596,14 +568,12 @@ func (s *kiteProbeSession) close() {
     _ = s.game.Close()
 }
 
-// probeItemIDs maps the dress order to the item ids: the bow first,
-// the quiver second (the left hand belongs to the arrows), then the
-// armor and the jewels.
+// probeDressItems maps the dress order to the item ids: the bow first, the
+// quiver second (the left hand belongs to the arrows), then armor and jewels.
 var probeDressItems = []int32{13, 17, 23, 31, 44, 50, 1121}
 
-// dress equips the bow kit manually: the raw session has no hunt
-// loop, so the UseItem calls of the official client paperdoll the
-// gear one slot at a time, paced by the item use flood protector.
+// dress equips the bow kit: the raw session has no hunt loop, so the UseItem
+// calls paperdoll the gear one slot at a time, paced by the flood protector.
 func (s *kiteProbeSession) dress() error {
     for _, itemID := range probeDressItems {
         objectID, ok := s.inventoryObject(itemID)
@@ -632,9 +602,8 @@ func (s *kiteProbeSession) inventoryObject(itemID int32,
     return 0, false
 }
 
-// findTarget waits for a live attackable mob inside the bow band: the
-// Kaboo Orc ground respawns every 15-20 s, so the wait tolerates a
-// freshly cleared cell.
+// findTarget waits for a live attackable mob inside the bow band: the Kaboo Orc
+// ground respawns every 15-20 s, so the wait tolerates a cleared cell.
 func (s *kiteProbeSession) findTarget() (int32, error) {
     deadline := time.Now().Add(30 * time.Second)
     for time.Now().Before(deadline) {
@@ -650,11 +619,9 @@ func (s *kiteProbeSession) findTarget() (int32, error) {
     return 0, errors.New("no attackable mob inside the band in 30 s")
 }
 
-// nearestMob scans the known objects for the preferred target: the
-// weakest live attackable mob inside the approach band (the level
-// order keeps the probe away from the level 10 Kaboo Orc Fighter
-// when the level 7 Grunts are around), skipping the guards (the
-// level cap).
+// nearestMob scans the known objects for the preferred target: the weakest live
+// attackable mob inside the approach band (the level order keeps the probe off
+// the level 10 Kaboo Orc Fighter while level 7 Grunts are around).
 func (s *kiteProbeSession) nearestMob() (int32, bool) {
     selfX, selfY, _, ok := s.tracker.SelfPosition()
     if !ok {
@@ -694,23 +661,18 @@ func (s *kiteProbeSession) nearestMob() (int32, bool) {
     return best, best != 0
 }
 
-// kiteProbeLadderBudget bounds the ladder wall time: the rounds
-// pause for the cell respawns when the auto attack chain spent the
-// in-band mobs, so the budget keeps the whole probe inside its
-// timeout no matter how the respawns pace.
+// kiteProbeLadderBudget bounds the ladder wall time: the rounds pause for the
+// cell respawns when the attack chain spent the in-band mobs.
 const kiteProbeLadderBudget = 150 * time.Second
 
-// kiteProbeTargetWait bounds the respawn wait of one round: the cell
-// respawns its mobs every 15-20 s, so a round whose band emptied
-// waits one respawn window before it skips.
+// kiteProbeTargetWait bounds the respawn wait of one round (the cell respawns
+// every 15-20 s), so an emptied band waits one window before the skip.
 const kiteProbeTargetWait = 25 * time.Second
 
-// walkLadder walks the delay ladder: every round anchors on the next
-// own Attack broadcast of a forced attack, sleeps the round delay and
-// sends the retreat click, then observes the movement answer. The
-// rounds that lose the anchor (the mob died, the flood gate ate the
-// request) are skipped, not measured; the ladder stops at its wall
-// budget whatever rounds landed.
+// walkLadder walks the delay ladder: every round anchors on the next own Attack
+// broadcast of a forced attack, sleeps the round delay, sends the retreat click
+// and observes the movement answer. Rounds that lose the anchor (the mob died,
+// the flood gate ate the request) skip; the ladder stops at its wall budget.
 func (s *kiteProbeSession) walkLadder() []probeRound {
     var rounds []probeRound
     started := time.Now()
@@ -732,18 +694,16 @@ func (s *kiteProbeSession) walkLadder() []probeRound {
         round := s.retreatClickRound(anchor, target, delay)
         rounds = append(rounds, round)
         s.stopWalk()
-        // The attack stance keeps shooting (and spending) the cell
-        // between the rounds - the cancel keeps the mobs alive for
-        // the rounds that follow.
+        // The attack stance keeps shooting the cell between the rounds: the
+        // cancel keeps the mobs alive for the rounds that follow.
         _ = s.game.ClearTarget()
     }
 
     return rounds
 }
 
-// waitForTarget waits one respawn window for a live target in band
-// (the auto attack chain of the earlier rounds may have spent the
-// in-band mobs).
+// waitForTarget waits one respawn window for a live target in band (the attack
+// chain of the earlier rounds may have spent the in-band mobs).
 func (s *kiteProbeSession) waitForTarget() (int32, bool) {
     deadline := time.Now().Add(kiteProbeTargetWait)
     for {
@@ -757,8 +717,8 @@ func (s *kiteProbeSession) waitForTarget() (int32, bool) {
     }
 }
 
-// settle waits for the character to stand still (the previous round
-// may still be walking) and lets the broadcast dust settle.
+// settle waits for the character to stand still (the previous round may still
+// walk) and lets the broadcast dust settle.
 func (s *kiteProbeSession) settle() {
     deadline := time.Now().Add(3 * time.Second)
     for time.Now().Before(deadline) && s.tracker.SelfWalking() {
@@ -767,8 +727,8 @@ func (s *kiteProbeSession) settle() {
     time.Sleep(400 * time.Millisecond)
 }
 
-// drinkIfNeeded drains a healing potion when the health dipped under
-// the floor (one per call at most: the item use flood gate).
+// drinkIfNeeded drains a healing potion under the floor (one per call at most:
+// the item use flood gate).
 func (s *kiteProbeSession) drinkIfNeeded() {
     if s.tracker.SelfHealthPercent() >= kiteProbeHealFloor {
         return
@@ -780,11 +740,10 @@ func (s *kiteProbeSession) drinkIfNeeded() {
     }
 }
 
-// anchorShot forces the attack on the target and waits for the own
-// Attack broadcast (the server commit of the shot): the first request
-// may only select the target and the AI may walk the bow range before
-// the first swing, so the wait re-requests inside the flood gate until
-// the broadcast lands or the attempts run out.
+// anchorShot forces the attack and waits for the own Attack broadcast (the
+// server commit of the shot): the first request may only select the target and
+// the AI may walk the bow range before the first swing, so the wait
+// re-requests inside the flood gate until the broadcast lands.
 func (s *kiteProbeSession) anchorShot(
     target int32,
 ) (time.Time, bool) {
@@ -800,18 +759,16 @@ func (s *kiteProbeSession) anchorShot(
             }
             time.Sleep(20 * time.Millisecond)
         }
-        // The attempts ride the PlayerAction flood protector (one
-        // request per second); the answer window already spaces the
-        // pair far past it, the nap covers the tail.
+        // The attempts ride the PlayerAction flood protector (one request per
+        // second); the answer window already spaces the pair past it.
         time.Sleep(200 * time.Millisecond)
     }
 
     return time.Time{}, false
 }
 
-// retreatClickRound runs one measured round: the retreat click at the
-// ladder delay after the anchor, the observation of the movement
-// answer and the classification.
+// retreatClickRound runs one measured round: the retreat click at the ladder
+// delay after the anchor, the movement observation and the classification.
 func (s *kiteProbeSession) retreatClickRound(
     anchor time.Time, target int32, delay time.Duration,
 ) probeRound {
@@ -839,8 +796,8 @@ func (s *kiteProbeSession) retreatClickRound(
     return round
 }
 
-// observeMove waits for the first own movement broadcast after the
-// click and counts the ActionFailed answers that arrived first.
+// observeMove waits for the first own movement broadcast after the click and
+// counts the ActionFailed answers that arrived first.
 func (s *kiteProbeSession) observeMove(
     walkSent time.Time,
 ) (time.Time, int) {
@@ -860,8 +817,8 @@ func (s *kiteProbeSession) observeMove(
     return movedAt, refusals
 }
 
-// stopWalk cancels the current walk the way the official client does:
-// a click onto the own position collapses to a StopMove.
+// stopWalk cancels the current walk like the official client: a click onto the
+// own position collapses to a StopMove.
 func (s *kiteProbeSession) stopWalk() {
     if x, y, z, ok := s.tracker.SelfPosition(); ok {
         if err := s.game.WalkTo(x, y, z); err == nil {
@@ -870,8 +827,8 @@ func (s *kiteProbeSession) stopWalk() {
     }
 }
 
-// retreatEndpoint computes the retreat click target: the kite step
-// length along the ray away from the mob.
+// retreatEndpoint computes the retreat click target: the kite step along the
+// ray away from the mob.
 func retreatEndpoint(
     selfX, selfY, mobX, mobY int32,
 ) (int32, int32) {
@@ -886,12 +843,11 @@ func retreatEndpoint(
         int32(float64(selfY) + dy/length*kiteProbeRetreatStep)
 }
 
-// cursorKeyRound measures the WASD shot-while-moving window: the
-// cursor key latch arms right after the shot anchor, the claim stream
-// walks the character through the windup, and the round watches the
-// own movement, the claim adoptions and the target health (the arrow
-// of the anchored shot lands at the windup end no matter where the
-// archer walked - the question is whether the claims really walk).
+// cursorKeyRound measures the WASD shot-while-moving window: the cursor key
+// latch arms right after the shot anchor, the claim stream walks the character
+// through the windup, and the round watches the own movement, the adoptions
+// and the target health (the anchored arrow lands at the windup end wherever
+// the archer walked).
 func (s *kiteProbeSession) cursorKeyRound() probeWASDResult {
     result := probeWASDResult{hpBefore: -1, hpAfter: -1}
     s.settle()
@@ -933,11 +889,9 @@ func (s *kiteProbeSession) cursorKeyRound() probeWASDResult {
     return result
 }
 
-// streamClaims walks the claimed positions of the cursor key movement
-// for the windup window: one claim every claim period, each step the
-// run speed unit advance along the retreat ray. The answer is how far
-// the own position (the tracker view fed by the broadcasts) moved
-// from the anchor by the windup end.
+// streamClaims walks the claimed positions for the windup window: one claim per
+// period, each step the run speed unit advance along the retreat ray. The
+// answer is how far the tracked own position moved by the windup end.
 func (s *kiteProbeSession) streamClaims(
     anchor time.Time, windup time.Duration, selfZ int32,
     fromX, fromY, toX, toY float64,

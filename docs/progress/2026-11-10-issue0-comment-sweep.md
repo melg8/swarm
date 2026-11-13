@@ -1107,6 +1107,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - kite_timing_probe.go, the measurement vehicle
+
+- 47 blocks compress, the file falls from 195 comment lines of 980
+  (19.9 percent) to 149 of 934 (15.9 percent): the header drops the
+  issue id and keeps the three phase bow question and the ladder, the
+  constants keep the measured numbers (the 1.5 s windup, the 3 s
+  disable window, the five claims a second, ~170 units per second, the
+  15-20 s respawn), and the recorder notes keep the coarse clock stamp
+  rule. The timing data stays in docs/kite_timing_findings.md.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
