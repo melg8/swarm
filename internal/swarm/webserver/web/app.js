@@ -709,7 +709,7 @@ function engageFightDetail(snap, c, hunt) {
   return parts.join(", ");
 }
 
-// engageSearchDetail describes the target search: the patience age
+// engageSearchDetail describes the target search: the no-target age
 // and the skip list when the diagnostics arrived.
 function engageSearchDetail(hunt) {
   if (!hunt) {

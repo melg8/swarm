@@ -375,8 +375,9 @@ type safetyState struct {
 
 // diagState is the diagnostics: the stagnation watch and the paced log gates.
 type diagState struct {
-    // noTargetSince starts the patrol patience of an empty search; noPickLogAt
-    // and weaponWaitLogAt pace the two hold logs (zero logs at once).
+    // noTargetSince stamps the first targetless tick of an empty search (the
+    // no-target age of the diagnostics); noPickLogAt and weaponWaitLogAt pace
+    // the two hold logs (zero logs at once).
     noTargetSince   time.Time
     noPickLogAt     time.Time
     weaponWaitLogAt time.Time

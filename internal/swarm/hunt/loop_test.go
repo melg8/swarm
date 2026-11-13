@@ -521,6 +521,60 @@ func TestLoopLootsAfterKill(t *testing.T) {
     require.Equal(t, []int32{9}, game.pickups)
 }
 
+// TestLoopWalksToTheNextTargetRightAfterLoot pins the no-idle handover of
+// the loot phase: the loot phase ends the moment the last drop is gone and
+// the first engage tick must send the walk toward the next target. The old
+// 6 s targetless patience stood the hunter on the corpse first, which read
+// as a stuck bot in the live runs.
+func TestLoopWalksToTheNextTargetRightAfterLoot(t *testing.T) {
+    clock := newFakeClock()
+    bot := newTestBot()
+    // The next valid mob sits 2200 units east: inside the zone, outside
+    // the 1500 unit engage radius, so only the far target walk closes on it.
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 11, TemplateID: 1000001, Attackable: true,
+        X: 47200, Y: 50000, Name: "Gremlin",
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    clock.install(loop)
+    loop.SetHuntingZone(45000, 50000, 2500)
+    loop.lastActionAt = clock.Now().Add(-time.Minute)
+
+    // The kill leaves one drop next to the corpse.
+    spawnMob(bot)
+    bot.ApplySpawnItem(state.ItemInfo{
+        ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
+    })
+    bot.ApplyStatusUpdate(7, []state.Attribute{
+        {ID: state.AttrCurHP, Value: 0},
+    })
+    bot.ApplySelfTarget(7)
+    loop.target = 7
+
+    loop.tick()
+    require.Equal(t, phaseLoot, loop.phase)
+    require.Equal(t, []int32{9}, game.pickups)
+
+    // The server confirms the pickup: the loot phase ends on its next tick.
+    bot.ApplyItemPickup(state.ItemPickup{ObjectID: 9, PlayerID: 100})
+    clock.Advance(tickPeriod)
+    loop.tick()
+    require.Equal(t, phaseEngage, loop.phase)
+
+    // The first engage tick walks toward the far pack instead of standing
+    // out a patience window.
+    clock.Advance(tickPeriod)
+    loop.tick()
+    require.NotEmpty(t, game.walks,
+        "the hunter walks to the next target at once after the loot")
+    walk := game.walks[len(game.walks)-1]
+    require.True(t, walk[0] > 45000 && walk[0] <= 46200,
+        "the walk segment heads toward the far mob")
+    require.Equal(t, int32(50000), walk[1],
+        "the walk keeps the line to the mob")
+}
+
 // TestLoopApproachesTheRangedKillAndLoots pins the ranged-kill loot
 // order: a mob shot down from a distance drops at its corpse - the
 // corpse sits far from the character and the drop broadcast can
@@ -1218,15 +1272,9 @@ func TestLoopPatrolsTowardTheCenterWithoutTargets(t *testing.T) {
     loop.SetHuntingZone(46500, 50800, 1500)
     loop.lastActionAt = time.Now().Add(-time.Minute)
 
-    // No targets around: the first empty search arms the patience, no
-    // walk yet.
-    loop.tick()
-    require.Empty(t, game.walks, "the patience holds the center walk")
-
-    // The patience expires: one paced segment toward the zone center (the
-    // next searches pick up any mob the walk passes).
-    loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
-    loop.lastActionAt = time.Now().Add(-2 * time.Second)
+    // No targets around: the first empty search walks one paced segment
+    // toward the zone center (the next searches pick up any mob the walk
+    // passes).
     loop.tick()
     require.Len(t, game.walks, 1, "an idle hunter walks toward the center")
     segment := game.walks[0]
@@ -1252,7 +1300,6 @@ func TestLoopWalksToFarTargetsOfABigZone(t *testing.T) {
     loop := NewLoop(game, bot)
     loop.SetHuntingZone(46000, 50000, 1300)
     loop.lastActionAt = time.Now().Add(-time.Minute)
-    loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
 
     loop.tick()
     require.NotEmpty(t, game.walks,
@@ -1276,7 +1323,6 @@ func TestLoopKeepsStandingWhenTheFarMobEntersTheEngageRadius(t *testing.T) {
     loop := NewLoop(game, bot)
     loop.SetHuntingZone(46000, 50000, 1300)
     loop.lastActionAt = time.Now().Add(-time.Minute)
-    loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
 
     loop.tick()
     require.Empty(t, game.walks,

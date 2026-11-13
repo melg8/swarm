@@ -1335,7 +1335,7 @@ plumbing closes that gap:
   the internals the hunt loop publishes every tick
   (`Loop.diagnostics` through `SetHuntDiagnostics`: the target and
   its engagement age, the active skip count of both skip maps, the
-  no-target patience, the re-path count, the stuck watchdog age, the
+  no-target age, the re-path count, the stuck watchdog age, the
   waypoints left, the trip and flee episode ages, the buy retries,
   the walk and kill ETAs (`walkEtaMs`, `killEtaMs`; zero means no
   estimate - the loop is not walking a plan, or no confirmed fight

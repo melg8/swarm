@@ -19,19 +19,16 @@ import (
 )
 
 // walkToFarTarget walks a targetless hunter toward the nearest valid mob of
-// the zone when the pack sits outside the engage radius. One paced segment at
-// a time - the per second target search picks up any mob the segment comes
-// past. The cell mode drops the fence (pickZone): the segment walks toward
-// the nearest VISIBLE enemy wherever it stands. Reports whether the tick was
-// handled; without a far target the caller falls back to the center patrol.
+// the zone when the pack sits outside the engage radius. The walk starts on
+// the first targetless tick, one paced segment at a time - the per second
+// target search picks up any mob the segment comes past, so a finished loot
+// hands the next move over without a standstill. The cell mode drops the fence
+// (pickZone): the segment walks toward the nearest VISIBLE enemy wherever it
+// stands. Reports whether the tick was handled; without a far target the caller
+// falls back to the center patrol.
 func (l *Loop) walkToFarTarget(now time.Time) bool {
     if l.noTargetSince.IsZero() {
         l.noTargetSince = now
-
-        return false
-    }
-    if now.Sub(l.noTargetSince) < noTargetPatience {
-        return false
     }
     if now.Sub(l.lastActionAt) < selectPeriod {
         return true
@@ -118,9 +115,10 @@ func (l *Loop) logWeaponWait(now time.Time) {
 }
 
 // patrolToCenter walks a targetless hunter toward the zone center: the pack
-// moved on or the social fence keeps the camps out of reach. One paced segment
-// at a time, so the per second target search picks up any mob the segment
-// comes past instead of marching to the center first.
+// moved on or the social fence keeps the camps out of reach. The walk starts on
+// the first targetless tick, one paced segment at a time, so the per second
+// target search picks up any mob the segment comes past instead of marching to
+// the center first.
 func (l *Loop) patrolToCenter(now time.Time) {
     zone := l.zone()
     if zone == nil {
@@ -128,11 +126,6 @@ func (l *Loop) patrolToCenter(now time.Time) {
     }
     if l.noTargetSince.IsZero() {
         l.noTargetSince = now
-
-        return
-    }
-    if now.Sub(l.noTargetSince) < noTargetPatience {
-        return
     }
     if now.Sub(l.lastActionAt) < selectPeriod {
         return

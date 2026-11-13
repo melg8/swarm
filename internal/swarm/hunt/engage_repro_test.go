@@ -130,17 +130,17 @@ func TestReproDumpStandingBotExplainsItselfInLog(t *testing.T) {
     loop.tick()
     require.Equal(t, "elven-2019_23-b1", loop.zonePickedID)
 
-    // The first targetless tick arms the patience, nothing fires yet.
+    // The first targetless tick finds nothing pickable: no attack and
+    // no walk (the character stands at the center), the diagnostic line
+    // fires with the dump's own data.
     loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Empty(t, game.forces, "nothing is attackable in the square")
     require.Empty(t, game.walks, "no far target and no patrol segment exist")
     require.Equal(t, "elven-2019_23-b1", loop.zonePickedID)
 
-    // The patience expires: the far search confirms the whole square
-    // holds nothing pickable, the diagnostic line fires with the
-    // dump's own data.
-    loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
+    // A second empty tick keeps the square: the log pacing holds the
+    // line back.
     loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.Empty(t, game.forces)
@@ -174,7 +174,6 @@ func TestReproDumpStandingBotRotatesOutOfTheFencedSquare(t *testing.T) {
     // stays empty, the diagnostic explains the opponents.
     loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
-    loop.noTargetSince = time.Now().Add(-noTargetPatience - time.Second)
     loop.lastActionAt = time.Now().Add(-time.Minute)
     loop.tick()
     require.False(t, loop.zoneEmptySince.IsZero(),

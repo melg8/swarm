@@ -288,13 +288,15 @@ already unwinding, and the relogin inherited none of the cleanup).
   without idling the farm for minutes).
 - Entering a hunting zone engages the first valid target the entry
   radius offers (`engagesOnZoneEntry` of the return phase), and a
-  targetless hunter patrols toward the zone center after a 6 s
-  patience window instead of standing still. A big square whose pack
+  targetless hunter moves on the first empty search - the loot handover
+  never stands the character on the corpse. A big square whose pack
   sits outside the engage radius (1500) is walked toward directly:
   `walkToFarTarget` searches the whole zone for the nearest valid mob
-  and follows one paced segment per second, so the hunter closes on a far
-  pack instead of standing central in an empty radius (the rotation
-  only fires on a fully empty square).
+  and follows one paced segment per second, so the hunter closes on a
+  far pack instead of standing central in an empty radius; with no
+  valid mob anywhere the patrol walks toward the zone center, and only
+  a hunter already central waits for the respawn (the rotation fires on
+  a fully empty square).
 - A flee that never shakes the chase ends the session too: one escape
   episode older than `fleeLogoutAfter` (20 s) logs the character out
   (a recovered health or a fresh fight clears the episode) - the

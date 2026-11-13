@@ -148,9 +148,6 @@ const (
     // escapeNoProgressDistance is the planar distance the escape must open per
     // window: a healthy escape clears it by an order of magnitude.
     escapeNoProgressDistance = 120.0
-    // noTargetPatience is the idle time before a targetless hunter patrols
-    // toward the zone center: only an empty radius keeps the character walking.
-    noTargetPatience = 6 * time.Second
     // patrolCenterMinDist suppresses the center patrol when the
     // character already stands central: the respawns come to it.
     patrolCenterMinDist = 700.0

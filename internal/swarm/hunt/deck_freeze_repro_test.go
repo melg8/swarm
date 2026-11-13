@@ -163,9 +163,6 @@ func TestReproDeckVillageReturnToZoneOnDifferentDeck(t *testing.T) {
         {X: 36000, Y: 46765, Z: -3576},
     }}
     loop.SetNavigator(nav)
-    // The patience window of walkToFarTarget holds the first walk
-    // back, so it never interferes with the zone return path.
-    loop.noTargetSince = time.Now().Add(-2 * noTargetPatience)
     loop.lastActionAt = time.Time{}
 
     loop.tick()
@@ -213,7 +210,6 @@ func TestReproDeckVillageNoDirectWalkTowardCrossDeckMob(t *testing.T) {
         {X: 36000, Y: 46765, Z: -3576},
     }}
     loop.SetNavigator(nav)
-    loop.noTargetSince = time.Now().Add(-2 * noTargetPatience)
     loop.lastActionAt = time.Time{}
 
     loop.tick()
@@ -263,7 +259,6 @@ func TestReproDeckVillageEngagesSameDeckMob(t *testing.T) {
         MaxHP: 339, CurHP: 339, MaxMP: 137, CurMP: 137, Exp: 238925,
     })
     loop.SetNavigator(&fakeNavigator{found: true})
-    loop.noTargetSince = time.Now().Add(-2 * noTargetPatience)
     loop.lastActionAt = time.Time{}
 
     loop.tick()
