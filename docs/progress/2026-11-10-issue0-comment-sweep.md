@@ -1402,6 +1402,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the webserver suite (8.2 s),
   `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
 
+### 2026-11-13 - packets/packet keeps the codec facts only
+
+- `reader.go` (9 blocks): the sentinel short read without an allocation,
+  the slice header plus offset instead of a `bytes.Reader` wrapper with
+  one bounds check, the aliasing `ReadBytes` with the copy rule, `Skip`
+  as one comparison, the ASCII fast path with the U+00E9 low byte trap
+  (a Latin-1 unit has a zero high byte but an above 0x80 low byte),
+  `unsafe.String` reuse of the buffer and the BMP slow path count.
+  79 comment lines of 238 become 43 of 202.
+- `writer.go` (7 blocks): the sticky `FailWrites` and the counted
+  `FailWritesAfter` test seam, the per pair ASCII writes from one stack
+  array behind `Grow`, and the `utf16.Encode` surrogate pairs of the
+  non-ASCII path. 54 comment lines of 206 become 32 of 184.
+- Verified: `task fmt`, `go build ./...`, the packets suite (all five
+  packages), `golangci-lint run ./internal/swarm/packets/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

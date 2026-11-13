@@ -15,15 +15,13 @@ import (
 type Writer struct {
     *bytes.Buffer
     // writeErr is the sticky failure the tests arm (FailWrites or
-    // FailWritesAfter): every write method returns it once the budget
-    // runs out. A memory buffer write never fails on its own, so the
-    // guarded error returns of the packet builders are unreachable in
-    // production - the armed writer is the exercise those branches
-    // get (see the builder error path tests of the packet packages).
+    // FailWritesAfter): every write method returns it once the budget runs out.
+    // A memory buffer write never fails on its own, so the guarded error
+    // returns of the builders are only reachable through an armed writer.
     writeErr error
-    // writeBudget counts the writes that still pass before the armed
-    // failure fires (FailWritesAfter): the counted form lets the
-    // builder tests walk a whole write sequence branch by branch.
+    // writeBudget counts the writes that still pass before the armed failure
+    // fires (FailWritesAfter), so a builder test walks a write sequence branch
+    // by branch.
     writeBudget int
 }
 
@@ -43,23 +41,18 @@ func NewWriterTo(data []byte) *Writer {
     }
 }
 
-// FailWrites arms the sticky write failure: every write method of
-// this writer returns err from the next call on, without touching
-// the buffer. The packet builders guard every write with an error
-// return - a contract the wire layer could enforce one day - and the
-// failure injection is how the tests reach those branches. Pass a
-// fresh writer (or never arm one) for the ordinary error free
-// behavior.
+// FailWrites arms the sticky write failure: every write method returns err from
+// the next call on and the buffer stays untouched. The packet builders guard
+// every write with an error return, and the failure injection is how the tests
+// reach those branches.
 func (b *Writer) FailWrites(err error) {
     b.writeErr = err
     b.writeBudget = 0
 }
 
-// FailWritesAfter arms the counted write failure: the first n write
-// calls succeed, every later call returns err. A sticky arm from the
-// first write would exercise only the FIRST error branch of a
-// builder - the counted form walks the whole write sequence branch
-// by branch (the builder error tests step n through 0, 1, 2, ...).
+// FailWritesAfter arms the counted write failure: the first n calls succeed,
+// every later one returns err. A sticky arm would exercise only the first error
+// branch of a builder, the counted form walks the whole write sequence.
 func (b *Writer) FailWritesAfter(n int, err error) {
     b.writeErr = err
     b.writeBudget = n
@@ -139,30 +132,18 @@ func (b *Writer) WriteBytes(bytes []byte) error {
     return err
 }
 
-// WriteStringAsUtf16 writes value as a null terminated UTF-16LE byte
-// sequence. The previous implementation allocated an intermediate
-// []byte per call and then copied it into the buffer through Write,
-// which on the 100 bot fleet path added up: every outbound packet
-// that carries a name (the auth login, the character create request,
-// the use item and say commands) paid one allocation just for the
-// scratch buffer.
-//
-// The optimized form pre-sizes the buffer with Grow so the underlying
-// bytes.Buffer reuses its capacity across writes, writes ASCII names
-// (the overwhelming majority of L2 character, account and NPC names)
-// directly into the buffer through a single stack array per pair, and
-// only falls back to rune decoding for genuine non-ASCII input. The
-// slow path now uses unicode/utf16.Encode so supplementary characters
-// above the BMP produce correct surrogate pairs instead of the
-// previous byte(r) truncation that silently corrupted non Latin-1
-// names.
+// WriteStringAsUtf16 writes value as a null terminated UTF-16LE byte sequence.
+// The ASCII fast path (the overwhelming majority of L2 names) writes the pairs
+// from one stack array behind a Grow hint, so a call allocates nothing; the
+// non-ASCII path encodes the runes through utf16.Encode, so supplementary
+// characters produce surrogate pairs instead of a truncated byte.
 func (b *Writer) WriteStringAsUtf16(value string) error {
     if err := b.writeGate(); err != nil {
         return err
     }
-    // Fast path: ASCII only. Scan once to confirm, then write pairs
-    // directly without allocating a scratch slice. The Grow hint
-    // keeps the buffer from reallocating mid-write on repeated calls.
+    // Fast path: ASCII only. Scan once to confirm, then write the pairs from
+    // one stack array without a scratch slice; the Grow hint keeps the buffer
+    // from reallocating mid-write.
     ascii := true
     for i := range len(value) {
         if value[i] >= 0x80 {
@@ -188,11 +169,8 @@ func (b *Writer) WriteStringAsUtf16(value string) error {
         return nil
     }
 
-    // Slow path: non-ASCII. Decode UTF-8 runes, encode to UTF-16
-    // (producing surrogate pairs for supplementary characters), then
-    // write each unit little endian. One allocation for the rune
-    // slice and one for the encoded units - acceptable for the rare
-    // non-ASCII name.
+    // Slow path: decode the runes and utf16.Encode them (surrogate pairs above
+    // the BMP), then write each unit little endian.
     runes := []rune(value)
     encoded := utf16.Encode(runes)
     var buf [2]byte
