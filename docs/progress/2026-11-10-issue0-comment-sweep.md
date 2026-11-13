@@ -1155,6 +1155,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - state/bot.go keeps the field reference only
+
+- 32 field blocks compress: the tracker struct keeps the fact a field
+  name cannot say (the clock seam, the density contract of the world
+  store, the inventory version the equip cache keys on, the walk plan
+  timing, the ActionFailed refusal channel without request identity,
+  the critical hint window, the lifetime fields surviving a session
+  reset) and points at the owning file. 169 comment lines of 302
+  become 85 of 218 (39.0 percent, a struct registry).
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

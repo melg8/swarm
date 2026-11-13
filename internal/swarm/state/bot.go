@@ -15,234 +15,150 @@ type Bot struct {
     mu     sync.RWMutex
     id     string
     status Status
-    // phase mirrors the hunt loop phase so the web UI can show a
-    // human readable activity banner (hunting, walking to town,
-    // selling, deleveling). Empty until the loop publishes its
-    // first phase; the manual only sessions stay empty (the loop
-    // never sets it) and the UI falls back to the status text.
+    // phase is the activity banner of the hunt loop; a manual-only session
+    // leaves it empty and the UI shows the status text.
     phase string
-    // kind tags the role of the bot in the process: the empty
-    // default reads as long-running, the acceptance manager tags
-    // its temp bots with KindAcceptance so the web UI can split
-    // them out of the fleet bot list. Set once at construction;
-    // the sidebar reads it through Info().
+    // kind tags the role: empty reads as a fleet bot, KindAcceptance splits
+    // the manager's temp bots out of the fleet list (set once).
     kind string
-    // nowFn is the time source of the decision logic (see clock.go):
-    // nil reads the system clock, the hunt loop and the tests inject
-    // their own.
+    // nowFn is the decision clock (see clock.go); nil reads the system one.
     nowFn func() time.Time
-    // phaseAt records when the phase last changed: the
-    // diagnostics report the age of the current phase (a bot
-    // stuck in one phase for minutes is the top stuck
-    // signature).
+    // phaseAt ages the phase; a long age is the top stuck signature.
     phaseAt time.Time
     selfID  int32
     char    CharacterState
-    // world is the dense object storage (see objectStore): the
-    // packet apply paths mutate the records in place and the
-    // scans walk the memory sequentially.
+    // world is the dense object storage (see objectStore): applies mutate in
+    // place, scans walk it sequentially.
     world     objectStore
     inventory inventoryStore
-    // inventoryVersion counts the inventory and paperdoll
-    // mutations: the equip managers of the hunt loop key their
-    // cached scans on it, so an unchanged bag costs no per tick
-    // re-scan (see hunt equipManager).
+    // inventoryVersion counts the inventory and paperdoll mutations; the
+    // equip managers key their cached scans on it (see hunt equipManager).
     inventoryVersion uint64
     paperdoll        [PaperdollSlots]int32
-    // log is the rolling packet event log, chat the chat window
-    // ring, combat the web view animation feed (one component
-    // value each, see their types for the layout contracts).
+    // log, chat and combat are the event log, the chat ring and the web
+    // view animation feed.
     log       eventLog
     chat      chatLog
     combat    combatFeed
     zone      *Zone
     zoneViews []ZoneView
-    // huntMeshVersion and huntMeshJSON cache the encoded Voronoi
-    // hunt mesh of the cell hunting (the static registry payload the
-    // version keyed endpoint serves - see SetHuntingCells), huntCell
-    // is the live record of the cell the loop holds. Both survive the
-    // session resets like the zone policy: the fresh loop republishes
-    // the live record after its first pick.
+    // huntMeshVersion and huntMeshJSON cache the encoded Voronoi hunt mesh
+    // (see SetHuntingCells); huntCell is the live cell the loop holds. Both
+    // survive session resets, and the fresh loop republishes the record.
     huntMeshVersion string
     huntMeshJSON    []byte
     huntCell        CellLiveView
-    // killMarks carries the recent kills of the hunt loop (the kill
-    // ring of the cell hunter): the positions feed the fleet wide
-    // cross layer of the map, so the crosses survive the bot switches
-    // of the web view.
+    // killMarks carries the recent kill positions: the fleet cross layer
+    // survives the bot switches of the web view.
     killMarks []KillMarkView
     packets   int64
     version   uint64
     started   time.Time
-    // sessionAt is the moment of the current login: ResetSession
-    // refreshes it, so the bounded waits of the hunt loop (the skill
-    // list gate of the first town trip) re-arm on every reconnect -
-    // the enter world packet burst races the first ticks of every
-    // session, not only the first one of the tracker.
+    // sessionAt is the moment of the current login: ResetSession refreshes
+    // it, so the bounded waits re-arm on every reconnect (the enter world
+    // burst races the first ticks of every session).
     sessionAt time.Time
     updated   time.Time
-    // hunt, huntPublishedAt: the internals the hunt loop
-    // publishes every tick (SetHuntDiagnostics) with their
-    // publication stamp - the encoders derive the loop
-    // heartbeat age from it.
+    // hunt and huntPublishedAt are the diagnostics the loop publishes every
+    // tick, stamped for the heartbeat age of the encoders.
     hunt            HuntDiagnostics
     huntPublishedAt time.Time
-    // huntLastAction, huntLastActionAt: the last decision line
-    // of the loop (NoteAction), the same text the event log
-    // carries.
+    // huntLastAction is the last decision line of the loop (NoteAction).
     huntLastAction   string
     huntLastActionAt time.Time
-    // huntErrand is the status of the blocking errand of the loop
-    // (the city shopping round): the acceptance runner reads it to
-    // fail fast on an errand that already stopped.
+    // huntErrand is the blocking errand status; the acceptance runner fails
+    // fast on an errand that already stopped.
     huntErrand HuntErrand
-    // actionFailedAt records the arrival time of the last
-    // ActionFailed (0x35) answer of the server: the server refuses
-    // a request - a move click its geodata collapses, an action
-    // while the character is held - and answers with the one byte
-    // packet. The hunt walk machinery reads it as the online
-    // refusal evidence: the offline click validation port cannot
-    // see a server side refusal (a different server build or
-    // geodata validates the same click differently), the
-    // ActionFailed answer is the only channel that names it (see
-    // hunt.Loop.refusalEvidence).
+    // actionFailedAt is the arrival of the last ActionFailed (0x35): the
+    // only channel that names a server side refusal, which the offline click
+    // port cannot see (see hunt.Loop.refusalEvidence).
     actionFailedAt time.Time
-    // moveRequestAt records the send time of the last walk click
-    // (MoveToLocation 0x01) and otherRequestAt the send time of the
-    // last non walk request: the ActionFailed answer carries no
-    // request identity, so the refusal channel compares the two to
-    // decide whether an arrival may be attributed to the click at
-    // all (an equip or transaction refusal riding the click would
-    // otherwise latch a walk refusal that never happened, see
-    // OtherRequestBetween).
+    // moveRequestAt and otherRequestAt are the sends of the last walk click
+    // (0x01) and of the last other request: ActionFailed carries no identity,
+    // so the refusal channel compares them (see OtherRequestBetween).
     moveRequestAt  time.Time
     otherRequestAt time.Time
-    // packetWindow feeds the packet rate of the diagnostics
-    // view (see packetRateWindow).
+    // packetWindow feeds the packet rate of the diagnostics view.
     packetWindow packetRateWindow
-    // eventSink mirrors every recorded event into the session
-    // journal of cmd/swarm (see SetEventSink): nil unless the
-    // journal wiring installed it.
+    // eventSink mirrors every event into the session journal (SetEventSink).
     eventSink    EventSink
     commandQueue chan Command
-    // The published walk plan of the web UI and the state dump
-    // (see SetWalkPlan): the planning origin, the full waypoint
-    // list of the segment, the waypoint the follower currently heads
-    // to and the final destination - the whole walk reads at a
-    // glance in the dump. walkPlanStart pins the moment the walk
-    // was first published (the zero point of the waypoint timing
-    // line of the dump) and walkWpAt holds the observed arrival
-    // time of every waypoint (the entry i fills when the follower
-    // cursor moves past i, see publishWalkPlanLocked).
+    // walkPlan is the published walk of the web UI and the dump (see
+    // SetWalkPlan): the segment waypoints, the current cursor and the
+    // destination. walkPlanStart is the zero point of the timing, and
+    // walkWpAt holds the arrival of every waypoint (see
+    // publishWalkPlanLocked).
     walkPlan      *WalkPlan
     walkPlanAt    time.Time
     walkPlanStart time.Time
     walkWpAt      []time.Time
-    // lastWalkPlan keeps the most recent published walk plan after
-    // its walk ended: the live plan expires with the walk (the TTL,
-    // the arrive, the timeout), the report of a stuck segment needs the
-    // whole planned walk even when the walk is already over (see
-    // rememberWalkPlanLocked). The next published plan overwrites
-    // the record; nothing clears it. lastWalkStart and lastWalkWpAt
-    // carry the timing view of the record (the same zero point and
-    // arrivals the live plan held, deep copied).
+    // lastWalkPlan keeps the last walk after it ended: a stuck segment report
+    // needs the whole plan (see rememberWalkPlanLocked). The next published
+    // plan overwrites it, and the lastWalk* fields carry its timing.
     lastWalkPlan   *WalkPlan
     lastWalkPlanAt time.Time
     lastWalkStart  time.Time
     lastWalkWpAt   []time.Time
-    // shopping holds the published purchase queue of the shop
-    // strategy (see SetShoppingPlan): what the bot plans to buy next
-    // with the prices and the missing adena, nil while nothing is
-    // published. shoppingAt bounds its freshness (shoppingPlanTTL).
+    // shopping is the published purchase queue (see SetShoppingPlan), nil
+    // while nothing is published; shoppingAt bounds its freshness
+    // (shoppingPlanTTL).
     shopping   *ShoppingPlanView
     shoppingAt time.Time
-    // dialog holds the open dialog page (the NPC_HTML scope mirror
-    // of docs/quest_protocol.md): one page, replaced on every
-    // NpcHtmlMessage arrival, cleared with the session (see
-    // dialog.go).
+    // dialog is the open NPC_HTML page (see dialog.go): one page, replaced on
+    // every NpcHtmlMessage and cleared with the session.
     dialog openDialog
-    // quests holds the quest journal of the QuestList packets
-    // (quest id -> the state int of the cond or completion flags);
-    // questItems holds the quest item stacks the packet repeats
-    // (item id -> count, the quest-item id set the sell filter
-    // needs). The server sends the whole journal on every change, so
-    // both maps are replaced, not merged (see quests.go).
+    // quests is the quest journal (id -> state) and questItems the repeated
+    // stacks (id -> count, the sell filter set): the server sends the whole
+    // journal on every change, so both replace (see quests.go).
     quests     map[int32]int32
     questItems map[int32]int32
-    // skills holds the learned skill list of the server packet
-    // (id -> level + passive). skillsRevision counts the SetSkills
-    // calls and the weapon priority changes; skillQueueCache caches
-    // the ordered learning queue behind an atomic pointer and
-    // rebuilds when the class or the revision moves (see
-    // skillQueueLocked). skillWeapons holds the weapon families the
-    // queue prefers (the weapon in hand and the next weapon of the
-    // purchase plan).
+    // skills holds the learned list (id -> level + passive).
+    // skillsRevision counts SetSkills and weapon priority changes;
+    // skillQueueCache rebuilds when the class or revision moves (see
+    // skillQueueLocked). skillWeapons holds the preferred weapon families.
     skills          map[int32]learnedSkill
     skillsRevision  uint64
     skillQueueCache atomic.Pointer[skillQueueCache]
     skillWeapons    []string
-    // bookKeepCache caches the demanded spellbook item ids of the
-    // unlocked queued lessons (see demandedBooksLocked): the junk
-    // flows of the sell trips and the overflow destroy read it under
-    // the read lock, so the per call walk of the queue stays cached
-    // between the skill list revisions. A learn bumps the revision, a
-    // level up shifts the unlock window, a class swap changes the
-    // tree - the key fields answer all three. The atomic pointer
-    // keeps the read lock readers read-only (the plain fields here
-    // raced two concurrent snapshot encoders, see the 2026-09-20
-    // review).
+    // bookKeepCache caches the demanded spellbook ids (see
+    // demandedBooksLocked) between skill revisions: the sell trips read it
+    // under the read lock, so the atomic pointer keeps those readers
+    // read-only.
     bookKeepCache atomic.Pointer[bookKeepCache]
-    // buffs holds the active effect list of the server
-    // AbnormalStatusUpdate packets (skillId -> level + seconds left
-    // at the arrival); buffsAt anchors the remaining seconds the
-    // views count down from (see SetBuffs).
+    // buffs holds the AbnormalStatusUpdate effects (skill -> level + seconds
+    // left at arrival); buffsAt anchors the countdown (see SetBuffs).
     buffs   map[int32]buffRecord
     buffsAt time.Time
-    // skillCasts holds the cast and reuse windows the self
-    // MagicSkillUse broadcasts opened (skill id -> the window): the
-    // cast fill and the cooldown countdown of the web view read it
-    // through the skillStates snapshot section (see skill_cast.go).
+    // skillCasts holds the cast and reuse windows the self MagicSkillUse
+    // opened: the web view reads them through the skillStates section (see
+    // skill_cast.go).
     skillCasts map[int32]skillCastWindow
-    // critVictim/critVictimAt/critVictimHits carry the critical hit
-    // hint of the last Attack broadcast: the victim of the landed
-    // critical blows, the moment they landed and how many of them
-    // await their HP drop (a dual weapon can crit twice in one
-    // broadcast). The next HP drops of that victim within
-    // critHintWindow consume the count and label their damage float
-    // as critical (the StatusUpdate HP drops carry no crit flag -
-    // see recordCharDamageLocked). One slot: the bursts that overlap
-    // two crits on different victims inside the window are rare and
-    // the wrong label is cosmetic only.
+    // critVictim, critVictimAt and critVictimHits carry the critical hint of
+    // the last Attack broadcast: the next HP drops of that victim inside
+    // critHintWindow consume the count and label the damage critical (the
+    // StatusUpdate drops carry no flag, see recordCharDamageLocked). One
+    // slot: an overlapping mislabel is cosmetic.
     critVictim     int32
     critVictimAt   time.Time
     critVictimHits int
-    // loginCooldownUntil holds the reconnect pause the supervisor
-    // honors after an emergency logout. The tracker outlives the
-    // sessions, so the cooldown spans them (see SetLoginCooldown).
+    // loginCooldownUntil is the reconnect pause after an emergency logout;
+    // the tracker outlives the sessions (see SetLoginCooldown).
     loginCooldownUntil time.Time
-    // emergencyReason carries the honest cause of the last intentional
-    // emergency logout across the session boundary: the supervisor
-    // consumes it once when the session unwinds, so the lost-session
-    // record names the pile up instead of the misleading "use of
-    // closed network connection" of the socket close.
+    // emergencyReason is the cause of the last emergency logout, consumed by
+    // the supervisor: the lost-session record names it instead of the closed
+    // socket.
     emergencyReason string
-    // dangerSpots is the capped ring of the recent emergency logout
-    // positions (see NoteDangerSpot): the zone regression of the hunt
-    // loop folds them back in on every fresh session, because an
-    // emergency logout ends the loop instance that counted it.
+    // dangerSpots is the capped ring of recent emergency logout positions
+    // (see NoteDangerSpot); the fresh loop folds them into the zone
+    // regression, which lost its count with the previous loop.
     dangerSpots []DangerSpot
-    // deathCell names the hunting cell the last death regression
-    // left, deathCellAt the moment it happened. The cell heat lives
-    // in the per-session hunt loop, which the supervisor rebuilds on
-    // every relogin (see runBot); the tracker outlives the sessions,
-    // so the resume handoff of the next loop can refuse the deadly
-    // ground the login landed on until the heat cools.
+    // deathCell and deathCellAt name the cell the last death regression left.
+    // The heat lives in the per-session loop, so the next loop refuses the
+    // deadly ground the login landed on until it cools (see runBot).
     deathCell   string
     deathCellAt time.Time
-    // metrics holds the lifetime statistics counters of the tracker
-    // (see metrics.go): the kills, deaths, sessions, swings and
-    // damage of the whole deployment history of the bot, surviving
-    // the session resets like every other lifetime field.
+    // metrics holds the lifetime counters (see metrics.go), surviving the
+    // session resets like every other lifetime field.
     metrics botMetrics
 }
 
