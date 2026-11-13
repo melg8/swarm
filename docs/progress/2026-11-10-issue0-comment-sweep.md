@@ -1333,6 +1333,23 @@ corner probe is a length, not a leg at all.
   list. The report dates, build hashes and the duplicate key drop.
   134 comment lines of 484 become 98 of 448.
 
+### 2026-11-13 - cmd/swarm/session.go keeps the supervisor contract only
+
+- 25 blocks compress: the session script keeps the 2 s..30 s reconnect
+  backoff with the one minute stable window, the 128 byte modulus
+  publication, the NewGameClient ownership on success only, the proxy
+  registration before the first read, the manual mode of the always
+  running loop, the archer gear seed against the class override, the
+  spawn settle relogin rule (H-005), the navmesh hybrid against the grid
+  fallback, the sampler wait group and the login cooldown over the
+  backoff. The issue ids drop. 130 comment lines of 455 become 94 of
+  419.
+- Fixed in passing: the `runNavmeshViewer` doc comment sat orphaned
+  above `newBotEngine`; it moved to the function itself
+  (`cmd/swarm/pathfind_mode.go`).
+- Verified: `task fmt`, `go build ./...`, `go vet ./cmd/...`, the cmd
+  suite (every binary package), `golangci-lint run ./cmd/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

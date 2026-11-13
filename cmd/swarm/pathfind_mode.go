@@ -178,6 +178,12 @@ func navmeshComparePack(dir string) (*navmesh.Mesh, bool) {
     return mesh, true
 }
 
+// runNavmeshViewer serves the botless 3D navmesh viewer (the -show-navmesh
+// mode): the mesh tiles of the configured or auto detected directory render
+// in the browser, a double click pair runs the real corridor search with its
+// construction timer, and the process serves until stopped. The flag selection
+// bounds the initially visible tiles (every tile when empty); route queries
+// always run over the full directory mesh.
 func runNavmeshViewer(cfg config) {
     if cfg.webAddress == "" {
         log.Println("Navmesh viewer needs the web interface, " +
