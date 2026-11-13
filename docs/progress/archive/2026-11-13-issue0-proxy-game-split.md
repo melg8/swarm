@@ -1,4 +1,4 @@
-# The proxy game connection split: files by responsibility (status: in progress)
+# The proxy game connection split: files by responsibility (status: complete)
 
 Started 2026-11-13, branch main, issue0 (owner instruction: continue
 the refactor with `internal/swarm/proxy/game.go`).
@@ -75,4 +75,5 @@ lines). `go build ./...`, `go vet` and the proxy tests are green,
 
 ## Status
 
-In progress: the split is verified, the commit and the push are next.
+Complete: the five files land on `main` as `d258c723`, `task verify`
+green, the tree pushed.
