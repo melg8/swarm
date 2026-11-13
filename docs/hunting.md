@@ -2179,10 +2179,13 @@ alone.
   far elven cells sit up to 53 000 units from the village, near the
   10 minute quest walk timeout per walking segment),
   `cityShopStopTimeout` 4 minutes per merchant stop,
-  `cityShopCooldown` 10 minutes between attempts and
-  `cityShopHomeRadius` 300 units for the walk home. A hung errand
-  ends inside the budget; the next ordinary tick hunts from wherever
-  it stopped.
+  `cityShopCooldown` 10 minutes between attempts,
+  `cityShopHomeRadius` 300 units for the walk home,
+  `cityShopPendingWait` 5 s for the in flight equips to settle and
+  `cityShopPoll` 500 ms as the re-read period of the blocking buy
+  loop (the shopping decisions pace themselves on the transaction
+  window). A hung errand ends inside the budget; the next ordinary
+  tick hunts from wherever it stopped.
 - The acceptance scenario `city-shopping` rides this production gate
   (no seam): it sets a level 15 character with 800 000 adena, the
   village dress and a Forest Bow on the Kaboo ground and verifies the

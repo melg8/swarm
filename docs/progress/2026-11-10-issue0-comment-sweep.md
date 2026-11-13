@@ -808,6 +808,17 @@ corner probe is a length, not a leg at all.
   lint:new`. `kite_lane.go` fell from 43.7 to 27.6 percent (90
   comment lines of 326), no block above 8 lines.
 
+### 2026-11-12 - hunt/city_shopping.go keeps the errand facts
+
+- 45 blocks compress: the 21 line errand header (the route, the stock
+  and the tax story now point at the doc), the errand name, the item
+  ids, the tax, the six pacing bounds, the two transfer pairs, the
+  stops and the plan notes. `docs/hunting.md` bounds bullet gained
+  `cityShopPendingWait` 5 s and `cityShopPoll` 500 ms.
+- Verified: `task fmt`, `go build ./...`, the 15 city shop tests,
+  `task lint:new`. `city_shopping.go` fell from 26.4 to 18.2 percent
+  (119 comment lines of 655), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -831,9 +842,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `acceptance/plaza_herbiel.go`, `pathfind/click_validate.go`,
 `cmd/counterprobe/world.go`, `hunt/lure.go`, `hunt/town_sell.go` and
 `gear/shopping.go`, `hunt/loop_zone.go`,
-`webserver/navmesh_geometry.go`, `hunt/kite_ledger.go` and
-`hunt/kite_lane.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the
+`webserver/navmesh_geometry.go`, `hunt/kite_ledger.go`,
+`hunt/kite_lane.go` and `hunt/city_shopping.go` (second passes). Next:
+a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
