@@ -27,12 +27,11 @@ type SellItemEntry struct {
 }
 
 // RequestSellItemPacket sells inventory items to a merchant. The server
-// answers with InventoryUpdate (removals), ItemList, a StatusUpdate with
-// the new load, a SystemMessage "The transaction is complete." and adds
-// half of the reference price of every sold item as adena.
-// Wire format (see RequestSellItem.readImpl): [opcode 0x1E]
-// [listId: 4][count: 4] then count entries of
-// [objectId: 4][itemId: 4][count: 4].
+// answers with InventoryUpdate (removals), ItemList, a StatusUpdate with the
+// new load, a completion SystemMessage and adds half of the reference price
+// of every sold item as adena. Wire (RequestSellItem.readImpl): [opcode
+// 0x1E][listId: 4][count: 4], then count entries of [objectId: 4][itemId: 4]
+// [count: 4].
 type RequestSellItemPacket struct {
     ListID int32
     Items  []SellItemEntry

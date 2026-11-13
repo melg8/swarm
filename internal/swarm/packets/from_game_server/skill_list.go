@@ -26,12 +26,10 @@ type SkillListEntry struct {
     Passive bool
 }
 
-// SkillListPacket is the full skill list of the character, sent on
-// entering the world and after every skill learn. The bot uses it to
-// render the learned skills of the equipment widget and to compute
-// the next lessons of the learning queue.
-// Wire format (see SkillList.writeImpl): [opcode 0x6D][count: 4] then
-// per skill [passive: 4][level: 4][id: 4].
+// SkillListPacket is the full skill list of the character, sent on world
+// entry and after every skill learn: the bot renders the learned skills and
+// computes the next lessons from it. Wire (SkillList.writeImpl): [opcode
+// 0x6D][count: 4], then per skill [passive: 4][level: 4][id: 4].
 type SkillListPacket struct {
     Skills []SkillListEntry
 }

@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package memwatch logs the process memory footprint on a fixed
-// cadence: a long unattended run (the 24/7 fleet) demonstrates its
-// memory behavior from the log alone - the slow growth the web
-// statistics chart shows becomes a searchable log line once a minute,
-// comparable across runs and visible without the web interface.
+// Package memwatch logs the process memory footprint on a fixed cadence: a
+// long unattended run (the 24/7 fleet) demonstrates its memory behavior from
+// the log alone, since the slow growth the web statistics chart shows becomes
+// a searchable line once a minute, comparable across runs.
 package memwatch
 
 import (
@@ -41,11 +40,10 @@ func Watch(ctx context.Context, logger *log.Logger, period time.Duration) {
     }
 }
 
-// writeLine renders one footprint line: the live heap, the runtime
-// reserved memory, the goroutine count and the GC cycle count - the
-// four numbers a leak investigation starts from. The one decimal
-// keeps the small single bot runs readable while the fleet sizes
-// round fine.
+// writeLine renders one footprint line: the live heap, the runtime reserved
+// memory, the goroutine count and the GC cycle count, the four numbers a leak
+// investigation starts from. The one decimal keeps the small single bot runs
+// readable while the fleet sizes round fine.
 func writeLine(logger *log.Logger) {
     var mem runtime.MemStats
     runtime.ReadMemStats(&mem)

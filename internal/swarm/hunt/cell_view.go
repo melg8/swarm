@@ -10,14 +10,12 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The view layer of the cell hunting: the STATIC mesh (the whole
-// registry with its polygons, served once per version through the
-// dedicated endpoint - it never rides the per second snapshot) and
-// the LIVE record of the held cell (the identity, the respawn clock,
-// the measured income - a couple hundred bytes per second). The map
-// draws the mesh edges and highlights exactly ONE element: the cell
-// the bot holds or walks to (the minimal information set of the
-// user order; the rest of the map stays outline-only).
+// The view layer of the cell hunting: the static mesh (the whole registry
+// with its polygons, served once per version through the dedicated endpoint,
+// never in the per second snapshot) and the live record of the held cell (the
+// identity, the respawn clock, the measured income - a couple hundred bytes
+// per second). The map draws the mesh edges and highlights exactly one
+// element, the cell the bot holds or walks to; the rest stays outline-only.
 
 // cellLiveStateFarming marks the live record of a bot working its
 // ground (inside the polygon), cellLiveStateMoving the record of a
@@ -60,12 +58,10 @@ func (h *cellHunter) publishMesh(l *Loop) {
 
 // publishView pushes the live record of the held cell to the tracker
 // snapshot: the identity and the state (farming or moving - the map
-// highlights the cell the bot is heading to), the respawn clock of
-// the overlay, the measured income, the death heat and the kill
-// centroid EMA. The persistent kill log rides along: the death places
-// of the whole session feed the fleet wide statistics layer of the
-// map (every kill of every bot, independent of the observed bot and
-// of the picked cell - issue #6).
+// highlights the cell the bot is heading to), the respawn clock of the
+// overlay, the measured income, the death heat and the kill centroid EMA. The
+// persistent kill log rides along, so the death places of the whole session
+// feed the fleet wide statistics layer of the map.
 func (h *cellHunter) publishView(l *Loop, now time.Time) {
     if l.tracker == nil {
         return
@@ -76,10 +72,10 @@ func (h *cellHunter) publishView(l *Loop, now time.Time) {
     h.viewAt = now
     h.pruneKills(now)
     h.publishMesh(l)
-    // The persistent kill log publishes on every view tick, picked
-    // cell or not: the marks are the session death statistics of the
-    // bot, they survive the hunt stops and the rotations (the map
-    // layer owns the whole fleet read, issue #6).
+    // The persistent kill log publishes on every view tick, picked cell or
+    // not: the marks are the session death statistics of the bot, and they
+    // survive the hunt stops and the rotations (the map layer owns the whole
+    // fleet read).
     l.tracker.SetKillMarks(h.mapKills)
     if h.picked < 0 {
         //nolint:exhaustruct_v5 // the zero view clears the record

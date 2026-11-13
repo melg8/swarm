@@ -18,14 +18,12 @@ const SetupGaugePacketID = 0x85
 // feed bar of a mount). Only the red gauge carries a bow cycle.
 const gaugeColorRed = 1
 
-// SetupGaugePacket announces a gauge bar of the played character. The
-// packet carries no object id on the wire (it is sent only to the
-// affected client), so every parsed gauge belongs to the self.
-// Wire format (see SetupGauge.writeImpl): [opcode 0x85][color: 4]
-// [current: 4][max: 4]. The RED gauge is the bow shot cycle: the
-// server sends SetupGauge(RED, sAtk + reuse) from
-// Creature.doAttackHitByBow at the exact moment it commits the shot,
-// so the max is the full disable window of the bow in milliseconds.
+// SetupGaugePacket announces a gauge bar of the played character. The packet
+// carries no object id (it goes only to the affected client), so every parsed
+// gauge belongs to the self. Wire (SetupGauge.writeImpl): [opcode 0x85]
+// [color: 4][current: 4][max: 4]. The RED gauge is the bow shot cycle: the
+// server sends SetupGauge(RED, sAtk + reuse) from Creature.doAttackHitByBow
+// when it commits the shot, so the max is the full disable window.
 type SetupGaugePacket struct {
     Color   int32
     Current int32

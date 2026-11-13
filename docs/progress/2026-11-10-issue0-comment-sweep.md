@@ -2527,6 +2527,35 @@ corner probe is a length, not a leg at all.
   moved to the package clause after the stale directive surfaced),
   `task fmt:check` clean.
 
+### 2026-11-13 - the gear planner, cell view and packet wire docs
+
+- `gear/shopping_armor.go` keeps the five families of at most five
+  options, the one-piece exclusion and the dominance prunes; 46 of 198
+  become 41 of 193.
+- `gear/shopping_slots.go` keeps the 200-600 calls per plan computation
+  and the 3 MB of allocations over a 3 minute run; 19 of 66 become 17
+  of 64.
+- `hunt/cell_view.go` keeps the static mesh endpoint split, the couple
+  hundred bytes per second of the live record and the kill mark
+  survival; 37 of 124 become 33 of 120.
+- `webserver/navmesh_compare.go` keeps the dual pack endpoint contract
+  and the vanished tile diff; 32 of 194 become 30 of 192.
+- `packets/to_game_server/item_use.go` keeps the C1 drop radius of 150
+  units and the absent later chronicle ctrl flag,
+  `request_sell_item.go` the half reference price payout;
+  20/19 become 18/18.
+- `packets/from_game_server/skill_list.go` keeps the learn refresh and
+  the wire layout, `setup_gauge.go` the RED bow shot cycle from
+  Creature.doAttackHitByBow, `change_wait_type.go` the own transition
+  broadcast; 18/18/16 become 16/16/15.
+- `memwatch/memwatch.go` keeps the four leak numbers,
+  `pathfind/region_export.go` the private layer pool of the builder and
+  the ascending height order; 19/15 become 17/13.
+- Verified: `task fmt`, `go build ./...`, the gear (0.5 s), hunt
+  (30.7 s), webserver (8.9 s), packets (0.3 s), memwatch (0.3 s),
+  pathfind (56.6 s), navbuild (37.3 s) and navmesh (34.8 s) suites,
+  `golangci-lint run` on the six paths 0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

@@ -14,12 +14,11 @@ func slotScore(entry ScoredItem) float64 {
     return entry.Score
 }
 
-// slotBuf is a stack-allocated slot list: the maximum number of
-// affected slots is 2 (lrhand, onepiece, ears, fingers), so a fixed
-// array avoids the heap allocation that []Slot caused on every call.
-// The 100 bot fleet called affectedSlots 200-600 times per plan
-// computation (20-40 candidates x 5 walk steps x 2-3 calls each),
-// which was 3 MB of allocations over a 3 minute run.
+// slotBuf is a stack-allocated slot list: at most 2 slots are affected
+// (lrhand, onepiece, ears, fingers), so a fixed array avoids the heap
+// allocation []Slot caused on every call. The 100 bot fleet called
+// affectedSlots 200-600 times per plan computation (20-40 candidates x 5 walk
+// steps x 2-3 calls each), which was 3 MB of allocations over a 3 minute run.
 type slotBuf struct {
     data [2]Slot
     n    int
@@ -27,14 +26,13 @@ type slotBuf struct {
 
 func (b slotBuf) slice() []Slot { return b.data[:b.n] }
 
-// affectedSlots lists the paperdoll slots an item of the bodypart
-// writes to when it is equipped on the virtual paperdoll: its own slot
-// plus the family slots the equip clears on the server (a two hand
-// weapon drops the shield, a one-piece empties the legs, a shield a
-// two hand weapon and legs a one-piece chest). Pair jewels report the
-// single slot the equip would take, so a second purchase of the pair
-// may still fill the other, empty half. Returns a stack-allocated
-// slotBuf so the caller iterates without heap traffic.
+// affectedSlots lists the paperdoll slots an item of the bodypart writes to
+// when equipped on the virtual paperdoll: its own slot plus the family slots
+// the equip clears (a two hand weapon drops the shield, a one-piece empties
+// the legs, a shield a two hand weapon and legs a one-piece chest). Pair
+// jewels report the single slot the equip takes, so a second purchase may
+// still fill the other half. The result is a stack-allocated slotBuf, so the
+// caller iterates without heap traffic.
 func affectedSlots(virtual [slotCount]ScoredItem, bodyPart string) slotBuf {
     switch {
     case bodyPart == partLrhand:

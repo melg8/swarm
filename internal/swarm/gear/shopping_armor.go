@@ -8,12 +8,11 @@ import (
     "sort"
 )
 
-// enumerateArmorSetCap bounds the exhaustive armor set enumeration:
-// the product of the per family frontier sizes stays under it for
-// every real catalog (the elven armor shop holds five families of at
-// most five options each); a pathological catalog trims each frontier
-// to its top options by gain before the walk, so the enumeration
-// never explodes.
+// enumerateArmorSetCap bounds the exhaustive armor set enumeration: the
+// product of the per family frontier sizes stays under it for every real
+// catalog (the elven armor shop holds five families of at most five options
+// each); a pathological catalog trims each frontier to its top options by
+// gain before the walk.
 const enumerateArmorSetCap = 1 << 16
 
 // armorOption is one candidate choice of one armor family: the pdef
@@ -27,13 +26,11 @@ type armorOption struct {
     sellFirst []int32
 }
 
-// armorFamilies lists the armor bodypart families of the set planner
-// in a fixed order (the enumeration and the emission stay
-// deterministic). The one-piece armor stays out: it owns the chest
-// and the legs slots at once and no catalog of the deployment sells
-// one (the guard keeps a future catalog honest - a onepiece family
-// needs the joint slot interplay of the equip planner, not a blind
-// set entry).
+// armorFamilies lists the armor bodypart families of the set planner in a
+// fixed order, so the enumeration and the emission stay deterministic. The
+// one-piece armor stays out: it owns the chest and the legs slots at once and
+// no catalog of the deployment sells one (a future onepiece family needs the
+// joint slot interplay of the equip planner, not a blind set entry).
 var armorFamilies = []string{
     partChest, partLegs, partHead, partGloves, partFeet, partBack,
 }
@@ -54,12 +51,11 @@ func (w *planWalk) planArmorSet() []armorOption {
     return enumerateArmorSet(options, w.budget)
 }
 
-// familyFrontier builds the efficient frontier of one armor family:
-// the strict upgrades over the virtual slot occupant with their net
-// costs (the price minus the sell credit of the real displaced
-// piece), pruned so every option gains strictly more pdef than every
-// cheaper one - a dominated option never wins the enumeration. Equal
-// gain and cost ties keep the lower item id (the determinism).
+// familyFrontier builds the efficient frontier of one armor family: the
+// strict upgrades over the virtual slot occupant with their net costs (the
+// price minus the sell credit of the real displaced piece), pruned so every
+// option gains strictly more pdef than every cheaper one, since a dominated
+// option never wins. Equal gain and cost ties keep the lower item id.
 func (w *planWalk) familyFrontier(family string) []armorOption {
     slots := SlotsForBodyPart(family)
     if len(slots) != 1 {
@@ -97,11 +93,10 @@ func (w *planWalk) familyFrontier(family string) []armorOption {
     return pruneArmorFrontier(options)
 }
 
-// pruneArmorFrontier drops the dominated options of a family: the
-// candidates sorted by cost ascending, every option that does not
-// gain strictly more pdef than the best cheaper one leaves (an equal
-// or lower gain at an equal or higher cost never wins a budget
-// limited enumeration).
+// pruneArmorFrontier drops the dominated options of a family: with the
+// candidates sorted by cost ascending, every option that does not gain
+// strictly more pdef than the best cheaper one leaves, since an equal or lower
+// gain at an equal or higher cost never wins a budget limited enumeration.
 func pruneArmorFrontier(options []armorOption) []armorOption {
     if len(options) == 0 {
         return nil
@@ -175,11 +170,11 @@ func enumerateArmorSet(
     return best
 }
 
-// capArmorFrontiers trims the family frontiers when their cross
-// product would explode past enumerateArmorSetCap: every frontier
-// keeps its top options by gain (the frontier order is the cost
-// ascending one, the gain ascends with it). The real catalogs never
-// reach the cap - the guard serves a future mega catalog.
+// capArmorFrontiers trims the family frontiers when their cross product
+// would explode past enumerateArmorSetCap: every frontier keeps its top
+// options by gain (the frontier order is cost ascending and the gain ascends
+// with it). The real catalogs never reach the cap; the guard serves a future
+// mega catalog.
 func capArmorFrontiers(options [][]armorOption) [][]armorOption {
     product := 1
     for _, frontier := range options {

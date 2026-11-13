@@ -12,12 +12,11 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// The dual pack view endpoints (issue #59, the visual counterpart of
-// the navpack-verify corpus): the second pack of NavmeshOptions
-// renders side by side with the primary one, the per tile polygon
-// diff highlights what moved or vanished, and the compare pathfind
-// rides the regular path endpoint (the handler answers both meshes
-// when the compare mesh is armed).
+// The dual pack view endpoints, the visual counterpart of the navpack-verify
+// corpus: the second pack of NavmeshOptions renders side by side with the
+// primary one, the per tile polygon diff highlights what moved or vanished,
+// and the compare pathfind rides the regular path endpoint (the handler
+// answers both meshes when the compare mesh is armed).
 
 // navmeshDiffRect is the identity of one polygon for the tile diff:
 // the rect bounds and the four corner heights - two polygons match
@@ -105,11 +104,10 @@ func (s *Server) navmeshCompareGeometry(key navmesh.RegionKey,
         key, "compare ")
 }
 
-// handleNavmeshCompareDiff answers the polygon diff of one tile
-// between the primary and the compare pack: the counts of both sides
-// and the rect level lists of the vanished and the added polygons. A
-// tile absent on one side diffs against an empty set - the whole
-// tile vanished (or appeared).
+// handleNavmeshCompareDiff answers the polygon diff of one tile between the
+// primary and the compare pack: the counts of both sides and the rect level
+// lists of the vanished and the added polygons. A tile absent on one side
+// diffs against an empty set, so the whole tile vanished (or appeared).
 func (s *Server) handleNavmeshCompareDiff(
     w http.ResponseWriter, r *http.Request,
 ) {

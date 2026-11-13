@@ -16,10 +16,9 @@ const (
 )
 
 // RequestUseItem uses an inventory item: equippable items toggle their
-// equipped state (see UseItem.runImpl calling useEquippableItem), other
-// items run their item handler. The web UI drives it with double clicks
-// and drag-and-drop of the equipment widget.
-// Wire format (see UseItem.readImpl): [opcode 0x14][objectId: 4]. The
+// equipped state (see UseItem.runImpl calling useEquippableItem) and other
+// items run their handler. The web UI drives it with double clicks and
+// drag-and-drop. Wire (UseItem.readImpl): [opcode 0x14][objectId: 4]; the
 // trailing ctrl flag of later chronicles is not part of the C1 format.
 type RequestUseItem struct {
     ObjectID int32
@@ -42,13 +41,12 @@ func (p *RequestUseItem) ToBytes(writer *packet.Writer) error {
     return nil
 }
 
-// RequestDropItem drops an inventory item on the ground at the given
-// world position. The server only accepts drops within 150 units of the
-// character (see RequestDropItem.runImpl), so the caller passes the
-// character position. Stackable items may drop a partial stack through
-// the count; the server splits the stack itself.
-// Wire format (see RequestDropItem.readImpl): [opcode 0x12]
-// [objectId: 4][count: 4][x: 4][y: 4][z: 4].
+// RequestDropItem drops an inventory item on the ground at a world position.
+// The server accepts drops only within 150 units of the character (see
+// RequestDropItem.runImpl), so the caller passes the character position;
+// stackable items may drop a partial stack through the count, and the server
+// splits the stack itself. Wire (RequestDropItem.readImpl): [opcode
+// 0x12][objectId: 4][count: 4][x: 4][y: 4][z: 4].
 type RequestDropItem struct {
     ObjectID int32
     Count    int32

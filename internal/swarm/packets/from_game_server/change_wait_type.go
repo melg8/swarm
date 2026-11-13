@@ -19,11 +19,10 @@ const (
     waitTypeStanding = 1
 )
 
-// ChangeWaitTypePacket announces the sit/stand transition of a creature.
-// The broadcast goes through Player.broadcastPacket, so the acting client
-// receives its own transitions.
-// Wire format (see ChangeWaitType.writeImpl): [opcode 0x3F][objectId: 4]
-// [moveType: 4][x: 4][y: 4][z: 4] with moveType 0 for sitting and 1 for
+// ChangeWaitTypePacket announces the sit/stand transition of a creature. The
+// broadcast goes through Player.broadcastPacket, so the acting client receives
+// its own transitions. Wire (ChangeWaitType.writeImpl): [opcode 0x3F]
+// [objectId: 4][moveType: 4][x: 4][y: 4][z: 4], moveType 0 sitting and 1
 // standing.
 type ChangeWaitTypePacket struct {
     ObjectID int32
