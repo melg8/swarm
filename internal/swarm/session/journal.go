@@ -18,14 +18,11 @@ import (
     "time"
 )
 
-// Journal tuning. The flush period bounds how much of a crashed run is
-// lost (2 s of events at the observed rates is a couple of lines); the
-// channel depth rides out a slow disk burst; the rotation size keeps a
-// runaway loop from filling the user disk (the rotated file gzips to
-// roughly a tenth - JSONL with repeated keys compresses well); the
-// story cap mutes an event flood of a misbehaving loop (a healthy bot
-// writes well under thirty lines a minute, the cap sits at four times
-// that so the flood itself stays visible as a drop counter).
+// Journal tuning: the flush period bounds the loss of a crashed run, the
+// channel depth rides out a slow disk burst, the rotation size keeps a
+// runaway loop from filling the disk (the segment gzips to roughly a tenth)
+// and the story cap mutes a flood (a healthy bot writes well under thirty
+// lines a minute, so the cap sits at four times that).
 const (
     flushPeriod     = 2 * time.Second
     eventQueueDepth = 4096
@@ -40,20 +37,14 @@ var (
     errUnknownBot = errors.New("bot has no session journal aggregate")
 )
 
-// Journal is the append-only session journal of one swarm process:
-// every bot of the process writes into one JSONL file, each record
-// carrying its bot id. A single writer goroutine owns the file (the
-// callers hand records over a channel and never block - the hunt tick
-// and the tracker locks must not wait on disk), the aggregator rides
-// the same goroutine so the report always sees the flushed truth, and
-// the file rotates at rotateBytes with the rotated copy gzipped in the
-// background. The first record flushes to disk at once (a run killed
-// before the first flush period still leaves the build identity line
-// behind instead of a zero byte mystery file).
-//
-// A nil *Journal is valid: every method is a no-op on it, so the hunt
-// loop, the supervisor and the web handlers call it unconditionally
-// (the -session-dir "" mode turns the journal off everywhere at once).
+// Journal is the append-only session journal of one process: every bot writes
+// into one JSONL file, each record carrying its bot id. A single writer
+// goroutine owns the file (the callers never block, so the hunt tick and the
+// tracker locks never wait on disk), the aggregator rides it so the report sees
+// the flushed truth, and the file rotates at rotateBytes with the copy gzipped
+// in the background. The first record flushes at once, so a run killed inside
+// the first flush period still leaves the build identity line. A nil *Journal
+// is a no-op everywhere (the -session-dir "" mode turns it off).
 type Journal struct {
     dir         string
     path        string
@@ -110,10 +101,9 @@ func NewJournal(dir string, logger *log.Logger) (*Journal, error) {
     return j, nil
 }
 
-// createJournalFile opens a fresh journal file. The name carries the
-// start timestamp and the process id; two journals of the same second
-// (a test, a quick restart) disambiguate through an attempt counter,
-// the exclusive create refuses to append to an existing file.
+// createJournalFile opens a fresh journal file named after the start timestamp
+// and the process id; the attempt counter disambiguates two journals of the
+// same second and the exclusive create refuses an existing file.
 func createJournalFile(dir string) (*os.File, string, error) {
     stamp := time.Now().Format("20060102-150405")
     for attempt := range 64 {
@@ -153,9 +143,8 @@ func (j *Journal) Path() string {
     return j.path
 }
 
-// Dropped returns the count of records the queue refused (a storm the
-// writer could not keep up with); a persistent non-zero growth means
-// the disk stalls the writer.
+// Dropped returns the count of records the queue refused: a growing non-zero
+// count means the disk stalls the writer.
 func (j *Journal) Dropped() uint64 {
     if j == nil {
         return 0
@@ -164,9 +153,8 @@ func (j *Journal) Dropped() uint64 {
     return j.dropped.Load()
 }
 
-// send hands one record to the writer. It never blocks: a full queue
-// drops the record and counts it (the journal is diagnostics, never a
-// load-bearing path of the bot).
+// send hands one record to the writer without blocking: a full queue drops the
+// record and counts it (the journal is diagnostics only).
 func (j *Journal) send(r record) {
     if j == nil || j.closed.Load() {
         return
@@ -178,12 +166,10 @@ func (j *Journal) send(r record) {
     }
 }
 
-// flusher is the single writer goroutine: it drains the queue into
-// the buffered file, flushes on the period ticker and exits when the
-// journal closes and the queue drains. The very first record lands on
-// disk immediately: a process killed inside the first flush period
-// still leaves its build identity line, so an empty journal file is
-// never a mystery again (only a run that never got past NewJournal).
+// flusher is the single writer goroutine: it drains the queue into the
+// buffered file, flushes on the period ticker and exits when the journal closes
+// and the queue drains. The first record lands on disk immediately, so an empty
+// journal means a run that never got past NewJournal.
 func (j *Journal) flusher() {
     defer j.wg.Done()
     ticker := time.NewTicker(flushPeriod)
@@ -221,11 +207,9 @@ func (j *Journal) drain() {
     }
 }
 
-// write encodes one record into the file and folds it into the
-// aggregate of its bot. The story cap keeps a flooded event log from
-// eating the disk; the muted count rides the aggregate so the report
-// names it. The aggregate state is only touched under the write lock
-// (the report readers hold the read lock).
+// write encodes one record into the file and folds it into the aggregate of
+// its bot. The muted count rides the aggregate, so the report names the story
+// cap drops. The aggregate is touched under the write lock only.
 func (j *Journal) write(r record) {
     j.mu.Lock()
     agg := j.lookupLocked(r.B)
@@ -268,14 +252,11 @@ func (j *Journal) flushFile() {
     }
 }
 
-// rotate gzips the filled segment in the background and opens the
-// next one. The segments keep sequence numbers, so they order
-// lexically after the base file. The next segment opens before the
-// old one closes: a failed open keeps the writer on the still-open
-// file and the size cap re-arms the attempt on every later flush,
-// while the old order closed the file first and stranded every later
-// record on a closed handle forever (the report and the file
-// silently diverged).
+// rotate gzips the filled segment in the background and opens the next one; the
+// sequence numbers order the segments lexically after the base file. The next
+// segment opens before the old one closes, so a failed open keeps the writer on
+// the still-open file and the size cap re-arms the attempt on every later
+// flush (closing first would strand every later record on a closed handle).
 func (j *Journal) rotate() {
     rotated := j.path
     if j.seq > 0 {
@@ -320,9 +301,8 @@ func (j *Journal) closeFile() {
     }
 }
 
-// Close stops accepting new records, drains and flushes the queue,
-// closes the file and waits for the background gzip to land. It is
-// idempotent.
+// Close stops new records, drains and flushes the queue, closes the file and
+// waits for the background gzip to land. It is idempotent.
 func (j *Journal) Close() {
     if j == nil || !j.closed.CompareAndSwap(false, true) {
         return
@@ -368,10 +348,9 @@ func (j *Journal) Level(bot string, level int32, exp int64) {
     j.send(r)
 }
 
-// Kill records one killed mob: the fight duration in seconds, the
-// health percent the character ended the fight with and the position
-// the fight ended at (the drill-down locates the bad fights of a long
-// run on the map without pulling the samples around every kill).
+// Kill records one killed mob with its fight duration, the end health percent
+// and the position, so the drill-down locates the bad fights without the
+// samples around every kill.
 func (j *Journal) Kill(
     bot string, mob string, level int32, fightSec float64, health float64,
     x int32, y int32,
@@ -434,9 +413,8 @@ func (j *Journal) Zone(bot string, name string, reason string) {
     j.send(r)
 }
 
-// Stall records a stagnation watch event (an xp or position hold) with
-// the hunt phase it fired in: the phase separates the stalled delevel
-// walks from the stalled farms in the drill-down.
+// Stall records a stagnation watch event with the hunt phase it fired in; the
+// phase separates the stalled delevel walks from the stalled farms.
 func (j *Journal) Stall(
     bot string, kind string, held time.Duration, x int32, y int32,
     phase string,
@@ -472,10 +450,9 @@ func (j *Journal) Lost(bot string, reason string) {
     j.send(r)
 }
 
-// Logout records one intentional emergency logout of the hunt safety
-// layer with its reason and login cooldown: the socket close the
-// supervisor books as a lost connection gets its honest cause here, so
-// the offline analysis separates the pile-up escapes from the real
+// Logout records an intentional emergency logout with its reason and login
+// cooldown: the socket close the supervisor books as a lost connection gets its
+// honest cause, so the analysis separates the pile-up escapes from the real
 // network drops.
 func (j *Journal) Logout(bot string, reason string, cooldown time.Duration) {
     r := newRecord(bot, kindLogout, time.Now())
@@ -525,10 +502,9 @@ func itoa(v int64) string {
     return string(buf[pos:])
 }
 
-// countingWriter wraps the journal file to track the written bytes of
-// the rotation decision (the counter is read after the bufio flush,
-// so the unsynchronized int64 is always observed after a flush that
-// happens-before it on the same goroutine).
+// countingWriter tracks the written bytes behind the rotation decision. The
+// counter is read after the bufio flush on the same goroutine, so the
+// unsynchronized int64 is safe.
 type countingWriter struct {
     inner   io.Writer
     written int64
@@ -542,14 +518,11 @@ func (c *countingWriter) Write(p []byte) (int, error) {
     return n, err //nolint:wrapcheck // passthrough writer
 }
 
-// gzipFile compresses a rotated journal segment to path.gz and
-// removes the original on success. Any failure (open, create,
-// compress) keeps the original on disk - the data survives, only the
-// compression is lost - and drops the partial archive so a truncated
-// .gz never shadows the intact original. Both handles close before a
-// remove: Windows refuses to unlink a file another handle still holds,
-// so the deferred source close of the old order left every rotated
-// segment in place after a successful compression.
+// gzipFile compresses a rotated segment to path.gz and removes the original on
+// success. A failure keeps the original (the data survives, the compression is
+// lost) and drops the partial archive, so a truncated .gz never shadows the
+// intact original. Both handles close before the remove: Windows refuses to
+// unlink a file another handle holds.
 func gzipFile(path string, wg *sync.WaitGroup, logger *log.Logger) {
     defer wg.Done()
     source, err := os.Open(path)
@@ -580,11 +553,9 @@ func gzipFile(path string, wg *sync.WaitGroup, logger *log.Logger) {
     }
 }
 
-// compressSegment copies the source through the gzip sink into the
-// target. The copy, the sink close and the target close are one unit
-// of work - a failure anywhere means the archive did not land - and
-// every path closes both handles, so a failed archive never pins the
-// partial file open. A failed compression drops the partial archive.
+// compressSegment copies the source through the gzip sink into the target: a
+// failure anywhere means the archive did not land, and every path closes both
+// handles, so a failed archive never pins the partial file open.
 func compressSegment(target *os.File, source *os.File) error {
     sink := gzip.NewWriter(target)
     _, err := gzipCopy(sink, source)
@@ -602,9 +573,8 @@ func compressSegment(target *os.File, source *os.File) error {
     return nil
 }
 
-// closeGzipHandle closes one journal handle and reports the failure
-// when the journal carries a logger. The close of a handle that only
-// served a failed stage must never mask the stage error.
+// closeGzipHandle closes one handle and reports the failure; a handle that only
+// served a failed stage never masks the stage error.
 func closeGzipHandle(logger *log.Logger, stage string, handle *os.File) {
     gzipLog(logger, stage, handle.Close())
 }

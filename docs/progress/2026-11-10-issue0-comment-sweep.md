@@ -1263,6 +1263,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the connection suite (10.5 s),
   `golangci-lint run ./internal/swarm/connection/...` 0 issues.
 
+### 2026-11-13 - session/journal.go keeps the writer contract only
+
+- 16 blocks compress: the journal keeps the tuning numbers (the 2 s
+  flush, the 4096 queue, the 64 MiB rotation, the 120 lines a minute
+  story cap and the well under thirty lines a healthy bot writes), the
+  single writer goroutine and the never blocking send, the open next
+  before closing old rotation rule, the first record flush and the
+  Windows unlink rule of the gzip step. 129 comment lines of 623
+  become 99 of 594.
+- Verified: `task fmt`, `go build ./...`, the session suite (0.5 s),
+  `golangci-lint run ./internal/swarm/session/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
