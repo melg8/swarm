@@ -20,47 +20,34 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// The navmesh viewer mode (the -show-navmesh flag of cmd/swarm): the
-// bot less 3D inspection surface of docs/navmesh.md. The mesh tiles
-// render through the embedded three.js viewer, a double click pair
-// asks the real corridor search for the route and the answer carries
-// the measured construction time. The flag selects the tiles: a bare
-// -show-navmesh loads every tile of the directory stitched together
-// (the links cross the region borders through the external targets),
-// -show-navmesh=21_19 opens the named tiles only - the route queries
-// always run over the full directory mesh, so a path may leave the
-// visible tiles (the polyline draws wherever it walks).
-//
-// The binary geometry contract of the tile endpoint lives in
-// navmesh_geometry.go: the NMV2 payload of the surface quads, the
-// link portals of the edge connections overlay and the height step
-// walls that close the cracks between adjacent bilinear surfaces.
+// The navmesh viewer mode (the -show-navmesh flag of cmd/swarm) is the
+// botless 3D inspection surface of docs/navmesh.md: the embedded three.js
+// viewer renders the tiles, a double click pair asks the real corridor
+// search and the answer carries the construction time. A bare
+// -show-navmesh loads every tile stitched together (the links cross the
+// region borders), -show-navmesh=21_19 opens the named tiles only, while
+// the queries always run over the full directory mesh. The binary geometry
+// contract (NMV2) lives in navmesh_geometry.go.
 
 // navmeshPathBodyLimit caps the JSON request of a route query.
 const navmeshPathBodyLimit = 4096
 
 // NavmeshOptions tunes the navmesh viewer server.
 type NavmeshOptions struct {
-    // InitialTiles are the tile keys the viewer opens with; an empty
-    // selection opens every tile of the directory (the stitched
-    // world). The -show-navmesh=21_19 form of the flag fills it.
+    // InitialTiles are the tile keys the viewer opens with; empty opens
+    // every tile of the directory (the stitched world).
     InitialTiles []navmesh.RegionKey
-    // Engine is the geodata engine behind the original geometry and
-    // the capsule clearance of the route answers. A nil engine keeps
-    // the viewer mesh only with the raw funnel pivots (the tests).
+    // Engine backs the original geometry and the capsule clearance. A nil
+    // engine keeps the raw funnel pivots (the tests).
     Engine *pathfind.Engine
-    // CompareMesh arms the dual pack view (issue #59): the second
-    // pack the viewer renders side by side with the primary one -
-    // the old and the reduced decomposition of the same geodata -
-    // with the per tile poly diff and the compare pathfind (one
-    // click pair, both meshes answer). Nil keeps the single pack
-    // viewer.
+    // CompareMesh arms the dual pack view: the second pack renders side by
+    // side with the primary one, with the per tile poly diff and one click
+    // routing both meshes. Nil keeps the single pack viewer.
     CompareMesh *navmesh.Mesh
 }
 
-// NewNavmeshServer creates the web server of the navmesh viewer mode:
-// no game connection and no bot, the 3D mesh inspection surface with
-// the interactive route search of the real corridor query.
+// NewNavmeshServer creates the botless viewer server with the real corridor
+// search.
 func NewNavmeshServer(
     mesh *navmesh.Mesh, address string, logger *log.Logger,
     options NavmeshOptions,
@@ -97,28 +84,24 @@ func NewNavmeshServer(
     return server
 }
 
-// navmeshConfigResponse is the boot payload of the viewer page. The
-// compare section arms the dual pack view (issue #59): nil when the
-// viewer runs single pack.
+// navmeshConfigResponse is the boot payload; Compare is nil for the single
+// pack viewer.
 type navmeshConfigResponse struct {
     Mode    string         `json:"mode"`
     Navmesh navmeshConfig  `json:"navmesh"`
     Compare *navmeshConfig `json:"compare,omitempty"`
 }
 
-// navmeshConfig tells the viewer which tiles exist and which of them
-// the flag selected.
+// navmeshConfig tells the viewer which tiles exist.
 type navmeshConfig struct {
     Dir       string           `json:"dir"`
     TileFiles int              `json:"tileFiles"`
     Tiles     []navmeshTileKey `json:"tiles"`
-    // InitialTiles lists the flag selected keys; nil means every
-    // tile (the bare -show-navmesh of the stitched world).
+    // InitialTiles lists the flag selected keys; nil means every tile.
     InitialTiles []navmeshTileKey `json:"initialTiles"`
 }
 
-// navmeshTileKey names one tile with its world footprint (the tile
-// rectangle spans MinX..MaxX, MinY..MaxY of the world plane).
+// navmeshTileKey names one tile with its world footprint.
 type navmeshTileKey struct {
     Col  int16   `json:"col"`
     Row  int16   `json:"row"`
@@ -128,8 +111,7 @@ type navmeshTileKey struct {
     MaxY float64 `json:"maxY"`
 }
 
-// navmeshPoint is one world position of the navmesh API: X and Y are
-// the horizontal world axes, Z the height.
+// navmeshPoint is one world position: X and Y horizontal, Z the height.
 type navmeshPoint struct {
     X float64 `json:"x"`
     Y float64 `json:"y"`
@@ -140,40 +122,30 @@ type navmeshPoint struct {
 type navmeshPathRequest struct {
     Start navmeshPoint `json:"start"`
     End   navmeshPoint `json:"end"`
-    // Approach is the approach radius of the search (the plan repro
-    // contract): a positive value succeeds on the first polygon whose
-    // surface sits within the radius of the end (the bot trip
-    // searches plan with 200), the zero default keeps the exact
-    // destination contract of the double click pair.
+    // Approach is the approach radius (the plan repro contract): positive
+    // succeeds on the first polygon within the radius of the end (the bot
+    // trip plans with 200), zero keeps the exact destination.
     Approach float64 `json:"approach,omitempty"`
-    // Avoid lists the ban circles the search seals (the frozen areas
-    // the plan carried). Empty for the clean searches.
+    // Avoid lists the ban circles the search seals.
     Avoid []navmeshAvoidCircle `json:"avoid,omitempty"`
-    // Fold runs the capsule post pass over the answer (the pushes and
-    // the bend pass, then the fold into the longest grid clear segments -
-    // the double click default). The plan repro links send false: the
-    // answer then IS the search answer the bot publishes as its walk
-    // plan, no grid pass bends it (the grid oracle is water blind -
-    // the 2026-09-19 route mismatch round: the fold drew a straight
-    // chord over the lake the mesh route detours).
+    // Fold runs the capsule post pass and the fold into the longest grid
+    // clear segments (the double click default). The plan repro links send
+    // false, so the answer IS the published search plan; the grid oracle is
+    // water blind and once drew a chord over the lake the mesh detours.
     Fold *bool `json:"fold,omitempty"`
 }
 
-// navmeshAvoidCircle is one ban circle of the route request: the
-// center on the world plane and the radius to seal.
+// navmeshAvoidCircle is one ban circle: the center and the radius.
 type navmeshAvoidCircle struct {
     X float64 `json:"x"`
     Y float64 `json:"y"`
     R float64 `json:"r"`
 }
 
-// navmeshPathResponse is the reply of POST /api/navmesh/path: the
-// waypoints of the corridor search with the measured construction
-// time (the first query of a region may include the lazy tile
-// decode, roughly a millisecond per tile - the number stays honest,
-// it is what a cold bot pays too). The smoothed answer rides in
-// waypoints when the capsule clearance arms the shortcut pass; the
-// raw funnel answer rides in rawWaypoints for the comparison toggle.
+// navmeshPathResponse is the corridor answer with the measured
+// construction time (a cold query pays the lazy tile decode, roughly a
+// millisecond per tile). Waypoints is the smoothed answer when the capsule
+// pass arms, RawWaypoints the raw funnel answer for the comparison toggle.
 type navmeshPathResponse struct {
     Found        bool           `json:"found"`
     Partial      bool           `json:"partial"`
@@ -183,14 +155,12 @@ type navmeshPathResponse struct {
     DurationMs   float64        `json:"durationMs"`
     Explored     int            `json:"explored"`
     Corridor     int            `json:"corridor"`
-    // Compare carries the same query's answer over the second pack of
-    // the dual pack view (nil when the viewer runs single pack) - the
-    // same click routes both meshes, the viewer draws both answers.
+    // Compare carries the same query over the second pack of the dual view
+    // (nil for the single pack viewer).
     Compare *navmeshPathResponse `json:"compare,omitempty"`
 }
 
-// handleNavmeshConfig answers the mode and the tile listing of the
-// viewer boot.
+// handleNavmeshConfig answers the mode and the tile listing.
 func (s *Server) handleNavmeshConfig(w http.ResponseWriter, _ *http.Request) {
     stats := s.navmeshMesh.Stats()
     tiles := meshTileKeys(s.navmeshMesh)
@@ -220,9 +190,8 @@ func (s *Server) handleNavmeshConfig(w http.ResponseWriter, _ *http.Request) {
     writeJSON(w, s.logger, answer)
 }
 
-// handleNavmeshTiles lists the tile files of the mesh directory with
-// their world footprints. No tile is decoded: the listing reads the
-// directory scan, the geometry endpoint loads on demand.
+// handleNavmeshTiles lists the tile files with their world footprints; no
+// tile is decoded (the geometry endpoint loads on demand).
 func (s *Server) handleNavmeshTiles(w http.ResponseWriter, _ *http.Request) {
     writeJSON(w, s.logger, navmeshTilesResponse{
         Tiles: meshTileKeys(s.navmeshMesh),
@@ -234,10 +203,9 @@ type navmeshTilesResponse struct {
     Tiles []navmeshTileKey `json:"tiles"`
 }
 
-// handleNavmeshGeometry serves the binary polygon soup of one tile.
-// The payload is immutable for a given tile file, so the ETag lets the
-// browser revalidate for free and the server caches the encoded bytes
-// for the lifetime of the process.
+// handleNavmeshGeometry serves the binary polygon soup of one tile. The
+// payload is immutable, so the ETag revalidates for free and the server
+// caches the encoded bytes for the process lifetime.
 func (s *Server) handleNavmeshGeometry(w http.ResponseWriter, r *http.Request) {
     key, ok := navmeshKeyOf(r.PathValue("key"))
     if !ok {
@@ -277,12 +245,9 @@ func (s *Server) handleNavmeshGeometry(w http.ResponseWriter, r *http.Request) {
     _, _ = w.Write(payload)
 }
 
-// handleNavmeshOriginal serves the binary polygon soup of one region
-// rendered from the RAW l2j geodata cells (the comparison variant of
-// the geometry toggle). The payload contract is the NMV2 of the mesh
-// endpoint with an empty link block; the ETag lets the browser
-// revalidate for free and the server caches the encoded bytes for the
-// lifetime of the process.
+// handleNavmeshOriginal serves the geometry of one region from the raw l2j
+// cells (the comparison toggle): the NMV2 contract with an empty link block,
+// cached like the mesh geometry.
 func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
     r *http.Request,
 ) {
@@ -323,10 +288,8 @@ func (s *Server) handleNavmeshOriginal(w http.ResponseWriter,
     _, _ = w.Write(payload)
 }
 
-// handleNavmeshPath runs one corridor search of the mesh between the
-// two double clicked points (the exact destination, the fold pipeline)
-// or one plan repro search of a pathfind link (the approach radius,
-// the ban circles, the raw answer), and measures the construction
+// handleNavmeshPath runs one corridor search between the double clicked
+// points (or one plan repro search of a pathfind link) and measures the
 // time.
 func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     body, err := io.ReadAll(io.LimitReader(r.Body, navmeshPathBodyLimit))
@@ -343,10 +306,8 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     }
     response := s.navmeshSearchAnswer(s.navmeshMesh, &request, "")
     if s.navmeshCompare != nil {
-        // The dual pack view (issue #59): the same click pair routes
-        // the second mesh with the identical filter contract, and the
-        // answer rides the response - the viewer draws both routes
-        // and compares them by eye.
+        // The same click pair routes the second mesh under the identical
+        // filter, so the viewer compares both routes by eye.
         compare := s.navmeshSearchAnswer(
             s.navmeshCompare, &request, "compare")
         response.Compare = &compare
@@ -354,15 +315,10 @@ func (s *Server) handleNavmeshPath(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, s.logger, response)
 }
 
-// navmeshSearchAnswer runs one corridor search of the given mesh
-// between the two double clicked points (the exact destination, the
-// fold pipeline) or one plan repro search of a pathfind link (the
-// approach radius, the ban circles, the raw answer), and measures the
-// construction time. The filter contract is identical for every mesh
-// of the view (the water pricing, the capsule clearance, the ban
-// circles) - the packs decompose the same geodata, the answers differ
-// by the decomposition only, which is the comparison of issue #59.
-// The label distinguishes the console lines of the two packs.
+// navmeshSearchAnswer runs one corridor search of the given mesh and measures
+// the construction time. The filter contract is identical for every mesh of
+// the view, so two packs over the same geodata differ by the decomposition
+// only. The label distinguishes the console lines of the two packs.
 func (s *Server) navmeshSearchAnswer(
     mesh *navmesh.Mesh, request *navmeshPathRequest, label string,
 ) navmeshPathResponse {
@@ -412,13 +368,9 @@ func (s *Server) navmeshSearchAnswer(
         response.Partial = route.Partial
         response.Explored = route.Explored
         response.Corridor = len(route.Corridor)
-        // The fold switch: the smoothed answer walks the full
-        // pipeline (the pushes and the bends of the capsule pass,
-        // then the fold into the longest grid clear segments), the plan
-        // repro answer (fold=false) serves the search waypoints as
-        // the bot publishes them. The raw funnel answer keeps the
-        // legacy post pass only - it is the before picture of the
-        // comparison toggle.
+        // The smoothed answer walks the full pipeline; the plan repro answer
+        // serves the search waypoints as the bot publishes them. The raw
+        // funnel keeps the push and bend pass only (the before picture).
         fold := true
         if request.Fold != nil {
             fold = *request.Fold
@@ -435,14 +387,10 @@ func (s *Server) navmeshSearchAnswer(
     return response
 }
 
-// navmeshRouteFilter builds the search filter of the navmesh viewer
-// queries: the priced search (the water polygons stay walkable at the
-// swim rate - the run/swim speed ratio - so a crossing competes with
-// the land detours on the honest travel time; the pricing follows the
-// server water zone data), the capsule clearance of the viewer engine
-// and the guard of the armed capsule pass. Every mesh of the view
-// searches under the same filter - the answers differ by the
-// decomposition only.
+// navmeshRouteFilter builds the search filter: the priced search (water
+// polygons stay walkable at the swim rate, so a crossing competes with the
+// land detour on travel time), the capsule clearance of the viewer engine and
+// the guard of the armed capsule pass.
 func (s *Server) navmeshRouteFilter() (navmesh.Filter, float64) {
     filter := navmesh.DefaultFilter()
     filter.WaterZones = navmesh.C1WaterZones()
@@ -459,11 +407,9 @@ func (s *Server) navmeshRouteFilter() (navmesh.Filter, float64) {
     return filter, clearance
 }
 
-// logNavmeshRoute keeps the construction cost observable from the
-// server window (the viewer answer carries the same number in the
-// duration field): the cold request pays the tile decode, the repeat
-// answers from the resident mesh. The label distinguishes the two
-// packs of the dual view.
+// logNavmeshRoute keeps the construction cost observable: a cold request
+// pays the tile decode, a repeat answers from the resident mesh. The label
+// distinguishes the two packs of the dual view.
 func (s *Server) logNavmeshRoute(label string, route *navmesh.Route,
     err error, duration time.Duration,
 ) {
@@ -496,13 +442,10 @@ func (s *Server) logNavmeshRoute(label string, route *navmesh.Route,
         len(route.Waypoints), len(route.Corridor))
 }
 
-// clearedWaypoints runs the answer waypoints through the capsule
-// clearance post pass when the viewer engine arms it (the funnel
-// pivot clearance covers the turns, the smoothing covers the merged
-// segments, the post pass covers whatever still grazes a wall) and folds
-// the result into the longest grid clear segments - the walker consumes
-// segments that answer the server movement rules with the capsule
-// clearance.
+// clearedWaypoints runs the answer through the capsule clearance post pass
+// (the funnel pivots and the smoothing cover the turns and the merges, the
+// post pass whatever still grazes a wall) and folds it into the longest grid
+// clear segments.
 func (s *Server) clearedWaypoints(waypoints []navmesh.Pos,
     clearance float64,
 ) []navmesh.Pos {
@@ -523,10 +466,8 @@ func (s *Server) clearedWaypoints(waypoints []navmesh.Pos,
     return positions
 }
 
-// legacyWaypoints runs the raw funnel answer through the capsule
-// push and bend pass only - the pre smoothing pipeline the owner
-// compares against (the granular pivots and the anchor chains stay
-// visible in the raw variant of the route toggle).
+// legacyWaypoints runs the raw funnel answer through the capsule push and
+// bend pass only - the before picture of the comparison toggle.
 func (s *Server) legacyWaypoints(waypoints []navmesh.Pos,
     clearance float64,
 ) []navmesh.Pos {
@@ -603,9 +544,8 @@ func tileKeysOf(keys []navmesh.RegionKey) []navmeshTileKey {
     return tiles
 }
 
-// tileKeyOf derives the wire tile key of a region: the world footprint
-// is a pure function of the region anchors (one region spans 32768
-// world units from its min corner).
+// tileKeyOf derives the wire tile key: the footprint is a pure function of
+// the region anchors (one region spans 32768 world units).
 func tileKeyOf(key navmesh.RegionKey) navmeshTileKey {
     region := navmesh.TileWorldSize()
     minX := float64(key.Col-navmesh.TileZeroCol()) * region
@@ -629,12 +569,9 @@ func (s *Server) navmeshGeometry(key navmesh.RegionKey,
         key, "")
 }
 
-// navmeshGeometryCached is the shared encode-and-cache core of the
-// pack geometry endpoints: the payload of one tile of the given mesh
-// rasterizes once per process (the map answers the repeats) and the
-// ETag lets the browser revalidate for free. The label names the pack
-// in the console line and in the load error (the primary answers as
-// today, the compare pack of the dual view marks itself).
+// navmeshGeometryCached is the encode-and-cache core of the pack geometry
+// endpoints: a tile rasterizes once per process and the ETag revalidates for
+// free. The label names the pack in the console line and the load error.
 func (s *Server) navmeshGeometryCached(
     mesh *navmesh.Mesh, cache map[navmesh.RegionKey][]byte,
     key navmesh.RegionKey, label string,
@@ -653,9 +590,8 @@ func (s *Server) navmeshGeometryCached(
     began := time.Now()
     payload, err := encodeNavmeshGeometry(mesh, tile)
     duration := time.Since(began)
-    // The first open of a tile pays the polygon soup encode (the
-    // process cache answers the repeats); the console line keeps
-    // that cost observable.
+    // A cold tile pays the polygon soup encode; the process cache answers
+    // the repeats.
     s.logger.Printf("Navmesh %sgeometry %d_%d: %.1f ms, %.1f MB",
         label, key.Col, key.Row, float64(duration.Nanoseconds())/1e6,
         float64(len(payload))/(1024*1024))
@@ -667,8 +603,8 @@ func (s *Server) navmeshGeometryCached(
     return payload, navmeshGeoETag(key, payload), nil
 }
 
-// navmeshGeoETag derives the immutable geometry tag of a tile: the
-// region key with the three block counts of the NMV2 payload.
+// navmeshGeoETag derives the immutable tag: the key and the three block
+// counts.
 func navmeshGeoETag(key navmesh.RegionKey, payload []byte) string {
     return fmt.Sprintf(`"nmv2-%d_%d-%d-%d-%d"`, key.Col, key.Row,
         binary.LittleEndian.Uint32(payload[20:24]),

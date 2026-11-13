@@ -1167,6 +1167,17 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - webserver/navmesh.go keeps the viewer contract only
+
+- 32 blocks compress: the viewer header becomes eight lines and points
+  at `docs/navmesh.md` for the dual pack view; the blocks keep the
+  approach radius, the fold and grid oracle water blindness, the cold
+  tile decode cost (roughly a millisecond per tile), the priced water
+  search and the process cached NMV2 payload with its ETag. 168 comment
+  lines of 681 become 104 of 617.
+- Verified: `task fmt`, `go build ./...`, the webserver suite (8.3 s),
+  `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
