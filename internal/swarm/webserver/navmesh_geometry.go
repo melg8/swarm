@@ -13,37 +13,20 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// The NMV2 geometry encoder of the navmesh viewer. The payload of one
-// tile carries three blocks beyond the header:
-//
-//   - the polygon corners: four quantized corner triples per
-//     rectangle (the surface quads the viewer tessellates),
-//   - the link portals: one record per polygon-to-polygon connection
-//     with the world segment of the open span and the area class of
-//     the pair (the edge connections overlay: green fields, blue
-//     water, teal shore),
-//   - the height step walls: the vertical filler quads between the
-//     bilinear surfaces of adjacent rectangles. The corner heights of
-//     a polygon come from its own inside cells, so two rectangles
-//     sharing an edge generally disagree about the height of that
-//     edge - the honest staircase of the geodata seen through the
-//     bilinear approximation. Without the filler the disagreement
-//     reads as see-through black wedges (the defect of the previous
-//     round: the clear color behind a cracked surface).
-//
-// The walls are emitted only through the MaxX and MaxY sides of the
-// emitting polygon, so every shared edge is walled exactly once; the
-// region borders resolve their targets in the east and north neighbor
-// tiles through the mesh (a missing neighbor tile simply leaves the
-// seam open - it merges with the void of the unloaded region).
+// The NMV2 geometry encoder of the navmesh viewer. Beyond the header the
+// payload carries the polygon corners (flat quads at the exact cell heights),
+// the link portals (the world span of every connection with the area class of
+// the pair) and the height step walls: the vertical filler quads between the
+// flat surfaces of adjacent rectangles. Every shared edge is walled once
+// through the MaxX and MaxY sides of the emitter; a region border resolves its
+// target in the east or north neighbor tile, and a missing neighbor leaves the
+// seam open. The format detail lives in docs/navmesh.md.
 
-// navmeshGeoMagic is the magic word of the NMV2 geometry payload
-// ('NMV2' little endian). The fixed header of navmeshGeoHeaderSize
-// bytes follows: magic u32, col i16, row i16, worldMinX i32,
-// worldMinY i32, minH i16, maxH i16, polyCount u32, linkCount u32,
-// wallCount u32; then the corner block, the padded area tail, the
-// link records and the wall records described on the stride
-// constants.
+// navmeshGeoMagic is the magic word of the NMV2 payload ('NMV2' little endian).
+// The fixed header of navmeshGeoHeaderSize bytes follows: magic u32, col i16,
+// row i16, worldMinX i32, worldMinY i32, minH i16, maxH i16, polyCount u32,
+// linkCount u32, wallCount u32; then the corner block, the padded area tail,
+// the link records and the wall records.
 const navmeshGeoMagic = 0x32564D4E
 
 // navmeshGeoHeaderSize is the fixed prefix of the geometry payload.
@@ -53,15 +36,11 @@ const navmeshGeoHeaderSize = 32
 // triple (cellX, cellY, height as int16).
 const navmeshGeoCornerStride = 6
 
-// navmeshGeoRecordSize is the wire size of one polygon: four corner
-// triples plus the area byte. The layout keeps the corner block
-// contiguous (every polygon contributes twelve int16 values in a row,
-// the corner order X0Y0 X1Y0 X0Y1 X1Y1 - the world position of a
-// corner is worldMin + cell*16) with the area bytes as one padded
-// tail block, so the viewer reads the corners as a single Int16Array
-// view. The triangles themselves never ride the wire: every polygon
-// is its own quad of four consecutive corners, the viewer
-// tessellates (0, 2, 1) (0, 2, 3).
+// navmeshGeoRecordSize is the wire size of one polygon: four corner triples
+// plus the area byte. The corner block stays contiguous (twelve int16 values
+// per polygon, corner order X0Y0 X1Y0 X0Y1 X1Y1, world position worldMin +
+// cell*16) so the viewer reads it as one Int16Array view; the area bytes ride
+// one padded tail. The viewer tessellates each quad as (0, 2, 1) (0, 2, 3).
 const navmeshGeoRecordSize = navmeshGeoCornerStride*4 + 1
 
 // navmeshGeoLinkStride is the wire size of one link portal record:
@@ -71,15 +50,12 @@ const navmeshGeoRecordSize = navmeshGeoCornerStride*4 + 1
 // portal ends rounded to whole units.
 const navmeshGeoLinkStride = 16
 
-// navmeshGeoWallStride is the wire size of one height step wall
-// record: fixed u16, lo u16, hi u16, hA0 i16, hA1 i16, hB0 i16,
-// hB1 i16, areaA u8, orient u8, two pad bytes. The fixed coordinate
-// names the shared edge (a multiple of sixteen); lo and hi bound the
-// wall along the crossing axis in tile local world offsets (whole
-// units - a crossing split may land inside a cell); hA0/hA1 are the
-// emitter surface heights at lo/hi, hB0/hB1 the target surface
-// heights; orient 0 is a vertical wall at a fixed x, 1 a horizontal
-// wall at a fixed y.
+// navmeshGeoWallStride is the wire size of one height step wall record: fixed
+// u16, lo u16, hi u16, hA0 i16, hA1 i16, hB0 i16, hB1 i16, areaA u8, orient u8,
+// two pad bytes. fixed names the shared edge (a multiple of sixteen); lo and hi
+// bound the wall along the crossing axis (whole units, a crossing split may
+// land inside a cell); hA0/hA1 and hB0/hB1 are the emitter and target surface
+// heights; orient 0 is a wall at a fixed x, 1 at a fixed y.
 const navmeshGeoWallStride = 16
 
 // The area classes of the link portal records.
@@ -108,16 +84,12 @@ const (
 // viewing distance of the stitched world.
 const navmeshWallMinStep = 0.5
 
-// navmeshWallMaxStep is the largest height difference a wall may
-// close. The honest crack scale of the build is the climb range of
-// the linked surfaces (40) plus the bilinear corner tolerance of the
-// rectangle surfaces (24) - every wall the crack filler ever needs
-// sits below it. A taller step between two surfaces is not a crack
-// but the open air between two separate worlds - the floating deck
-// over the lake, the tree canopy over the ground - and the void is
-// the honest answer there: the fabricated curtain is what fused the
-// elven village into the water and grew the mother tree into the
-// ground.
+// navmeshWallMaxStep is the largest height difference a wall may close. The
+// honest crack scale of the build is the 40 unit climb of the linked surfaces
+// plus the corner tolerance of the rectangles, and a taller step is the open
+// air between two separate worlds (the floating deck, the tree canopy) - the
+// void is the honest answer there, while a fabricated curtain fused the elven
+// village into the water.
 const navmeshWallMaxStep = 80.0
 
 // geoTarget is one rectangle interval a wall may close onto: the
@@ -128,12 +100,10 @@ type geoTarget struct {
     hi   int32
 }
 
-// encodeNavmeshGeometry renders one tile into the binary NMV2 payload
-// the viewer draws: the surface quads, the link portals of the
-// connection overlay and the height step walls that close the cracks
-// between the bilinear surfaces of adjacent rectangles. The mesh
-// resolves the neighbor tiles of the region border walls and the
-// external link areas.
+// encodeNavmeshGeometry renders one tile into the binary NMV2 payload: the
+// surface quads, the link portals of the connection overlay and the height step
+// walls between adjacent rectangles. The mesh resolves the neighbor tiles of
+// the region borders and the external link areas.
 func encodeNavmeshGeometry(mesh *navmesh.Mesh, tile *navmesh.Tile,
 ) ([]byte, error) {
     if len(tile.Polys) == 0 {
@@ -148,9 +118,7 @@ func encodeNavmeshGeometry(mesh *navmesh.Mesh, tile *navmesh.Tile,
     links := encodeNavmeshLinks(mesh, tile)
     walls := encodeNavmeshWalls(mesh, tile)
 
-    // The payload layout: the header, the contiguous corner block, the
-    // area tail padded to the four byte alignment, the link portal
-    // block and the wall block.
+    // The payload layout: header, corner block, padded area tail, links, walls.
     size := navmeshGeoHeaderSize +
         len(tile.Polys)*navmeshGeoCornerStride*4 +
         geoPad4(len(tile.Polys)) + len(links) + len(walls)
@@ -218,9 +186,8 @@ func geoPad4(size int) int {
     return (size + 3) &^ 3
 }
 
-// encodeNavmeshLinks renders the link portal block: every connection
-// of every polygon as its open world span with the area class of the
-// pair.
+// encodeNavmeshLinks renders the link portal block: every connection as its
+// open world span with the area class of the pair.
 func encodeNavmeshLinks(mesh *navmesh.Mesh, tile *navmesh.Tile) []byte {
     links := make([]byte, 0, len(tile.Links)*navmeshGeoLinkStride)
     for i := range tile.Polys {
@@ -251,11 +218,10 @@ func encodeNavmeshLinks(mesh *navmesh.Mesh, tile *navmesh.Tile) []byte {
     return links
 }
 
-// navmeshLinkClass names the area pair of one link: the internal
-// target reads the neighbor polygon of the same tile, the external
-// target loads the neighbor region through the mesh. A target that
-// does not resolve keeps the unknown class - the overlay draws it
-// gray instead of guessing.
+// navmeshLinkClass names the area pair of one link: the internal target reads
+// the neighbor polygon of the same tile, the external one loads the neighbor
+// region through the mesh. An unresolved target keeps the unknown class, which
+// the overlay draws gray instead of guessing.
 func navmeshLinkClass(mesh *navmesh.Mesh, tile *navmesh.Tile,
     poly *navmesh.Poly, link *navmesh.Link,
 ) uint8 {
@@ -289,11 +255,9 @@ func navmeshLinkClass(mesh *navmesh.Mesh, tile *navmesh.Tile,
     return navmeshLinkGround
 }
 
-// encodeNavmeshWalls renders the height step wall block. The walls
-// leave through the MaxX and MaxY sides of the emitting polygon, so
-// every shared edge is walled exactly once across the whole mesh; the
-// region border emitters resolve their targets in the east and north
-// neighbor tiles.
+// encodeNavmeshWalls renders the height step wall block. The walls leave
+// through the MaxX and MaxY sides only, so every shared edge is walled once; a
+// region border emitter targets the east or north neighbor tile.
 func encodeNavmeshWalls(mesh *navmesh.Mesh, tile *navmesh.Tile) []byte {
     side := int32(2048)
     targetsX := make(map[int32][]geoTarget, 64)
@@ -305,21 +269,17 @@ func encodeNavmeshWalls(mesh *navmesh.Mesh, tile *navmesh.Tile) []byte {
         targetsY[p.Y0] = append(targetsY[p.Y0],
             geoTarget{poly: p, lo: p.X0, hi: p.X1})
     }
-    // The interval lists sort by their lower bound: the mesh
-    // rectangles tile the plane, the intervals of one column are
-    // disjoint, so the overlap window of a query edge is contiguous
-    // (the binary search of the window replaced the full column scan
-    // whose rejects dominated the encode profile).
+    // The intervals of one column are disjoint and sorted by their lower bound,
+    // so the overlap window of a query edge is contiguous and a binary search
+    // finds it.
     for _, targets := range targetsX {
         sortTargetsByLo(targets)
     }
     for _, targets := range targetsY {
         sortTargetsByLo(targets)
     }
-    // The region border emitters close onto the border facing spans
-    // of the neighbor tiles: the MinX == 0 spans of the east neighbor
-    // share the y axis, the MinY == 0 spans of the north neighbor
-    // share the x axis.
+    // A border emitter closes onto the border facing spans of the neighbor: the
+    // MinX == 0 spans of the east tile, the MinY == 0 spans of the north one.
     east := navmeshBorderTargets(mesh, navmesh.RegionKey{
         Col: tile.Col + 1, Row: tile.Row}, false)
     north := navmeshBorderTargets(mesh, navmesh.RegionKey{
@@ -365,12 +325,9 @@ func sortTargetsByLo(targets []geoTarget) {
     })
 }
 
-// geoOverlapWindow answers the contiguous run of targets whose
-// interval overlaps the query range: the lists are disjoint per
-// column and sorted by the lower bound, so the first hi past the
-// query start bounds the window and the walk ends at the first lo
-// past the query end (the emitted pairs match the lo >= hi reject of
-// the wall writers exactly).
+// geoOverlapWindow answers the contiguous run of targets whose interval
+// overlaps the query range: sorted disjoint lists bound the window, and the
+// emitted pairs match the lo >= hi reject of the wall writers exactly.
 func geoOverlapWindow(targets []geoTarget, lo, hi int32) []geoTarget {
     start := sort.Search(len(targets), func(i int) bool {
         return targets[i].hi > lo
@@ -383,12 +340,10 @@ func geoOverlapWindow(targets []geoTarget, lo, hi int32) []geoTarget {
     return targets[start:end]
 }
 
-// navmeshBorderTargets lists the border facing intervals of one
-// neighbor tile: the MinX == 0 spans of the east neighbor for the
-// vertical walls at the region border, the MinY == 0 spans of the
-// north neighbor for the horizontal ones. A tile that does not
-// resolve (absent region, failed decode) answers nil - the border
-// seam stays open and merges with the void of the missing tile.
+// navmeshBorderTargets lists the border facing intervals of one neighbor
+// tile: the MinX == 0 spans of the east neighbor for the vertical walls, the
+// MinY == 0 spans of the north neighbor for the horizontal ones. An unresolved
+// tile answers nil and the border seam stays open.
 func navmeshBorderTargets(mesh *navmesh.Mesh,
     key navmesh.RegionKey, north bool) []geoTarget {
     if mesh == nil {
@@ -419,9 +374,8 @@ func navmeshBorderTargets(mesh *navmesh.Mesh,
     return targets
 }
 
-// geoWallVertical walls the MaxX edge of the emitter against the MinX
-// edge of the target: the shared x line, the overlapping y range, the
-// two bilinear surface heights along it.
+// geoWallVertical walls the MaxX edge of the emitter against the MinX edge of
+// the target: the shared x line and the overlapping y range.
 func geoWallVertical(writer *[]byte, a *navmesh.Poly, target geoTarget) {
     lo := max(a.Y0, target.lo)
     hi := min(a.Y1, target.hi)
@@ -437,9 +391,8 @@ func geoWallVertical(writer *[]byte, a *navmesh.Poly, target geoTarget) {
         hA, hB, lo, hi, a.Area, navmeshWallVertical)
 }
 
-// geoWallHorizontal walls the MaxY edge of the emitter against the
-// MinY edge of the target: the shared y line, the overlapping x
-// range.
+// geoWallHorizontal walls the MaxY edge of the emitter against the MinY edge of
+// the target: the shared y line and the overlapping x range.
 func geoWallHorizontal(writer *[]byte, a *navmesh.Poly, target geoTarget) {
     lo := max(a.X0, target.lo)
     hi := min(a.X1, target.hi)
@@ -455,11 +408,9 @@ func geoWallHorizontal(writer *[]byte, a *navmesh.Poly, target geoTarget) {
         hA, hB, lo, hi, a.Area, navmeshWallHorizontal)
 }
 
-// geoWallSpans emits the wall quads of one shared edge overlap: one
-// quad when the height difference keeps its sign, two when the
-// surfaces cross inside the span (the split keeps both quads simple).
-// A span where both surfaces agree within half a unit is skipped -
-// the crack is subpixel at every viewing distance.
+// geoWallSpans emits the wall quads of one shared edge overlap: one quad when
+// the height difference keeps its sign, two when the surfaces cross inside the
+// span. A span where both surfaces agree within half a unit is skipped.
 func geoWallSpans(writer *[]byte, fixed, lo, hi float64,
     hA, hB func(int32) float64, loCell, hiCell int32, area uint8,
     orient uint8,
@@ -489,10 +440,8 @@ func geoWallSpans(writer *[]byte, fixed, lo, hi float64,
         hB(hiCell), area, orient)
 }
 
-// geoWall appends one wall quad record. The height cap drops the
-// walls whose surfaces sit further apart than the honest crack scale:
-// those are not cracks but separate worlds with open air between
-// them.
+// geoWall appends one wall quad record; the height cap drops the separate
+// worlds with open air between them.
 func geoWall(writer *[]byte, fixed, lo, hi, hA0, hA1, hB0, hB1 float64,
     area uint8, orient uint8,
 ) {
@@ -519,8 +468,7 @@ func geoWall(writer *[]byte, fixed, lo, hi, hA0, hA1, hB0, hB1 float64,
     (*writer)[base+15] = orient
 }
 
-// geoLerp interpolates one edge height profile: the corner heights of
-// the edge over the cell range it spans.
+// geoLerp interpolates one edge height profile over the cell range.
 func geoLerp(h0, h1 int16, t0, t1, v int32) float64 {
     if t1 <= t0 {
         return float64(h0)
@@ -541,8 +489,7 @@ func geoHeight(v float64) uint16 {
     return uint16(int16(math.Round(v)))
 }
 
-// writeGeoCorner stores one quantized polygon corner (the cell
-// coordinates and the exact geodata height).
+// writeGeoCorner stores one quantized polygon corner.
 func writeGeoCorner(payload []byte, offset int, cellX, cellY, height int32) {
     binary.LittleEndian.PutUint16(payload[offset:], uint16(cellX))
     binary.LittleEndian.PutUint16(payload[offset+2:], uint16(cellY))

@@ -771,6 +771,18 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `loop_zone.go` fell from 45.2 to 33.1 percent (42
   comment lines of 127), no block above 8 lines.
 
+### 2026-11-12 - webserver/navmesh_geometry.go loses the stale bilinear note
+
+- 20 blocks compress: the 23 line payload header, the magic word, the
+  record, link and wall strides, the height step cap, the encoder and
+  its two block builders, the overlap window, the border targets, the
+  wall writers and the quantizers. The header claimed the bilinear
+  surfaces that the exact square port removed; it now records the flat
+  quads at the exact cell heights and points at `docs/navmesh.md`.
+- Verified: `task fmt`, `go build ./...`, the webserver tests, `task
+  lint:new`. `navmesh_geometry.go` fell from 29.0 to 21.5 percent (107
+  comment lines of 498), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -793,8 +805,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `gear/shopping_candidates.go`, `hunt/town_segment.go`,
 `acceptance/plaza_herbiel.go`, `pathfind/click_validate.go`,
 `cmd/counterprobe/world.go`, `hunt/lure.go`, `hunt/town_sell.go` and
-`gear/shopping.go` and `hunt/loop_zone.go` (second passes). Next: a
-fresh `task comment:audit --top 10` pick (the
+`gear/shopping.go`, `hunt/loop_zone.go` and
+`webserver/navmesh_geometry.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
