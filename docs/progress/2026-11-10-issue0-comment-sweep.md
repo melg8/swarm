@@ -2066,6 +2066,26 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - hunt/soe.go keeps the scroll economy
+
+- 20 blocks compress: the file keeps the keep one scroll rule (the
+  shopping queue buys it the moment the last one is gone), the pricing
+  rule (the walk uses the scroll only when the walking time beats the
+  scroll cost at the measured farm income), the skill 2013 20 second
+  stationary cast answered with `TeleportToLocation` and confirmed with
+  `Appearing`, the landing rule (the race respawn point of a standing
+  `RespawnZone`, else the map region spawn list, the elven town ring for
+  the elven grounds), the Herbiel buylist 3015000 and the Dion Lara
+  3006300 (item 736, reference 400), the 1.4 walk factor of the geodata
+  bend, the run speed fallback, the untrusted income answering zero
+  before the five minute trust horizon, the 200 adena sale of a 460
+  adena scroll the junk guard blocks, and the `dropOwnedPurchases`
+  filter. The header dropped the owner rule date and the redundant note
+  that the return legs run unchanged. 81 comment lines of 265 become 66
+  of 250.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

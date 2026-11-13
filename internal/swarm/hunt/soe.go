@@ -4,19 +4,14 @@
 
 package hunt
 
-// The Scroll of Escape economy (the owner rule of 2026-09-21): the
-// bot always carries at least one scroll (the shopping queue buys it
-// the moment the last one is gone), and a long walk to the village
-// uses the scroll instead of walking whenever the walking time is
-// worth more than the scroll costs at the character's measured farm
-// income. The scroll teleports to the nearest village (skill 2013, a
-// 20 second stationary cast the server answers with TeleportToLocation
-// and the connection layer confirms with Appearing), so it replaces
-// the walk to the village only: the shopping stops, the city errand
-// rides and every return leg run unchanged behind it. The landing is
-// the race respawn point of a RespawnZone the character stands in, or
-// the spawn list of its map region otherwise (the elven town ring for
-// the elven hunting grounds: docs/hunting.md).
+// The Scroll of Escape economy: the bot always carries at least one scroll (the
+// shopping queue buys it the moment the last one is gone), and a long walk to
+// the village uses the scroll instead whenever the walking time is worth more
+// than the scroll costs at the measured farm income. The scroll teleports to
+// the nearest village (skill 2013, a 20 second stationary cast answered with
+// TeleportToLocation and confirmed with Appearing), so it replaces the village
+// walk only. The landing is the race respawn point of a RespawnZone the
+// character stands in, or a spawn of its map region (docs/hunting.md).
 
 import (
     "math"
@@ -29,38 +24,34 @@ import (
 )
 
 const (
-    // soeItemID is the Scroll of Escape display id (the Herbiel
-    // grocery buylist 3015000 carries it, reference price 400).
+    // soeItemID is the Scroll of Escape display id (the Herbiel grocery buylist
+    // 3015000 carries it, reference price 400).
     soeItemID = int32(736)
-    // soeCastSeconds is the skill 2013 cast time (hitTime 20000 of
-    // the server skill data): the stationary seconds the scroll
-    // always costs.
+    // soeCastSeconds is the skill 2013 cast time (hitTime 20000 of the server
+    // skill data), the stationary seconds the scroll always costs.
     soeCastSeconds = 20.0
-    // soeArrivalWait bounds the escape wait: the cast, the packet
-    // round trips and the teleport landing (the UseItem to the self
-    // TeleportToLocation window) plus a healthy margin.
+    // soeArrivalWait bounds the escape wait: the cast, the packet round trips
+    // and the teleport landing (the UseItem to the self TeleportToLocation
+    // window) plus a healthy margin.
     soeArrivalWait = 35 * time.Second
-    // soeArrivalPoll is the position check period of the arrival
-    // wait.
+    // soeArrivalPoll is the position check period of the arrival wait.
     soeArrivalPoll = 250 * time.Millisecond
-    // soeArrivalDistance is the displacement that marks the landing:
-    // the village respawn sits far from every farm spot the trip
-    // starts from.
+    // soeArrivalDistance is the displacement that marks the landing: the
+    // village respawn sits far from every farm spot the trip starts from.
     soeArrivalDistance = 500.0
-    // soeWalkFactor widens the straight line distance to the merchant
-    // into a walk length estimate (the geodata path bends around the
-    // buildings and the coast; 1.4 keeps the estimate honest without
-    // overpaying the scroll on a nearly straight road).
+    // soeWalkFactor widens the straight line distance to the merchant into a
+    // walk length estimate (the geodata path bends around the buildings and the
+    // coast; 1.4 keeps it honest without overpaying the scroll on a nearly
+    // straight road).
     soeWalkFactor = 1.4
-    // soeRunSpeedFallback is the run speed used while the server has
-    // not told the character speed yet (the elven fighter base run
-    // speed of the deployed stack).
+    // soeRunSpeedFallback is the run speed used while the server has not told
+    // the character speed yet (the elven fighter base run speed of the deployed
+    // stack).
     soeRunSpeedFallback = 120.0
 )
 
-// SOEItemID returns the display id of the Scroll of Escape the
-// economy keeps in the bag; the acceptance scenario injects one and
-// verifies its consumption.
+// SOEItemID returns the display id of the Scroll of Escape the economy keeps in
+// the bag; the acceptance scenario injects one and verifies its consumption.
 func SOEItemID() int32 {
     return soeItemID
 }
@@ -77,8 +68,8 @@ func (l *Loop) soeCount() int {
     return count
 }
 
-// soeObjectID resolves the first scroll stack of the bag (the empty
-// answer means the bag holds none).
+// soeObjectID resolves the first scroll stack of the bag, the empty answer
+// meaning none.
 func (l *Loop) soeObjectID() (int32, bool) {
     for _, item := range l.tracker.InventoryItems() {
         if item.ItemID == soeItemID && item.Count > 0 && !item.Equipped {
@@ -89,10 +80,9 @@ func (l *Loop) soeObjectID() (int32, bool) {
     return 0, false
 }
 
-// currentAdenaPerMin returns the trusted measured income of the held
-// ground, zero while no ground is held or the rate has not earned its
-// trust horizon yet (an untrusted rate must not promise income the
-// ground never paid - the walk would be priced with a guess).
+// currentAdenaPerMin returns the trusted measured income of the held ground,
+// zero while no ground is held or the rate has not earned its trust horizon yet
+// (an untrusted rate must not promise income the ground never paid).
 func (h *cellHunter) currentAdenaPerMin() float64 {
     if h.picked < 0 || h.picked >= len(h.metrics) {
         return 0
@@ -105,10 +95,10 @@ func (h *cellHunter) currentAdenaPerMin() float64 {
     return metric.adenaPerMin()
 }
 
-// soeEscapeProfitable prices the walk home against the scroll: the
-// walking seconds saved beyond the scroll's own cast, valued at the
-// character's measured adena per second, must beat the scroll price
-// (the 400 reference plus the town tax the buylist charges).
+// soeEscapeProfitable prices the walk home against the scroll: the walking
+// seconds saved beyond the scroll's own cast, valued at the measured adena per
+// second, must beat the scroll price (the 400 reference plus the town tax the
+// buylist charges).
 func (l *Loop) soeEscapeProfitable(
     walkDist float64, adenaPerMin float64,
 ) bool {
@@ -130,20 +120,18 @@ func (l *Loop) soeEscapeProfitable(
     return saved*adenaPerSecond > float64(price)
 }
 
-// soePrice returns the scroll buy price with the active region tax
-// (the reference price of the generated item data times the town tax
-// rate of the shopping flow).
+// soePrice returns the scroll buy price with the active region tax (the
+// reference price of the generated item data times the town tax rate).
 func (l *Loop) soePrice() int64 {
     price := npcdata.ItemPrice(soeItemID)
 
     return price + int64(float64(price)*townTaxRate)
 }
 
-// escapeWithSOE uses the scroll and waits for the teleport landing:
-// the scroll vanishes from the inventory (the skill consume of the
-// cast) and the character reappears at the village respawn. It
-// reports whether the landing happened - a failed escape leaves the
-// trip on the walking path.
+// escapeWithSOE uses the scroll and waits for the landing: the scroll vanishes
+// from the inventory (the skill consume of the cast) and the character
+// reappears at the village respawn. It reports whether the landing happened; a
+// failed escape leaves the trip on the walking path.
 func (l *Loop) escapeWithSOE() bool {
     objectID, ok := l.soeObjectID()
     if !ok {
@@ -174,26 +162,24 @@ func (l *Loop) escapeWithSOE() bool {
     return false
 }
 
-// EscapeWithSOE runs the scroll escape sequence of the town trips:
-// the UseItem of the carried scroll, the arrival wait and the landing
-// report. The acceptance scenario drives this entry because the
-// profitability gate of maybeEscapeTo needs the five minute income
-// trust horizon a short run never earns.
+// EscapeWithSOE runs the scroll escape sequence of the town trips: the UseItem
+// of the carried scroll, the arrival wait and the landing report. The
+// acceptance scenario drives this entry, because the profitability gate needs
+// the five minute income trust horizon a short run never earns.
 func (l *Loop) EscapeWithSOE() bool {
     return l.escapeWithSOE()
 }
 
-// maybeEscapeWithSOE arms the scroll leg of the town trip start: the
-// scroll runs only when the bag holds one, the ground pays a trusted
-// income and the walk to the merchant is worth more than the scroll.
+// maybeEscapeWithSOE arms the scroll leg of the town trip start for the
+// merchant walk.
 func (l *Loop) maybeEscapeWithSOE(merchant townNpc) {
     l.maybeEscapeTo(merchant.X, merchant.Y)
 }
 
-// maybeEscapeTo arms the scroll leg for a walk to (x, y): the scroll
-// replaces the walk only when the bag holds one, the ground pays a
-// trusted income and the saved walking time is worth the scroll. A
-// failed escape leaves the caller on its planned walking route.
+// maybeEscapeTo arms the scroll leg for a walk to (x, y): the scroll replaces
+// the walk only when the bag holds one, the ground pays a trusted income and
+// the saved walking time is worth the scroll. A failed escape leaves the caller
+// on its planned walking route.
 func (l *Loop) maybeEscapeTo(x int32, y int32) {
     if l.soeCount() < 1 {
         return
@@ -217,10 +203,10 @@ func (l *Loop) maybeEscapeTo(x int32, y int32) {
     }
 }
 
-// soePurchaseLine builds the keep one scroll purchase of the shopping
-// queue: the grocery merchant of the active region sells the scroll,
-// the line lands only when the bag holds none (the dropOwnedPurchases
-// filter would drop a carried line anyway).
+// soePurchaseLine builds the keep one scroll purchase of the shopping queue:
+// the grocery merchant of the active region sells the scroll, and the line
+// lands only when the bag holds none (the dropOwnedPurchases filter would drop
+// a carried line anyway).
 func (l *Loop) soePurchaseLine() (gear.Purchase, bool) {
     var zero gear.Purchase
     if l.soeCount() > 0 {
@@ -244,10 +230,9 @@ func (l *Loop) soePurchaseLine() (gear.Purchase, bool) {
     }, true
 }
 
-// soeMerchantOf resolves the grocery merchant of the region that
-// sells the scroll (the elven Herbiel list 3015000 and the Dion Lara
-// list 3006300 carry the item 736; the generated buylists are the
-// authority).
+// soeMerchantOf resolves the grocery merchant of the region that sells the
+// scroll (the elven Herbiel list 3015000 and the Dion Lara list 3006300 carry
+// item 736; the generated buylists are the authority).
 func soeMerchantOf(region string) (int32, int32) {
     switch region {
     case regionDion:
@@ -257,9 +242,9 @@ func soeMerchantOf(region string) (int32, int32) {
     }
 }
 
-// keepSOE is the junk sell guard: the scroll stack the economy buys
-// never sells back (the 200 adena sale of a 460 adena scroll would
-// burn the keep one rule every trip).
+// keepSOE is the junk sell guard: the scroll stack the economy buys never sells
+// back (the 200 adena sale of a 460 adena scroll would burn the keep one rule
+// every trip).
 func keepSOE(item state.InventoryItem) bool {
     return item.ItemID == soeItemID
 }
