@@ -2196,7 +2196,17 @@ alone.
   ground's measured income prices the walk to Mirabel above the
   scroll, the scroll replaces the walk and the character lands at
   the village respawn next to Mirabel. A failed escape keeps the
-  walking route.
+  walking route. The landing rule (live-verified 2026-11-13): the
+  server answers the `TOWN` escape with `getNearestTownRespawn`, which
+  first asks the `RespawnZone` the character stands in
+  (`dist/game/data/zones/respawn.xml`: one zone per starting ground,
+  keyed by race - the Mothertree Glade maps every race to the
+  `Mothertree_Glade` region) and otherwise the spawn list of the map
+  region of its cell (`(x>>15)+20` / `(y>>15)+18`; cell 21_19 is
+  `elf_town`, so the elven hunting grounds land on one of the twelve
+  town respawn points). A scroll used inside a starting ground zone
+  therefore lands a few hundred units away, and the arrival check of
+  `escapeWithSOE` reads that as "never landed" and walks on.
 - The bounds: `cityShopBudget` 30 minutes for the whole errand (the
   far elven cells sit up to 53 000 units from the village, near the
   10 minute quest walk timeout per walking segment),

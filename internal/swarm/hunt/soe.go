@@ -13,7 +13,10 @@ package hunt
 // 20 second stationary cast the server answers with TeleportToLocation
 // and the connection layer confirms with Appearing), so it replaces
 // the walk to the village only: the shopping stops, the city errand
-// rides and every return leg run unchanged behind it.
+// rides and every return leg run unchanged behind it. The landing is
+// the race respawn point of a RespawnZone the character stands in, or
+// the spawn list of its map region otherwise (the elven town ring for
+// the elven hunting grounds: docs/hunting.md).
 
 import (
     "math"

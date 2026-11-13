@@ -16,12 +16,12 @@ import (
 )
 
 // The scroll escape acceptance scenario: the level 15 fighter stands
-// on the Mothertree Glade spawn 8 300 units south of the elven
-// village with one Scroll of Escape in the bag and uses it. The
-// scenario verifies the whole scroll leg of the town trip - the skill
-// 2013 cast window of the snapshot with the blue-white vortex icon
-// the C1 client draws for it (skill0000), the item consumption and
-// the teleport landing on the elven town respawn ring.
+// on the Keltir glade 5 000 units south of the elven village with one
+// Scroll of Escape in the bag and uses it. The scenario verifies the
+// whole scroll leg of the town trip - the skill 2013 cast window of
+// the snapshot with the blue-white vortex icon the C1 client draws
+// for it (skill0000), the item consumption and the teleport landing
+// on the elven town respawn ring.
 
 // scrollEscapeScenarioID is the scenario registry id.
 const scrollEscapeScenarioID = "scroll-escape"
@@ -39,16 +39,18 @@ const (
 // shutdown - the budget keeps the slowest honest run inside.
 const scrollEscapeTimeout = 5 * time.Minute
 
-// The start ground of the scenario: the elven creation spawn of the
-// Mothertree Glade (the first respawn point of the elf_town region,
-// map cell 21_19), far enough from the town ring to prove the travel.
-// The Keltirs and Gremlins around it carry isAggressive="false" in
-// the datapack (a missing attribute would default to aggressive), so
-// the 20 second stationary cast is never interrupted.
+// The start ground of the scenario: the Keltir glade of the elven
+// starting grounds (the oren02_2119_08 territory), far enough from
+// the town ring to prove the travel. Every Keltir of the ground
+// carries isAggressive="false" in the datapack (a missing attribute
+// would default to aggressive), so the 20 second stationary cast is
+// never interrupted, and no race respawn zone covers the cell, so
+// the scroll lands on the town ring instead of a starting ground
+// respawn.
 const (
-    scrollEscapeSpawnX = 46045
-    scrollEscapeSpawnY = 41251
-    scrollEscapeSpawnZ = -3440
+    scrollEscapeSpawnX = 45496
+    scrollEscapeSpawnY = 44544
+    scrollEscapeSpawnZ = -3704
     scrollEscapeLevel  = 15
 )
 
@@ -101,8 +103,8 @@ const (
 )
 
 // scrollEscapeReset returns the start state of the scenario: the
-// level 15 vitals on the Mothertree Glade spawn with one Scroll of
-// Escape in the bag (the display id the hunt economy injects).
+// level 15 vitals on the Keltir glade with one Scroll of Escape in
+// the bag (the display id the hunt economy injects).
 func scrollEscapeReset(account string) characterReset {
     return characterReset{
         Account: account,
@@ -173,7 +175,7 @@ func scrollEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
         return stopScrollEscapeSession(cancelSession, sessionDone, err)
     }
     test.appendLog("acceptance: the bot is in the world on the " +
-        "Mothertree Glade with one Scroll of Escape, watching the cast")
+        "Keltir glade with one Scroll of Escape, watching the cast")
 
     loop, err := awaitScrollEscapeLoop(ctx, loopCh)
     if err != nil {
@@ -189,7 +191,7 @@ func scrollEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
 
 // prepareScrollEscapeState creates the temp character and injects the
 // start state: the level 15 fighter with one scroll in the bag on the
-// Mothertree Glade spawn.
+// Keltir glade.
 func prepareScrollEscapeState(m *Manager, test *Test) error {
     if err := m.ensureCharacter(scrollEscapeAccount,
         scrollEscapePassword, scrollEscapeAccount,

@@ -124,9 +124,9 @@ func Definitions() []TestDef {
             Account: scrollEscapeAccount,
             Timeout: scrollEscapeTimeout,
             Description: "Start: the elven fighter temp26 resets onto " +
-                "the Mothertree Glade creation spawn (46045 41251 " +
-                "-3440) as the level 15 character with one Scroll of " +
-                "Escape in the bag and nothing else. Flow: the session " +
+                "the Keltir glade (45496 44544 -3704) as the level 15 " +
+                "character with one Scroll of Escape in the bag and " +
+                "nothing else. Flow: the session " +
                 "runs without autonomy so no hunt or town trip " +
                 "competes with the scroll, the acceptance seam fires " +
                 "the scroll (skill 2013, the 20 second stationary " +

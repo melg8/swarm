@@ -14,8 +14,8 @@ import (
 )
 
 // The scroll escape scenario tests: the level 15 fighter on the
-// Mothertree Glade spawn uses one Scroll of Escape and lands on the
-// elven town respawn ring.
+// Keltir glade uses one Scroll of Escape and lands on the elven town
+// respawn ring.
 
 // TestScrollEscapeDefinition pins the scenario registration: the
 // scroll round owns the head of the web UI list, temp26 and the five
@@ -29,7 +29,7 @@ func TestScrollEscapeDefinition(t *testing.T) {
     require.Equal(t, scrollEscapeTimeout, defs[0].Timeout)
     require.NotNil(t, defs[0].Scenario)
     for _, needle := range []string{
-        "46045 41251 -3440", "level 15", "Scroll of Escape",
+        "45496 44544 -3704", "level 15", "Scroll of Escape",
         "skill 2013", "skill0000", "town respawn ring",
     } {
         require.Contains(t, defs[0].Description, needle)
@@ -37,8 +37,8 @@ func TestScrollEscapeDefinition(t *testing.T) {
 }
 
 // TestScrollEscapeResetMatchesTheStartState pins the injected state:
-// the level 15 vitals on the Mothertree Glade spawn with exactly one
-// Scroll of Escape in the bag and nothing else.
+// the level 15 vitals on the Keltir glade with exactly one Scroll of
+// Escape in the bag and nothing else.
 func TestScrollEscapeResetMatchesTheStartState(t *testing.T) {
     reset := scrollEscapeReset(scrollEscapeAccount)
     require.Equal(t, scrollEscapeAccount, reset.Account)
