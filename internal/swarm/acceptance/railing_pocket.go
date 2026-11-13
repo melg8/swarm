@@ -14,18 +14,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The railing pocket scenario (the 2026-09-19 route report): the
-// character wakes at 43736 47048 -2992 - the elven village deck cell
-// just off the railings - and cannot build a route anywhere from it.
-// The cell itself is honest ground: the server walks clicks in and
-// out of it, the grid engine plans out of it, but the mesh link graph
-// connects polygons across shared edges only and every axis neighbor
-// of the cell carries a railing wall bit - the cell is a linkless one
-// polygon island whose only way out is the diagonal squeeze the
-// server's anti corner cut rule allows. The mesh pocket escape
-// answers the walk out and the plan cycles route from the connected
-// ground; the scenario pins the contract the user demanded: from this
-// position the bot builds a route and leaves the pocket on its own.
+// The railing pocket scenario: the character wakes at 43736 47048
+// -2992, the elven village deck cell just off the railings, and
+// cannot build a route anywhere from it. The cell is honest ground -
+// the server walks clicks in and out, the grid engine plans out - but
+// every axis neighbour carries a railing wall bit, so the mesh link
+// graph makes it a linkless one polygon island whose only way out is
+// the diagonal squeeze the anti corner cut rule allows. The pocket
+// escape walks out and the plan routes from the connected ground.
 const (
     // railingPocketSpawnX/Y/Z is the reported pocket cell (the deck
     // cell off the village railings the report named).

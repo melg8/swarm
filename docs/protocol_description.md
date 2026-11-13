@@ -569,6 +569,23 @@ parser skips it.
 | 41 | 2 | Pad, only when critical flag is 1 |
 | 41/43 | 12 | Target X, Y, Z |
 
+### CreatureSay (0x5D)
+
+One chat line of a creature (`CreatureSay.writeImpl`): the sender
+object id, the `ChatType` client id of the channel, the sender name
+and the text. The system variant that writes an int `charId` and an
+int `messageId` instead of the two strings is not a chat line and is
+not parsed - the C1 client renders those through `NpcSay` and
+`SystemMessage`.
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 1 | Opcode 0x5D |
+| 1 | 4 | Sender object id |
+| 5 | 4 | Channel (`ChatType` client id) |
+| 9 | .. | Sender name, null-terminated UTF-16LE |
+| .. | .. | Text, null-terminated UTF-16LE |
+
 ### GetItem (0x17) position semantics
 
 `GetItem` carries the position of the ITEM, not of the picker

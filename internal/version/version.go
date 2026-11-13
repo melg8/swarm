@@ -4,16 +4,12 @@
 
 // Package version pins the build identity of the running binary: the
 // git branch, the commit, the tree state and the build time. The
-// build scripts bake the values in at link time with -ldflags -X; a
-// plain go build or go run falls back to the VCS stamp Go embeds into
-// binaries built from a git repository (the package path form - `go
-// run ./cmd/swarm`; a file path build like `go run ./cmd/swarm/main.go`
-// compiles the command-line-arguments package and gets NO stamp) and
-// to the .git directory of the working directory, which carries both
-// the branch and the commit. Every artifact that must match a code
-// state - the state dump of the web UI, the startup log line of the
-// bot - renders the identity through Identity, so a live problem
-// report always tells which exact code produced it.
+// build scripts bake the values in with -ldflags -X; a plain go build
+// or go run falls back to the VCS stamp of a package path form build
+// (`go run ./cmd/swarm`; a file path build like `go run
+// ./cmd/swarm/main.go` gets no stamp) and to the .git directory. The
+// state dump and the startup log render Identity, so a report always
+// names the exact code that produced it.
 package version
 
 import (

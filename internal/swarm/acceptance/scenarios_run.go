@@ -82,16 +82,14 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
     }
 }
 
-// buildingEntryScenario runs the trainer hall round of the
-// 2026-09-12 03:56 freeze dump: the temp character wakes at the west
-// aisle entrance of the trainer hall with the dump inventory and the
-// learning trip armed - the sell stop walks first (every vendor trip
-// sells the accumulated junk), then the teacher segment must cross the
-// building entrance and reach the class master Ellenia inside the
-// hall, and the lessons begin. The dump freeze held the character at
-// the entrance forever; the frozen corridor ban, the detour re-plan
-// and the direct server routed walk own the recovery, the offline
-// reproduction lives in hunt/building_entry_test.go.
+// buildingEntryScenario runs the trainer hall round: the temp
+// character wakes at the west aisle entrance of the trainer hall with
+// the dump inventory and the learning trip armed - the sell stop walks
+// first, then the teacher segment must cross the building entrance and
+// reach the class master Ellenia inside the hall, and the lessons
+// begin. The frozen corridor ban, the detour re-plan and the direct
+// server routed walk own the recovery (the repro:
+// hunt/building_entry_test.go).
 func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(buildingEntryChecks())
@@ -169,18 +167,12 @@ func evaluateBuildingEntryConditions(tracker *state.Bot, test *Test) {
     test.updateCheck(checkLesson, learned, lessonDetail)
 }
 
-// zoneReturnScenario runs the stuck cell round: the temp character
-// wakes at the reported freeze position with the reported item set
-// and must walk to its selected hunting zone on its own - the freeze
-// of the report (the round 58 dump) held a character on that very
-// cell forever, the reproduction and the fix live in the hunt package.
 // runSupervisedScenario drives the common skeleton of the supervised
 // temp bot scenarios: ensure the temp character exists, inject the
 // start state, run the supervised hunt session behind it and watch
 // the check list until every condition holds (the context cancel
-// unwinds the session either way). The zone return and the gear gap
-// rounds share it - their stories differ only in the start state and
-// the conditions.
+// unwinds the session either way). The scenarios differ only in the
+// start state and the conditions.
 func runSupervisedScenario(
     ctx context.Context, m *Manager, t *Test, reset characterReset,
     evaluate func(*state.Bot, *Test), watchLog, doneLog string,
@@ -244,14 +236,13 @@ func runSupervisedScenario(
 }
 
 // fullDressScenario runs the world entry burst round: the temp
-// character wakes at the creation spawn point with the complete
-// outfit in the bag and nothing worn, and the auto equipment must
-// dress the whole set within the world entry window - the burst
-// planner sends every independent use item request in one tick, the
-// confirmation gate holds back only the steps that share server
-// state. The retired fixed pause between the requests needed over
-// twenty seconds for the same bag; the window of the fast check
-// fails that pacing.
+// character wakes at the creation spawn point with the complete outfit
+// in the bag and nothing worn, and the auto equipment must dress the
+// whole set within the world entry window - the burst planner sends
+// every independent use item request in one tick, the confirmation
+// gate holds back only the steps that share server state. The fixed
+// pause pacing needed over twenty seconds for the same bag; the fast
+// check window fails it.
 func fullDressScenario(ctx context.Context, m *Manager, t *Test) error {
     t.setChecks(fullDressChecks())
     watch := &fullDressWatch{}
@@ -264,10 +255,9 @@ func fullDressScenario(ctx context.Context, m *Manager, t *Test) error {
 }
 
 // zoneReturnScenario runs the stuck cell round: the temp character
-// wakes at the reported freeze position with the reported item set
-// and must walk to its selected hunting zone on its own - the freeze
-// of the report (the round 58 dump) held a character on that very
-// cell forever, the reproduction and the fix live in the hunt package.
+// wakes at the frozen position with the frozen item set and must walk
+// to its selected hunting zone on its own; the reproduction and the
+// fix live in the hunt package.
 func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
     t.setChecks(zoneReturnChecks())
 

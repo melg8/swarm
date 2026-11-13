@@ -3,17 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 // Package navbuild builds navigation mesh tiles from the l2j geodata
-// region files (docs/navmesh.md): the walkable cell layers are
-// partitioned into 2D manifold sheets, every sheet decomposes into
-// rectangle polygons with exact corner heights, the polygon links
-// carry the open NSWE portal spans of the shared edges and the tiles
-// serialize into the format of internal/swarm/pathfind/navmesh.
-//
-// The pipeline replaces the Recast build of the research round
-// (docs/recast_pathfinding.md): the geodata is already an exact voxel
-// surface, so the rasterization half of Recast has nothing to
-// contribute, while the region/contour half fights the stacked
-// surfaces the sheet decomposition here resolves directly.
+// region files (docs/navmesh.md): the walkable cell layers partition
+// into 2D manifold sheets, every sheet decomposes into rectangle
+// polygons with exact corner heights, the polygon links carry the open
+// NSWE portal spans of the shared edges and the tiles serialize into
+// the navmesh format. The geodata is already an exact voxel surface,
+// so the Recast rasterization half has nothing to contribute and the
+// sheet decomposition resolves the stacked surfaces directly.
 package navbuild
 
 import (

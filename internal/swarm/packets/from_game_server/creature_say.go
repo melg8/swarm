@@ -12,18 +12,13 @@ import (
 
 const CreatureSayPacketID = 0x5D
 
-// CreatureSayPacket is one chat line of a creature in the world: the
-// sender object id, the ChatType client id of the channel, the sender
-// name and the text.
-// Wire format (see CreatureSay.writeImpl): [opcode 0x5D]
-// [senderObjectId: 4][channel: 4][senderName: null-terminated UTF-16LE]
-// [text: null-terminated UTF-16LE]. The system variant that writes an
-// int charId and an int messageId instead of the two strings is not a
-// chat line and is not parsed (the name read would fail or degrade;
-// the C1 client renders those through NpcSay and SystemMessage
-// instead).
-// Reference: org/l2jmobius/gameserver/network/serverpackets/
-// CreatureSay.java.
+// CreatureSayPacket is one chat line of a creature: the sender object
+// id, the ChatType client id of the channel, the sender name and the
+// text. Wire (CreatureSay.writeImpl): [opcode 0x5D][senderObjectId:
+// 4][channel: 4][senderName: UTF-16LE][text: UTF-16LE], the strings
+// null-terminated. The system variant that writes an int charId and an
+// int messageId instead of the strings is not a chat line and is not
+// parsed; the client renders those through NpcSay and SystemMessage.
 type CreatureSayPacket struct {
     ObjectID int32
     Channel  int32

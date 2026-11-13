@@ -18,15 +18,12 @@ import (
     "github.com/melg8/swarm/internal/version"
 )
 
-// runFleet launches multiple bot sessions in one process: each bot gets
-// its own account (the base -account/-char name plus the 1-based index,
-// so -account test1 -bots 3 makes test1, test2, test3), its own tracker
-// in a shared registry, and its own runBotForever goroutine. All bots
-// share one web interface (the sidebar lists every bot, clicking
-// switches the observed one), one proxy (the web UI selects which bot a
-// connecting C1 client attaches to) and one geodata engine. The process
-// stays alive until every bot supervisor returns (SIGINT/SIGTERM stops
-// them all through the shared context).
+// runFleet launches multiple bot sessions in one process: each gets
+// its own account (the base name plus the 1-based index), its own
+// tracker in a shared registry and its own runBotForever goroutine.
+// All bots share one web interface, one proxy (the UI selects which
+// bot a C1 client attaches to) and one geodata engine. The process
+// lives until every supervisor returns.
 //
 //nolint:funlen // the fleet start walks the phases in order
 func runFleet(cfg config) {

@@ -115,17 +115,14 @@ func appendCellWord(buffer []byte, layer layerSpec) []byte {
     return append(buffer, word[:]...)
 }
 
-// miniWorld is the synthetic floating village of the builder tests:
-// a dry mainland plateau, a six step shore ramp descending toward the
-// water level, the water itself and a floating deck stacked over the
-// water with no connection. The shore wall closes the first ten cells
-// of the ramp edge, so the only dry crossing into the ramp sits at
-// x 10..20 (the NSWE portal span case).
-//
-// The heights (multiples of 8, the l2j granularity): the plateau
-// rides at -3504, the ramp steps -40 per row down to -3744, the water
-// floor sits at -3784 (below the C1 water level -3780) and the deck
-// floats at -3504 over the water.
+// miniWorld is the synthetic floating village of the builder tests: a
+// dry mainland plateau at -3504, a six step shore ramp descending 40
+// per row to -3744, the water floor at -3784 (below the C1 water level
+// -3780) and a floating deck at -3504 over the water with no
+// connection. The shore wall closes the first ten cells of the ramp
+// edge, so the only dry crossing into the ramp sits at x 10..20 (the
+// NSWE portal span case). Heights are multiples of 8, the l2j
+// granularity.
 func miniWorld(t *testing.T) []byte {
     t.Helper()
     rampHeights := []int16{-3544, -3584, -3624, -3664, -3704, -3744}

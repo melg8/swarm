@@ -14,20 +14,16 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The dump start state of the village escape scenario (the
-// 2026-09-14 12:31 stuck report, build 73fcfa6, bot test3): the
-// level 15 fighter stood at the elven village center cell
-// (the Mother Tree plaza where the village streets converge)
-// through a whole day of refused walks - three dumps of the same
-// position (08:42, 10:18 and 12:31) show the character never
-// moving a single cell while the corridor bans, the detour
-// re-plans and the server routed hops all failed. The scenario
-// pins the exact recovery contract the user demanded: from this
-// position the bot finds a path and gets out of the city within
-// two minutes at most.
+// The dump start state of the village escape scenario: a level 15
+// fighter stood at the elven village center cell (the Mother Tree
+// plaza where the village streets converge) through a whole day of
+// refused walks - the corridor bans, the detour re-plans and the
+// server routed hops all failed. The scenario pins the recovery
+// contract: from this position the bot finds a path out of the city
+// within two minutes.
 const (
-    // villageEscapeSpawnX/Y/Z is the reported stuck position (the
-    // dump of 2026-09-14 12:31, the village plaza cell of test3).
+    // villageEscapeSpawnX/Y/Z is the reported stuck position, the
+    // village plaza cell.
     villageEscapeSpawnX = 45768
     villageEscapeSpawnY = 49848
     villageEscapeSpawnZ = -3056
@@ -86,30 +82,25 @@ func villageEscapeReset(account string) characterReset {
     }
 }
 
-// The escape contract of the scenario: the character is out of the
-// city when its distance from the village center passes the escape
-// radius, and the whole escape (from the world entry at the dump
-// cell to the open ground past the village) fits the escape window.
-//
-// The radius covers every village structure of the geodata: the
-// farthest village npc of the dump stood 2734 units from the plaza
-// (Cobendell at the trainer hall), the southwest gate corridor the
-// walk plans exit through sits 2348 units out, and the village
-// streets the zone return scenario starts from reach 2760 units -
-// a character 3000 units from the plaza stands on the open road to
-// the hunting grounds past every wall, gate and deck of the city.
+// The escape contract: the character is out of the city once its
+// distance from the village center passes the escape radius, and the
+// whole escape (from the world entry at the dump cell to the open
+// ground) fits the escape window. The radius covers every village
+// structure of the geodata: the farthest npc stands 2734 units from
+// the plaza (Cobendell), the southwest gate corridor sits 2348 out,
+// the village streets reach 2760 - at 3000 units the character stands
+// on the open road past every wall, gate and deck of the city.
 const (
     villageEscapeRadius = 3000.0
     villageEscapeWindow = 2 * time.Minute
     villageEscapeBudget = 5 * time.Minute
 )
 
-// villageEscapeScenario runs the refused-click dump round: the temp
-// character wakes at the village plaza cell of the 12:31 dump with
-// the dump state and must get out of the city on its own within the
-// two minute window - the day of dumps held characters on that very
-// cell forever (the corridor bans, the detour re-plans and the
-// server routed hops of the report all failed to move them).
+// villageEscapeScenario runs the refused-click round: the temp
+// character wakes at the village plaza cell with the dump state and
+// must reach the open ground on its own within the escape window. The
+// corridor bans, the detour re-plans and the server routed hops all
+// failed to move the stuck characters.
 func villageEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(villageEscapeChecks())

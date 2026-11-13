@@ -46,15 +46,12 @@ func (l *Loop) resetFightClock() {
 
 // recoverFromDeath returns a dead character to the hunt: the village
 // restart request is the death dialog choice of the official client and
-// revives the character with restored vitals. The request retries until
-// the revival lands (the server refuses it during the death delay) and
-// the stale target and loot references are dropped; the zone leash of
-// the engage phase walks the revived character back afterwards. A town
-// trip interrupted by the death is dropped without a cooldown so a full
-// inventory sells right after the revival (the restart lands in the
-// village, next to the shops). A death during the deleveling is the
-// point of the exercise: the phase keeps running and replans the walk
-// to the guard from the restart point.
+// revives the character with restored vitals. It retries until the
+// revival lands (the server refuses during the death delay), drops the
+// stale target and loot references, and the engage lease walks the
+// revived character back. A town trip interrupted by the death drops
+// without a cooldown so a full inventory sells right away; a death
+// during the deleveling keeps the phase running from the restart point.
 func (l *Loop) recoverFromDeath() {
     now := l.now()
     if !l.restartAt.IsZero() && now.Sub(l.restartAt) < deathRestartPeriod {

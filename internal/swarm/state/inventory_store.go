@@ -9,16 +9,13 @@ import (
 )
 
 // inventoryStore is the inventory storage of one bot session: a dense
-// item slice kept in the canonical widget order (the equipped gear
-// first, then the plain inventory, both by item id with the object id
-// breaking ties, see compareInventoryItems) plus the object id to
-// slot index for the O(1) lookups of the packet apply paths. The
-// order is an invariant maintained at mutation time: appends, removals
-// and equip flag flips mark it dirty and the mutation batch restores
-// it once at its end, so every reader - the snapshot fill, the JSON
-// encode and the gear scans - walks the memory sequentially without
-// materializing and sorting a copy first. Every method expects the
-// caller to hold the bot lock (the store itself is not synchronized).
+// item slice in the canonical widget order (equipped gear first, then
+// the plain inventory, both by item id with the object id breaking
+// ties, see compareInventoryItems) plus the object id to slot index
+// for the O(1) apply path lookups. Appends, removals and equip flag
+// flips mark the order dirty and the mutation batch restores it once
+// at its end, so the snapshot fill, the JSON encode and the gear scans
+// walk it sequentially. Every method expects the bot lock.
 type inventoryStore struct {
     items []InventoryItem
     index map[int32]int32

@@ -16,16 +16,12 @@ const MagicSkillUsePacketID = 0x5A
 
 // MagicSkillUsePacket announces one creature starting a skill cast.
 // The hit time is the cast animation length in milliseconds (the
-// skill resolves when it elapses) and the reuse delay is the
-// cooldown the server opened for the skill, also in milliseconds -
-// both drive the cast fill and the cooldown countdown of the web
-// view.
-// Wire format (see MagicSkillUse.writeImpl): [opcode 0x5A]
-// [casterId: 4][targetId: 4][skillId: 4][skillLevel: 4]
-// [hitTime: 4][reuseDelay: 4]
-// [casterX: 4][casterY: 4][casterZ: 4]
-// [criticalFlag: 4][pad: 2 when critical]
-// [targetX: 4][targetY: 4][targetZ: 4].
+// skill resolves when it elapses); the reuse delay is the cooldown the
+// server opened, also in milliseconds - both drive the cast fill and
+// the cooldown countdown of the web view. Wire (MagicSkillUse.writeImpl):
+// [opcode 0x5A][casterId][targetId][skillId][skillLevel][hitTime]
+// [reuseDelay][casterX][casterY][casterZ][criticalFlag][pad: 2 when
+// critical][targetX][targetY][targetZ], 4 bytes each.
 type MagicSkillUsePacket struct {
     CasterID   int32
     TargetID   int32

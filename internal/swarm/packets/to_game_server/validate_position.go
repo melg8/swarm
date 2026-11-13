@@ -16,18 +16,14 @@ import (
 
 const validatePositionPacketID = 0x48
 
-// ValidatePositionPacket reports the client side position of the
-// character to the game server, exactly like the periodic validation
-// of the official client (ValidatePosition 0x48, see
-// gameserver/network/clientpackets/ValidatePosition.java). The server
-// uses it to adopt the client z within its tolerance band, to refresh
-// the last server position the door logout exploit check compares
-// against and to keep its clientX/clientY/clientZ view of the session
-// fresh - a session that never validates leaves that view at zero
-// forever, so every server side branch that reads it (the z adoption
-// gate subtracts the client z) answers for a client that never spoke.
-// Wire format: [opcode 0x48][x: 4][y: 4][z: 4][heading: 4]
-// [vehicleId: 4].
+// ValidatePositionPacket reports the client side position exactly like
+// the periodic validation of the official client (ValidatePosition
+// 0x48, see gameserver/network/clientpackets/ValidatePosition.java).
+// The server adopts the client z within its tolerance band, refreshes
+// the position the door logout exploit check compares and keeps its
+// clientX/clientY/clientZ view fresh; a session that never validates
+// leaves that view at zero, so the branches that read it answer for a
+// client that never spoke. Wire: [x][y][z][heading][vehicleId], 4 each.
 type ValidatePositionPacket struct {
     X       int32
     Y       int32

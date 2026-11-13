@@ -2357,6 +2357,35 @@ corner probe is a length, not a leg at all.
   state (1.1 s), session (0.4 s) and pathfind (52.6 s) suites,
   `golangci-lint run` on the eight paths 0 issues.
 
+### 2026-11-13 - the twelve line blocks and the duplicate doc
+
+- `acceptance/scenarios_run.go`: the stray `zoneReturnScenario` doc
+  above `runSupervisedScenario` is gone (the real doc sits above its
+  function); the trainer hall and full dress docs keep the sell stop,
+  the Ellenia segment and the twenty second pacing fact. 74 of 476
+  become 64 of 466.
+- `acceptance/village_escape.go` and `acceptance/railing_pocket.go`:
+  the escape radius evidence (2734 npc, 2348 gate corridor, 2760
+  streets, 3000 out), the railing island coordinates and the diagonal
+  squeeze stay; 56/41 become 47/37.
+- `packets/to_game_server/validate_position.go`, `magic_skill_use.go`,
+  `creature_say.go` and `request_magic_skill_use.go`: the wire layouts
+  compress to one line each and CreatureSay gains its wire section in
+  `docs/protocol_description.md`; 21/24/17/16 become 17/20/12/13.
+- `version.go`, `navbuild/geodata.go`, `navbuild/testworld.go`,
+  `hunt/loop_death.go`, `cmd/swarm/fleet.go`, `state/inventory_store.go`
+  and `proxy/transformer.go`: the VCS stamp rule, the sheet
+  decomposition, the test world heights, the death restart, the fleet
+  sharing and the store invariants stay; 58/35/35/36/39/40/23 become
+  54/31/32/33/36/37/20.
+- `hunt/merchant_stands_world.go` stays and the `huntdata` tables
+  keep their headers: a generated file carries a DO NOT EDIT hand
+  rule, so the generator owns the wording.
+- Verified: `task fmt`, `go build ./...`, the acceptance (8.9 s),
+  packets (0.4 s), version (0.4 s), navbuild (32.7 s), hunt (29.3 s),
+  state (1.0 s) and proxy (6.8 s) suites, `golangci-lint run` on the
+  eight paths 0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
