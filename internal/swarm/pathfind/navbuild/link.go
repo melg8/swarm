@@ -171,7 +171,6 @@ const (
     stripSouth = 3
 )
 
-// stripSide maps an outward step direction to the strip it leaves.
 func stripSide(dx, dy int32) int {
     switch {
     case dx < 0:
@@ -278,7 +277,6 @@ func (w *linkWalker) pair(rl *regionLayers, cx, cy int, dx, dy int) {
     }
 }
 
-// kept reports whether the layer instance belongs to a kept sheet.
 func (w *linkWalker) kept(k int) bool {
     sheet := w.sh.sheetOf[k]
 
@@ -312,7 +310,6 @@ func (s *borderStrips) collect(rl *regionLayers, sh *sheets,
     }
 }
 
-// finalize turns the per-position entry counts into prefix offsets.
 func (s *borderStrips) finalize() {
     for side := range s.strips {
         strip := &s.strips[side]
@@ -349,7 +346,6 @@ func stitchBorders(tile *navmesh.Tile, own borderStrips,
     return added
 }
 
-// neighborStrip picks the opposite strip of one neighbour.
 func neighborStrip(neighbors [4]*borderStrips, ownSide, theirSide int,
 ) *borderStrip {
     if neighbors[ownSide] == nil {

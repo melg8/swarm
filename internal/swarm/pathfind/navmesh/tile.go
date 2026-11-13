@@ -172,13 +172,11 @@ type BVNode struct {
 // polygon index (0 is the null reference).
 type PolyRef uint64
 
-// RefOf packs a region key and a polygon index into a reference.
 func RefOf(col, row int16, poly uint32) PolyRef {
     return PolyRef(uint64(uint16(col)))<<48 | PolyRef(uint64(uint16(row)))<<32 |
         PolyRef(poly+1)
 }
 
-// TileOf returns the region key of a reference.
 func TileOf(ref PolyRef) (col, row int16) {
     return int16(uint16(ref >> 48)), int16(uint16(ref >> 32))
 }
@@ -192,7 +190,6 @@ func PolyOf(ref PolyRef) int32 {
     return int32(uint32(ref&0xFFFFFFFF)) - 1
 }
 
-// RegionOfWorld maps a world position to its region key.
 func RegionOfWorld(x, y float64) (int16, int16) {
     return int16(math.Floor(x/tileWorldSize)) + tileZeroCol,
         int16(math.Floor(y/tileWorldSize)) + tileZeroRow
@@ -201,19 +198,14 @@ func RegionOfWorld(x, y float64) (int16, int16) {
 // TileWorldSize returns the world size of one region tile (32768).
 func TileWorldSize() float64 { return tileWorldSize }
 
-// TileZeroCol returns the region key anchor of the world x axis.
 func TileZeroCol() int16 { return tileZeroCol }
 
-// TileZeroRow returns the region key anchor of the world y axis.
 func TileZeroRow() int16 { return tileZeroRow }
 
-// WorldMinX returns the world x anchor of the region.
 func (t *Tile) WorldMinX() float64 { return t.worldMinX }
 
-// WorldMinY returns the world y anchor of the region.
 func (t *Tile) WorldMinY() float64 { return t.worldMinY }
 
-// WorldRect returns the world bounds of one polygon.
 func (t *Tile) WorldRect(p *Poly) (x0, y0, x1, y1 float64) {
     return t.worldMinX + float64(p.X0)*cellSizeWorld,
         t.worldMinY + float64(p.Y0)*cellSizeWorld,
@@ -406,7 +398,6 @@ func decodePolys(data []byte, offset *int, tile *Tile) error {
     return validatePolys(tile)
 }
 
-// validatePolys checks the decoded polygon bounds.
 func validatePolys(tile *Tile) error {
     for i := range tile.Polys {
         poly := &tile.Polys[i]
@@ -467,7 +458,6 @@ func decodeLinks(data []byte, offset *int, tile *Tile) error {
     return validateLinks(tile)
 }
 
-// validateLinks checks the decoded link chains.
 func validateLinks(tile *Tile) error {
     for i := range tile.Links {
         link := &tile.Links[i]
@@ -555,15 +545,12 @@ func packLinkSpan(side uint8, t0, t1 int32) uint32 {
     return uint32(side) | uint32(t0)<<2 | uint32(t1)<<14
 }
 
-// unpackLinkSpan splits the packed span word.
 func unpackLinkSpan(word uint32) (side uint8, t0, t1 int32) {
     return uint8(word & 3), int32(word >> 2 & 0xFFF), int32(word >> 14 & 0xFFF)
 }
 
-// zigzag folds a signed delta into the uvarint range.
 func zigzag(v int64) uint64 { return uint64(v<<1) ^ uint64(v>>63) }
 
-// unzigzag unfolds the signed delta.
 func unzigzag(v uint64) int64 { return int64(v>>1) ^ -int64(v&1) }
 
 // buildGridIndex buckets the polygon rectangles into the uniform grid, the

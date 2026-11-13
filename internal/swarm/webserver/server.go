@@ -347,12 +347,10 @@ func (s *Server) handleBotConfig(w http.ResponseWriter, _ *http.Request) {
     })
 }
 
-// Address returns the address the server listens on.
 func (s *Server) Address() string {
     return s.httpServer.Addr
 }
 
-// ListenAndServe runs the web server until shutdown.
 func (s *Server) ListenAndServe() error {
     s.logger.Println("Web interface listening on http://" +
         s.httpServer.Addr)
@@ -497,7 +495,6 @@ func writeEvent(w http.ResponseWriter, flusher http.Flusher, data []byte) {
     flusher.Flush()
 }
 
-// lookupBot resolves the bot id of the request path.
 func (s *Server) lookupBot(
     w http.ResponseWriter, r *http.Request,
 ) (*state.Bot, bool) {
@@ -511,7 +508,6 @@ func (s *Server) lookupBot(
     return bot, true
 }
 
-// writeJSON responds with a JSON document.
 func writeJSON(w http.ResponseWriter, logger *log.Logger, value any) {
     w.Header().Set("Content-Type", "application/json")
     if err := json.NewEncoder(w).Encode(value); err != nil {

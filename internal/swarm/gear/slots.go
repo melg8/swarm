@@ -59,7 +59,6 @@ var slotNames = [slotCount]string{
     partChest, partLegs, partFeet, partBack,
 }
 
-// String renders the slot for logs.
 func (s Slot) String() string {
     if s < 0 || s >= slotCount {
         return "unknown slot"
@@ -162,7 +161,6 @@ func jewelBodyPart(bodyPart string) bool {
     }
 }
 
-// Category is the gear family of an item for the scoring dispatch.
 type Category int
 
 const (
@@ -233,7 +231,6 @@ func NewEquipment(
     return equipment
 }
 
-// itemByID finds the inventory item of the object id.
 func (e Equipment) itemByID(objectID int32) (state.InventoryItem, bool) {
     for _, item := range e.Items {
         if item.ObjectID == objectID {

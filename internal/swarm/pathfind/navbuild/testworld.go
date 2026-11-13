@@ -104,7 +104,6 @@ func appendBlock(t *testing.T, buffer []byte, bx, by int,
     return buffer
 }
 
-// appendCellWord appends one encoded cell word.
 func appendCellWord(buffer []byte, layer layerSpec) []byte {
     var word [2]byte
     binary.LittleEndian.PutUint16(word[:], encodeCellWord(layer))

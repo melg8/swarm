@@ -234,7 +234,6 @@ func hashRef(v uint64) uint64 {
     return v
 }
 
-// reset empties the state for reuse.
 func (s *queryState) reset() {
     s.nodes = s.nodes[:0]
     s.index.reset()
@@ -270,7 +269,6 @@ func (s *queryState) create(ref PolyRef, parent uint32, pos Pos,
     return idx
 }
 
-// push inserts a node index into the open heap.
 func (s *queryState) push(idx uint32) {
     if s.nodes[idx].heapIdx >= 0 {
         return
@@ -289,7 +287,6 @@ func (s *queryState) push(idx uint32) {
     }
 }
 
-// fix restores the heap property of a node whose score improved.
 func (s *queryState) fix(idx uint32) {
     i := s.nodes[idx].heapIdx
     if i < 0 {
@@ -308,7 +305,6 @@ func (s *queryState) fix(idx uint32) {
     }
 }
 
-// pop removes and returns the best open node index.
 func (s *queryState) pop() (uint32, bool) {
     if len(s.open) == 0 {
         return 0, false
@@ -343,12 +339,10 @@ func (s *queryState) pop() (uint32, bool) {
     return top, true
 }
 
-// less orders two heap entries by their f score.
 func (s *queryState) less(a, b uint32) bool {
     return s.nodes[a].f < s.nodes[b].f
 }
 
-// swap exchanges two heap entries and fixes their indices.
 func (s *queryState) swap(i, j int32) {
     s.open[i], s.open[j] = s.open[j], s.open[i]
     s.nodes[s.open[i]].heapIdx = i
@@ -610,7 +604,6 @@ func relax(
     }
 }
 
-// dist3 is the 3D distance between two positions.
 func dist3(a, b Pos) float64 {
     dx := a.X - b.X
     dy := a.Y - b.Y

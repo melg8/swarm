@@ -103,17 +103,14 @@ func origWalkCells(region *pathfind.Region) []origCell {
     return pairs
 }
 
-// origSet marks one cell in the merge bitset.
 func origSet(bitset []uint64, cell int32) {
     bitset[cell>>6] |= 1 << uint(cell&63)
 }
 
-// origClear drops one cell from the merge bitset.
 func origClear(bitset []uint64, cell int32) {
     bitset[cell>>6] &^= 1 << uint(cell&63)
 }
 
-// origHas reports whether one cell sits in the merge bitset.
 func origHas(bitset []uint64, cell int32) bool {
     return bitset[cell>>6]&(1<<uint(cell&63)) != 0
 }
@@ -250,7 +247,6 @@ func origWorldMinY(key navmesh.RegionKey) float64 {
         navmesh.TileWorldSize()
 }
 
-// origHeightRange scans the rectangle heights of the payload.
 func origHeightRange(polys []origPoly) (int16, int16) {
     minH, maxH := int16(32767), int16(-32768)
     for i := range polys {

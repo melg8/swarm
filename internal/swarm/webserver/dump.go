@@ -89,7 +89,6 @@ func writeDumpHeader(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintf(b, "\n")
 }
 
-// writeDumpCharacter writes the full character sheet of the dump.
 func writeDumpCharacter(b *strings.Builder, snap state.Snapshot) {
     c := snap.Character
     fmt.Fprintf(b, "character:\n")
@@ -157,7 +156,6 @@ func writeDumpAttackers(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintln(b)
 }
 
-// writeDumpZone writes the hunting zone of the session.
 func writeDumpZone(b *strings.Builder, snap state.Snapshot) {
     if snap.HuntingZone == nil {
         fmt.Fprintf(b, "hunting zone: none\n\n")
@@ -207,7 +205,6 @@ func dumpSlotName(bodyPart int32) string {
     return fmt.Sprintf("part 0x%x", bodyPart)
 }
 
-// writeDumpInventory writes the equipment and the bag of the dump.
 func writeDumpInventory(b *strings.Builder, snap state.Snapshot) {
     var equipped, bag []string
     for i := range snap.Inventory {
@@ -518,7 +515,6 @@ func walkDur(d time.Duration) string {
     return d.Round(time.Second).String()
 }
 
-// writeDumpCombat writes the recent combat beats.
 func writeDumpCombat(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintf(b, "recent combat (%d):\n", len(snap.CombatEvents))
     for i := range snap.CombatEvents {
@@ -529,7 +525,6 @@ func writeDumpCombat(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintln(b)
 }
 
-// writeDumpChat writes the recent chat lines.
 func writeDumpChat(b *strings.Builder, snap state.Snapshot) {
     start := 0
     if len(snap.Chat) > dumpChatLimit {
@@ -545,7 +540,6 @@ func writeDumpChat(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintln(b)
 }
 
-// writeDumpEvents writes the deep event window in chronological order.
 func writeDumpEvents(b *strings.Builder, events []state.Event) {
     fmt.Fprintf(b, "events (%d):\n", len(events))
     for i := range events {

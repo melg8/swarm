@@ -267,7 +267,6 @@ type compRun struct {
     count uint32
 }
 
-// compRunsOf folds the component array into the runs.
 func compRunsOf(comps []uint32) []compRun {
     runs := make([]compRun, 0, len(comps)/8+1)
     for _, value := range comps {

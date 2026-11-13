@@ -486,7 +486,6 @@ func (s *Server) legacyWaypoints(waypoints []navmesh.Pos,
     return positions
 }
 
-// toNavmeshPoints converts the funnel waypoints to the JSON shape.
 func toNavmeshPoints(waypoints []navmesh.Pos) []navmeshPoint {
     points := make([]navmeshPoint, len(waypoints))
     for i, waypoint := range waypoints {
@@ -500,7 +499,6 @@ func toNavmeshPoints(waypoints []navmesh.Pos) []navmeshPoint {
     return points
 }
 
-// navmeshKeyOf parses a col_row path value into a region key.
 func navmeshKeyOf(text string) (navmesh.RegionKey, bool) {
     colText, rowText, found := strings.Cut(text, "_")
     if !found {
@@ -533,7 +531,6 @@ func meshTileKeys(mesh *navmesh.Mesh) []navmeshTileKey {
     return keys
 }
 
-// tileKeysOf converts region keys to the wire tile keys.
 func tileKeysOf(keys []navmesh.RegionKey) []navmeshTileKey {
     tiles := make([]navmeshTileKey, 0, len(keys))
     for _, key := range keys {

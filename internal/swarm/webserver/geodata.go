@@ -181,7 +181,6 @@ func parseGeodataTileRequest(
         string(pathfind.ParseRenderMode(r.URL.Query().Get("mode"))), true
 }
 
-// writeGeodataTile responds with one PNG tile.
 func writeGeodataTile(w http.ResponseWriter, tile []byte) {
     w.Header().Set("Content-Type", "image/png")
     w.Header().Set("Cache-Control", "public, max-age=86400")

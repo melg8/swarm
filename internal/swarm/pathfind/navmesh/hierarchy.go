@@ -81,7 +81,6 @@ type coarseState struct {
     bestH   float64
 }
 
-// reset empties the coarse state for reuse.
 func (s *coarseState) reset() {
     s.nodes = s.nodes[:0]
     clear(s.index)
@@ -91,7 +90,6 @@ func (s *coarseState) reset() {
     s.bestH = math.MaxFloat64
 }
 
-// push inserts a node index into the open heap.
 func (s *coarseState) push(idx int32) {
     if s.nodes[idx].heapIdx >= 0 {
         return
@@ -110,7 +108,6 @@ func (s *coarseState) push(idx int32) {
     }
 }
 
-// fix restores the heap property of a node whose score improved.
 func (s *coarseState) fix(idx int32) {
     i := s.nodes[idx].heapIdx
     if i < 0 {
@@ -129,7 +126,6 @@ func (s *coarseState) fix(idx int32) {
     }
 }
 
-// pop removes and returns the best open node index.
 func (s *coarseState) pop() (int32, bool) {
     if len(s.open) == 0 {
         return 0, false
@@ -165,7 +161,6 @@ func (s *coarseState) pop() (int32, bool) {
     return top, true
 }
 
-// swap exchanges two heap entries and fixes their indices.
 func (s *coarseState) swap(i, j int32) {
     s.open[i], s.open[j] = s.open[j], s.open[i]
     s.nodes[s.open[i]].heapIdx = i
@@ -750,7 +745,6 @@ func lineRegionKeys(start, end Pos) []RegionKey {
     return keys
 }
 
-// abs16 is the |a| of an int16 pair delta.
 func abs16(a int16) int16 {
     if a < 0 {
         return -a
@@ -948,7 +942,6 @@ func (m *Mesh) runHop(q *hierQuery, fromRef PolyRef, fromPos Pos,
     }
 }
 
-// hierEdge loads one coarse edge by reference (the chain just walked it).
 func (m *Mesh) hierEdge(ref abstractEdgeRef) (*abstractEdge, bool) {
     abstract := m.abstractOf(ref.Region)
     if abstract == nil || ref.Index < 0 ||
@@ -983,7 +976,6 @@ type hopKey struct {
     to   abstractEdgeRef
 }
 
-// cachedHop answers the cached corridor of a hop key.
 func (m *Mesh) cachedHop(key hopKey) ([]PolyRef, bool) {
     m.hierMu.Lock()
     defer m.hierMu.Unlock()
@@ -998,7 +990,6 @@ func (m *Mesh) cachedHop(key hopKey) ([]PolyRef, bool) {
     return out, true
 }
 
-// storeHop caches the corridor of a portal pair.
 func (m *Mesh) storeHop(key hopKey, corridor []PolyRef) {
     m.hierMu.Lock()
     defer m.hierMu.Unlock()
@@ -1034,7 +1025,6 @@ func chainEstimate(m *Mesh, q *hierQuery, edges []abstractEdgeRef) float64 {
     return sum
 }
 
-// routeLengthOf sums the waypoint walk length of a route.
 func routeLengthOf(route *Route) float64 {
     sum := 0.0
     for i := 1; i < len(route.Waypoints); i++ {
@@ -1145,7 +1135,6 @@ func corridorCostOf(m *Mesh, corridor []PolyRef, q *hierQuery) float64 {
     return sum
 }
 
-// dist2D is the horizontal distance between two positions.
 func dist2D(a, b Pos) float64 {
     dx := a.X - b.X
     dy := a.Y - b.Y

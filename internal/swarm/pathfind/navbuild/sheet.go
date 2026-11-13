@@ -180,7 +180,6 @@ func (s *sheets) dropIslandComponents(rl *regionLayers, climb int32) {
 // every cell pair is visited once.
 var islandDeltas = [2][2]int{{1, 0}, {0, 1}}
 
-// floodNeighbours relaxes the neighbour columns of one flooded layer.
 func (s *sheets) floodNeighbours(rl *regionLayers, cur uint32,
     sheet int32, climb int32, stack *[]uint32,
 ) {

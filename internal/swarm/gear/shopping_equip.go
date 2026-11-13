@@ -148,7 +148,6 @@ func PlannedEquips(
     return keeps
 }
 
-// describe renders the candidate for purchase logs.
 func (c *purchaseCandidate) describe(gain float64) string {
     name := npcdata.ItemName(c.itemID)
     if name == "" {
@@ -160,7 +159,6 @@ func (c *purchaseCandidate) describe(gain float64) string {
     return name + " (+" + gainText + " for " + priceText + " adena)"
 }
 
-// AdenaSpent sums the prices of the purchases.
 func AdenaSpent(purchases []Purchase) int64 {
     total := int64(0)
     for _, purchase := range purchases {

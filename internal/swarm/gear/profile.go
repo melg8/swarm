@@ -37,7 +37,6 @@ type Profile interface {
 // jewels by mDef and shields by the expected block value.
 type MeleeFighter struct{}
 
-// Name of the melee fighter profile.
 func (MeleeFighter) Name() string {
     return "melee fighter"
 }
@@ -99,7 +98,6 @@ func (MeleeFighter) WeaponPoints(stats npcdata.GearStats) int32 {
 // caster swings the staff only when the mana runs dry.
 type MysticFighter struct{}
 
-// Name of the mystic fighter profile.
 func (MysticFighter) Name() string {
     return "mystic fighter"
 }
@@ -140,7 +138,6 @@ func (MysticFighter) WeaponPoints(stats npcdata.GearStats) int32 {
 // step (see bow.go and hunt/equip.go).
 type Archer struct{}
 
-// Name of the archer profile.
 func (Archer) Name() string {
     return "archer"
 }
@@ -185,7 +182,6 @@ func (Archer) WeaponPoints(stats npcdata.GearStats) int32 {
     return stats.PAtk
 }
 
-// scoreStats dispatches the profile scoring on the gear family of the stats.
 func scoreStats(profile Profile, stats npcdata.GearStats) float64 {
     switch CategoryOf(stats) {
     case CategoryWeapon:

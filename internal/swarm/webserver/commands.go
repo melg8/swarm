@@ -71,7 +71,6 @@ func validSayChannel(channel int32) bool {
     }
 }
 
-// describeCommand renders the queued command for the event log.
 func describeCommand(cmd commandRequest) string {
     switch cmd.Kind {
     case state.CommandMove:

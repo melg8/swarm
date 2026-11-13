@@ -31,7 +31,6 @@ func (s *Server) SetSessionJournal(journal *session.Journal) {
         "GET /api/bots/{id}/session-report", s.handleSessionReport)
 }
 
-// handleSessionReport serves the session report of one bot as plain text.
 func (s *Server) handleSessionReport(w http.ResponseWriter, r *http.Request) {
     if s.journal == nil {
         http.Error(w, "session journal is disabled",

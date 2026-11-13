@@ -93,7 +93,6 @@ type search struct {
     seq             uint64
 }
 
-// newSearch prepares a fresh search over an engine.
 func newSearch(engine *Engine, maxPassableHeight uint16) *search {
     return &search{
         engine:            engine,
@@ -368,13 +367,11 @@ func (s *search) nodeReached(current *node) bool {
     return current.coords == s.target
 }
 
-// push inserts a node into the open set.
 func (s *search) push(node *node) {
     s.openSet[node.key] = node
     heap.Push(&s.queue, node)
 }
 
-// reconstruct walks the parent chain of the target back to the start.
 func (s *search) reconstruct(target *node) []*node {
     path := []*node{}
     for current := target; current != nil; current = current.parent {
@@ -734,7 +731,6 @@ func (s *search) segmentAllowed(from, to *node) bool {
     return true
 }
 
-// sign returns the sign of an integer difference.
 func sign(v int32) int32 {
     if v > 0 {
         return 1
@@ -746,7 +742,6 @@ func sign(v int32) int32 {
     return 0
 }
 
-// nodesToWorld converts a node path to world cell centers.
 func nodesToWorld(path []*node) []Vec3 {
     world := make([]Vec3, len(path))
     for i, node := range path {
@@ -763,7 +758,6 @@ func nodeWorld(node *node) Vec3 {
     return Vec3{X: center.X, Y: center.Y, Z: float64(node.layer.Height)}
 }
 
-// pathLength sums the 3D segment lengths of a waypoint path.
 func pathLength(waypoints []Vec3) float64 {
     length := 0.0
     for i := 1; i < len(waypoints); i++ {
@@ -780,7 +774,6 @@ func pathLength(waypoints []Vec3) float64 {
 // remaining distance and then by insertion order, so runs stay deterministic.
 type nodeQueue []*node
 
-// Len returns the heap length.
 func (q nodeQueue) Len() int { return len(q) }
 
 // Less orders the nodes by f score, then h, then insertion sequence.
@@ -803,14 +796,12 @@ func (q nodeQueue) Swap(i, j int) {
     q[j].index = j
 }
 
-// Push appends a node to the heap.
 func (q *nodeQueue) Push(value any) {
     node := value.(*node)
     node.index = len(*q)
     *q = append(*q, node)
 }
 
-// Pop removes the best node from the heap.
 func (q *nodeQueue) Pop() any {
     old := *q
     item := old[len(old)-1]

@@ -23,7 +23,6 @@ type wallSpan struct {
     ax, ay, bx, by float64
 }
 
-// wallSpansOf returns the wall spans of one polygon, cached once per pass.
 func wallSpansOf(m *Mesh, ref PolyRef,
     walls map[PolyRef]*[4][]wallSpan,
 ) *[4][]wallSpan {
@@ -200,7 +199,6 @@ func segSegDistSqr2D(ax, ay, bx, by, cx, cy, dx, dy float64) float64 {
     return px*px + py*py
 }
 
-// clamp01 clamps the value into [0, 1].
 func clamp01(v float64) float64 {
     if v < 0 {
         return 0

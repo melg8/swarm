@@ -57,7 +57,6 @@ const (
     planKindLegsOverOnePiece
 )
 
-// better replaces the accumulator when the gain strictly improves.
 func (c *nextPlanCandidate) better(
     action EquipAction, kind planKind,
     candidate ScoredItem, current ScoredItem, slot Slot,
@@ -433,7 +432,6 @@ func planLegs(
     }
 }
 
-// describeItem renders the item for action logs.
 func describeItem(item ScoredItem) string {
     name := npcdata.ItemName(item.Item.ItemID)
     if name == "" {

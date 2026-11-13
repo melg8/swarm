@@ -29,7 +29,6 @@ const (
     stripEntryWireSize = 7
 )
 
-// sidecarPath returns the strip sidecar path of a region key.
 func sidecarPath(outDir string, key navmesh.RegionKey) string {
     return filepath.Join(outDir,
         fmt.Sprintf("%d_%d%s", key.Col, key.Row, sidecarExt))

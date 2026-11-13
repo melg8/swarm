@@ -2642,6 +2642,21 @@ corner probe is a length, not a leg at all.
   (30.3 s) suites, `golangci-lint run` on the two paths 0 issues,
   `task fmt:check` clean.
 
+### 2026-11-13 - the restating path and web docs
+
+- The same rule over the pathfinder, the web server and the gear
+  planner: the heap and pool plumbing docs (`push`, `pop`, `fix`,
+  `swap`, `acquire*`), the tile accessors, the dump section parsers
+  (`parseBag`, `parseEvents`, ...) and the planner helper mirrors all
+  restate their own signature, so 159 docs go.
+- 44 files, 159 comment lines fewer; the audit reads 16 955 of
+  170 490 (9.9 percent) and the `--gate` run exits 0, so the share
+  target of the sweep holds.
+- Verified: `task fmt`, `go build ./...`, the pathfind (55.5 s),
+  navbuild (37.0 s), navmesh (33.8 s), prototype (0.3 s), webserver
+  (8.8 s) and gear (0.3 s) suites, `golangci-lint run` on the five
+  paths 0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

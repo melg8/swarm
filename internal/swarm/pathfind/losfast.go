@@ -479,12 +479,10 @@ func segmentSegmentDistance(ax, ay, bx, by, cx, cy, dx,
     return best
 }
 
-// orientSign answers the orientation of the triplet.
 func orientSign(ax, ay, bx, by, px, py float64) float64 {
     return (bx-ax)*(py-ay) - (by-ay)*(px-ax)
 }
 
-// onSegment answers whether a point sits on the segment bounding box.
 func onSegment(px, py, ax, ay, bx, by float64) bool {
     return px >= math.Min(ax, bx)-1e-9 && px <= math.Max(ax, bx)+1e-9 &&
         py >= math.Min(ay, by)-1e-9 && py <= math.Max(ay, by)+1e-9

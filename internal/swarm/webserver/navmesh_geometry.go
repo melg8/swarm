@@ -162,7 +162,6 @@ func encodeNavmeshGeometry(mesh *navmesh.Mesh, tile *navmesh.Tile,
     return payload, nil
 }
 
-// geoHeightRange scans the corner heights of the tile polygons.
 func geoHeightRange(tile *navmesh.Tile) (int16, int16) {
     minH, maxH := int16(32767), int16(-32768)
     for i := range tile.Polys {
@@ -468,7 +467,6 @@ func geoWall(writer *[]byte, fixed, lo, hi, hA0, hA1, hB0, hB1 float64,
     (*writer)[base+15] = orient
 }
 
-// geoLerp interpolates one edge height profile over the cell range.
 func geoLerp(h0, h1 int16, t0, t1, v int32) float64 {
     if t1 <= t0 {
         return float64(h0)
@@ -488,7 +486,6 @@ func geoHeight(v float64) uint16 {
     return uint16(int16(math.Round(v)))
 }
 
-// writeGeoCorner stores one quantized polygon corner.
 func writeGeoCorner(payload []byte, offset int, cellX, cellY, height int32) {
     binary.LittleEndian.PutUint16(payload[offset:], uint16(cellX))
     binary.LittleEndian.PutUint16(payload[offset+2:], uint16(cellY))

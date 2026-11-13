@@ -195,7 +195,6 @@ func (b *rectBuilder) free(cx, cy int) bool {
     return b.grid[cell] >= 0 && !b.covered[cell]
 }
 
-// markCovered flags the cells of one emitted rectangle.
 func (b *rectBuilder) markCovered(cx, cy int, x1, y1 int32) {
     for x := int32(cx); x < x1; x++ {
         for y := int32(cy); y < y1; y++ {
@@ -224,7 +223,6 @@ func (b *rectBuilder) cellHeight(cx, cy int) int16 {
     return b.layers[b.grid[cx*regionCellsSide+cy]].h
 }
 
-// bindLayers maps every covered layer instance to the polygon index.
 func (b *rectBuilder) bindLayers(cx, cy int, x1, y1 int32, index int32) {
     for x := int32(cx); x < x1; x++ {
         for y := int32(cy); y < y1; y++ {

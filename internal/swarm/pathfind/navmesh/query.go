@@ -407,7 +407,6 @@ func tileQueryPolys(tile *Tile, minX, minY, maxX, maxY, minZ, maxZ float64,
     return out
 }
 
-// quantizeBV converts a world offset into the quantized BVTree units.
 func quantizeBV(world float64) uint16 {
     cells := world / cellSizeWorld
     if cells < 0 {
@@ -462,7 +461,6 @@ func tileQueryPolysGrid(tile *Tile, minX, minY, maxX, maxY, minZ, maxZ float64,
     return out
 }
 
-// polyHeightRange returns the min and max corner height of a polygon.
 func polyHeightRange(poly *Poly) (int16, int16) {
     hMin := poly.H00
     hMax := poly.H00
@@ -478,7 +476,6 @@ func polyHeightRange(poly *Poly) (int16, int16) {
     return hMin, hMax
 }
 
-// quantOverlap reports whether two quantized bounds overlap.
 func quantOverlap(aMin, aMax, bMin, bMax [3]uint16) bool {
     for a := range 3 {
         if aMin[a] > bMax[a] || aMax[a] < bMin[a] {
@@ -494,7 +491,6 @@ func wrapNoNavmesh(pos Pos) error {
     return &NoNavmeshError{Pos: pos}
 }
 
-// NoNavmeshError reports a position without a usable mesh polygon.
 type NoNavmeshError struct {
     Pos Pos
 }

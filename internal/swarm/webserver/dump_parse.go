@@ -142,7 +142,6 @@ func applyDumpNpc(bot *state.Bot, o *state.ObjectSnapshot) {
     })
 }
 
-// applyDumpItem replays one item object view into the bot.
 func applyDumpItem(bot *state.Bot, o *state.ObjectSnapshot) {
     //nolint:exhaustruct_v5 // the dump carries a subset of ItemInfo
     bot.ApplyItemInfo(state.ItemInfo{
@@ -249,7 +248,6 @@ func (p *dumpParser) parseBotLine(line string) {
     }
 }
 
-// parseCharacter reads the "character:" section.
 func (p *dumpParser) parseCharacter() error {
     c := &p.snap.Character
     for p.pos < len(p.lines) {
@@ -267,7 +265,6 @@ func (p *dumpParser) parseCharacter() error {
     return nil
 }
 
-// parseCharField reads one indented character field.
 func parseCharField(c *state.CharacterSnapshot, field string) error {
     parts := strings.SplitN(field, ":", 2)
     if len(parts) != 2 {
@@ -303,7 +300,6 @@ func parseCharField(c *state.CharacterSnapshot, field string) error {
     return nil
 }
 
-// firstToken returns the first whitespace-delimited token of s.
 func firstToken(s string) string {
     for i, r := range s {
         if r == ' ' || r == '\t' {
@@ -411,7 +407,6 @@ func (p *dumpParser) parseAttackers() error {
     return nil
 }
 
-// parseHuntingZone reads the "hunting zone:" header line.
 func (p *dumpParser) parseHuntingZone(header string) error {
     // "hunting zone: center 46500 50000, half 800 (square 1600x1600)"
     // or "hunting zone: none"
@@ -430,7 +425,6 @@ func (p *dumpParser) parseHuntingZone(header string) error {
     return nil
 }
 
-// parseEquipment reads the "equipment (N):" section.
 func (p *dumpParser) parseEquipment() error {
     for p.pos < len(p.lines) {
         line := p.lines[p.pos]
@@ -449,7 +443,6 @@ func (p *dumpParser) parseEquipment() error {
     return nil
 }
 
-// parseBag reads the "bag (N):" section.
 func (p *dumpParser) parseBag() error {
     for p.pos < len(p.lines) {
         line := p.lines[p.pos]
@@ -514,7 +507,6 @@ func dumpSlotMask(slot string) int32 {
     return 0
 }
 
-// parseObjects reads the "objects (N):" section.
 func (p *dumpParser) parseObjects() error {
     for p.pos < len(p.lines) {
         line := p.lines[p.pos]
@@ -701,7 +693,6 @@ func parseWalkCoords(s string) state.WalkPoint {
     return wp
 }
 
-// parseCombat reads the "recent combat (N):" section.
 func (p *dumpParser) parseCombat() error {
     for p.pos < len(p.lines) {
         line := p.lines[p.pos]
@@ -738,7 +729,6 @@ func parseCombatLine(line string) (state.CombatEventView, bool) {
     return ev, true
 }
 
-// parseChat reads the "chat (N):" section.
 func (p *dumpParser) parseChat() error {
     for p.pos < len(p.lines) {
         line := p.lines[p.pos]
@@ -768,7 +758,6 @@ func (p *dumpParser) parseChat() error {
     return nil
 }
 
-// parseEvents reads the "events (N):" section.
 func (p *dumpParser) parseEvents() error {
     for p.pos < len(p.lines) {
         line := p.lines[p.pos]
@@ -792,7 +781,6 @@ func (p *dumpParser) parseEvents() error {
     return nil
 }
 
-// skipIndented advances past the indented body of a section.
 func (p *dumpParser) skipIndented() {
     for p.pos < len(p.lines) {
         line := p.lines[p.pos]

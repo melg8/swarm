@@ -171,7 +171,6 @@ type Stats struct {
     Loaded    int    `json:"loadedTiles"`
 }
 
-// Stats returns the current mesh summary.
 func (m *Mesh) Stats() Stats {
     m.mu.Lock()
     defer m.mu.Unlock()
@@ -201,7 +200,6 @@ func (m *Mesh) TileFiles() []RegionKey {
     return keys
 }
 
-// scanFiles counts the tile files of the directory.
 func (m *Mesh) scanFiles() {
     entries, err := os.ReadDir(m.dir)
     if err != nil {
@@ -271,7 +269,6 @@ func (m *Mesh) Tile(key RegionKey) (*Tile, error) {
     return entryAnswer(entry)
 }
 
-// entryAnswer unwraps a tile cache entry into the Tile contract.
 func entryAnswer(entry *tileEntry) (*Tile, error) {
     switch entry.state {
     case tileLoaded:
@@ -429,7 +426,6 @@ func (m *Mesh) PrefetchAbstracts(keys []RegionKey) {
     wg.Wait()
 }
 
-// evict drops the least recently used entries beyond the capacity.
 func (m *Mesh) evict() {
     for len(m.lru) > m.capacity && m.capacity > 0 {
         oldest := m.lru[0]
@@ -438,7 +434,6 @@ func (m *Mesh) evict() {
     }
 }
 
-// touch moves an entry to the back of the LRU queue.
 func (m *Mesh) touch(entry *tileEntry) {
     for i, candidate := range m.lru {
         if candidate == entry {
@@ -477,7 +472,6 @@ func (m *Mesh) polyOfRef(ref PolyRef) (*Tile, *Poly) {
     return tile, &tile.Polys[poly]
 }
 
-// acquireState takes a pooled query state.
 func (m *Mesh) acquireState() *queryState {
     return m.states.Get().(*queryState)
 }
@@ -488,12 +482,10 @@ func (m *Mesh) releaseState(state *queryState) {
     m.states.Put(state)
 }
 
-// acquireCoarse takes a pooled coarse (cluster level) search state.
 func (m *Mesh) acquireCoarse() *coarseState {
     return m.coarsePool.Get().(*coarseState)
 }
 
-// releaseCoarse returns a coarse search state to the pool.
 func (m *Mesh) releaseCoarse(state *coarseState) {
     m.coarsePool.Put(state)
 }

@@ -32,7 +32,6 @@ type Options struct {
     RepairFake bool
 }
 
-// DefaultOptions returns the production tunables.
 func DefaultOptions() Options {
     return Options{
         Climb:          40,
@@ -140,7 +139,6 @@ func StitchRegion(tile *navmesh.Tile, own borderStrips,
     return stitchBorders(tile, own, neighbors, opts.Climb), nil
 }
 
-// collectStats summarizes the build for the audits.
 func collectStats(rl *regionLayers, sh *sheets, acc *linkAccumulator,
     tile *navmesh.Tile,
 ) BuildStats {

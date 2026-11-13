@@ -195,7 +195,6 @@ func arrowItemID(catalog Catalog) int32 {
     return best
 }
 
-// arrowOffer resolves the cheapest catalog offer of the given arrow item.
 func arrowOffer(
     catalog Catalog, itemID int32,
 ) (int32, int32, int64, bool) {

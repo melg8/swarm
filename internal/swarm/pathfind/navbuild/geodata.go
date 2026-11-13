@@ -104,7 +104,6 @@ func extractRegion(
     return flat, nil
 }
 
-// abs16 is the absolute value of an int16 as int32.
 func abs16(a int16) int32 {
     d := int32(a)
     if d < 0 {

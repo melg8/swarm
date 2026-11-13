@@ -27,7 +27,6 @@ const statsWindowDefault = 24 * time.Hour
 // spike.
 const rateFloorSeconds = 60.0
 
-// parseStatsWindow resolves the window query parameter.
 func parseStatsWindow(r *http.Request) time.Duration {
     raw := r.URL.Query().Get("window")
     if raw == "" {
@@ -50,7 +49,6 @@ type botNow struct {
     startedAt time.Time
 }
 
-// readBotNow snapshots one tracker outside every collector lock.
 func readBotNow(bot *state.Bot) botNow {
     return botNow{
         info:      bot.Info(),
@@ -228,7 +226,6 @@ func (s *Server) handleBotStats(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, s.logger, response)
 }
 
-// processStats snapshots the Go runtime metrics of the process.
 func (c *statsCollector) processStats(now time.Time) processStats {
     var mem runtime.MemStats
     runtime.ReadMemStats(&mem)
@@ -468,7 +465,6 @@ func (c *statsCollector) fleetHistoryLocked(
     return history
 }
 
-// windowedFleetLocked collects the fleet samples of the window.
 func (c *statsCollector) windowedFleetLocked(
     now time.Time, window time.Duration,
 ) []fleetSample {
@@ -606,7 +602,6 @@ func roundUpSampleSec(sec int64) int64 {
     return ((sec + sample - 1) / sample) * sample
 }
 
-// sampleTimes collects the timestamps of the windowed bot samples.
 func sampleTimes(samples []botSample) []int64 {
     times := make([]int64, len(samples))
     for i := range samples {
@@ -616,7 +611,6 @@ func sampleTimes(samples []botSample) []int64 {
     return times
 }
 
-// fleetSampleTimes collects the timestamps of the windowed fleet samples.
 func fleetSampleTimes(samples []fleetSample) []int64 {
     times := make([]int64, len(samples))
     for i := range samples {
@@ -728,7 +722,6 @@ func adenaGainedOf(read botNow, series *botSeries) int64 {
     return int64(read.character.Adena) - series.adenaBase
 }
 
-// lastPacketRate reads the observed packet rate of the last sample.
 func lastPacketRate(series *botSeries) float64 {
     if series == nil {
         return 0

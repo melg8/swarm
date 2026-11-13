@@ -73,7 +73,6 @@ var phaseNames = [phaseCount]string{
     "cityShop", "delevel", "user", "idle",
 }
 
-// phaseCode resolves the sample code of a phase string.
 func phaseCode(phase string) uint8 {
     if code, ok := phaseCodes[phase]; ok {
         return code
@@ -174,7 +173,6 @@ type sampleRing struct {
     count   int
 }
 
-// append stores one sample and compacts the ring when it is full.
 func (r *sampleRing) append(s botSample) {
     if r.count == statsRingCapacity {
         r.compact()
@@ -253,7 +251,6 @@ type botSeries struct {
     events    []statsEvent
 }
 
-// newBotSeries opens the history of a tracker.
 func newBotSeries(bot *state.Bot) *botSeries {
     return &botSeries{
         bot:       bot,
@@ -266,7 +263,6 @@ func newBotSeries(bot *state.Bot) *botSeries {
     }
 }
 
-// noteEvent appends one transition event to the bounded ring.
 func (s *botSeries) noteEvent(now time.Time, kind string, value int64) {
     s.events = append(s.events, statsEvent{
         AtMs:  now.UnixMilli(),
@@ -309,7 +305,6 @@ type statsCollector struct {
     stopOnce    sync.Once
 }
 
-// newStatsCollector creates the collector of a registry.
 func newStatsCollector(
     registry *state.Registry, logger *log.Logger,
 ) *statsCollector {
@@ -331,7 +326,6 @@ func (c *statsCollector) stop() {
     c.stopOnce.Do(func() { close(c.stopCh) })
 }
 
-// run samples the fleet until stop is called.
 func (c *statsCollector) run() {
     c.mu.Lock()
     c.started = time.Now()
@@ -554,7 +548,6 @@ func (c *statsCollector) noteBotEventsLocked(
     }
 }
 
-// botPacketRate returns the packet counter delta over the nominal period.
 func (c *statsCollector) botPacketRate(id string, packets int64) float64 {
     last, ok := c.lastPackets[id]
     c.lastPackets[id] = packets
@@ -565,7 +558,6 @@ func (c *statsCollector) botPacketRate(id string, packets int64) float64 {
     return float64(packets-last) / statsSamplePeriod.Seconds()
 }
 
-// compactFleetLocked halves the fleet slice like the per bot rings do.
 func (c *statsCollector) compactFleetLocked() {
     kept := c.fleet[:0]
     for i := 0; i < len(c.fleet); i += 2 {

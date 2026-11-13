@@ -103,22 +103,18 @@ func NewEngine(dir string) *Engine {
     return engine
 }
 
-// MaxPassableHeight returns the default height step limit of the engine.
 func (e *Engine) MaxPassableHeight() uint16 {
     return e.maxPass
 }
 
-// SetMaxPassableHeight overrides the default height step limit.
 func (e *Engine) SetMaxPassableHeight(maxPassableHeight uint16) {
     e.maxPass = maxPassableHeight
 }
 
-// Dir returns the geodata directory of the engine.
 func (e *Engine) Dir() string {
     return e.dir
 }
 
-// Stats returns the current engine summary.
 func (e *Engine) Stats() Stats {
     e.mu.Lock()
     defer e.mu.Unlock()

@@ -43,7 +43,6 @@ type clusterKey struct {
 // clusterID packs the cluster indices inside a region (CX<<4|CY).
 type clusterID uint8
 
-// clusterOfCell returns the cluster id of a region local cell.
 func clusterOfCell(cx, cy int32) clusterID {
     return clusterID(uint8(cx/clusterCellsSide)<<4 |
         uint8(cy/clusterCellsSide))
@@ -62,7 +61,6 @@ func clusterOfPos(col, row int16, x, y float64) clusterKey {
     return clusterKey{Col: col, Row: row, ID: clusterOfCell(cx, cy)}
 }
 
-// clampCell folds a region local cell coordinate into the region.
 func clampCell(c int32) int32 {
     if c < 0 {
         return 0
@@ -476,7 +474,6 @@ func markClusters(tile *Tile, abstract *regionAbstract) {
     }
 }
 
-// nodeOf returns the node of a cluster id, creating it on first use.
 func (a *regionAbstract) nodeOf(id clusterID) *abstractNode {
     if ni, ok := a.index[id]; ok {
         return &a.nodes[ni]

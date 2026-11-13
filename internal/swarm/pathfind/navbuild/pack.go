@@ -429,7 +429,6 @@ func stitchPackTile(outDir string, key navmesh.RegionKey,
     return added, nil
 }
 
-// tilePathOf returns the tile file path of a region key.
 func tilePathOf(outDir string, key navmesh.RegionKey) string {
     return filepath.Join(outDir, fmt.Sprintf("%d_%d.nm", key.Col,
         key.Row))
@@ -466,7 +465,6 @@ func RegionKeysOfDir(geodataDir string,
     return keys, nil
 }
 
-// parseRegionKey parses "col_row" into a region key.
 func parseRegionKey(base string) (navmesh.RegionKey, bool) {
     colText, rowText, found := strings.Cut(base, "_")
     if !found {

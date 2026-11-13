@@ -131,7 +131,6 @@ func quantize(value float64) uint16 {
     return uint16(value)
 }
 
-// quantOverlap reports whether two quantized bounds overlap.
 func quantOverlap(aMin, aMax, bMin, bMax [3]uint16) bool {
     for a := range 3 {
         if aMin[a] > bMax[a] || aMax[a] < bMin[a] {
@@ -408,7 +407,6 @@ func (h *nodeHeap) Pop() any {
     return item
 }
 
-// distSq3 is the squared 3D distance.
 func distSq3(a, b Point) float64 {
     dx := a[0] - b[0]
     dy := a[1] - b[1]
@@ -417,7 +415,6 @@ func distSq3(a, b Point) float64 {
     return dx*dx + dy*dy + dz*dz
 }
 
-// dist3 is the 3D distance.
 func dist3(a, b Point) float64 {
     return math.Sqrt(distSq3(a, b))
 }

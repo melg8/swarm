@@ -89,7 +89,6 @@ func CellToWorldCenter(p Point) Vec3 {
     return Vec3{X: corner.X + cellSize/2, Y: corner.Y + cellSize/2, Z: 0}
 }
 
-// CellToRegion returns the region file coordinates of a global cell.
 func CellToRegion(p Point) RegionKey {
     return RegionKey{
         Col: int16(floorDiv(p.X, cellsPerRegionSide)),

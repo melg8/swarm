@@ -70,7 +70,6 @@ type layerKey struct {
     nswe   uint8
 }
 
-// newLayerPool creates an empty layer pool.
 func newLayerPool() *layerPool {
     return &layerPool{
         mu:     sync.RWMutex{},
@@ -79,7 +78,6 @@ func newLayerPool() *layerPool {
     }
 }
 
-// intern returns the pool id of the layer, adding it on first use.
 func (p *layerPool) intern(layer Layer) uint16 {
     key := layerKey{height: layer.Height, nswe: layer.NSWE}
     p.mu.Lock()

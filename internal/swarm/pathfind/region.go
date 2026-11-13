@@ -176,17 +176,14 @@ func (r *Region) setSingleLayer(block, cell int, layer Layer) {
 // the layer count.
 const spanOffsetBits = 24
 
-// packSpan merges a refs offset and a layer count into one span word.
 func packSpan(offset, count int) uint32 {
     return uint32(offset)<<8 | uint32(count)
 }
 
-// unpackSpan splits a span word into refs offset and layer count.
 func unpackSpan(span uint32) (offset, count int) {
     return int(span >> 8), int(span & 0xFF)
 }
 
-// cellSpanIndex converts a block and cell position to the span index.
 func cellSpanIndex(block, cell int) int {
     return block*cellsPerBlock + cell
 }
@@ -238,7 +235,6 @@ func (r *Region) ClosestLayer(local Point, z int16) (Layer, bool) {
     return best, true
 }
 
-// heightDelta is the absolute height distance of two layers.
 func heightDelta(a, b int16) int {
     d := int(a) - int(b)
     if d < 0 {

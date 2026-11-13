@@ -245,7 +245,6 @@ type candidateCacheKey struct {
     catalogHash uint64
 }
 
-// cacheKeyOf builds the cache key of a (profile, catalog) pair.
 func cacheKeyOf(profile Profile, catalog Catalog) candidateCacheKey {
     return candidateCacheKey{
         profile:     profile.Name(),
@@ -287,7 +286,6 @@ func catalogHash(catalog Catalog) uint64 {
     return h
 }
 
-// buildCatalogCandidates is the uncached implementation of catalogCandidates.
 func buildCatalogCandidates(
     profile Profile, catalog Catalog,
 ) []purchaseCandidate {

@@ -221,7 +221,6 @@ func parsePolys(data []byte, offset *int, count int) ([]Poly, error) {
     return polys, nil
 }
 
-// parseBVTree reads the bounding volume tree block.
 func parseBVTree(data []byte, offset *int, count int) ([]BVNode, error) {
     if count == 0 {
         return nil, nil

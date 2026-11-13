@@ -46,7 +46,6 @@ type Capsule struct {
     engine *Engine
 }
 
-// NewCapsule creates the clearance probe over an engine.
 func NewCapsule(engine *Engine) *Capsule {
     return &Capsule{engine: engine}
 }
@@ -82,7 +81,6 @@ func (c *Capsule) Clearance(x, y float64, refZ int16) float64 {
     return c.nearestWall(x, y, refZ).dist
 }
 
-// nearestWall resolves the closest wall obstacle of the point.
 func (c *Capsule) nearestWall(x, y float64, refZ int16) capsuleObstacle {
     var best capsuleObstacle
     best.dist = capsuleMaxDistance

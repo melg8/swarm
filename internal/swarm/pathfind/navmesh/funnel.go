@@ -20,7 +20,6 @@ type funnelWp struct {
     portal int32
 }
 
-// funnelPositions strips the funnel waypoints down to their positions.
 func funnelPositions(wps []funnelWp) []Pos {
     positions := make([]Pos, len(wps))
     for i, wp := range wps {
@@ -241,7 +240,6 @@ func labelPortalEnds(tile *Tile, poly *Poly,
     return left, right
 }
 
-// rectCenter returns the world center of a rectangle polygon.
 func rectCenter(tile *Tile, poly *Poly) (float64, float64) {
     x0, y0, x1, y1 := tile.WorldRect(poly)
 
@@ -443,7 +441,6 @@ func triArea2D(a, b, c Pos) float64 {
     return (b.X-a.X)*(c.Y-a.Y) - (b.Y-a.Y)*(c.X-a.X)
 }
 
-// same2D reports whether two positions coincide in 2D.
 func same2D(a, b Pos) bool {
     return math.Abs(a.X-b.X) < funnelEpsilon &&
         math.Abs(a.Y-b.Y) < funnelEpsilon

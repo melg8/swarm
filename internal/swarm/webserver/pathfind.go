@@ -159,7 +159,6 @@ func (s *Server) handlePathfind(w http.ResponseWriter, r *http.Request) {
     writeJSON(w, s.logger, response)
 }
 
-// toResponsePoints converts world positions to the JSON shape.
 func toResponsePoints(world []pathfind.Vec3) []pathfindPoint {
     points := make([]pathfindPoint, len(world))
     for i, position := range world {
