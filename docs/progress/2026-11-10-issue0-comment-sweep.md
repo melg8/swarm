@@ -2197,6 +2197,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the navmesh suite (30.2 s),
   `golangci-lint run ./internal/swarm/pathfind/navmesh/...` 0 issues.
 
+### 2026-11-13 - state/skills.go keeps the cache and plan rules
+
+- 9 blocks compress: the file keeps the 256 queue bound, the full list
+  replacement of `SetSkills`, the atomic pointer reason (a lazily
+  written field made two snapshot encoders writers of the single source
+  of truth, two concurrent rebuilds store two consistent snapshots and
+  one wins), the immutable slice and allocation free read contract, the
+  `corridor`-free plan order (the warrior priorities, the stable unlock
+  level, skill id, level order) and the demanded book rule (an unlock
+  level reached demands the book, a book sold for `referencePrice/2`
+  returns as a full priced buy and its lesson waits forever) with the
+  per class, revision and level cache key. The review date and the
+  retold copy loops drop. 100 comment lines of 371 become 78 of 350, no
+  block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

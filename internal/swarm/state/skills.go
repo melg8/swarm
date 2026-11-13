@@ -11,10 +11,8 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// skillQueueCap bounds the learning queue of the snapshot: the C1
-// class trees carry at most a few hundred remaining lessons, so 256
-// covers every class while a pathological tree cannot grow the view
-// without end.
+// skillQueueCap bounds the learning queue of the snapshot: 256 covers the
+// few hundred remaining lessons of every C1 class.
 const skillQueueCap = 256
 
 // LearnedSkill is one entry of the server skill list packet: the
@@ -68,14 +66,11 @@ type SkillPlanEntry struct {
 }
 
 // SkillPlanView is the published learning queue of the web UI: the
-// remaining lessons in the order the bot plans to learn them (the
-// warrior priorities first - physical weapon attack power, then
-// defense, then the rest; within a category by the unlock level), the
-// SP the plan was computed against, the total SP the whole queue
-// costs and the SP still missing for it. The entries never carry the
-// affordability flag from the stored queue - every view (the snapshot
-// copy, the live encode) computes it against the SP it read under the
-// same lock.
+// remaining lessons in plan order (the warrior priorities first, within a
+// category by the unlock level), the SP the plan was computed against, the
+// queue total and the SP still missing. The stored queue never carries the
+// affordability flag: every view computes it against the SP it read under
+// the same lock.
 type SkillPlanView struct {
     Sp      int64            `json:"sp"`
     Total   int64            `json:"total"`
@@ -83,12 +78,10 @@ type SkillPlanView struct {
     Entries []SkillPlanEntry `json:"entries"`
 }
 
-// SetSkills applies the full skill list of the server packet: the
-// learned level and the passive flag of every skill the character
-// knows. The server sends the whole list on entering the world and
-// after every learn, so the map is replaced, not merged. The learning
-// queue rebuilds lazily on the next snapshot (the learned set
-// changed).
+// SetSkills applies the full skill list of the server packet: the server
+// sends every known skill on entering the world and after every learn, so
+// the map is replaced, not merged. The learning queue rebuilds lazily on
+// the next snapshot.
 func (b *Bot) SetSkills(skills []LearnedSkill) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -104,9 +97,8 @@ func (b *Bot) SetSkills(skills []LearnedSkill) {
     b.touch()
 }
 
-// skillTotalsLocked walks the stored queue and returns the SP total
-// of the whole queue and the SP still missing for it against the
-// given wallet. The caller must hold a lock.
+// skillTotalsLocked returns the SP total of the stored queue and the SP
+// still missing against the given wallet. The caller must hold a lock.
 func skillTotals(entries []SkillPlanEntry, sp int64) (total, missing int64) {
     for i := range entries {
         total += int64(entries[i].SpCost)
@@ -137,12 +129,10 @@ type bookKeepCache struct {
     books    map[int32]bool
 }
 
-// currentSkillQueueLocked returns the cached queue with a freshness
-// flag: ok is true when the cache key still matches the current class
-// and skills revision (the queue itself may be nil - a class with
-// nothing left to learn caches as empty). The peek never rebuilds, so
-// the size estimate and the other hint paths stay allocation free.
-// The caller must hold a lock.
+// currentSkillQueueLocked returns the cached queue with a freshness flag:
+// ok is true when the class and skills revision still match (a class with
+// nothing left to learn caches as empty). The peek never rebuilds, so the
+// hint paths stay allocation free. The caller must hold a lock.
 func (b *Bot) currentSkillQueueLocked() (queue []SkillPlanEntry, ok bool) {
     if c := b.skillQueueCache.Load(); c != nil &&
         c.class == b.char.ClassID && c.revision == b.skillsRevision {
@@ -153,16 +143,13 @@ func (b *Bot) currentSkillQueueLocked() (queue []SkillPlanEntry, ok bool) {
 }
 
 // skillQueueLocked returns the ordered learning queue of the current
-// class, learned set and weapon priority, rebuilding the cache when
-// the class or the skills revision moved. The cache lives behind an
-// atomic pointer instead of plain bot fields: the readers here run
-// under the store read lock, and a lazily written field turned two
-// concurrent snapshot encoders into writers of the single source of
-// truth - a real data race the review of 2026-09-20 caught before a
-// test did. Two concurrent rebuilds store two consistent snapshots
-// and one wins; the steady state read stays allocation free. The
-// returned slice is immutable (every view copies it or reads it value
-// by value). The caller must hold a lock.
+// class, learned set and weapon priority, rebuilding the cache when the
+// class or the skills revision moved. The cache lives behind an atomic
+// pointer because the readers run under the store read lock, and a lazily
+// written field would make two concurrent snapshot encoders writers of the
+// single source of truth; two concurrent rebuilds store two consistent
+// snapshots and one wins. The steady state read stays allocation free and
+// the returned slice is immutable. The caller must hold a lock.
 func (b *Bot) skillQueueLocked() []SkillPlanEntry {
     if queue, ok := b.currentSkillQueueLocked(); ok {
         return queue
@@ -180,11 +167,10 @@ func (b *Bot) skillQueueLocked() []SkillPlanEntry {
     return queue
 }
 
-// skillPlanViewLocked builds the learning queue view of the snapshot:
-// a copy of the queue with the affordability flags set against the
-// current SP, plus the queue total and the missing SP. The copy keeps
-// the view safe against the next queue rebuild. The caller must hold
-// a lock.
+// skillPlanViewLocked builds the learning queue view of the snapshot: a
+// copy of the queue with the affordability flags set against the current SP,
+// plus the queue total and the missing SP, safe against the next rebuild.
+// The caller must hold a lock.
 func (b *Bot) skillPlanViewLocked() *SkillPlanView {
     queue := b.skillQueueLocked()
     if len(queue) == 0 {
@@ -206,18 +192,13 @@ func (b *Bot) skillPlanViewLocked() *SkillPlanView {
     }
 }
 
-// demandedBooksLocked collects the spellbook item ids the character
-// still needs for its near term lessons: every queued lesson whose
-// unlock level the character already reached demands its spellbook
-// (the learning trips buy exactly these books; a looted book of the
-// same lessons joins them). The sell and destroy junk flows keep the
-// collected items - a book sold for referencePrice/2 comes back as a
-// full priced buy of the next learning trip, and the lesson it feeds
-// waits forever without it. The set is cached per class, skills
-// revision and level behind an atomic pointer for the same reason as
-// the queue (see skillQueueLocked): a learn bumps the revision, a
-// level up shifts the unlock window, and the next read rebuilds. The
-// caller must hold a lock.
+// demandedBooksLocked collects the spellbook item ids of the near term
+// lessons (every queued lesson whose unlock level the character reached),
+// which the learning trips buy and the junk flows keep: a book sold for
+// referencePrice/2 comes back as a full priced buy, and the lesson it feeds
+// waits forever without it. The set caches per class, skills revision and
+// level, since a learn bumps the revision and a level up shifts the unlock
+// window. The caller must hold a lock.
 func (b *Bot) demandedBooksLocked() map[int32]bool {
     if c := b.bookKeepCache.Load(); c != nil &&
         c.class == b.char.ClassID && c.revision == b.skillsRevision &&
@@ -246,16 +227,13 @@ func (b *Bot) demandedBooksLocked() map[int32]bool {
     return books
 }
 
-// buildSkillQueue computes the ordered learning queue of a class: the
-// remaining lessons (not learned yet, not auto granted) sorted by the
-// warrior priority - the attack power skills whose weapon condition
-// accepts one of the preferred weapon families first (the weapon in
-// hand and the next weapon of the purchase plan), the other attack
-// power skills second, the defense skills third, everything else
-// last; within a priority group the stable tree order (the unlock
-// level, then the skill id, then the level) survives. The returned
-// slice is the stored queue; the affordability flag is filled by the
-// views, never here.
+// buildSkillQueue sorts the remaining lessons (not learned, not auto
+// granted) by the warrior priority: the attack power skills whose weapon
+// condition accepts a preferred family first (the weapon in hand and the
+// next one of the purchase plan), the other attack power skills second, the
+// defense skills third, everything else last. Within a group the stable tree
+// order (unlock level, skill id, level) survives. The affordability flag is
+// filled by the views, never here.
 func buildSkillQueue(
     classID int32, learned map[int32]learnedSkill, weapons []string,
 ) []SkillPlanEntry {
