@@ -37,26 +37,23 @@ const connectTimeout = 10 * time.Second
 //nolint:exhaustruct_v5 // the zero defaults are intended
 var sessionDialer = &net.Dialer{Timeout: connectTimeout}
 
-// ensurePause separates the character creation connection from the
-// test session login: the game server releases the account when the
-// connection drops, the pause keeps the second login of the same
-// account from racing it.
+// ensurePause separates the creation connection from the test login: the game
+// server releases the account when the connection drops, so the second login
+// would race it.
 const ensurePause = 2 * time.Second
 
-// The reconnect backoff of the supervised sessions: the same shape
-// the runBotForever supervisor uses (a lost session reconnects after
-// the login cooldown, a stable session resets the delay).
+// The reconnect backoff of the supervised sessions, the same shape
+// runBotForever uses: a lost session reconnects after the login cooldown, a
+// stable one resets the delay.
 const (
     sessionReconnectMinDelay = 2 * time.Second
     sessionReconnectMaxDelay = 30 * time.Second
     sessionStableTime        = time.Minute
 )
 
-// ensureCharacter connects to the login and game server, creates the
-// temp character when it is missing (a level 1 elven fighter with the
-// starter gear, standing at the creation spawn point) and drops the
-// connection without entering the world. The database reset that
-// follows turns the character into the scenario start state.
+// ensureCharacter connects to the login and game server, creates the temp
+// character when it is missing (a level 1 elven fighter with the starter gear
+// at the creation spawn) and drops the connection without entering the world.
 func (m *Manager) ensureCharacter(
     account string, password string, char string, logLine func(string),
 ) error {
@@ -64,9 +61,8 @@ func (m *Manager) ensureCharacter(
     if err != nil {
         return err
     }
-    // The creation exchange lands in the run log too (the character
-    // list, the create request and its answer): the prologue of the
-    // run tells whether the temp character existed or was created.
+    // The creation exchange lands in the run log too, so the prologue tells
+    // whether the temp character existed or was created.
     m.tapGame(game, account)
     charList, err := game.Authenticate(gameSessionParams(auth))
     if err != nil {
@@ -99,7 +95,7 @@ func (m *Manager) ensureCharacter(
 }
 
 // gameSessionParams maps the login auth result into the game session
-// authentication parameters.
+// parameters.
 func gameSessionParams(auth *connection.AuthResult,
 ) connection.GameSessionParams {
     return connection.GameSessionParams{
@@ -111,12 +107,10 @@ func gameSessionParams(auth *connection.AuthResult,
     }
 }
 
-// openGame performs the shared connection prologue: the login server
-// authentication and the game server handshake of one temp account.
-// The registrar is the client proxy the session registers with (nil
-// keeps the default proxy of the process, a dedicated server owns the
-// relay scenario). The connection steps land in the run log of the
-// account so the file tells how the session was wired.
+// openGame performs the shared connection prologue: the login authentication
+// and the game handshake of one temp account. The registrar is the proxy the
+// session registers with (nil keeps the process default, a dedicated server
+// owns the relay scenario).
 func (m *Manager) openGame(
     account string, password string, registrar *proxy.Server,
 ) (*connection.AuthResult, *connection.GameClient, error) {
@@ -137,8 +131,8 @@ func (m *Manager) openGame(
     runLog.Session("login authenticated, the game server %d waits at %s",
         auth.ServerID, gameAddress(auth))
     if registrar != nil {
-        // The emulated login server of the client proxy mirrors the
-        // scrambled RSA modulus of the real one.
+        // The emulated login server mirrors the scrambled RSA modulus of the
+        // real one.
         registrar.SetRsaModulus(auth.RsaPublicKey)
     }
     runLog.Session("game dial %s", gameAddress(auth))
@@ -167,8 +161,7 @@ func gameAddress(auth *connection.AuthResult) string {
         auth.ServerPort)
 }
 
-// tapGame wires the packet taps of the run log onto one game client
-// (the short lived creation connection of ensureCharacter).
+// tapGame wires the run log packet taps onto one game client.
 func (m *Manager) tapGame(game *connection.GameClient, account string) {
     runLog := m.runLogFor(account)
     if runLog == nil {
@@ -178,10 +171,9 @@ func (m *Manager) tapGame(game *connection.GameClient, account string) {
     game.SetSendTap(runLog.Send)
 }
 
-// wireSessionTaps wires the packet taps of one session: the run log
-// observes every packet the bot receives and sends, the proxy
-// recorder keeps its replay history (the client can attach to the
-// running bot exactly like to any fleet bot).
+// wireSessionTaps wires the session packet taps: the run log observes every
+// packet, the proxy recorder keeps its replay history (a client can attach like
+// to a fleet bot).
 func (m *Manager) wireSessionTaps(
     game *connection.GameClient, account string,
     proxyRecord func([]byte),
@@ -203,22 +195,19 @@ func (m *Manager) wireSessionTaps(
     game.SetSendTap(runLog.Send)
 }
 
-// sessionLoopHook customizes the hunt loop of one session before
-// the goroutine starts: the scenarios that launch a typed fleet slot
-// apply their type wiring through it (the archer type sets the bow
-// gear profile the same way the config launch of cmd/swarm does for
-// its fleet - the loop is constructed inside runSession, so a hook
-// is the only injection point that does not fork the runner).
+// sessionLoopHook customizes the hunt loop of one session before the goroutine
+// starts: a typed fleet slot applies its wiring through it (the archer sets the
+// bow gear profile like the cmd/swarm fleet does). The loop is built inside
+// runSession, so a hook is the only injection point that does not fork the
+// runner.
 type sessionLoopHook func(*hunt.Loop)
 
-// runSession plays the temp character until the context ends: the
-// full runBot wiring (login, handshake, authentication, the character
-// selection, the world entry, the hunt loop with the geodata
-// navigator, the proxy registration) squeezed into the acceptance
-// runner. The autonomous flag mirrors -hunt of the command line: the
-// farm scenarios hunt on their own, the lifetime and proxy scenarios
-// stay in the manual only mode. The optional hooks run on the fresh
-// hunt loop before Run starts (see sessionLoopHook).
+// runSession plays the temp character until the context ends with the full
+// runBot wiring: login, handshake, authentication, character selection, world
+// entry, the hunt loop with the geodata navigator and the proxy registration.
+// The autonomous flag mirrors -hunt: the farm scenarios hunt on their own, the
+// lifetime and proxy ones stay manual. The hooks run on the fresh loop before
+// Run starts.
 func (m *Manager) runSession(
     ctx context.Context, account string, password string, char string,
     autonomous bool, registrar *proxy.Server, logLine func(string),
@@ -233,9 +222,9 @@ func (m *Manager) runSession(
     }
     game.SetTracker(tracker)
 
-    // The proxy observes the whole session (the recorder replays it
-    // to connecting C1 clients) so the user can attach a real client
-    // to the running test bot exactly like to any fleet bot.
+    // The proxy observes the whole session (the recorder replays it to
+    // connecting C1 clients), so a real client can attach like to any fleet
+    // bot.
     var proxyRecord func([]byte)
     if registrar != nil {
         sessionRecorder := registrar.RegisterSession(account, game, tracker)
@@ -249,10 +238,9 @@ func (m *Manager) runSession(
         return fmt.Errorf("game authentication: %w", err)
     }
 
-    // The temp character must exist before the selection: a fresh
-    // database starts every scenario with an empty account, so the
-    // session creates the missing elven fighter exactly like runBot
-    // does (the same creation values ensureCharacter uses).
+    // The temp character must exist before the selection: a fresh database
+    // starts with an empty account, so the session creates the missing elven
+    // fighter like runBot does.
     charList, err = game.EnsureCharacter(connection.CharacterParams{
         Name:      char,
         Race:      elfRaceID,
@@ -278,12 +266,11 @@ func (m *Manager) runSession(
     }
     logLine("acceptance: entered the world")
 
-    // The hunt loop always runs: with autonomy it hunts, shops and
-    // learns on its own; without it executes the manual commands only
-    // (the web UI stays interactive either way). The loop rides its
-    // OWN session context (see startSessionLoop): the supervisor
-    // context outlives every session, so a loop started on it would
-    // keep ticking against the closed game client after a relogin.
+    // The hunt loop always runs: with autonomy it hunts, shops and learns on
+    // its own, without it executes manual commands only (the web UI stays
+    // interactive). The loop rides its own session context: the supervisor
+    // context outlives every session, so a loop started on it would keep
+    // ticking against the closed client after a relogin.
     loop := hunt.NewLoop(game, tracker)
     wireSessionLoop(m, loop, tracker, autonomous, logLine, hooks)
     stopLoop := startSessionLoop(ctx, loop.Run)
@@ -293,14 +280,11 @@ func (m *Manager) runSession(
 }
 
 // startSessionLoop starts the hunt loop on a cancellable child of the
-// supervisor context and returns the stop function that cancels the
-// child and joins the loop goroutine. The supervisor reconnects with
-// its own long-lived context, so a loop started on it outlived the
-// session: the temp18 acceptance dump of 2026-11-09 showed the leaked
-// loops spamming "use of closed network connection" and doubling
-// every decision (the `step 33 of 12` counters next to the fresh
-// chain of the relogin). The stop runs on every session return path,
-// so the next session starts with exactly one loop.
+// supervisor context and returns the stop function that cancels the child and
+// joins the goroutine. A loop started on the long-lived supervisor context
+// outlived its session, spamming "use of closed network connection" and
+// doubling every decision. The stop runs on every session return path, so the
+// next session starts with exactly one loop.
 func startSessionLoop(
     ctx context.Context, run func(context.Context),
 ) func() {
@@ -317,22 +301,18 @@ func startSessionLoop(
     }
 }
 
-// wireSessionLoop builds the hunt loop of one session: the logger
-// mirror, the navigator of the live integration (the mesh corridor
-// search the fleet bot serves when the mesh loaded, the pure grid
-// navigator otherwise), the autonomy switch (with autonomy it hunts,
-// shops and learns on its own; without it the manual commands of the
-// web UI own the character) and the type hooks of the typed fleet
-// slots (see sessionLoopHook).
+// wireSessionLoop builds the hunt loop of one session: the logger mirror, the
+// navigator (the mesh corridor search when the mesh loaded, the pure grid
+// navigator otherwise), the autonomy switch and the type hooks of the typed
+// fleet slots.
 func wireSessionLoop(
     m *Manager, loop *hunt.Loop, tracker *state.Bot, autonomous bool,
     logLine func(string), hooks []sessionLoopHook,
 ) {
     loop.SetLogger(sessionLogger(tracker, logLine))
     if m.engine != nil && m.mesh != nil {
-        // The mesh navigator of the live integration: the scenarios
-        // plan through the same mesh corridor search the fleet bot
-        // serves (the pure grid navigator answers a different walk).
+        // The scenarios plan through the same mesh corridor search the fleet
+        // bot serves; the pure grid navigator answers a different walk.
         loop.SetNavigator(hunt.NewNavmeshNavigator(m.engine, m.mesh))
     } else if m.engine != nil {
         loop.SetNavigator(hunt.NewNavigator(m.engine))
@@ -347,22 +327,17 @@ func wireSessionLoop(
     }
 }
 
-// joinSessionDone waits for a supervised session goroutine after a
-// cancel and discards its error: the teardown paths call it only to
-// join the goroutine, the scenario verdict already names the outcome.
+// joinSessionDone joins a supervised session goroutine and discards its error:
+// the scenario verdict already names the outcome.
 func joinSessionDone(done <-chan error) {
     <-done //nolint:errcheck // teardown join, the error is moot
 }
 
-// runSessionSupervised keeps the temp session alive the way the
-// runBotForever supervisor does: a lost session (the emergency logout
-// of the hunt loop, a server kick, a transport error) reconnects
-// after the tracker login cooldown with a growing backoff, and the
-// run context ends the loop. The supervisor answers when the run
-// context ended: the loop itself never gives up (every session loss
-// is a reconnect), so there is no error to report. The optional hooks
-// pass through to every session of the supervision (see
-// sessionLoopHook).
+// runSessionSupervised keeps the temp session alive like runBotForever: a lost
+// session (the emergency logout, a server kick, a transport error) reconnects
+// after the tracker login cooldown with a growing backoff, and the run context
+// ends the loop. The supervisor returns when the context ends; the loop itself
+// never gives up.
 func (m *Manager) runSessionSupervised(
     ctx context.Context, account string, password string, char string,
     registrar *proxy.Server, logLine func(string),
@@ -407,10 +382,9 @@ func (m *Manager) registryTracker(account string) *state.Bot {
     return state.NewBot(account)
 }
 
-// sessionLogger builds the hunt loop logger: the console copy and the
-// mirrored lines of the test log. The hunt decisions explain what the
-// scenario is doing (the shopping trips, the lessons, the zone
-// switches) exactly like the fleet sessions.
+// sessionLogger builds the hunt loop logger: the console copy and the mirrored
+// test log lines, so the hunt decisions explain the scenario like the fleet
+// sessions.
 func sessionLogger(
     tracker *state.Bot, logLine func(string),
 ) *log.Logger {
@@ -420,8 +394,8 @@ func sessionLogger(
     }), "", log.LstdFlags)
 }
 
-// logMirror forwards the hunt log lines into the tracker event log
-// and the test log (without the console timestamp prefix).
+// logMirror forwards the hunt log lines into the tracker event log and the test
+// log.
 type logMirror struct {
     tracker *state.Bot
     logLine func(string)

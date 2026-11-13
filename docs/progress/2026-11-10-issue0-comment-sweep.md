@@ -1710,6 +1710,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the cmd/swarm tests,
   `golangci-lint run ./cmd/swarm/...` 0 issues.
 
+### 2026-11-13 - acceptance/runner.go keeps the session wiring
+
+- 21 blocks compress: the runner keeps the creation pause (the game
+  server releases the account when the connection drops, so the test
+  login would race it), the backoff shape of 2 s to 30 s with the
+  1 minute stable reset, the temp character recipe (level 1 elven
+  fighter, race 1, class 18, starter gear at the creation spawn, the
+  connection dropped without entering the world), the proxy registrar
+  rule, the per-session hunt loop context (a loop started on the
+  long-lived supervisor context outlived its session and doubled every
+  decision), the mesh corridor navigator, the cooldown aware reconnect
+  and the log mirror. 109 comment lines of 459 become 83 of 433.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
