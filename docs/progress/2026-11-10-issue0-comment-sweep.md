@@ -2168,6 +2168,20 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the connection suite (10.7 s),
   `golangci-lint run ./internal/swarm/connection/...` 0 issues.
 
+### 2026-11-13 - npcdata/skill_flags.go keeps the two flag mechanics
+
+- 5 blocks compress: the file keeps the verification source
+  (`dist/game/data/stats/skills/00000-00299.xml`), the overhit mechanic
+  (the cast arms the flag, it survives until the next damage event, a
+  kill in that event pays `exp * min(overkill / maxHp, 0.25)`) and the
+  self heal stats of 1216 (42 power, 7 mp plus 2 initial, 10 s reuse)
+  with the skill list over class tree rule. The per entry XML line
+  trail and the repeated "the hunt loop casts it instead of sitting"
+  prose drop; `docs/hunting.md` carries both recovery sections.
+  52 comment lines of 118 become 37 of 104, no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the npcdata suite (0.4 s),
+  `golangci-lint run ./internal/swarm/npcdata/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
