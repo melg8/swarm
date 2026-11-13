@@ -1,28 +1,13 @@
-// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com
+// SPDX-FileCopyrightText: 2026 Melg Eight <public.melg8@gmail.com>
 //
 // SPDX-License-Identifier: MIT
 
-// The route regression corpus of the navmesh pack (owner issue #27):
-// the harness that grows the five query pairwise comparison of the
-// transport round (#11) into a recorded corpus. Three modes:
-//
-//    navpack-verify generate -mesh DIR -out FILE [-seed N]
-//        [-samples N] [-anchors FILE]
-//    navpack-verify replay -mesh DIR -corpus FILE
-//    navpack-verify compare -old DIR -new DIR [-corpus FILE]
-//
-// generate walks a deterministic query set over one pack - the town
-// trip and hunt cell anchors, the cross region corridors and the
-// seeded random pairs - runs every query and records the answer (the
-// verdict, the waypoint count, the waypoint stream hash, the first
-// and last waypoints) into the corpus JSON. replay runs the same
-// queries over one pack and refuses any answer drift, so a structurally
-// reduced pack (the polygon count round) proves the route answers
-// stay identical before it lands. compare keeps the legacy two pack
-// pairwise form of the transport round (the compressed transport must
-// not move a single waypoint), optionally binding both sides to a
-// recorded corpus. Every mode exits nonzero on any mismatch: the
-// corpus is the gate, not a report.
+// The navpack-verify command is the route regression corpus of the navmesh
+// pack: it generates a deterministic query set (the town trip and hunt cell
+// anchors, the cross region corridors, the seeded pairs), records every answer
+// and replays the corpus over a changed pack, failing on any drift - the
+// structural pack rounds gate on it. The three modes (generate, replay,
+// compare), the corpus wire and the anchor sources: docs/navmesh.md.
 package main
 
 import (
@@ -45,15 +30,12 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// The corpus wire version: bump on any answer semantics change, the
-// replay refuses a corpus of a foreign version instead of comparing
-// apples to oranges.
+// The corpus wire version: a semantics change bumps it, and the replay refuses
+// a foreign corpus instead of comparing apples to oranges.
 const corpusVersion = 1
 
-// The verdict classes of a recorded answer: the found and partial
-// routes and the refusals (a missing mesh under an endpoint or any
-// other query error) - the structural round must not flip any of the
-// three.
+// The verdict classes of a recorded answer: the found and partial routes and
+// the refusals (a missing mesh under an endpoint or any other query error).
 const (
     verdictFound   = "found"
     verdictPartial = "partial"
@@ -70,17 +52,15 @@ const (
     kindHuntCell = "hunt-cell"
 )
 
-// corpusPos is one world position of the corpus JSON (the navmesh.Pos
-// fields as they are).
+// corpusPos is one world position of the corpus JSON.
 type corpusPos struct {
     X float64 `json:"x"`
     Y float64 `json:"y"`
     Z float64 `json:"z"`
 }
 
-// corpusAnswer is the recorded answer of one query: everything the
-// replay compares - the verdict class, the error class of a refusal,
-// the waypoint count and the hash of the waypoint stream.
+// corpusAnswer is the recorded answer of one query: the verdict class, the
+// error class of a refusal, the waypoint count and the stream hash.
 type corpusAnswer struct {
     Verdict   string    `json:"verdict"`
     Error     string    `json:"error,omitempty"`
@@ -90,8 +70,8 @@ type corpusAnswer struct {
     Last      corpusPos `json:"last"`
 }
 
-// corpusQuery is one recorded query: the endpoints, the kind and the
-// answer the pack under test must reproduce.
+// corpusQuery is one recorded query: the endpoints, the kind and the answer the
+// pack under test must reproduce.
 type corpusQuery struct {
     ID     string       `json:"id"`
     Kind   string       `json:"kind"`
@@ -100,9 +80,8 @@ type corpusQuery struct {
     Answer corpusAnswer `json:"answer"`
 }
 
-// corpusFile is the corpus JSON: the query set with the recorded
-// answers, plus the metadata the replay reads back (the version gate,
-// the seed and the region list the generator ran over).
+// corpusFile is the corpus JSON: the queries with their answers plus the
+// version, seed and region list the replay reads back.
 type corpusFile struct {
     Version    int           `json:"version"`
     Generator  string        `json:"generator"`
@@ -129,9 +108,8 @@ func zeroAnswer() corpusAnswer {
     }
 }
 
-// newQuery is the constructor of the pre-record queries: the one
-// place the full query literal lives, the generators name the
-// endpoints and move on.
+// newQuery is the constructor of the pre-record queries: the one place the full
+// query literal lives.
 func newQuery(
     id, kind string, start, goal navmesh.Pos,
 ) corpusQuery {
@@ -142,9 +120,8 @@ func newQuery(
     }
 }
 
-// waypointSHA hashes the waypoint stream: the little endian float64
-// bits of every waypoint in order - any moved waypoint flips the
-// hash, the count alone would miss the substitutions.
+// waypointSHA hashes the little endian float64 bits of every waypoint in order,
+// so any moved waypoint flips the hash.
 func waypointSHA(route []navmesh.Pos) string {
     h := sha256.New()
     var buf [24]byte
@@ -158,9 +135,8 @@ func waypointSHA(route []navmesh.Pos) string {
     return hex.EncodeToString(h.Sum(nil))
 }
 
-// runQuery answers one query over the mesh: the recorded answer
-// shape. A refusal records the error CLASS, not the error text - the
-// text drifts with the versions, the class is the regression signal.
+// runQuery answers one query over the mesh. A refusal records the error class,
+// not the text - the text drifts with the versions, the class is the signal.
 func runQuery(mesh *navmesh.Mesh, q corpusQuery) corpusAnswer {
     route, err := mesh.Route(
         navmesh.Pos(q.Start), navmesh.Pos(q.Goal),
@@ -263,10 +239,9 @@ func regionCenter(k regionKey) navmesh.Pos {
     return navmesh.Pos{X: minX + size/2, Y: minY + size/2, Z: 0}
 }
 
-// The built-in anchor set of the transport round (the elven village
-// block endpoints of the town trips and the hunt cells) - the real
-// traffic queries, kept verbatim so the corpus of every round carries
-// them.
+// The built-in anchor set of the transport round (the elven village block
+// endpoints of the town trips and the hunt cells): the real traffic queries,
+// kept verbatim so every corpus carries them.
 func anchorQueries() []corpusQuery {
     pairs := [][2]navmesh.Pos{
         {
@@ -308,10 +283,9 @@ type huntCell struct {
     FocusY float64 `json:"focus_y"`
 }
 
-// anchorPairsFromHuntCells reads the hunt cells file and pairs the
-// cell foci into cross ground queries: cell i walks toward cell
-// (i*7+11) mod len - a deterministic spread over the hunting grounds.
-// The count caps at 64 to bound the generate run.
+// anchorPairsFromHuntCells reads the hunt cells file and pairs the foci into
+// cross ground queries: cell i walks toward cell (i*7+11) mod len, capped at 64
+// to bound the generate run.
 func anchorPairsFromHuntCells(path string) ([]corpusQuery, error) {
     data, err := os.ReadFile(path)
     if err != nil {
@@ -339,10 +313,8 @@ func anchorPairsFromHuntCells(path string) ([]corpusQuery, error) {
     return queries, nil
 }
 
-// corridorQueries pairs the region centers: every consecutive region
-// pair in the sorted key order walks center to center, the first and
-// the last region close the ring - the long cross region corridors
-// the town trips ride.
+// corridorQueries pairs the region centers in sorted key order and closes the
+// ring with the first region - the long cross region corridors the trips ride.
 func corridorQueries(regions []regionKey) []corpusQuery {
     queries := make([]corpusQuery, 0, len(regions))
     for i := 0; i < len(regions); i++ {
@@ -357,13 +329,9 @@ func corridorQueries(regions []regionKey) []corpusQuery {
     return queries
 }
 
-// sampleQueries draws the seeded random pairs over the pack polygons:
-// one walkable surface point per endpoint, drawn straight from a
-// random polygon of a random region (the rect center at its exact
-// surface height - the corpus endpoints sit ON the world the pack
-// carries, every sample answers a real route question). Every 4th
-// sample pairs one region with itself - the intra region density the
-// hunt walks produce.
+// sampleQueries draws the seeded random pairs: one walkable surface point per
+// endpoint from a random polygon, with every 4th sample pairing one region with
+// itself (the intra region density the hunt walks produce).
 func sampleQueries(
     mesh *navmesh.Mesh, regions []regionKey, seed int64, count int,
 ) []corpusQuery {
@@ -383,11 +351,9 @@ func sampleQueries(
     return queries
 }
 
-// surfacePoint draws one walkable world point of one region: a
-// random polygon of the region tile, its rect center, the surface
-// height under it. A region whose tile fails to load falls back to
-// the region center (the refusal records itself - the lost tile is
-// a regression signal too).
+// surfacePoint draws a walkable point of one region (a random polygon at its
+// rect center and surface height); a region whose tile fails to load falls back
+// to its center, which records itself as a regression signal.
 func surfacePoint(
     mesh *navmesh.Mesh, rng *rand.Rand, k regionKey,
 ) navmesh.Pos {
@@ -404,9 +370,8 @@ func surfacePoint(
     return navmesh.Pos{X: x, Y: y, Z: tile.HeightAt(poly, x, y)}
 }
 
-// runGenerate builds the corpus over one pack: the query set first
-// (deterministic: the sorted regions, the fixed anchors, the seeded
-// samples), then the answers - every query runs and records.
+// runGenerate builds the corpus over one pack: the query set first, then the
+// answers, every query recorded.
 func runGenerate(args []string) error {
     fs := flag.NewFlagSet("generate", flag.ExitOnError)
     meshDir := fs.String("mesh", "data/navmesh",
@@ -513,9 +478,8 @@ func loadCorpus(path string) (*corpusFile, error) {
     return &corpus, nil
 }
 
-// runReplay replays the corpus over one pack: every query must
-// answer exactly the recorded answer, any drift names the query and
-// the differing fields and fails the run.
+// runReplay replays the corpus over one pack, naming the query and the
+// differing fields on any drift.
 func runReplay(args []string) error {
     fs := flag.NewFlagSet("replay", flag.ExitOnError)
     meshDir := fs.String("mesh", "data/navmesh",
@@ -565,11 +529,9 @@ func answerText(a corpusAnswer) string {
         a.Verdict, a.Waypoints, a.SHA[:12])
 }
 
-// runCompare keeps the two pack pairwise contract of the transport
-// round: the same queries run over both packs, the answers must
-// match side for side. With -corpus the query set is the corpus,
-// without it the built-in anchors - the form the transport round
-// shipped.
+// runCompare keeps the two pack pairwise contract: the same queries over both
+// packs must match side for side, with -corpus as the query set and the
+// built-in anchors otherwise.
 func runCompare(args []string) error {
     fs := flag.NewFlagSet("compare", flag.ExitOnError)
     oldDir := fs.String("old", "",

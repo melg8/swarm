@@ -890,6 +890,18 @@ corner probe is a length, not a leg at all.
   tests), `task lint:new`. `main.go` fell from 13.5 to 8.4 percent (26
   comment lines of 309), no block above 8 lines.
 
+### 2026-11-12 - cmd/navpack-verify trims the corpus prose
+
+- 19 blocks compress: the 21 line package doc (the modes, the corpus
+  wire and the gate semantics already live in `docs/navmesh.md`), the
+  version and verdict notes, the four corpus record notes, the hash,
+  the query runner, the anchor set, the corridor, sample and surface
+  point notes and the three mode runners. The broken SPDX email line
+  is fixed.
+- Verified: `task fmt`, `go build ./...`, the cmd/navpack-verify
+  package, `task lint:new`. `main.go` fell from 16.5 to 11.5 percent
+  (72 comment lines of 627), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -916,9 +928,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `webserver/navmesh_geometry.go`, `hunt/kite_ledger.go`,
 `hunt/kite_lane.go`, `hunt/city_shopping.go`, `hunt/town_merchants.go`,
 `acceptance/delevel.go`, `pathfind/navbuild/sheet.go`,
-`pathfind/navmesh/abstract.go`, `huntaudit/audit.go` and
-`cmd/navmesh-export/main.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the
+`pathfind/navmesh/abstract.go`, `huntaudit/audit.go`,
+`cmd/navmesh-export/main.go` and `cmd/navpack-verify/main.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
