@@ -1775,6 +1775,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - state/metrics.go keeps the attribution rules
+
+- 10 blocks compress: the tracker keeps the counter lifetime (the
+  counters survive the session resets, so a 24/7 process reports the
+  whole deployment story), the attribution rules (a kill counts when
+  the object the character fights dies, a steal between two swings
+  counts too, a death counts on the alive to dead transition and the
+  village restart is a revive, a session counts every login attempt),
+  the 10 second `killAttributionWindow`, the 0.1 tick EMA weight, the
+  one minute `tickMaxWindow` and the zero time "never happened"
+  marker. The 16 line header block at line 9 - the longest block in
+  the tree - shrinks to 8. 52 comment lines of 189 become 35 of 172.
+- Verified: `task fmt`, `go build ./...`, the state suite,
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

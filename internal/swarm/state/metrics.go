@@ -6,37 +6,26 @@ package state
 
 import "time"
 
-// The lifetime statistics counters of a bot tracker: the session
-// history facts the web statistics tab aggregates into its fleet and
-// per bot views. The counters survive the session resets (a relogin
-// continues the same tracker), so a 24/7 process reports the whole
-// deployment story, not just the current session.
-//
-// Attribution rules (documented where they are armed):
-//   - a kill counts when an object the character actively fights dies
-//     (the fight target of the last swings and chase steps): the solo
-//     farming case is exact, a kill stolen between two swings of the
-//     character is indistinguishable on the wire and counts too;
-//   - a death counts on the alive to dead transition of the played
-//     character (the zero HP StatusUpdate), the village restart that
-//     follows is a revive, not a death;
-//   - a session counts every login attempt (ResetSession): the first
-//     one opens the deployment, every later one is a rejoin.
+// The lifetime statistics counters of a bot tracker, the session history facts
+// the statistics tab aggregates. The counters survive the session resets (a
+// relogin continues the same tracker), so a 24/7 process reports the whole
+// deployment story. Attribution: a kill counts when the object the character
+// fights dies (the fight target of the last swings and chase steps), and a
+// steal between two swings counts too; a death counts on the alive to dead
+// transition of the played character, the village restart that follows is a
+// revive; a session counts every login attempt, so the first opens the run.
 
-// killAttributionWindow bounds how fresh the last self combat activity
-// must be for the death of the fighting target to count as the kill of
-// the character: the killing blow precedes the death broadcast by a
-// sub second, the window only absorbs server hiccups.
+// killAttributionWindow bounds how fresh the last self combat activity must be
+// for the death of the fighting target to count: the blow precedes the death by
+// a sub second.
 const killAttributionWindow = 10 * time.Second
 
-// tickEmaWeight is the smoothing factor of the hunt tick duration EMA:
-// a fast enough reaction to a slowdown, slow enough to keep one slow
-// tick from spiking the average.
+// tickEmaWeight is the smoothing factor of the hunt tick duration EMA: fast
+// enough to react, slow enough to keep one slow tick from spiking the average.
 const tickEmaWeight = 0.1
 
-// tickMaxWindow is how long the maximum tick duration stays armed
-// before a fresh window starts: the statistics view reports the worst
-// tick of the last window, not of the whole process lifetime.
+// tickMaxWindow is how long the maximum tick duration stays armed: the view
+// reports the worst tick of the last window, not of the process lifetime.
 const tickMaxWindow = time.Minute
 
 // botMetrics accumulates the lifetime counters of one bot tracker.
@@ -76,10 +65,9 @@ func newBotMetrics() botMetrics {
     }
 }
 
-// MetricsView is the read-only statistics snapshot of a bot tracker:
-// the lifetime counters with their reference times, so the aggregation
-// layer derives the rates and the ages. The zero times encode "never
-// happened".
+// MetricsView is the read-only statistics snapshot: the lifetime counters with
+// their reference times, so the aggregation layer derives the rates and ages; a
+// zero time encodes "never happened".
 type MetricsView struct {
     Kills        int32         `json:"kills"`
     Deaths       int32         `json:"deaths"`
@@ -116,10 +104,9 @@ func (b *Bot) Metrics() MetricsView {
     }
 }
 
-// NoteHuntTick feeds one measured hunt loop tick duration into the
-// statistics: the web statistics tab reports the average and the worst
-// tick of every bot (the loop cadence is the loop health signal of a
-// loaded process). Human paced, never a hotpath.
+// NoteHuntTick feeds one measured hunt loop tick duration: the statistics tab
+// reports the average and the worst tick (the loop cadence is the health signal
+// of a loaded process).
 func (b *Bot) NoteHuntTick(d time.Duration) {
     if d < 0 {
         return
@@ -139,16 +126,14 @@ func (b *Bot) NoteHuntTick(d time.Duration) {
     }
 }
 
-// noteDeathLocked counts one death of the played character. The caller
-// must hold the write lock.
+// noteDeathLocked counts one death of the played character.
 func (b *Bot) noteDeathLocked(now time.Time) {
     b.metrics.deaths++
     b.metrics.lastDeathAt = now
 }
 
-// noteKillLocked counts the death of the object the character fights
-// (the last fighting target with fresh self combat activity). The
-// caller must hold the write lock.
+// noteKillLocked counts the death of the object the character fights, the last
+// fighting target with fresh self combat activity.
 func (b *Bot) noteKillLocked(objectID int32, now time.Time) {
     if objectID != b.char.FightingTargetID ||
         now.Sub(b.char.CombatActiveAt) > killAttributionWindow {
@@ -158,9 +143,8 @@ func (b *Bot) noteKillLocked(objectID int32, now time.Time) {
     b.metrics.lastKillAt = now
 }
 
-// noteSwingsLocked counts one Attack broadcast: the swings the played
-// character made (with how many connected) and the swings aimed at it
-// by other units. The caller must hold the write lock.
+// noteSwingsLocked counts one Attack broadcast: the swings the played character
+// made (with how many connected) and the swings aimed at it by other units.
 func (b *Bot) noteSwingsLocked(a Attack) {
     if a.AttackerID == b.selfID {
         b.metrics.swingsMade++
@@ -179,9 +163,8 @@ func (b *Bot) noteSwingsLocked(a Attack) {
     }
 }
 
-// noteDamageTakenLocked folds one observed HP drop of the played
-// character into the cumulative damage taken. The caller must hold the
-// write lock.
+// noteDamageTakenLocked folds one observed HP drop into the cumulative damage
+// taken.
 func (b *Bot) noteDamageTakenLocked(amount float64) {
     if amount > 0 {
         b.metrics.damageTaken += amount
