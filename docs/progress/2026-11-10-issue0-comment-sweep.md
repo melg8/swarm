@@ -1275,6 +1275,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the session suite (0.5 s),
   `golangci-lint run ./internal/swarm/session/...` 0 issues.
 
+### 2026-11-13 - pathfind/navmesh/astar.go keeps the search facts only
+
+- 24 blocks compress: the search keeps the 65536 node cap, the tile
+  resolved once at relaxation, the 16384 unit water bucket cell, the
+  build versus coverage cost split, the 494 ms map against the 35 ms
+  typed arena measurement, the 0.7 load, the polygon granularity
+  approach rule with its z axis layer split, the escape flood with the
+  zero heuristic, the recovery ban graze rule and its 15k ford, and the
+  external link resolution. 143 comment lines of 649 become 110 of 620.
+- Verified: `task fmt`, `go build ./...`, the navmesh suite (32.6 s),
+  `golangci-lint run ./internal/swarm/pathfind/navmesh/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

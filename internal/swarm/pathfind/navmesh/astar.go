@@ -6,18 +6,15 @@ package navmesh
 
 import "math"
 
-// maxQueryNodes bounds the A* node count of one flat search. The
-// corridors of real routes hold hundreds of polygons; the bound exists
-// so a pathological filter (or a mesh bug) answers a partial route
-// instead of walking every polygon of every loaded region. The
-// hierarchical route passes its own budgets (the coarse level and the
-// refinement hops, see hierarchy.go).
+// maxQueryNodes bounds the A* node count of one flat search: real corridors
+// hold hundreds of polygons, so a pathological filter or a mesh bug answers a
+// partial route instead of walking every polygon of every loaded region. The
+// hierarchical route passes its own budgets (see hierarchy.go).
 const maxQueryNodes = 65536
 
-// astarNode is one node of the corridor search: the polygon with its
-// tile (resolved once at relaxation - the mesh lookup per settled
-// node is the hot path cost this cache removes), the entry position
-// (the portal midpoint), the parent, the costs and the open heap
+// astarNode is one node of the corridor search: the polygon with its tile
+// (resolved once at relaxation, which removes the mesh lookup per settled
+// node), the portal midpoint entry, the parent, the costs and the heap
 // bookkeeping.
 type astarNode struct {
     ref     PolyRef
@@ -37,31 +34,28 @@ const (
     notInHeap = -1
 )
 
-// queryState is the pooled per-query search state: the node array,
-// the reference-to-node index, the open heap and the best partial
-// node tracking. One Route call takes a state from the mesh pool,
-// resets and returns it.
+// queryState is the pooled per-query search state: the nodes, the
+// reference-to-node index, the open heap and the best partial node. One Route
+// call takes it from the mesh pool, resets and returns it.
 type queryState struct {
     nodes []astarNode
     index refIndex
     open  []uint32
     best  uint32
     bestH float64
-    // zones is the bucket index of the filter water zone cuboids,
-    // built once per search for the zone-aware swim pricing (nil
+    // zones buckets the filter water zone cuboids for the swim pricing (nil
     // without the zone table).
     zones *zoneIndex
 }
 
-// zoneCellShift is the bucket grid side of the water zone index: the
-// world splits into 16384 unit cells (a C1 region spans two), every
-// cuboid lands in the few cells its box overlaps.
+// zoneCellShift is the side of the water zone bucket grid: the world splits
+// into 16384 unit cells (a C1 region spans two) and a cuboid lands in the few
+// cells its box overlaps.
 const zoneCellShift = 14
 
-// zoneIndex buckets the water zone cuboids by their x/y footprint:
-// the per search build costs one pass over the table, the per
-// polygon coverage test reads one bucket - a handful of boxes where
-// the whole table carries hundreds.
+// zoneIndex buckets the water zone cuboids by their x/y footprint: the build
+// costs one pass over the table and a coverage test reads one bucket - a
+// handful of boxes where the whole table carries hundreds.
 type zoneIndex struct {
     cells map[uint64][]WaterZone
 }
@@ -85,12 +79,10 @@ func newZoneIndex(boxes []WaterZone) *zoneIndex {
     return idx
 }
 
-// covered reports whether the server prices the swim at a world
-// point whose bed height is z: the x/y point falls inside a zone box
-// whose water surface reaches above the bed (the ZoneCuboid x/y test
-// of the server, the surface test instead of the exact feet z - a
-// swimming character floats near the surface inside the box, the
-// zone data minZ never splits a water body the surface covers).
+// covered reports whether the server prices the swim at an x/y point over a bed
+// of height z: the point falls inside a zone box whose surface reaches above
+// the bed (the ZoneCuboid x/y test, the surface instead of the exact feet z - a
+// swimmer floats near the surface and the minZ never splits a covered body).
 func (idx *zoneIndex) covered(x, y, z float64) bool {
     key := uint64(int64(x)>>zoneCellShift)<<32 |
         uint64(uint32(int64(y)>>zoneCellShift))
@@ -104,11 +96,10 @@ func (idx *zoneIndex) covered(x, y, z float64) bool {
     return false
 }
 
-// polyCost prices one polygon of the search: the land rate for the
-// ground, the swim price for the water polygons the armed zone data
-// covers, the plain land rate for the water polygons it omits (the
-// server walks such beds at the run speed - the authored zone data,
-// not the depth, prices the swim).
+// polyCost prices one polygon: the land rate for the ground, the swim price for
+// the water the armed zone data covers and the land rate for the water it omits
+// (the server walks such beds at run speed - the authored zone data, not the
+// depth, prices the swim).
 func polyCost(
     tile *Tile, poly *Poly, zones *zoneIndex, filter Filter,
 ) float64 {
@@ -127,14 +118,12 @@ func polyCost(
     return 1
 }
 
-// refIndex is the open addressing reference-to-node table the flat
-// search relaxes through. It replaces the map[PolyRef]uint32 whose
-// hash lookup per link relaxation owned the flat search constant
-// (the external benchmark round, docs/fastpath_research.md section
-// 8: the identical exhaustive query answers 494 ms with the map and
-// 35 ms with the typed arena the raasta engine uses). The epoch
-// stamp makes the reset O(1): the slots of the older epochs read as
-// empty, no rehash and no clear per query.
+// refIndex is the open addressing reference-to-node table of the flat search.
+// It replaces the map[PolyRef]uint32 whose hash lookup per relaxation owned the
+// search constant: the same exhaustive query answers 494 ms with the map and
+// 35 ms with the typed arena (docs/fastpath_research.md section 8). The epoch
+// stamp makes the reset O(1): older epochs read as empty, so no rehash and no
+// clear per query.
 type refIndex struct {
     slots []refSlot
     mask  uint64
@@ -150,13 +139,11 @@ type refSlot struct {
     epoch uint32
 }
 
-// refIndexMinSlots bounds the smallest table (the single tile
-// searches create thousands of nodes, the whole map hops hundreds
-// of thousands).
+// refIndexMinSlots bounds the smallest table: a single tile search creates
+// thousands of nodes, a whole map hop hundreds of thousands.
 const refIndexMinSlots = 1 << 13
 
-// init sizes the table to the power of two that keeps the default
-// load under 0.7 at the requested node count.
+// init sizes the table to the power of two that keeps the load under 0.7.
 func (ix *refIndex) init(nodes int) {
     size := refIndexMinSlots
     for size < (nodes+1)*2 {
@@ -173,8 +160,8 @@ func (ix *refIndex) init(nodes int) {
 func (ix *refIndex) reset() {
     ix.count = 0
     ix.epoch++
-    // The epoch wrap recycles the table: the slots all read stale at
-    // the epoch 0 boundary, the insert fills them afresh.
+    // The epoch wrap recycles the table: every slot reads stale at the 0
+    // boundary and the insert fills it afresh.
     if ix.epoch == 0 {
         for i := range ix.slots {
             ix.slots[i].epoch = 0
@@ -234,9 +221,9 @@ func (ix *refIndex) grow() {
     }
 }
 
-// hashRef is the splitmix64 finalizer: the packed references differ
-// mostly in the low bits (the polygon index) and the tile bits (the
-// region key), the avalanche spreads both into the table index.
+// hashRef is the splitmix64 finalizer: the packed references differ mostly in
+// the low polygon bits and the tile bits, and the avalanche spreads both into
+// the table index.
 func hashRef(v uint64) uint64 {
     v ^= v >> 33
     v *= 0xff51afd7ed558ccd
@@ -387,9 +374,8 @@ func (s *queryState) corridorOf(idx uint32) []PolyRef {
 // astarResult is the outcome of the corridor search.
 type astarResult struct {
     corridor []PolyRef
-    // end is the effective end position of the corridor: the search
-    // end for a reached goal, the entry position of the best partial
-    // node for the closest-reachable answer.
+    // end is the effective end: the search end for a reached goal, the entry of
+    // the best partial node for the closest-reachable answer.
     end      Pos
     reached  bool
     partial  bool
@@ -410,15 +396,13 @@ func emptyResult() astarResult {
     }
 }
 
-// astarGoal selects the stop condition of the corridor search: the
-// search stops at one target polygon. The approach radius widens the
-// goal: the search also stops on the first polygon whose closest
-// surface point lies within the radius of the end position.
+// astarGoal selects the stop condition: one target polygon, widened by an
+// approach radius that also stops on the first polygon whose closest surface
+// point lies within the radius of the end position.
 type astarGoal struct {
     target PolyRef
-    // approach is the 3D radius of the FindPathApproach goal (the
-    // merchant interaction distance of the town trips); zero keeps
-    // the exact target contract.
+    // approach is the 3D radius of the FindPathApproach goal (the merchant
+    // interaction distance); zero keeps the exact target contract.
     approach float64
 }
 
@@ -427,16 +411,12 @@ func (g astarGoal) reached(_ *Poly, ref PolyRef) bool {
     return ref == g.target
 }
 
-// approachReached reports whether a settled polygon already
-// satisfies an approach radius goal: the closest surface point of
-// the polygon lies within the 3D radius of the search end. This is
-// the polygon-granularity form of the grid nodeReached rule (the
-// first node within the approach radius of the target point): the
-// walker may stand anywhere on the rectangle, so the closest point
-// of the whole surface decides, not a cell center. The stacked-layer
-// disambiguation rides the z axis of the test unchanged - a deck
-// floating over the end position answers with its own height, the
-// vertical gap keeps it outside the radius.
+// approachReached reports whether a settled polygon satisfies an approach
+// radius goal: its closest surface point lies within the 3D radius of the end.
+// This is the polygon granularity form of the grid nodeReached rule - the
+// walker may stand anywhere on the rectangle, so the closest point of the
+// surface decides, not a cell center. The z axis keeps a deck floating over the
+// end outside the radius with its own height.
 func (g astarGoal) approachReached(tile *Tile, poly *Poly, end Pos) bool {
     if g.approach <= 0 || tile == nil || poly == nil {
         return false
@@ -449,15 +429,13 @@ func (g astarGoal) approachReached(tile *Tile, poly *Poly, end Pos) bool {
     return math.Sqrt(dx*dx+dy*dy+dz*dz) <= g.approach
 }
 
-// astar runs the corridor search over the mesh. The step cost is the
-// 3D distance between entry positions times the averaged area costs
-// of the two polygons (the water pricing of the filter); the
-// heuristic of the ordinary search is the 3D distance to the end
-// position, the escape search runs with a zero heuristic (a priced
-// flood whose first dry polygon is the cheapest way out). When the
-// goal is not reached the answer carries the corridor to the node
-// closest to the end position - the Detour partial result the dry
-// searches turn into the closest reachable dry point.
+// astar runs the corridor search over the mesh. The step cost is the 3D
+// distance between entry positions times the averaged area costs of the two
+// polygons; the heuristic is the 3D distance to the end, and the escape search
+// runs a zero heuristic (a priced flood whose first dry polygon is the cheapest
+// way out). When the goal is not reached the corridor ends at the node closest
+// to the end position: the Detour partial result the dry searches turn into the
+// closest reachable dry point.
 func (m *Mesh) astar(
     state *queryState, goal astarGoal, startRef PolyRef, startPos Pos,
     endPos Pos, filter Filter, avoid avoidCtx, budget int,
@@ -514,12 +492,11 @@ func (m *Mesh) astar(
     return result
 }
 
-// expand relaxes every link of one settled node. The internal links
-// resolve inside the node tile without any mesh lookup (the map and
-// the lock only serve the rare cross region links). The avoid
-// context walls the links onto banned polygons and prices the escape
-// polygons of the ban holding the start (the recovery ban rules of
-// the grid costTo - the rectangle granularity form, see avoid.go).
+// expand relaxes every link of one settled node. The internal links resolve
+// inside the node tile without a mesh lookup (the map and the lock serve the
+// rare cross region links only). The avoid context walls the links onto banned
+// polygons and prices the escape polygons of the ban holding the start (see
+// avoid.go).
 func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
     endPos Pos, filter Filter, avoid avoidCtx, allow *confinedSet,
 ) {
@@ -548,16 +525,13 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
             if avoid.portalBanned(ax, ay, bx, by) ||
                 !avoid.foreignTouched(targetTile, targetPoly) ||
                 !filter.AvoidGrazed {
-                // The recovery ban: the live server proved this ground
-                // unwalkable for this session, the detour around it is
-                // the only plan worth planning. The rectangle
-                // granularity of the wall test grazes the merged mesh
-                // strips far beyond the circle, so with AvoidGrazed the
-                // step whose own portal segment stays clear of every
-                // foreign circle survives at the grazed price below -
-                // the own ban beyond the escape ring keeps its seal
-                // (the way out contract) and the world town ban keeps
-                // the river ford 15k away crossable.
+                // The recovery ban: the server proved this ground unwalkable,
+                // so the detour around it is the only plan worth planning. The
+                // rectangle granularity grazes the merged strips far beyond the
+                // circle, so with AvoidGrazed a step whose portal segment stays
+                // clear of every foreign circle survives at the grazed price -
+                // the own ban beyond the escape ring keeps its seal and the
+                // town ban keeps the river ford 15k away crossable.
                 continue
             }
             portalClear = true
@@ -569,13 +543,12 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
         g := node.g + dist3(node.pos, mid)*(fromCost+targetCost)*0.5
         if ban == avoidEscape {
             // The ban that holds the start: the only honest route out
-            // of it crosses its own ground - expensive, never sealed.
+            // crosses its own ground - expensive, never sealed.
             g *= avoidEscapeMultiplier
         } else if portalClear {
-            // The grazed ground of a foreign ban: pricier than the own
-            // escape ring (the foreign ban wins the tie, the toy lane
-            // contract) yet never sealed - the merged strip granularity
-            // must not wall the ford 15k units downstream.
+            // The grazed ground of a foreign ban: pricier than the own escape
+            // ring (the foreign ban wins the tie) yet never sealed, so the
+            // merged strip granularity never walls the ford 15k downstream.
             g *= avoidGrazedMultiplier
         }
         h := dist3(mid, endPos)
@@ -583,11 +556,10 @@ func (m *Mesh) expand(state *queryState, node *astarNode, idx uint32,
     }
 }
 
-// linkTarget resolves one link of a node polygon to its target
-// reference, tile and polygon: the internal link stays inside the
-// node tile (no mesh lookup), the external one resolves through the
-// mesh. A link the mesh cannot resolve answers nil tiles - the caller
-// treats it as a wall.
+// linkTarget resolves one link to its target reference, tile and polygon: the
+// internal link stays inside the tile, the external one resolves through the
+// mesh. An unresolvable link answers nil tiles and the caller treats it as a
+// wall.
 func (m *Mesh) linkTarget(
     tile *Tile, link *Link,
 ) (PolyRef, *Tile, *Poly) {
@@ -611,9 +583,8 @@ func (m *Mesh) linkTarget(
     return targetRef, targetTile, targetPoly
 }
 
-// relax relaxes one link target of the corridor search: a reference
-// the search has not seen yet becomes a fresh node, an open one
-// improves through the cheaper parent.
+// relax relaxes one link target: an unseen reference becomes a fresh node, an
+// open one improves through the cheaper parent.
 func relax(
     state *queryState, idx uint32, targetRef PolyRef,
     targetTile *Tile, targetPoly *Poly, mid Pos, g, h float64,
