@@ -4,20 +4,16 @@
 
 package hunt
 
-// The class transfer quest chain data of M2: the executable form of the
-// chain tables of docs/quest_protocol.md, every value read from the
-// Mobius C1 quest scripts, their spawn files and the quest page htm
-// files. The quest_chains_test.go pins the data against the npcdata name
-// maps and the script facts.
-//
-// The accessors return fresh values (no shared state): a stage is a talk
-// stage when its TalkNpc carries a template id and a kill stage when its
-// Kill carries mobs (the zero sentinels of the townNpc convention).
+// The class transfer quest chain data of M2: the executable form of the chain
+// tables of docs/quest_protocol.md, every value read from the Mobius C1 quest
+// scripts, their spawn files and the quest page htm files; quest_chains_test.go
+// pins the data against the npcdata name maps. The accessors return fresh
+// values, and the zero sentinels split a talk stage (a TalkNpc template id)
+// from a kill stage (a Kill with mobs).
 
-// QuestNpc is one npc station of a quest chain: the display id of the
-// npcdata space (the tracker stores the NpcInfo template id as display id
-// plus 1000000) and the spawn position of the live stack, the walk target
-// of the trip planner.
+// QuestNpc is one npc station of a quest chain: the display id of the npcdata
+// space (the NpcInfo template id plus 1000000) and the spawn position of the
+// live stack, the walk target of the trip planner.
 type QuestNpc struct {
     TemplateID int32
     Name       string
@@ -26,21 +22,20 @@ type QuestNpc struct {
     Z          int32
 }
 
-// QuestKill is one farming stage of a quest: kill the mobs until the
-// quest items reach the target count. The script drops the item straight
-// into the killer's inventory 2.5 s after the corpse (Quest.giveItems),
-// never onto the ground.
+// QuestKill is one farming stage of a quest: kill the mobs until the quest
+// items reach the target count. The script drops the item straight into the
+// killer's inventory 2.5 s after the corpse (Quest.giveItems), never onto the
+// ground.
 type QuestKill struct {
-    // Mobs are the npcdata display ids of the mobs whose kills
-    // count (the addKillId set of the script, mapped through
-    // CT0_to_C4_ids.txt).
+    // Mobs are the npcdata display ids whose kills count (the addKillId set,
+    // mapped through CT0_to_C4_ids.txt).
     Mobs []int32
-    // ItemIDs are the quest item ids the drops accumulate: one id for a
-    // piece counter, several for the Q00407 torn letter set (one new
-    // piece per kill, in id order, until all four exist).
+    // ItemIDs are the quest item ids the drops accumulate: one for a piece
+    // counter, several for the Q00407 torn letter set (one new piece per kill,
+    // in id order).
     ItemIDs []int32
-    // DropPercent is the per kill chance of the script (the
-    // getRandom(10) < N gate; 100 for the unconditional drops).
+    // DropPercent is the per kill chance (the getRandom(10) < N gate, 100 for
+    // an unconditional drop).
     DropPercent int
     // Target is the total item count that advances the cond.
     Target int32
@@ -55,49 +50,43 @@ type QuestKill struct {
 // quest id).
 type QuestStage struct {
     Cond int32
-    // TalkNpc is the npc the stage talks to (the zero QuestNpc of
-    // a pure kill stage): walking into the interaction distance
-    // and opening the dialog (DriveDialog of the walker).
+    // TalkNpc is the npc the stage talks to, the zero value of a pure kill
+    // stage: walk into the interaction distance and open the dialog
+    // (DriveDialog).
     TalkNpc QuestNpc
-    // Links is the dialog route of the talk: non-empty when the cond
-    // advance rides a bypass click of the npc's page (the onEvent setCond
-    // branch - Kluto's "Ask about the favor"); empty when the talk itself
-    // advances (the onTalk setCond branch: the server moves the cond as
-    // the page opens).
+    // Links is the dialog route of the talk: non-empty when the cond advance
+    // rides a bypass click (the onEvent setCond branch), empty when the talk
+    // itself advances the cond as the page opens (the onTalk setCond branch).
     Links []DialogStep
     // Kill is the farming block of the stage (the zero QuestKill
     // of a pure talk stage).
     Kill QuestKill
-    // Transfer is the optional gatekeeper segment the stage opens with:
-    // the station sits in another town (Kluto of Gludin while the
-    // character stands in Gludio), so the stage walks to the gatekeeper
-    // and rides the teleport. Nil when the station is reachable on foot.
+    // Transfer is the optional gatekeeper segment the stage opens with: the
+    // station sits in another town (Kluto of Gludin while the character stands
+    // in Gludio), so the stage walks to the gatekeeper and rides the teleport.
     Transfer *QuestTransfer
 }
 
-// QuestTransfer is the town hop a quest stage may need before its station
-// becomes reachable: one gatekeeper teleport bought through the bypass
-// flow (the walk to the teleporter, the talk that opens the first page,
-// the showTeleports list, the destination button). The Gludio hops read
-// from the live stack teleporter xml (docs/quest_protocol.md).
+// QuestTransfer is the town hop before a station becomes reachable: one
+// gatekeeper teleport bought through the bypass flow (the walk to the
+// teleporter, the talk, the showTeleports list, the destination button). The
+// Gludio hops read from the live stack teleporter xml (docs/quest_protocol.md).
 type QuestTransfer struct {
-    // Gatekeeper is the teleporter npc of the town the character
-    // leaves (the walk target of the segment).
+    // Gatekeeper is the teleporter npc of the town the character leaves.
     Gatekeeper QuestNpc
-    // DestLabel selects the teleport list button (a substring of the
-    // label: "The Village of Gludin", "The Town of Gludio").
+    // DestLabel selects the teleport list button by a label substring ("The
+    // Village of Gludin", "The Town of Gludio").
     DestLabel string
-    // ArriveX/Y/Z is the arrival square of the teleport (the xml
-    // location of the teleporter data - the arrival wait gate).
+    // ArriveX/Y/Z is the arrival square of the teleporter xml, the arrival wait
+    // gate.
     ArriveX int32
     ArriveY int32
     ArriveZ int32
 }
 
-// QuestChain is one first profession quest of the elven fighter:
-// the journal progress the tracker observes (QuestCond of
-// QuestID), the dialog route of the accept and the stage ladder
-// from cond 1 to the exit.
+// QuestChain is one first profession quest of the elven fighter: the journal
+// progress the tracker observes (QuestCond of QuestID), the dialog route of the
+// accept and the stage ladder from cond 1 to the exit.
 type QuestChain struct {
     QuestID  int32
     Script   string
@@ -110,9 +99,8 @@ type QuestChain struct {
     // Accept is the dialog route from the start npc's first page
     // to the quest start (the links of the CREATED pages).
     Accept []DialogStep
-    // Stages run from cond 1 to the final cond whose talk ends the
-    // quest (the reward lands, exitQuest removes the registered
-    // quest items).
+    // Stages run from cond 1 to the final cond whose talk ends the quest: the
+    // reward lands and exitQuest removes the registered quest items.
     Stages []QuestStage
     // ProofItem is the item that survives the quest exit (not a
     // registered quest item) - the class change consumes it.
@@ -121,8 +109,8 @@ type QuestChain struct {
     RewardSP  int64
 }
 
-// ClassChange is the profession change segment at the grand master: the
-// dialog route from the master's static page to the change link.
+// ClassChange is the profession change segment at the grand master: the dialog
+// route from the static page to the change link.
 type ClassChange struct {
     Npc QuestNpc
     // TargetClass is the resulting class id (19 Elven Knight, 22
@@ -132,17 +120,14 @@ type ClassChange struct {
     // ProofItem is the quest proof the master takes (all copies).
     ProofItem int32
     MinLevel  int32
-    // Route is the dialog walk from the static villagemaster page (the
-    // "Listen to information about first class transfer" link opens the
-    // script pages) to the change link whose bypass command is
-    // `Script ElfHumanFighterChange1 <class id>` (the -h form the walker
-    // strips).
+    // Route is the dialog walk from the static villagemaster page to the change
+    // link whose bypass command is `Script ElfHumanFighterChange1 <class id>`
+    // (the -h form the walker strips).
     Route []DialogStep
 }
 
-// The zero sentinels of the stage halves (the townNpc convention:
-// a stage is a talk stage when its TalkNpc carries a template id,
-// a kill stage when its Kill carries mobs).
+// The zero sentinels of the stage halves (the townNpc convention of the talk
+// and kill stage split).
 var (
     zeroQuestNpc  = QuestNpc{TemplateID: 0, Name: "", X: 0, Y: 0, Z: 0}
     zeroQuestKill = QuestKill{
@@ -157,9 +142,8 @@ var zeroQuestStage = QuestStage{
     Transfer: nil,
 }
 
-// questTalkStage builds a talk stage: the cond the stage starts
-// at, the npc station and the optional dialog route (empty when
-// the talk itself advances the cond).
+// questTalkStage builds a talk stage from the cond, the npc station and the
+// optional dialog route.
 func questTalkStage(
     cond int32, npc QuestNpc, links ...DialogStep,
 ) QuestStage {
@@ -186,9 +170,8 @@ func (s QuestStage) withTransfer(transfer *QuestTransfer) QuestStage {
     return s
 }
 
-// The class transfer npc stations of the live stack (the Gludio
-// spawn file GludioNPCs.xml; Kluto of the Gludin spawn file).
-// The constructors return fresh values - the chains share no state.
+// The class transfer npc stations of the live stack (GludioNPCs.xml, Kluto of
+// the Gludin spawn file); the constructors return fresh values.
 func soriusNPC() QuestNpc {
     return QuestNpc{
         TemplateID: 7327, Name: "Sorius", X: -13440, Y: 122643, Z: -3103,
@@ -225,18 +208,16 @@ func rainsNPC() QuestNpc {
     }
 }
 
-// bellaNPC is the Gludio gatekeeper (GludioNPCs.xml: -12736 122816
-// -3114): the Gludin hop (the teleporter xml 30256.xml, "The Village of
-// Gludin" for 7300 adena).
+// bellaNPC is the Gludio gatekeeper (GludioNPCs.xml: -12736 122816 -3114) for
+// the Gludin hop (30256.xml, "The Village of Gludin" for 7300 adena).
 func bellaNPC() QuestNpc {
     return QuestNpc{
         TemplateID: 7256, Name: "Bella", X: -12736, Y: 122816, Z: -3114,
     }
 }
 
-// richlinNPC is the Gludin gatekeeper (GludinVillageNPCs.xml:
-// -80752 149776 -3044): the return Gludio hop (the teleporter xml
-// 30320.xml, "The Town of Gludio" for 7300 adena).
+// richlinNPC is the Gludin gatekeeper (GludinVillageNPCs.xml: -80752 149776
+// -3044) for the Gludio hop (30320.xml, "The Town of Gludio" for 7300 adena).
 func richlinNPC() QuestNpc {
     return QuestNpc{
         TemplateID: 7320, Name: "Richlin",
@@ -244,9 +225,8 @@ func richlinNPC() QuestNpc {
     }
 }
 
-// TransferGludioToGludin is the outbound town hop of the knight chain:
-// Bella teleports the character from Gludio to the Gludin village square
-// (the arrival square of the teleporter xml).
+// TransferGludioToGludin is the outbound town hop of the knight chain: Bella
+// lands the character on the Gludin village square of the teleporter xml.
 func TransferGludioToGludin() *QuestTransfer {
     return &QuestTransfer{
         Gatekeeper: bellaNPC(),
@@ -257,9 +237,9 @@ func TransferGludioToGludin() *QuestTransfer {
     }
 }
 
-// TransferGludinToGludio is the return town hop of the knight chain:
-// Richlin teleports the character from Gludin back to the Gludio town
-// square, where Rains and the closing Sorius talk stand.
+// TransferGludinToGludio is the return town hop of the knight chain: Richlin
+// lands the character on the Gludio square, where Rains and the closing Sorius
+// talk stand.
 func TransferGludinToGludio() *QuestTransfer {
     return &QuestTransfer{
         Gatekeeper: richlinNPC(),
@@ -270,14 +250,12 @@ func TransferGludinToGludio() *QuestTransfer {
     }
 }
 
-// ElvenKnightChain is the Q00406 Path to an Elven Knight ladder: the
-// skeleton hunt of the Ruins of Agony, the Ol Mahum camp second segment
-// and the Kluto talks across the Gludin hop, read from the script
-// (docs/quest_protocol.md).
-//
-// The registered quest items (removed at the exit): Sorius' Letter 1202,
-// Kluto's Box 1203, Topaz Piece 1205, Emerald Piece 1206, Kluto's Memo
-// 1276; the brooch 1204 survives as the class change proof.
+// ElvenKnightChain is the Q00406 Path to an Elven Knight ladder: the skeleton
+// hunt of the Ruins of Agony, the Ol Mahum camp and the Kluto talks across the
+// Gludin hop (docs/quest_protocol.md). The registered quest items (removed at
+// the exit) are Sorius' Letter 1202, Kluto's Box 1203, Topaz Piece 1205,
+// Emerald Piece 1206 and Kluto's Memo 1276; the brooch 1204 survives as the
+// class change proof.
 func ElvenKnightChain() QuestChain {
     return QuestChain{
         QuestID:  406,
@@ -293,17 +271,15 @@ func ElvenKnightChain() QuestChain {
         Stages: []QuestStage{
             questKillStage(1, QuestKill{
                 Mobs: []int32{35, 42, 45, 51, 54, 60},
-                // Tracker Skeleton 17, Tracker Skeleton Leader 18,
-                // Skeleton Scout 19, Skeleton Bowman 20, Ruin Spartoi 21,
-                // Raging Spartoi 22 - the Ruins of Agony west of Gludio
-                // (spawns Others/18_21.xml).
+                // Tracker Skeleton 17, its Leader 18, Skeleton Scout 19,
+                // Skeleton Bowman 20, Ruin Spartoi 21 and Raging Spartoi 22 -
+                // the Ruins of Agony west of Gludio (spawns Others/18_21.xml).
                 ItemIDs:     []int32{1205},
                 DropPercent: 70,
                 Target:      20,
-                // The eastern edge of the ruins, not the bounding box
-                // center: the center holds five to six spawn points of the
-                // aggressive clan inside one scan radius, while the edge
-                // feeds the hunt one mob at a time and sits eleven thousand
+                // The eastern edge, not the bounding box center: the center
+                // holds five to six aggressive clan spawns inside one scan
+                // radius, while the edge feeds one mob at a time and sits 11000
                 // units closer to the Gludio approach.
                 GroundX: -40000,
                 GroundY: 113000,
@@ -315,8 +291,8 @@ func ElvenKnightChain() QuestChain {
                 withTransfer(TransferGludioToGludin()),
             questKillStage(4, QuestKill{
                 Mobs: []int32{782},
-                // Ol Mahum Novice 17 - the camps north of Gludin (spawns
-                // Others/18_22.xml, 23 entries of the two quest species).
+                // Ol Mahum Novice 17 - the camps north of Gludin
+                // (Others/18_22.xml, 23 entries of the two quest species).
                 ItemIDs:     []int32{1206},
                 DropPercent: 50,
                 Target:      20,
@@ -333,18 +309,14 @@ func ElvenKnightChain() QuestChain {
     }
 }
 
-// ElvenScoutChain is the Q00407 Path to an Elven Scout ladder: the Ol
-// Mahum Patrol torn letter hunt, the Prias rescue south of the Neutral
-// Zone and the return segments, read from the script
-// (docs/quest_protocol.md).
-//
-// The registered quest items: Reisa's Letter 1207, the four torn letter
-// pieces 1208-1211, Moretti's Herb 1212, Moretti's Letter 1214, Prias'
-// Letter 1215, the Honorary Guard token 1216, the Rusted Key 1293; the
-// recommendation 1217 survives as the class change proof.
-//
-// Guard Babenco (30334, the Gludio west entrance) holds the advice page
-// 30334-01 at cond 2 - the optional guide, not a chain station.
+// ElvenScoutChain is the Q00407 Path to an Elven Scout ladder: the Ol Mahum
+// Patrol torn letter hunt, the Prias rescue south of the Neutral Zone and the
+// return segments (docs/quest_protocol.md). The registered quest items are
+// Reisa's Letter 1207, the torn letter pieces 1208-1211, Moretti's Herb 1212,
+// Moretti's Letter 1214, Prias' Letter 1215, the Honorary Guard token 1216 and
+// the Rusted Key 1293; the recommendation 1217 survives as the class change
+// proof. Guard Babenco (30334, the Gludio west entrance) holds the optional
+// advice page 30334-01, not a station.
 func ElvenScoutChain() QuestChain {
     return QuestChain{
         QuestID:  407,
@@ -362,11 +334,10 @@ func ElvenScoutChain() QuestChain {
                 DialogStep{LinkText: "Say you will begin the search"}),
             questKillStage(2, QuestKill{
                 Mobs: []int32{53},
-                // Ol Mahum Patrol 21 - the abandoned camp between Gludio
-                // and Gludin (spawns Others/18_22.xml around -49868
-                // 149683). The drops are the four torn letter pieces
-                // 1208-1211, one per kill in id order (no chance gate, the
-                // first missing piece drops): DropPercent 100.
+                // Ol Mahum Patrol 21 - the abandoned camp between Gludio and
+                // Gludin (Others/18_22.xml around -49868 149683). The four torn
+                // letter pieces 1208-1211 drop one per kill in id order: the
+                // first missing piece, no chance gate, DropPercent 100.
                 ItemIDs:     []int32{1208, 1209, 1210, 1211},
                 DropPercent: 100,
                 Target:      4,
@@ -377,8 +348,8 @@ func ElvenScoutChain() QuestChain {
             questTalkStage(4, priasNPC()),
             questKillStage(5, QuestKill{
                 Mobs: []int32{5031},
-                // Ol Mahum Sentry 17 - the two guards of Prias (spawns
-                // Others/19_20.xml at -8700 72362, respawn 180 s).
+                // Ol Mahum Sentry 17 - the two guards of Prias
+                // (Others/19_20.xml at -8700 72362, respawn 180 s).
                 ItemIDs:     []int32{1293},
                 DropPercent: 60,
                 Target:      1,
@@ -395,9 +366,8 @@ func ElvenScoutChain() QuestChain {
     }
 }
 
-// ElvenKnightClassChange is the Elven Fighter -> Elven Knight segment
-// at Grand Master Rains (the class id 19, the Elven Knight Brooch
-// proof of Q00406).
+// ElvenKnightClassChange is the Elven Fighter to Elven Knight segment at Grand
+// Master Rains: class id 19, the Elven Knight Brooch proof of Q00406.
 func ElvenKnightClassChange() ClassChange {
     return ClassChange{
         Npc:         rainsNPC(),
@@ -412,9 +382,8 @@ func ElvenKnightClassChange() ClassChange {
     }
 }
 
-// ElvenScoutClassChange is the Elven Fighter -> Elven Scout segment at
-// Grand Master Rains (the class id 22, the Reisa's Recommendation
-// proof of Q00407).
+// ElvenScoutClassChange is the Elven Fighter to Elven Scout segment at Grand
+// Master Rains: class id 22, the Reisa's Recommendation proof of Q00407.
 func ElvenScoutClassChange() ClassChange {
     return ClassChange{
         Npc:         rainsNPC(),
@@ -429,19 +398,17 @@ func ElvenScoutClassChange() ClassChange {
     }
 }
 
-// QuestEntryLinks is the dialog prefix every quest npc conversation of
-// this chain rides through: the static trainer page's "Quest" link opens
-// the current cond page (the detail: docs/quest_protocol.md).
+// QuestEntryLinks is the dialog prefix every quest npc conversation rides
+// through: the static trainer page's "Quest" link opens the current cond page
+// (docs/quest_protocol.md).
 func QuestEntryLinks(_ QuestChain) []DialogStep {
     return []DialogStep{
         {LinkText: "Quest"},
     }
 }
 
-// QuestStageByCond returns the stage of the chain at a cond value
-// (the quest journal the tracker reports): the stage the bot acts
-// on next. False when the cond sits outside the ladder (the quest
-// ended or never started).
+// QuestStageByCond returns the stage the bot acts on next at a journal cond
+// value, with false when the cond sits outside the ladder.
 func QuestStageByCond(chain QuestChain, cond int32) (QuestStage, bool) {
     for i := range chain.Stages {
         if chain.Stages[i].Cond == cond {

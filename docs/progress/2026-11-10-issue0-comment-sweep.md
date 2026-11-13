@@ -1451,6 +1451,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - hunt/quest_chains.go keeps the chain data
+
+- 35 blocks compress. The registry keeps every load bearing data fact:
+  the 2.5 s `Quest.giveItems` inventory drop, the `CT0_to_C4_ids.txt`
+  mapping, the `getRandom(10) < N` gate, the onEvent bypass against the
+  onTalk cond advance, the Gludio/Gludin teleporter xml ids (30256,
+  30320) at 7300 adena, the npc positions, the item id sets of Q00406
+  and Q00407, the 70/50/100/60 drop percentages, the eastern edge of the
+  Ruins of Agony against the aggressive clan center (11000 units closer
+  to the Gludio approach), the Ol Mahum spawn files and the 180 s respawn,
+  and the class ids 19 and 22 with the `Script ElfHumanFighterChange1`
+  bypass. 160 comment lines of 453 become 127 of 420.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
