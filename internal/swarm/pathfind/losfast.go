@@ -9,37 +9,30 @@ import (
     "math"
 )
 
-// The map free line of sight raster. The capsule guard probes call
-// the engine line of sight millions of times per route (every merged
-// chord candidate of the smooth pass walks the full supercover line),
-// and the profile named the A* node machinery as the cost: every
-// rastered cell allocated a node and paid two map operations (the
-// nodes insert and the missing lookup) although the walkability
-// contract needs no graph at all - only the cell sequence, the layer
-// choices and the step rules. This file re-walks the identical t/k
-// supercover with plain values: the same cell sequence, the same
-// closest layer resolution, the same wall and height rules, the same
-// server click verification - one region cache slot instead of the
-// maps, one scratch buffer per segment instead of per cell allocations.
+// The map free line of sight raster. The capsule guard probes call the line of
+// sight millions of times per route (every merged chord candidate of the smooth
+// pass walks the full supercover), and the A* node machinery cost a node and
+// two map operations per cell although the walkability contract needs no graph.
+// This file re-walks the identical t/k supercover with plain values: the same
+// cell sequence, layer resolution, wall and height rules and server click
+// verification, but one region cache slot instead of the maps and one scratch
+// buffer per segment instead of per cell allocations.
 
-// cellState is one rastered cell with its resolved layer: the plain
-// value pair the fast raster carries instead of the node objects.
+// cellState is one rastered cell with its resolved layer.
 type cellState struct {
     p     Point
     layer Layer
 }
 
-// regionSlot is the single region cache of the fast raster: the walk
-// is highly local, so one pointer check replaces the engine cache
-// lock on almost every cell (the search.closestLayer pattern without
-// the search allocations).
+// regionSlot is the single region cache of the fast raster: the walk is highly
+// local, so one pointer check replaces the engine cache lock on almost every
+// cell.
 type regionSlot struct {
     key    RegionKey
     region *Region
 }
 
-// cellLayerAt resolves the layer of a cell closest to z through the
-// slot cache (false when the cell has no geodata under it).
+// cellLayerAt resolves the layer of a cell closest to z through the slot cache.
 func (e *Engine) cellLayerAt(slot *regionSlot, p Point,
     z int16,
 ) (Layer, bool) {
@@ -57,11 +50,10 @@ func (e *Engine) cellLayerAt(slot *regionSlot, p Point,
     return slot.region.ClosestLayer(LocalCell(p), z)
 }
 
-// wallsOpenCells mirrors search.wallsOpen for a cell state pair: the
-// source wall open in the step direction, the target wall open in the
-// reverse direction and the anti corner cut flanks of a diagonal step
-// (a flank cell without geodata counts as open, the server reads no
-// wall from a region it has no data for).
+// wallsOpenCells mirrors search.wallsOpen: the source wall open in the step
+// direction, the target wall in reverse, and the anti corner cut flanks of a
+// diagonal (a flank without geodata counts open, the server reads no wall from
+// a region it has no data for).
 //
 //nolint:cyclop // the wall walk is one branch matrix over the four cell sides
 func (e *Engine) wallsOpenCells(slot *regionSlot, from,
@@ -98,10 +90,8 @@ func (e *Engine) wallsOpenCells(slot *regionSlot, from,
     return true
 }
 
-// diagonalFlanksOpenCells mirrors search.diagonalFlanksOpen: the two
-// orthogonal cells the diagonal step cuts across must each allow the
-// crossing direction, their layers resolved against the source
-// height.
+// diagonalFlanksOpenCells: the two orthogonal cells the diagonal cuts across
+// must allow the crossing, their layers resolved against the source height.
 func (e *Engine) diagonalFlanksOpenCells(slot *regionSlot, from,
     to cellState,
 ) bool {
@@ -131,9 +121,8 @@ func (e *Engine) diagonalFlanksOpenCells(slot *regionSlot, from,
     return true
 }
 
-// canStepCells mirrors search.canStep: the walls of both cells allow
-// the step and the symmetric height difference stays within the
-// passable limit.
+// canStepCells mirrors search.canStep: the walls allow the step and the
+// symmetric height difference stays within the passable limit.
 func (e *Engine) canStepCells(slot *regionSlot, from, to cellState,
     maxPassableHeight int,
 ) bool {
@@ -145,18 +134,16 @@ func (e *Engine) canStepCells(slot *regionSlot, from, to cellState,
         maxPassableHeight
 }
 
-// cellClickWorld names a cell state the way the server names a click
-// target: the cell center with the layer height (the nodeClickWorld
-// contract without the node).
+// cellClickWorld names a cell the way the server names a click target: the cell
+// center with the layer height.
 func cellClickWorld(c cellState) (int32, int32, int32) {
     return c.p.X*cellSize + worldMinX + cellSize/2,
         c.p.Y*cellSize + worldMinY + cellSize/2,
         int32(c.layer.Height)
 }
 
-// serverSegmentVerifiedBetween resolves the endpoint cells and runs the
-// server click validation between them (the serverSegmentVerified
-// contract without the nodes).
+// serverSegmentVerifiedBetween resolves the endpoint cells and runs the server
+// click validation between them.
 func (e *Engine) serverSegmentVerifiedBetween(a, b Vec3) bool {
     var slot regionSlot
     fromLayer, ok := e.cellLayerAt(&slot,
@@ -179,16 +166,13 @@ func (e *Engine) serverSegmentVerifiedBetween(a, b Vec3) bool {
 }
 
 // segmentClearCells answers the capsule guard contract for one segment: the
-// supercover raster stays walkable end to end, the wall clearance of
-// the open interior holds everywhere (every crossed cell checks the
-// true minimum distance of its segment portion against the walls of its
-// 3x3 neighborhood - strictly tighter than a 4 unit point sample
-// chain, the walls are axis aligned segments) and the server click
-// validation accepts the segment wholesale. The endpoints stay unprobed
-// (the first and the last four units ride on the callers: the start
-// is where the character stands, the end is where it asked to go -
-// the waypoint passes own their clearance). A missing endpoint cell
-// reads as not clear (the segmentWalkable error contract).
+// supercover stays walkable end to end, the wall clearance of the open interior
+// holds everywhere (every crossed cell checks the true minimum distance of its
+// segment portion against the walls of its 3x3 neighborhood - tighter than a 4
+// unit point sample chain because the walls are axis aligned) and the server
+// click validation accepts the segment. The endpoints stay unprobed (the first
+// and last four units ride on the callers), and a missing endpoint cell reads
+// as not clear.
 func (e *Engine) segmentClearCells(a, b Vec3, radius float64,
     maxPassableHeight uint16,
 ) bool {
@@ -197,11 +181,9 @@ func (e *Engine) segmentClearCells(a, b Vec3, radius float64,
     return err == nil && walked && e.serverSegmentVerifiedBetween(a, b)
 }
 
-// lineOfSightCells answers whether the straight walk between two
-// world positions stays on one walkable surface the whole way (the
-// server movement rules, the click validation included). A missing
-// endpoint cell is the ErrMissingCell error (the node oracle
-// contract).
+// lineOfSightCells answers whether the straight walk stays on one walkable
+// surface the whole way, the click validation included; a missing endpoint cell
+// is ErrMissingCell.
 func (e *Engine) lineOfSightCells(start, end Vec3,
     maxPassableHeight uint16,
 ) (bool, error) {
@@ -217,9 +199,8 @@ func (e *Engine) lineOfSightCells(start, end Vec3,
     return e.serverSegmentVerifiedBetween(start, end), nil
 }
 
-// lineOfSightNodes is the node graph oracle of the fast raster (the
-// differential test pins the two together; the grid smoothing keeps
-// the node machinery for its own context).
+// lineOfSightNodes is the node graph oracle of the fast raster; the
+// differential test pins the two together.
 func (e *Engine) lineOfSightNodes(start, end Vec3,
     maxPassableHeight uint16,
 ) (bool, error) {
@@ -236,10 +217,9 @@ func (e *Engine) lineOfSightNodes(start, end Vec3,
     return search.lineOfSight(from, to), nil
 }
 
-// walkSupercover resolves the endpoints and walks the supercover
-// raster with the clearance contract of the radius (zero skips the
-// wall checks - the pure walkability form). A missing endpoint cell
-// is the ErrMissingCell error.
+// walkSupercover resolves the endpoints and walks the raster with the radius
+// clearance contract (zero skips the wall checks); a missing endpoint cell is
+// ErrMissingCell.
 func (e *Engine) walkSupercover(a, b Vec3, maxPassableHeight int,
     radius float64,
 ) (bool, error) {
@@ -265,12 +245,11 @@ func (e *Engine) walkSupercover(a, b Vec3, maxPassableHeight int,
     return walked, nil
 }
 
-// walkSupercoverCells walks the t/k supercover line between the two
-// cells (the straightPath stepping, verbatim): every step must pass
-// the walk rules and, with a positive radius, every crossed cell must
-// hold the capsule clearance over its portion of the line. A cell
-// without geodata truncates the walk (the straightPath break - the
-// server click validation answers the gap).
+// walkSupercoverCells walks the t/k supercover line between the two cells, the
+// straightPath stepping verbatim: every step must pass the walk rules and, with
+// a positive radius, every crossed cell must hold the capsule clearance over
+// its portion. A cell without geodata truncates the walk, leaving the gap to
+// the click validation.
 //
 //nolint:cyclop,gocognit,funlen // one branch matrix over the four sides
 func (e *Engine) walkSupercoverCells(slot regionSlot, from,
@@ -285,9 +264,8 @@ func (e *Engine) walkSupercoverCells(slot regionSlot, from,
     x1, y1 := int64(xE-xS), int64(yE-yS)
     k := math.Abs(float64(y1) / float64(x1))
 
-    // The line parameters of the clearance portions: the interior
-    // contract skips the capsuleClearanceTrim arc units at both ends
-    // (the endpoints are the callers' own responsibility).
+    // The clearance portions skip the capsuleClearanceTrim arc units at both
+    // ends: the endpoints are the callers' own responsibility.
     length := math.Hypot(b.X-a.X, b.Y-a.Y)
     trimStart, trimEnd := 0.0, 1.0
     if radius > 0 && length > 2*capsuleClearanceTrim {
@@ -339,12 +317,11 @@ func (e *Engine) walkSupercoverCells(slot regionSlot, from,
         current = next
     }
     if truncated {
-        return true // the walk broke on a missing cell: the click
-        // validation answers the gap (the straightPath break)
+        // The walk broke on a missing cell: the click validation answers it.
+        return true
     }
 
-    // The tail portion of the last cell (the destination cell never
-    // exits, its clearance portion ends the segment).
+    // The tail portion of the destination cell, which never exits.
     if radius > 0 && length > 0 {
         return portionClear(e, &slot, current, a, b, tEnter, 1.0,
             trimStart, trimEnd, radius, scratch)
@@ -364,19 +341,15 @@ func crossingT(a, b, boundary float64) float64 {
     return (boundary - a) / (b - a)
 }
 
-// capsuleClearanceTrim is the unprobed arc length at both segment ends of
-// the clearance raster: the four unit first sample of the point chain
-// it replaces (the start is where the character stands, the end is
-// the asked destination - their wall distance belongs to the waypoint
-// passes).
+// capsuleClearanceTrim is the unprobed four unit arc at both segment ends of
+// the clearance raster: the start is where the character stands, the end the
+// asked destination, and their wall distance belongs to the waypoint passes.
 const capsuleClearanceTrim = 4.0
 
-// portionClear answers whether the segment portion between the line
-// parameters lo and hi keeps the radius from every closed wall edge
-// of the containing cell's 3x3 neighborhood (the layers resolved
-// against the portion's middle height - the nearestWall layer choice
-// per neighbor cell). The portion is clipped to the trim window
-// first; a portion fully inside the trim window answers clear.
+// portionClear answers whether the segment portion between the line parameters
+// lo and hi keeps the radius from every closed wall edge of the 3x3
+// neighborhood (the layers resolved against the portion middle height). The
+// portion is clipped to the trim window first; one fully inside answers clear.
 //
 //nolint:cyclop // the per portion clearance repeats the wall walk branches
 func portionClear(e *Engine, slot *regionSlot, cell cellState,
@@ -435,9 +408,8 @@ func portionClear(e *Engine, slot *regionSlot, cell cellState,
     return true
 }
 
-// portionWallsClear folds the closed wall edges of one neighbor cell
-// into the distance check of the segment portion (the mergeCellWalls
-// wall set with the segment form of the distance).
+// portionWallsClear folds the closed wall edges of one neighbor cell into the
+// distance check of the segment portion.
 func portionWallsClear(x0, y0, x1, y1 float64, key RegionKey,
     nx, ny int, layer Layer, radius float64,
 ) bool {
@@ -468,10 +440,8 @@ func portionWallsClear(x0, y0, x1, y1 float64, key RegionKey,
     return true
 }
 
-// segmentSegmentDistance answers the smallest distance between two
-// segments: zero when they touch, the minimum of the endpoint to
-// segment distances otherwise (the walls are axis aligned edges, the
-// segment portions are short slivers, the closed form stays simple).
+// segmentSegmentDistance answers the smallest distance between two segments:
+// zero when they touch, the minimum of the endpoint distances otherwise.
 func segmentSegmentDistance(ax, ay, bx, by, cx, cy, dx,
     dy float64,
 ) float64 {
@@ -509,14 +479,12 @@ func segmentSegmentDistance(ax, ay, bx, by, cx, cy, dx,
     return best
 }
 
-// orientSign answers the orientation of the triplet (the cross
-// product sign of the two edge vectors).
+// orientSign answers the orientation of the triplet.
 func orientSign(ax, ay, bx, by, px, py float64) float64 {
     return (bx-ax)*(py-ay) - (by-ay)*(px-ax)
 }
 
-// onSegment answers whether the point sits on the segment's bounding
-// box (the collinear case of the intersection test).
+// onSegment answers whether a point sits on the segment bounding box.
 func onSegment(px, py, ax, ay, bx, by float64) bool {
     return px >= math.Min(ax, bx)-1e-9 && px <= math.Max(ax, bx)+1e-9 &&
         py >= math.Min(ay, by)-1e-9 && py <= math.Max(ay, by)+1e-9

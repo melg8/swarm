@@ -1725,6 +1725,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - pathfind/losfast.go keeps the raster contract
+
+- 23 blocks compress: the file keeps the reason of the plain value
+  raster (the capsule guard probes walk the supercover millions of
+  times per route and the A* node machinery cost a node and two map
+  operations per cell), the identical t/k supercover and closest layer
+  resolution, the source and reverse wall rules, the anti corner cut
+  with a no-geodata flank counting open, the anti corner cut against
+  the source height, the click validation through
+  `serverSegmentVerifiedBetween`, the 4 unit `capsuleClearanceTrim`
+  ends, the true segment to wall distance over the 3x3 neighborhood
+  (tighter than a 4 unit point chain) and the truncation on a missing
+  cell. 108 comment lines of 523 become 76 of 491.
+- Verified: `task fmt`, `go build ./...`, the pathfind suite,
+  `golangci-lint run ./internal/swarm/pathfind/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
