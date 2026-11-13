@@ -844,6 +844,17 @@ corner probe is a length, not a leg at all.
   lint:new`. `delevel.go` fell from 25.1 to 18.2 percent (72 comment
   lines of 395), no block above 8 lines.
 
+### 2026-11-12 - pathfind/navbuild/sheet.go keeps the island drop
+
+- 9 blocks compress: the sheet decomposition header, the three struct
+  field notes, the bucket note, the flood header, the 19 line island
+  drop header, the delta tables and the bucket helper. No docs change:
+  `docs/navmesh.md` already carries the sheet decomposition, the island
+  drop and its measured numbers.
+- Verified: `task fmt`, `go build ./...`, the full navbuild package,
+  `task lint:new`. `sheet.go` fell from 21.0 to 13.7 percent (34
+  comment lines of 249), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -868,9 +879,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `cmd/counterprobe/world.go`, `hunt/lure.go`, `hunt/town_sell.go` and
 `gear/shopping.go`, `hunt/loop_zone.go`,
 `webserver/navmesh_geometry.go`, `hunt/kite_ledger.go`,
-`hunt/kite_lane.go`, `hunt/city_shopping.go`, `hunt/town_merchants.go`
-and `acceptance/delevel.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the
+`hunt/kite_lane.go`, `hunt/city_shopping.go`, `hunt/town_merchants.go`,
+`acceptance/delevel.go` and `pathfind/navbuild/sheet.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.

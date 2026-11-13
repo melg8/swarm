@@ -4,41 +4,32 @@
 
 package navbuild
 
-// sheets is the sheet decomposition of one region: the walkable
-// layers partitioned into 2D manifold surfaces. A sheet never stacks
-// over itself (the flood fill occupies every column at most once), so
-// the rectangle decomposition of each sheet produces polygons whose
-// footprint never self overlaps - the property the naive span import
-// loses and the reason the Recast region build crashed on the real
-// data (docs/recast_pathfinding.md).
+// sheets is the sheet decomposition of one region: the walkable layers
+// partitioned into 2D manifold surfaces. A sheet never stacks over itself (the
+// flood occupies every column once), so its rectangle footprints never self
+// overlap - the property the naive span import loses (docs/navmesh.md).
 type sheets struct {
     sheetOf []int32
     count   int
-    // class marks the water sheets (any layer below the water level -
-    // the flood never crosses the wetness boundary, so the class is
-    // uniform per sheet by construction).
+    // class marks the water sheets (the flood never crosses the wetness
+    // boundary, so the class is uniform per sheet).
     class []uint8
-    // dropped marks the sheets the build rejects: the islands smaller
-    // than the minimum and the floating components no walk can reach
-    // (dropIslandComponents below).
+    // dropped marks the sheets the build rejects: the islands smaller than the
+    // minimum and the floating components no walk can reach.
     dropped []bool
-    // island marks the sheets dropped as unreachable floating
-    // components (the stats separate them from the size drops).
+    // island marks the sheets dropped as unreachable floating components (the
+    // stats separate them from the size drops).
     island []bool
     sizes  []int32
 }
 
-// sheet constants: 2048 buckets cover the geodata height range (the
-// heights are multiples of 2, the buckets are 8 units wide).
+// sheetBuckets covers the geodata height range with 8 unit wide buckets.
 const sheetBuckets = 2048
 
-// assignSheets floods the sheets top down: the highest unassigned
-// walkable layer seeds a new sheet, the fill moves to the neighbour
-// column layers within the climb range of the same wetness class
-// whenever the sheet does not already occupy the neighbour column.
-// The NSWE walls are deliberately ignored here: the sheets are
-// geometric surfaces, the walls become the portal spans of the
-// polygon links (the link walk filters them afterwards).
+// assignSheets floods the sheets top down: the highest unassigned walkable
+// layer seeds a new sheet, the fill moves to the neighbour column layers within
+// the climb range of the same wetness class, never occupying a column twice.
+// The NSWE walls are ignored here - they become the portal spans of the links.
 func assignSheets(rl *regionLayers, climb int32, minLayers int32,
 ) *sheets {
     layerCount := len(rl.layers)
@@ -104,25 +95,12 @@ func assignSheets(rl *regionLayers, climb int32, minLayers int32,
     return out
 }
 
-// dropIslandComponents marks the sheets of the components no walk can
-// ever reach. The sheet graph joins two sheets when a layer of one
-// admits an engine step into an XY adjacent layer of the other: the
-// paired NSWE walls of both sides plus the climb height rule, the
-// exact canStep the grid search walks (the wetness split of the flood
-// is ignored, because the engine steps between the shore and the
-// water freely; the NSWE walls the flood ignores are honored here,
-// because a wall a character cannot cross is no connection at all -
-// the trunk helixes of the elven forest giant trees step within the
-// climb range from the ground but wall every step of the way up). A
-// component survives only when one of its sheets touches the region
-// border, the seam where the neighbour region may continue the walk
-// (the phase B stitching decides there); everything else is a
-// floating island of the geodata structural encoding - the tree
-// canopies over the elven forest, the trunk rings stacked hundreds of
-// units apart, the deck skirts under the bridge - real geometry a
-// character can never stand on. Keeping them renders the mother tree
-// as a walkable ramp fused into the ground and curtains the floating
-// village down to the lake.
+// dropIslandComponents marks the sheets of the components no walk can ever
+// reach: the sheet graph joins two sheets when a layer of one admits an
+// engine step into an adjacent layer of the other (the paired NSWE walls
+// plus the climb rule), and a component survives only when a sheet touches
+// the region border, where the neighbour region may continue the walk. The
+// rest are the floating canopies, trunks and deck skirts (docs/navmesh.md).
 //
 //nolint:cyclop,gocognit,funlen // the union find pass reads side by side
 func (s *sheets) dropIslandComponents(rl *regionLayers, climb int32) {
@@ -198,8 +176,8 @@ func (s *sheets) dropIslandComponents(rl *regionLayers, climb int32) {
     }
 }
 
-// islandDeltas are the east and south cell offsets of the island
-// adjacency walk (every cell pair is visited exactly once).
+// islandDeltas are the east and south offsets of the island adjacency walk, so
+// every cell pair is visited once.
 var islandDeltas = [2][2]int{{1, 0}, {0, 1}}
 
 // floodNeighbours relaxes the neighbour columns of one flooded layer.
@@ -256,8 +234,7 @@ func (s *sheets) columnHolds(off, cnt int, sheet int32) bool {
 // neighborDeltas are the four cell axis neighbour offsets.
 var neighborDeltas = [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
 
-// sheetBucket is the height bucket of a layer (the buckets are 8
-// units wide and cover [-8192, 8192)).
+// sheetBucket is the height bucket of a layer (8 unit wide, [-8192, 8192)).
 func sheetBucket(h int16) int {
     bucket := (int32(h) + 8192) / 8
     if bucket < 0 {
