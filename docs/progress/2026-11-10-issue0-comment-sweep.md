@@ -1435,6 +1435,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - hunt/loop_los.go keeps the blind engage rules
+
+- 21 blocks compress: the file keeps the "Cannot see target." answer
+  with the armed attack intention, `cannotSeeFreshWindow` 8 s at the
+  attack request cadence against the phantom MoveToPawn chase, the 2 s
+  engage delay, the 15 s walk budget, the two attempts, the 90 unit
+  melee ring and the 1 min blind skip between the flee and stuck skips.
+  The sight line proof rule stays (only activity newer than the refusal
+  clears the block, the equal Windows clock tick counts as progressed),
+  as do the sixteen direction vantage ring, the projection pass test of
+  the waypoint skip and the split at the server move limit. The dated
+  dump livelock story drops. 127 comment lines of 345 become 93 of 311;
+  no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

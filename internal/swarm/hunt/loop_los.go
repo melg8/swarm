@@ -4,14 +4,12 @@
 
 package hunt
 
-// The blind engage recovery, split out of the loop.go god file: when an
-// obstacle (a column, a wall) stands between the character and its
-// selected target, the Mobius server answers every swing attempt with
-// "Cannot see target." while keeping the attack intention armed - the
-// bot would stand at melee distance re-requesting the refused attack
-// forever. The recovery walks around the obstacle over the geodata
-// first and switches the target only when the walk cannot clear the
-// block.
+// The blind engage recovery: when an obstacle stands between the character and
+// its target, the Mobius server answers every swing with "Cannot see target."
+// while keeping the attack intention armed, so the bot would stand at melee
+// distance re-requesting forever. The recovery walks around the obstacle over
+// the geodata first and switches the target only when the walk cannot clear
+// the block.
 
 import (
     "math"
@@ -22,51 +20,39 @@ import (
 
 // Timing and geometry constants of the blind engage recovery.
 const (
-    // cannotSeeFreshWindow bounds how long a "Cannot see target."
-    // answer still counts as the current refusal: the server answers
-    // at the attack request cadence (once per second from the loop,
-    // once per AI think from the server itself), so a window covering
-    // a few missed answers keeps the detection stable.
+    // cannotSeeFreshWindow bounds how long a "Cannot see target." answer still
+    // counts as the current refusal: the server answers at the attack request
+    // cadence, so a few missed answers keep the detection stable.
     cannotSeeFreshWindow = 8 * time.Second
-    // blindEngageDelay is the minimum age of an engage attempt before
-    // the recovery may take over: the selection and the first forced
-    // attack need a second or two, and a healthy engage must not be
-    // interrupted mid start.
+    // blindEngageDelay is the minimum age of an engage attempt before the
+    // recovery may take over, so a healthy engage is not interrupted mid start.
     blindEngageDelay = 2 * time.Second
-    // blindWalkBudget bounds one reposition walk: the detour around a
-    // small obstacle is a few hundred units (a couple of seconds at
-    // run speed), the budget also covers a longer routing around a
-    // wall past the stuck timeout hold.
+    // blindWalkBudget bounds one reposition walk: the detour around a small
+    // obstacle is a few hundred units, the budget also covers a longer routing
+    // around a wall.
     blindWalkBudget = 15 * time.Second
-    // blindMaxAttempts bounds the reposition attempts per target: the
-    // first walk follows the planned geodata route, a second one
-    // re-plans from wherever the first ended (a moving target, a walk
-    // interrupted by a blow). Past the budget the target is switched.
+    // blindMaxAttempts bounds the reposition attempts per target: the first
+    // walk follows the planned route, a second one re-plans from wherever it
+    // ended (a moving target, an interrupted walk); past the budget the target
+    // is switched.
     blindMaxAttempts = 2
     // blindMeleeRadius is the ring radius around the target where the
-    // repositioned character stands: the refused swing proves the
-    // melee range held at a similar distance, so the vantage point
-    // keeps the fight startable the moment the sight line clears.
+    // repositioned character stands: the refused swing proves the melee range
+    // held, so the fight starts the moment the sight line clears.
     blindMeleeRadius = 90.0
-    // blindSkipDelay keeps an unreachable target out of the search:
-    // shorter than the flee skip (the mob is not dangerous, only
-    // obstructed), longer than the plain stuck skip (the obstacle
-    // stays, an immediate re-pick would rebuild the same blind spot).
+    // blindSkipDelay keeps an unreachable target out of the search: shorter
+    // than the flee skip (the mob is only obstructed), longer than the plain
+    // stuck skip (an immediate re-pick would rebuild the same blind spot).
     blindSkipDelay = 1 * time.Minute
 )
 
-// blindEngageBlocked reports whether the current engage attempt is
-// being refused because the target is not visible: the server answered
-// an attack with "Cannot see target." during this attempt, the answer
-// is fresh, and nothing of this fight landed in between - no swing and
-// no chase step is newer than the refusal. A fresh activity view alone
-// does not clear the block: the server of a refused attack keeps
-// broadcasting the chase steps of its own re-try (the MoveToPawn
-// stream of the armed attack intention), so the phantom chase reads
-// as a live fight while every swing attempt lands on the refusal - the
-// 2026-09-12 03:25 dump livelock stood exactly there for minutes (a
-// moving character or mob that truly walked past the obstacle edge
-// puts the activity after the refusal and reads as clear).
+// blindEngageBlocked reports whether the current engage attempt is refused
+// because the target is not visible: the server answered an attack with "Cannot
+// see target." during this attempt, the answer is fresh, and nothing of this
+// fight landed in between - no swing and no chase step newer than the refusal.
+// A fresh activity view alone does not clear the block: the server of a refused
+// attack keeps broadcasting the chase steps of its own re-try, so the phantom
+// chase reads as a live fight.
 func (l *Loop) blindEngageBlocked(now time.Time) bool {
     if l.target == 0 {
         return false
@@ -76,12 +62,11 @@ func (l *Loop) blindEngageBlocked(now time.Time) bool {
     }
     cannotSeeAt := l.tracker.SelfCannotSeeTargetAt()
     if !cannotSeeAt.After(l.engageAt) {
-        // The answer belongs to an earlier attempt, the current
-        // engage started at or after the obstruction was last
-        // reported. The equality counts as earlier: the walk
-        // completion re-anchors the clock AFTER the refusal it
-        // answered, and the Windows clock granularity can stamp both
-        // inside one millisecond.
+        // The answer belongs to an earlier attempt: the current engage started
+        // at or after the obstruction was last reported. The equality counts as
+        // earlier, because the walk completion re-anchors the clock after the
+        // refusal and the Windows clock granularity can stamp both inside one
+        // millisecond.
         return false
     }
     if now.Sub(cannotSeeAt) > cannotSeeFreshWindow {
@@ -91,29 +76,24 @@ func (l *Loop) blindEngageBlocked(now time.Time) bool {
     return !l.tracker.SelfCombatActiveAt().After(cannotSeeAt)
 }
 
-// blindRecoveryArmed reports whether the blind engage recovery owns
-// the current engage attempt: a fresh refusal was seen or the
-// reposition walk is running. The plain engage stuck timeout stays
-// held while it is true - the recovery manages its own budgets.
+// blindRecoveryArmed reports whether the blind engage recovery owns the current
+// attempt: a fresh refusal was seen or the reposition walk is running. The
+// plain engage stuck timeout stays held while it is true.
 func (l *Loop) blindRecoveryArmed(now time.Time) bool {
     return !l.losAt.IsZero() || l.blindEngageBlocked(now)
 }
 
-// recoverBlindEngage drives the two levels of the recovery: level A
-// plans and walks the geodata route to a standing point that sees the
-// obstructed target, level B drops the target for another one when no
-// route works. The walk stops the attack re-requests entirely: an
-// attack request would set the ATTACK intention again and cancel the
-// walk the recovery just started.
+// recoverBlindEngage drives the two levels of the recovery: level A plans and
+// walks the geodata route to a standing point that sees the obstructed target,
+// level B drops the target for another one when no route works. The walk stops
+// the attack re-requests, which would set the ATTACK intention again and cancel
+// the walk.
 func (l *Loop) recoverBlindEngage(now time.Time) {
     if l.fightClearedRefusal() {
-        // The fight progressed past the refusal: a swing or a chase step
-        // landed after the server last said "cannot see" (the walk
-        // cleared the sight line, or the mob walked past the obstacle
-        // edge on its own). Stand down and let the engage own the fight
-        // again. The plain fresh-chase view is not enough here - the
-        // phantom chase of the refused attack keeps it alive behind the
-        // obstacle and would stand the recovery down in a loop.
+        // The fight progressed past the refusal: a swing or a chase step landed
+        // after the last "cannot see" (the walk cleared the sight line, or the
+        // mob walked past the obstacle edge). The phantom chase alone is not
+        // enough, so the recovery stands down only on newer activity.
         l.clearBlindRecovery()
 
         return
@@ -135,33 +115,27 @@ func (l *Loop) recoverBlindEngage(now time.Time) {
     l.walkBlindWaypoints(now)
 }
 
-// fightClearedRefusal reports whether the running fight progressed
-// past the last "Cannot see target." refusal: the engagement is fresh
-// AND its last activity (a swing attempt or a chase step) landed after
-// the refusal. The refusal itself is the proof the sight line was
-// closed at that moment, so only newer activity proves it opened
-// again; the fresh chase view alone cannot (the server keeps
-// broadcasting the chase steps of the very attack it refuses).
+// fightClearedRefusal reports whether the running fight progressed past the
+// last "Cannot see target." refusal: the engagement is fresh and its last
+// activity landed after the refusal. The refusal proves the sight line was
+// closed, so only newer activity proves it opened again.
 func (l *Loop) fightClearedRefusal() bool {
     if !l.tracker.SelfFighting(l.target) {
         return false
     }
 
-    // The equality counts as progressed: a chase step issued in the
-    // same clock tick as the refusal is still newer activity (the
-    // Windows timer granularity cannot order the two, and the next
-    // refusal re-arms the recovery if the sight line stays closed).
+    // The equality counts as progressed: the Windows timer granularity cannot
+    // order a chase step and the refusal of the same tick, and the next refusal
+    // re-arms.
     return !l.tracker.SelfCombatActiveAt().Before(
         l.tracker.SelfCannotSeeTargetAt())
 }
 
-// startBlindReposition plans the route to a standing point that sees
-// the obstructed target (level A). The candidates form a ring around
-// the target at the melee radius; the nearest one with a bot side
-// geodata sight line to the target wins, and the planned path to it
-// becomes the reposition waypoints. Without a navigator, without a
-// vantage point or without a path the recovery falls through to the
-// target switch (level B).
+// startBlindReposition plans the route to a standing point that sees the
+// obstructed target (level A). The candidates form a ring around the target at
+// the melee radius; the nearest one with a bot side geodata sight line wins.
+// Without a navigator, a vantage point or a path the recovery falls through to
+// the target switch (level B).
 func (l *Loop) startBlindReposition(now time.Time) {
     l.losAt = now
     if l.navigator == nil || l.losTried >= blindMaxAttempts {
@@ -199,9 +173,8 @@ func (l *Loop) startBlindReposition(now time.Time) {
     result, err := l.navigator.FindPathApproach(from, goal, waypointArriveDist)
     if err != nil || result == nil || !result.Found ||
         len(result.Waypoints) == 0 {
-        // No geodata route to the vantage point: the fallback walk
-        // would run the character straight into the same obstacle,
-        // so the target is switched instead.
+        // No geodata route to the vantage point: the fallback walk would run
+        // into the same obstacle, so the target is switched instead.
         l.switchBlindTarget(now)
 
         return
@@ -211,18 +184,17 @@ func (l *Loop) startBlindReposition(now time.Time) {
     l.losMoveAt = time.Time{}
     l.logger.Printf("Hunt: target %d is not visible from here, "+
         "walking around the obstacle", l.target)
-    // The first segment leaves on the planning tick: the detour around a
-    // small obstacle is short, a planning tick of pure standing would
-    // double the recovery latency.
+    // The first segment leaves on the planning tick: a detour around a small
+    // obstacle is short, and a planning tick of pure standing would double the
+    // latency.
     l.walkBlindWaypoints(now)
 }
 
-// blindVantagePoint searches the ring of melee range standing points
-// around the target for the nearest one with a clear geodata sight
-// line to it. The ring is sampled in sixteen directions; the closest
-// candidate to the character wins (the shortest detour), a sight line
-// error counts as blocked (the recovery must stay conservative: a
-// phantom vantage point re-creates the blind engage on arrival).
+// blindVantagePoint searches the ring of melee range standing points around the
+// target for the nearest one with a clear geodata sight line. The ring is
+// sampled in sixteen directions, the closest candidate wins, and a sight line
+// error counts as blocked (a phantom vantage point re-creates the blind engage
+// on arrival).
 func (l *Loop) blindVantagePoint(
     selfX, selfY, targetX, targetY, targetZ float64,
 ) (pathfind.Vec3, bool) {
@@ -259,16 +231,13 @@ func (l *Loop) blindVantagePoint(
     return best, found
 }
 
-// walkBlindWaypoints follows the planned reposition route with paced
-// ground click walks: one segment per walk request period, the long segments
-// split at the server move limit like every hunt walk. A waypoint
-// counts as reached within its arrival radius (tight for the
-// intermediate turns, wide for the vantage goal) and only a waypoint
-// the character passed ON THE ROUTE skips ahead (the projection pass
-// test of the town walker). Reaching the final waypoint clears the
-// attempt bookkeeping - the engage takes over from the new standing
-// point and re-requests the attack, and a persisting block re-arms
-// the recovery with the remaining attempt budget.
+// walkBlindWaypoints follows the planned reposition route with paced ground
+// click walks: one segment per walk request period, the long ones split at the
+// server move limit. A waypoint counts as reached within its arrival radius and
+// only one passed ON THE ROUTE skips ahead (the projection test of the town
+// walker). Reaching the final waypoint clears the attempt bookkeeping, so the
+// engage takes over from the new standing point while a persisting block
+// re-arms the recovery.
 func (l *Loop) walkBlindWaypoints(now time.Time) {
     selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
@@ -296,9 +265,8 @@ func (l *Loop) walkBlindWaypoints(now time.Time) {
         break
     }
     if l.losWpIndex >= len(l.losWaypoints) {
-        // Arrived: hand the engage back with a fresh attempt clock,
-        // the block detection re-arms the recovery if the sight line
-        // is still closed.
+        // Arrived: hand the engage back with a fresh attempt clock; the block
+        // detection re-arms the recovery if the sight line is still closed.
         l.losAt = time.Time{}
         l.losWaypoints = nil
         l.engageAt = now
@@ -317,11 +285,9 @@ func (l *Loop) walkBlindWaypoints(now time.Time) {
     }
 }
 
-// switchBlindTarget drops the obstructed target (level B): the mob is
-// alive and valid, only unreachable behind the terrain, so it lands on
-// the skip list for a minute and the next search picks a different
-// one. The selection of the replacement target clears the stale server
-// side attack intention of the obstructed one.
+// switchBlindTarget drops the obstructed target (level B): the mob is alive and
+// valid, only unreachable behind the terrain, so it lands on the skip list for
+// a minute and the next search picks another one.
 func (l *Loop) switchBlindTarget(now time.Time) {
     l.logger.Printf("Hunt: target %d stays invisible, switching to "+
         "another", l.target)
