@@ -2,27 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package botlog writes the hyper-detailed per-run log files of the
-// acceptance scenarios into logs/acceptance: one file per run, the
-// full story of the temp bot from the server wiring to the verdict.
-//
-// The problem it solves: the acceptance scenarios run on the live
-// Mobius stack for minutes, and when a run hangs, drifts or passes
-// without the bot really doing the thing, the web UI test log (a 40
-// line ring) and the point-in-time state dump cannot answer what
-// happened at the moment things went wrong. The run log keeps the
-// complete trail on disk: the test contract (the description and the
-// pass/fail checks exactly like the web UI card), the environment
-// (the login, the proxy, the database, the build), every game packet
-// the session received and sent (decoded into one readable line
-// each), the scenario narration, the monitor check transitions (the
-// moments the tester decided an event happened), the periodic state
-// samples of the character and the final verdict block.
-//
-// The intended use: the owner attaches the one file of a suspicious
-// run to the next agent prompt ("it does not work" or "the test
-// passed but the bot never did X") and the file alone carries every
-// fact needed to diagnose the run without reproducing it.
+// Package botlog writes the per-run log file of one acceptance scenario into
+// logs/acceptance: the test contract, the environment, every received and sent
+// packet, the scenario narration, the check transitions, the periodic state
+// samples and the verdict, so one attached file carries the whole run. The
+// writer goroutine keeps the session reader off the disk (a full queue drops
+// lines and counts them). The file layout: docs/acceptance_botlog.md.
 package botlog
 
 import (
@@ -38,24 +23,20 @@ import (
     "time"
 )
 
-// Writer tuning. The flush period bounds how much of a crashed run
-// is lost; the queue depth rides out a slow disk burst; the drop
-// path keeps a flooded packet stream from blocking the session
-// reader (the dropped count rides the verdict so the gap is visible
-// instead of silent).
+// Writer tuning: the flush period bounds what a crashed run loses, the queue
+// depth rides out a disk burst and the drop path keeps a flooded packet stream
+// from blocking the session reader (the dropped count rides the verdict).
 const (
     flushPeriod     = time.Second
     queueDepth      = 8192
     writerBufferLen = 1 << 16
 )
 
-// Header carries the identity block written at the top of the file:
-// the test card of the web UI plus the environment the run is wired
-// into. The acceptance manager builds it when the run starts.
+// Header carries the identity block at the top of the file: the web UI test
+// card plus the environment the run is wired into.
 type Header struct {
-    // TestID, Title, Account and Generation identify the run: the
-    // generation is the manager launch counter of the test (a
-    // restart of a running test bumps it).
+    // TestID, Title, Account and Generation identify the run; the generation is
+    // the manager launch counter (a restart bumps it).
     TestID     string
     Title      string
     Account    string
@@ -91,10 +72,8 @@ type EnvLine struct {
     Value string
 }
 
-// entry is one queued record of the writer goroutine: the capture
-// time, the offset from the run start and the fully rendered lines
-// (the taps render on their own goroutines so the writer only adds
-// the time prefix).
+// entry is one queued record: the capture time, the offset from the run start
+// and the rendered lines (the taps render on their own goroutines).
 type entry struct {
     at    time.Time
     after float64
@@ -102,14 +81,12 @@ type entry struct {
     lines []string
 }
 
-// RunLog is the append-only log file of one acceptance run. A single
-// writer goroutine owns the file; the callers hand entries over a
-// buffered channel and never block (a full queue drops the line and
-// counts it - the session reader goroutine must not wait on disk).
+// RunLog is the append-only log file of one acceptance run: a single writer
+// goroutine owns the file and the callers hand entries over a buffered channel
+// without blocking (a full queue drops the line and counts it).
 //
-// A nil *RunLog is valid: every method is a no-op on it, so the
-// runner and the manager call it unconditionally (the disabled log
-// directory turns the whole subsystem off at once).
+// A nil *RunLog is valid: every method is a no-op, so the runner calls it
+// unconditionally.
 type RunLog struct {
     path    string
     started time.Time
@@ -126,11 +103,9 @@ type RunLog struct {
 // the same second on the same process.
 var fileSeq atomic.Uint64
 
-// Open creates the log directory when missing, opens the run file
-// (named after the test, the start time, the pid and a sequence
-// number) and starts the writer goroutine with the header block.
-// The file name stays flat so a directory listing sorts the runs
-// chronologically.
+// Open creates the log directory, opens the run file (named after the test, the
+// start time, the pid and a sequence number, so a listing sorts
+// chronologically) and starts the writer goroutine with the header block.
 func Open(dir string, head Header) (*RunLog, error) {
     if err := os.MkdirAll(dir, 0o755); err != nil {
         return nil, fmt.Errorf("botlog dir: %w", err)
@@ -191,9 +166,8 @@ func sanitizeName(value string) string {
     return out.String()
 }
 
-// writeLoop owns the file: it drains the queue, flushes on the
-// period and writes the header before the first entry so a run
-// killed at once still leaves the contract behind.
+// writeLoop owns the file: it drains the queue, flushes on the period and
+// writes the header first, so a run killed at once still leaves the contract.
 func (l *RunLog) writeLoop(
     file *os.File, writer *bufio.Writer, head Header,
 ) {
@@ -318,9 +292,8 @@ func writeln(writer *bufio.Writer, line string) {
     _ = writer.WriteByte('\n')
 }
 
-// writeEntry renders one queued record: the wall clock time, the
-// offset from the run start, the tag and the lines (the first line
-// rides the tag row, the continuation lines indent under it).
+// writeEntry renders one record: the wall clock, the offset, the tag and the
+// lines (the first rides the tag row, the rest indent under it).
 func writeEntry(writer *bufio.Writer, e entry) {
     prefix := fmt.Sprintf("[%s +%.3fs] [%s] ",
         e.at.Format("15:04:05.000"), e.after, e.tag)
@@ -334,9 +307,8 @@ func writeEntry(writer *bufio.Writer, e entry) {
     }
 }
 
-// emit renders and queues one record. The queue handoff never
-// blocks: a full queue drops the record and counts it, a closed log
-// drops silently (the verdict is already written).
+// emit renders and queues one record without blocking: a full queue drops and
+// counts it, a closed log drops silently.
 func (l *RunLog) emit(tag string, lines []string) {
     if l == nil || l.closed.Load() {
         return

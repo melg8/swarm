@@ -902,6 +902,17 @@ corner probe is a length, not a leg at all.
   package, `task lint:new`. `main.go` fell from 16.5 to 11.5 percent
   (72 comment lines of 627), no block above 8 lines.
 
+### 2026-11-12 - acceptance/botlog trims the package story
+
+- 10 blocks compress: the 21 line package doc (the layout doc already
+  carries the problem and the intended use), the writer tuning, the
+  header and generation notes, the queued record, the nil log
+  contract, the open, the write loop, the entry renderer and the
+  queue handoff.
+- Verified: `task fmt`, `go build ./...`, the botlog package, `task
+  lint:new`. `botlog.go` fell from 24.4 to 17.9 percent (59 comment
+  lines of 329), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -929,8 +940,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/kite_lane.go`, `hunt/city_shopping.go`, `hunt/town_merchants.go`,
 `acceptance/delevel.go`, `pathfind/navbuild/sheet.go`,
 `pathfind/navmesh/abstract.go`, `huntaudit/audit.go`,
-`cmd/navmesh-export/main.go` and `cmd/navpack-verify/main.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
+`cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go` and
+`acceptance/botlog/botlog.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
