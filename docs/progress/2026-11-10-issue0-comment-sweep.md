@@ -2415,6 +2415,30 @@ corner probe is a length, not a leg at all.
   `golangci-lint run` on the nine paths 0 issues, `task fmt:check`
   clean.
 
+### 2026-11-13 - the last nine line blocks and the legacy upgrade
+
+- `navbuild/upgrade.go` keeps the v1/v2 shapes, the legacy decode cost
+  and the in place rewrite (a multi gigabyte pack upgrades in
+  minutes); `navbuild/abstractsidecar.go`, `stripfile.go` and
+  `build.go` keep the tile stat rejection, the 165 region sidecar rule,
+  the 40 unit climb, the 32 unit dedup delta and the 54k pair 22_xx
+  figure; 30/30/20/42 become 27/29/19/40.
+- `packets/from_game_server/html_links.go` keeps the bypass cache
+  mirror and the "-h " prefix rule; `state/cells.go` the CCW cross
+  product test; `state/shopping.go` the plan bookkeeping;
+  `state/experience.go` the maxLevel 78 wrap rule; `gear/starters.go`
+  the is_sellable/is_dropable facts and the 3300/1160 weights;
+  30/30/41/16/37 become 29/28/39/14/36.
+- `acceptance/city_shopping.go` keeps the 800 000 adena start state,
+  the Gludio errand and the Forest Bow replacement; `huntaudit/audit.go`
+  keeps the anchor clustering risk and the evidence reload;
+  `cmd/benchdiff/main.go` the baseline workflow; 112/94/35 become
+  110/93/33.
+- Verified: `task fmt`, `go build ./...`, the navbuild (31.3 s),
+  packets (0.4 s), acceptance (8.9 s), state (1.2 s), gear (0.3 s),
+  huntaudit (0.3 s) and benchdiff (0.3 s) suites, `golangci-lint run`
+  on the seven paths 0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

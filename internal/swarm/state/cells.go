@@ -14,14 +14,12 @@ type ZoneVertex struct {
 }
 
 // CellZone is the convex polygon leash of the Voronoi cell hunting:
-// the hunt ground is the whole cell, not a square approximation of
-// it, so the target searches, the loot scans and the emptiness
-// readings fence on the exact cell shape (the half-plane
-// intersection the generator clipped). A point belongs to the cell
-// when it stays on the inner side of every polygon edge - the
-// cross product of the edge and the difference to the vertex stays
-// non-negative for a CCW polygon. A nil CellZone or a degenerate
-// vertex list means no limit, mirroring the nil *Zone semantics.
+// the ground is the whole cell, not a square approximation, so the
+// target searches, the loot scans and the emptiness readings fence on
+// the exact cell shape the generator clipped. A point belongs when the
+// cross product of every edge and the difference to its vertex stays
+// non-negative (a CCW polygon); a nil CellZone or a degenerate vertex
+// list means no limit, like a nil *Zone.
 type CellZone struct {
     Vertices []ZoneVertex
 }

@@ -6,15 +6,13 @@ package state
 
 import "time"
 
-// ShoppingEntryView is one planned purchase of the shop strategy: the
-// item the bot intends to buy, the merchant it comes from, the buy
-// price with the shop tax and the planning bookkeeping (the score
-// gain, the sell credit of the displaced gear, the affordability
+// ShoppingEntryView is one planned purchase: the item, the merchant,
+// the buy price with the shop tax and the planning bookkeeping (the
+// score gain, the sell credit of the displaced gear, the affordability
 // against the adena the plan was computed with and the adena still
-// missing for the wanted entries beyond the wallet). The combat stat
-// fields mirror InventoryItemSnapshot so the web tooltip of the shop
-// widget reuses the item tooltip shape (the family resolution and the
-// stat lines of the classic client tooltip).
+// missing). The combat stat fields mirror InventoryItemSnapshot, so
+// the shop widget tooltip reuses the item tooltip shape of the classic
+// client.
 type ShoppingEntryView struct {
     ItemID      int32   `json:"itemId"`
     Name        string  `json:"name"`

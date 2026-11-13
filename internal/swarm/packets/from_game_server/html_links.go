@@ -23,14 +23,13 @@ type HTMLLink struct {
 }
 
 // ParseHTMLLinks extracts the bypass links of a server dialog page,
-// mirroring the server side extraction of
-// HtmlUtil.buildHtmlBypassCache: the attribute values starting with
-// "bypass " are matched case-insensitively on the lowercased html
-// (the original casing is preserved in the result), the command
-// runs to the closing quote, the optional "-h " prefix is stripped
-// and the command trimmed. The link text is the content between the
-// anchor tag end and the next tag. A page without links (or with an
-// unterminated action attribute) yields nil.
+// mirroring HtmlUtil.buildHtmlBypassCache: the attribute values
+// starting with "bypass " match case-insensitively on the lowercased
+// html (the original casing stays in the result), the command runs to
+// the closing quote, the optional "-h " prefix strips and the command
+// trims. The link text is the content between the anchor tag end and
+// the next tag; a page without links or with an unterminated action
+// attribute yields nil.
 func ParseHTMLLinks(html string) []HTMLLink {
     if html == "" {
         return nil

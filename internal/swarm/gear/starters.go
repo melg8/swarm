@@ -13,13 +13,12 @@ import (
 
 // starterSet lists the item ids of the newbie kits the server never
 // takes back: the Mobius item xml flags them is_sellable=false and
-// is_dropable=false, so no shop buys them and the ground refuses
-// them - the destroy request is the only way they ever leave the
-// character. The elven fighter starts with the Dagger (item 10, the
-// weapon of the creation kit) plus the Squire's armor set; every kit
-// piece the paperdoll no longer needs is dead weight (the shirt alone
-// weighs 3300, the dagger 1160), the hunt loop destroys them through
-// ReplacedStarterItems once a better weapon or armor piece is worn.
+// is_dropable=false, so no shop buys them and the ground refuses them -
+// the destroy request is the only way they leave the character. The
+// elven fighter starts with the Dagger (item 10) and the Squire's set;
+// a piece the paperdoll no longer needs is dead weight (the shirt
+// weighs 3300, the dagger 1160), so the hunt loop destroys it through
+// ReplacedStarterItems once a better piece is worn.
 var starterSet = map[int32]bool{
     10:   true, // Dagger (the elven fighter's starter weapon)
     1146: true, // Squire's Shirt

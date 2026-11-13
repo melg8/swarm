@@ -4,13 +4,11 @@
 
 // Command benchdiff compares two `go test -bench` output files and
 // prints the per benchmark delta of every shared metric (ns/op, B/op,
-// allocs/op, MB/s). It is the repository-side plumbing of the
-// benchmark baseline workflow: `task bench:save` commits the output
-// of a touched package into runs/bench-<name>.txt and `task
-// bench:diff` wraps this tool, so the "compare allocations
-// before/after" rule reads the numbers from the committed baseline
-// instead of the agent's memory. The offline twin of benchstat - no
-// network, no module downloads, one parse walk.
+// allocs/op, MB/s). It is the plumbing of the benchmark baseline
+// workflow: `task bench:save` commits the output into
+// runs/bench-<name>.txt and `task bench:diff` wraps this tool, so the
+// comparison reads the committed baseline instead of the agent's
+// memory. The offline twin of benchstat: no network, one parse walk.
 package main
 
 import (

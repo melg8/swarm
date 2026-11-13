@@ -12,17 +12,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// The legacy tile upgrade: the pack builds before the v3 round left
-// the gzip wrapped v1/v2 tiles (and the plain tiles of the
-// -compress=false runs) behind, and the mtime freshness skip kept
-// them in place forever - the runtime reads every version, so the
-// pack worked, but the cold route paid the legacy decode (the wide
-// gzip tables, the per link Next chains, the BV tree walk) and the
-// disk carried the legacy size. The build pass rewrites such tiles
-// in place: the decode reads the legacy wire, the encode writes the
-// v3 columnar shape and the file lands in one zstd frame - the same
-// bytes a fresh build would have written, without the geodata parse
-// (the multi gigabyte pack upgrades in minutes, not hours).
+// The legacy tile upgrade: the pack builds before the v3 shape left
+// gzip wrapped v1/v2 tiles (and the plain tiles of -compress=false
+// runs) behind, and the mtime freshness skip kept them forever. The
+// runtime reads every version, but the cold route paid the legacy
+// decode (wide gzip tables, per link Next chains, the BV tree walk).
+// The build pass rewrites such tiles in place: the legacy wire decodes
+// into the v3 columnar shape in one zstd frame - the same bytes a fresh
+// build writes, without the parse (a multi gigabyte pack: minutes).
 
 // tileUpgrade reports what the legacy pass did with one tile.
 type tileUpgrade struct {

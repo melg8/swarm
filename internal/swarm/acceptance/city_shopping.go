@@ -14,15 +14,13 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The city shopping acceptance scenario: a character that already
-// wears the village dress, owns a Forest Bow and has saved 800 000
-// adena walks to the Elven Village gatekeeper, teleports to Gludio,
-// buys the top no-grade weapon and armor set at the town shops,
-// carries the top no-grade bow beside them (selling the Forest Bow it
-// replaces), rides back to the Elven Village and resumes the hunt on
-// the start ground. The errand itself lives in hunt/city_shopping.go
-// and starts from the production trigger; the scenario only sets the
-// start state and watches the story.
+// The city shopping acceptance scenario: a character in the village
+// dress with a Forest Bow and 800 000 adena walks to the Elven Village
+// gatekeeper, teleports to Gludio, buys the top no-grade weapon and
+// armor set, carries the top no-grade bow beside them (selling the
+// Forest Bow it replaces), rides back and resumes the hunt. The errand
+// lives in hunt/city_shopping.go and starts from the production
+// trigger; the scenario only sets the start state and watches.
 
 // cityShoppingScenarioID is the scenario registry id.
 const cityShoppingScenarioID = "city-shopping"

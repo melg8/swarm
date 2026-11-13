@@ -2,15 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package huntaudit measures the real hunting ground geometry on the live
-// Mobius C1 stack: for every cell of the registry it injects the probe
-// character at the anchor through the database position rewrite, waits out the
-// knownlist broadcast and dumps every attackable npc the character sees (name,
-// template, level, position, distance from the anchor, the leash verdict). The
-// registry anchors are clustered from the spawn polygon squares, never measured
-// live, so a leash square can fence out the whole observed mob mass and starve
-// the bots. The JSON output is the evidence file; a run reloads its own output
-// and skips the measured spots, so a long registry audits across several runs.
+// Package huntaudit measures the real hunting ground geometry on the
+// live Mobius C1 stack: for every registry cell it injects the probe
+// character at the anchor through the database position rewrite, waits
+// out the knownlist broadcast and dumps every attackable npc it sees.
+// The registry anchors are clustered from the spawn polygon squares,
+// never measured live, so a leash square can fence out the whole mob
+// mass; the JSON output is the evidence file the run reloads to skip
+// the measured spots across several runs.
 package huntaudit
 
 import (

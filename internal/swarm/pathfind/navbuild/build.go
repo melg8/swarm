@@ -13,15 +13,13 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// Options are the builder tunables. The defaults mirror the research
-// round (docs/recast_pathfinding.md): the 40 unit climb of the server
-// HEIGHT_INCREASE_LIMIT, the 32 unit dedup delta of the l2j duplicate
-// noise (the measured region noise sits at 16/24/32 unit deltas -
-// both-open pairs of the same surface; the elven region of the
-// research round showed none of it, the 22_xx column shows 54k pairs
+// Options are the builder tunables. The defaults: the 40 unit climb of
+// the server HEIGHT_INCREASE_LIMIT, the 32 unit dedup delta of the l2j
+// duplicate noise (both-open pairs of the same surface at 16/24/32
+// unit deltas; the elven region shows none, the 22_xx column 54k pairs
 // per region) and the 4 layer island filter. The rectangle polygons
 // carry no height tunable: they merge only the cells of one exact
-// geodata height (the faithful square port of the owner directive).
+// geodata height.
 type Options struct {
     Climb          int32
     DedupDelta     int32

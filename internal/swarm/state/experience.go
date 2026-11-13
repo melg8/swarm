@@ -4,14 +4,12 @@
 
 package state
 
-// experienceTable is the cumulative experience needed to reach each
-// level of the L2J Mobius C1 data pack
-// (dist/game/data/stats/players/experience.xml, table maxLevel 78).
-// experienceTable[N-1] is the total experience a character has exactly
-// when reaching level N, so the progress toward the next level is
-// (exp - experienceTable[level-1]) / (experienceTable[level] -
-// experienceTable[level-1]). Values above level 78 exceed the int32
-// protocol field and wrap, the percentage is clamped in that case.
+// experienceTable is the cumulative experience to reach each level of
+// the L2J Mobius C1 pack (experience.xml, table maxLevel 78).
+// experienceTable[N-1] is the total a character has exactly at level
+// N, so the progress toward the next level is (exp - table[level-1]) /
+// (table[level] - table[level-1]). Values above level 78 exceed the
+// int32 protocol field and wrap, so the percentage clamps.
 // Regenerate with tools/generate_experience_table.sh.
 var experienceTable = [...]int64{
     0, 68, 363,

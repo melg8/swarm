@@ -14,13 +14,12 @@ import (
 )
 
 // The border strip sidecar: the phase A build persists the border
-// strips of every region next to its tile file (X_Y.nsb). The phase B
-// stitching pairs strips of neighbouring regions - the sidecar keeps
-// that possible across pack build passes (the chunked builds of the
-// 165 region pack): a tile built in an earlier pass contributes its
-// sidecar strip instead of the in-pass build. The strips describe the
-// border cells of the region - appending the external links to the
-// tile never changes them, so the sidecar stays valid for the tile
+// strips of every region next to its tile (X_Y.nsb). The phase B
+// stitching pairs strips of neighbouring regions, and the sidecar
+// keeps that possible across the chunked passes of the 165 region
+// pack: a tile built in an earlier pass contributes its sidecar strip.
+// The strips describe the border cells only; appending the external
+// links never changes them, so the sidecar stays valid for the tile
 // lifetime.
 const (
     stripsMagic   = 0x534E5753 // 'SWNS' little endian

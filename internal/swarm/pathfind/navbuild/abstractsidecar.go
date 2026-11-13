@@ -24,15 +24,14 @@ type AbstractStats struct {
     Bytes   int64
 }
 
-// WriteAbstractSidecars serializes the cluster graph of every tile in
-// the output directory into the X_Y.ab sidecars (the persistent
-// coarse layer, docs/fastpath_research.md section 2). The pass runs
-// after the tile build and the compression: the sidecar records the
-// tile file stat it was built against and the runtime rejects a
-// sidecar whose tile changed under it. One worker per in flight
-// region (Workers caps the pool, 0 answers every core). The log
-// callback reports one line per region (nil mutes). A region whose
-// tile fails to decode counts failed and lets the pack finish.
+// WriteAbstractSidecars serializes the cluster graph of every tile
+// into the X_Y.ab sidecars (the persistent coarse layer,
+// docs/fastpath_research.md section 2). The pass runs after the tile
+// build and records the tile file stat it was built against, so the
+// runtime rejects a sidecar whose tile changed. One worker per in
+// flight region (Workers caps the pool, 0 answers every core); the log
+// callback reports one line per region, and a tile that fails to
+// decode counts failed and lets the pack finish.
 func WriteAbstractSidecars(outDir string, keys []navmesh.RegionKey,
     workers int, log func(format string, args ...any),
 ) (AbstractStats, error) {
