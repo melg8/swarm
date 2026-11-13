@@ -10,12 +10,11 @@ import "math"
 // portal advance guard and the waypoint deduplication.
 const funnelEpsilon = 1e-4
 
-// funnelWp is one waypoint of the raw funnel answer: the position and
-// the corridor index of the portal the waypoint sits on (-1 for the
-// start projection before the first portal, len(corridor)-1 for the
-// end projection). The portal index is the corridor walk address the
-// shortcut pass replays: a chord leaving the waypoint crosses the
-// portals after it, a chord arriving at it ends on its portal edge.
+// funnelWp is one waypoint of the raw funnel answer: the position and the
+// corridor index of the portal it sits on (-1 for the start projection,
+// len(corridor)-1 for the end one). The index is the walk address the shortcut
+// pass replays: a chord leaving the waypoint crosses the portals after it, one
+// arriving ends on its portal edge.
 type funnelWp struct {
     pos    Pos
     portal int32
@@ -31,9 +30,8 @@ func funnelPositions(wps []funnelWp) []Pos {
     return positions
 }
 
-// straightPathWps is the funnel answer with the corridor walk
-// addresses (the portal index of every waypoint) the shortcut pass
-// replays.
+// straightPathWps is the funnel answer with the corridor walk addresses the
+// shortcut pass replays.
 func (m *Mesh) straightPathWps(corridor []PolyRef, startPos, endPos Pos,
     clearance float64,
 ) []funnelWp {
@@ -69,14 +67,11 @@ func (m *Mesh) straightPathWps(corridor []PolyRef, startPos, endPos Pos,
     return waypoints
 }
 
-// runFunnel is the funnel state machine over the corridor portals.
-//
-// The cone side labels follow the local travel direction (the
-// left/right of the corridor as it crosses each portal); the signed
-// area convention here is the standard cross product (positive = the
-// third point lies counter-clockwise left of the first-two line),
-// which is the negative of the Detour dtTriArea2D - every comparison
-// of the upstream algorithm flips with it.
+// runFunnel is the funnel state machine over the corridor portals. The cone
+// side labels follow the local travel direction, and the signed area convention
+// is the standard cross product (positive = the third point lies
+// counter-clockwise left of the first-two line), the negative of the Detour
+// dtTriArea2D: every comparison of the upstream algorithm flips with it.
 func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
     clearance float64, waypoints *[]funnelWp,
 ) {
@@ -94,9 +89,8 @@ func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
         left, right, ok := m.corridorPortal(corridor, i, closestEnd,
             clearance)
         if !ok {
-            // A broken chain ends the walk at the last connected
-            // polygon: the corridor is inconsistent (should not
-            // happen on a built mesh).
+            // A broken chain ends the walk at the last connected polygon: the
+            // corridor is inconsistent (should not happen on a built mesh).
             return
         }
         if i == 0 &&
@@ -121,10 +115,9 @@ func (m *Mesh) runFunnel(corridor []PolyRef, closestStart, closestEnd Pos,
     }
 }
 
-// corridorPortal returns the left and right portal points of the
-// corridor transition at index i (the shared edge between the
-// polygons i and i+1, or the end position at the corridor end),
-// pulled inward from the wall abutting span ends (shrunkPortalSpan).
+// corridorPortal returns the left and right portal points of the transition at
+// index i (the shared edge of the polygons i and i+1, or the end position),
+// pulled inward from the walls that abut the span ends (shrunkPortalSpan).
 func (m *Mesh) corridorPortal(corridor []PolyRef, i int, closestEnd Pos,
     clearance float64,
 ) (Pos, Pos, bool) {
@@ -148,19 +141,17 @@ func (m *Mesh) corridorPortal(corridor []PolyRef, i int, closestEnd Pos,
     return left, right, true
 }
 
-// funnelCone is the narrowing cone of the funnel algorithm: the apex
-// and the two portal points it advanced through, with the corridor
-// indices the restarts jump back to.
+// funnelCone is the narrowing cone: the apex and the two portal points it
+// advanced through, with the corridor indices the restarts jump back to.
 type funnelCone struct {
     apex                             Pos
     left, right                      Pos
     apexIndex, leftIndex, rightIndex int
 }
 
-// narrowRight advances the right cone side through the right point of
-// portal i. It reports the new apex when the cone inverts on the left
-// side (the path bends at the left portal point and the funnel
-// restarts from it).
+// narrowRight advances the right cone side through the right point of portal i,
+// reporting the new apex when the cone inverts on the left side: the path bends
+// at the left portal point and the funnel restarts from it.
 func (c *funnelCone) narrowRight(right Pos, i int) (Pos, bool) {
     if triArea2D(c.apex, c.right, right) < 0 {
         return Pos{}, false
@@ -182,9 +173,8 @@ func (c *funnelCone) narrowRight(right Pos, i int) (Pos, bool) {
     return apex, true
 }
 
-// narrowLeft advances the left cone side through the left point of
-// portal i. It reports the new apex when the cone inverts on the
-// right side.
+// narrowLeft advances the left cone side through the left point of portal i,
+// reporting the new apex when the cone inverts on the right side.
 func (c *funnelCone) narrowLeft(left Pos, i int) (Pos, bool) {
     if triArea2D(c.apex, c.left, left) > 0 {
         return Pos{}, false
@@ -206,8 +196,7 @@ func (c *funnelCone) narrowLeft(left Pos, i int) (Pos, bool) {
     return apex, true
 }
 
-// linkBetween finds the link of one polygon that leads to the next
-// polygon of the corridor.
+// linkBetween finds the link of one polygon that leads to the next.
 func (m *Mesh) linkBetween(ref, next PolyRef,
 ) (*Tile, *Poly, *Link, bool) {
     tile, poly := m.polyOfRef(ref)
@@ -225,11 +214,10 @@ func (m *Mesh) linkBetween(ref, next PolyRef,
     return nil, nil, nil, false
 }
 
-// labelPortalEnds returns the portal endpoints labeled by the local
-// travel direction: the endpoint on the left of the corridor crossing
-// (the from-polygon center toward the neighbor center) is the left
-// cone side, the other one the right. The heights come from the
-// surface of the polygon the link leaves.
+// labelPortalEnds labels the portal endpoints by the local travel direction:
+// the endpoint left of the corridor crossing (the from-polygon center toward
+// the neighbor center) is the left cone side, the other the right. The heights
+// come from the surface of the polygon the link leaves.
 func labelPortalEnds(tile *Tile, poly *Poly,
     nextTile *Tile, nextPoly *Poly,
     ax, ay, bx, by float64,
@@ -238,9 +226,8 @@ func labelPortalEnds(tile *Tile, poly *Poly,
     cx0, cy0 := rectCenter(tile, poly)
     cx1, cy1 := rectCenter(nextTile, nextPoly)
     dx, dy := cx1-cx0, cy1-cy0
-    // The cross product of the travel direction with the endpoint
-    // offset picks the left endpoint (positive = counter-clockwise
-    // left of the travel).
+    // The cross product of the travel direction with the endpoint offset picks
+    // the left endpoint (positive = counter-clockwise left).
     crossA := dx*(ay-midY) - dy*(ax-midX)
     var left, right Pos
     if crossA > 0 {
@@ -261,16 +248,13 @@ func rectCenter(tile *Tile, poly *Poly) (float64, float64) {
     return (x0 + x1) * 0.5, (y0 + y1) * 0.5
 }
 
-// shrunkPortalSpan pulls the portal span ends inward from the walls
-// that abut them: the capsule clearance of the turning pivots. The
-// eroded free space of the walkable union shrinks a span end only
-// when the shared edge continues into a wall at it (spanEndWall) - an
-// end whose edge continues open into the neighboring cells keeps its
-// extent, the strip joints of the merged mesh stay open portals and
-// the funnel walks the open terrain straight (the owner zigzag
-// report of the raw answer). A span narrower than the pulled ends
-// pivots at its middle: the deepest point of a narrow doorway is the
-// best the capsule gets.
+// shrunkPortalSpan pulls the portal span ends inward from the walls that abut
+// them, the capsule clearance of the turning pivots. A span end shrinks only
+// when the shared edge continues into a wall at it (spanEndWall): an end whose
+// edge continues open keeps its extent, so the strip joints of the merged mesh
+// stay open portals and the funnel walks the open terrain straight. A span
+// narrower than the pulled ends pivots at its middle, the deepest point a
+// narrow doorway gives the capsule.
 func (m *Mesh) shrunkPortalSpan(tile *Tile, poly *Poly, link *Link,
     nextTile *Tile, nextPoly *Poly,
     ax, ay, bx, by, clearance float64,
@@ -305,14 +289,13 @@ func (m *Mesh) shrunkPortalSpan(tile *Tile, poly *Poly, link *Link,
     return ax + ux*low, ay + uy*low, bx - ux*high, by - uy*high
 }
 
-// spanEndWall answers whether a wall of the walkable union abuts one
-// end of the link portal span along the shared edge (the low end: the
-// T0 cell side, the high end: the T1+1 cell side). The edge continues
-// past the span end into the neighboring cells on both sides: a wall
-// stands at the end when either side closes there - the polygon whose
-// range covers the continuation cell without a link on the edge side,
-// or the polygon whose corner the span end is, walled along the
-// perpendicular side that meets the edge there.
+// spanEndWall answers whether a wall of the walkable union abuts one end of the
+// link portal span along the shared edge (the low end is the T0 cell side, the
+// high end the T1+1 cell). The edge continues past the span end into the
+// neighboring cells on both sides, and a wall stands there when either side
+// closes: the polygon whose range covers the continuation cell without a link
+// on the edge side, or the polygon whose corner the span end is, walled along
+// the perpendicular side that meets the edge there.
 func (m *Mesh) spanEndWall(tile *Tile, poly *Poly, link *Link,
     nextTile *Tile, nextPoly *Poly, low bool,
 ) bool {
@@ -323,9 +306,8 @@ func (m *Mesh) spanEndWall(tile *Tile, poly *Poly, link *Link,
     if spanSideWalled(tile, poly, link.Side, cell, low) {
         return true
     }
-    // The neighbor side of the edge: the continuation cell maps into
-    // the neighbor tile grid (the cross tile links carry their own
-    // tile anchors, the cell coordinates resume there).
+    // The neighbor side of the edge: the continuation cell maps into the
+    // neighbor tile grid, whose cell coordinates resume at its own anchor.
     nextCell := cell
     if nextTile != tile {
         nextCell = mapCellAcrossTiles(tile, nextTile, link.Side, cell)
@@ -335,10 +317,10 @@ func (m *Mesh) spanEndWall(tile *Tile, poly *Poly, link *Link,
         oppositeSide(link.Side), nextCell, low)
 }
 
-// spanSideWalled answers whether the shared edge at the continuation
-// cell walls on the given polygon's side: the polygon walled at the
-// cell its own range covers, or the polygon corner the span end is,
-// closed along the perpendicular side meeting the edge there.
+// spanSideWalled answers whether the shared edge at the continuation cell walls
+// on the given polygon side: the polygon walled at the cell its own range
+// covers, or the polygon corner the span end is, closed along the perpendicular
+// side meeting the edge there.
 func spanSideWalled(tile *Tile, poly *Poly, side uint8, cell int32,
     low bool,
 ) bool {
@@ -349,8 +331,7 @@ func spanSideWalled(tile *Tile, poly *Poly, side uint8, cell int32,
     return polyCornerWalled(tile, poly, side, low)
 }
 
-// sideRangeCovers answers whether the polygon's side of the given
-// orientation spans the cell coordinate (the along side axis range).
+// sideRangeCovers answers whether the polygon side spans the cell coordinate.
 func sideRangeCovers(poly *Poly, side uint8, cell int32) bool {
     lo, hi := poly.Y0, poly.Y1
     if side == SideMinY || side == SideMaxY {
@@ -360,8 +341,8 @@ func sideRangeCovers(poly *Poly, side uint8, cell int32) bool {
     return cell >= lo && cell < hi
 }
 
-// polySideLinkCovers answers whether one of the polygon's links on
-// the given side opens the crossing at the cell coordinate.
+// polySideLinkCovers answers whether a link on the side opens the crossing at
+// the cell.
 func polySideLinkCovers(tile *Tile, poly *Poly, side uint8,
     cell int32,
 ) bool {
@@ -376,11 +357,10 @@ func polySideLinkCovers(tile *Tile, poly *Poly, side uint8,
     return false
 }
 
-// polyCornerWalled answers whether the polygon boundary walls along
-// the perpendicular side that meets the shared edge at the span end
-// corner: the corner cell of the perpendicular side carries no link.
-// The span end is the polygon corner exactly when the continuation
-// cell falls outside the side range (the caller checked).
+// polyCornerWalled answers whether the polygon boundary walls along the
+// perpendicular side that meets the shared edge at the span end corner: the
+// corner cell carries no link. The span end is the polygon corner exactly when
+// the continuation cell falls outside the side range (the caller checked).
 func polyCornerWalled(tile *Tile, poly *Poly, edgeSide uint8,
     low bool,
 ) bool {
@@ -412,10 +392,9 @@ func polyCornerWalled(tile *Tile, poly *Poly, edgeSide uint8,
     return !polySideLinkCovers(tile, poly, perp, corner)
 }
 
-// mapCellAcrossTiles maps the continuation cell coordinate of the
-// from tile into the neighbor tile grid along the side axis: the
-// world coordinate of the cell boundary resumes as the neighbor cell
-// index (the region tiles are cell aligned).
+// mapCellAcrossTiles maps the continuation cell coordinate into the neighbor
+// tile grid along the side axis: the world coordinate of the cell boundary
+// resumes as the neighbor cell index (the region tiles are cell aligned).
 func mapCellAcrossTiles(fromTile, toTile *Tile, side uint8,
     cell int32,
 ) int32 {
@@ -431,8 +410,7 @@ func mapCellAcrossTiles(fromTile, toTile *Tile, side uint8,
     return int32(math.Round((world - origin) / cellSizeWorld))
 }
 
-// oppositeSide returns the side of the neighbor polygon that faces
-// the given side of the shared edge.
+// oppositeSide returns the side of the neighbor polygon facing the given side.
 func oppositeSide(side uint8) uint8 {
     switch side {
     case SideMinX:
@@ -447,8 +425,8 @@ func oppositeSide(side uint8) uint8 {
 }
 
 // appendWp appends a funnel corner with its corridor portal unless it
-// duplicates the previous one in 2D (the duplicate keeps the earlier
-// portal: the positions coincide, the walk address only tightens).
+// duplicates the previous one in 2D; the duplicate keeps the earlier portal,
+// whose walk address only tightens.
 func appendWp(waypoints []funnelWp, point Pos, portal int32) []funnelWp {
     if len(waypoints) > 0 &&
         same2D(waypoints[len(waypoints)-1].pos, point) {
@@ -458,9 +436,9 @@ func appendWp(waypoints []funnelWp, point Pos, portal int32) []funnelWp {
     return append(waypoints, funnelWp{pos: point, portal: portal})
 }
 
-// triArea2D is the signed 2D triangle area with the standard cross
-// product convention: positive when c lies counter-clockwise left of
-// the a-b line (the negative of the Detour dtTriArea2D).
+// triArea2D is the signed 2D triangle area: positive when c lies
+// counter-clockwise left of the a-b line, the negative of the Detour
+// dtTriArea2D.
 func triArea2D(a, b, c Pos) float64 {
     return (b.X-a.X)*(c.Y-a.Y) - (b.Y-a.Y)*(c.X-a.X)
 }
@@ -471,8 +449,8 @@ func same2D(a, b Pos) bool {
         math.Abs(a.Y-b.Y) < funnelEpsilon
 }
 
-// distPtSegSqr2D is the squared 2D distance of a point to a segment
-// (the Detour dtDistancePtSegSqr2D).
+// distPtSegSqr2D is the squared 2D distance of a point to a segment (the Detour
+// one).
 func distPtSegSqr2D(pt, a, b Pos) float64 {
     dx := b.X - a.X
     dy := b.Y - a.Y

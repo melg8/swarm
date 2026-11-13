@@ -1843,6 +1843,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - pathfind/navmesh/funnel.go keeps the funnel rules
+
+- 23 blocks compress: the funnel keeps the waypoint portal index
+  contract (-1 for the start projection, `len(corridor)-1` for the end
+  one; a chord leaving the waypoint crosses the portals after it), the
+  cross product convention against the Detour `dtTriArea2D` (every
+  upstream comparison flips), the cone inversion restarts, the
+  `shrunkPortalSpan` clearance pulls (a span end shrinks only when the
+  shared edge continues into a wall, so the strip joints stay open),
+  the narrow doorway pivot at the middle, the `spanEndWall`
+  continuation cell rule with the cross tile cell mapping, the 1e-4
+  `funnelEpsilon` and the 2D duplicate drop that keeps the earlier
+  portal. 100 comment lines of 491 become 78 of 469.
+- Verified: `task fmt`, `go build ./...`, the navmesh suite (28.6 s),
+  `golangci-lint run ./internal/swarm/pathfind/navmesh/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
