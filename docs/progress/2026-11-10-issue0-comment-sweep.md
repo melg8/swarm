@@ -1527,6 +1527,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - hunt/zones.go keeps the rotation rules
+
+- 37 blocks compress: the registry keeps the Mobius spawn terrain rule
+  (uniform random spawn point, wander inside the polygon), the 1 level
+  lead, the 30 s re-evaluation, the 10 s rotation window against the
+  15-20 s elven respawn, the 40 s empty cooldown (two respawn cycles)
+  and the three death demotion limit. The emptiness reading rule stays
+  (the mobs the character can actually pick: the level filter, the skip
+  list, the social clan fence; loot, trip, landing blows and rest reset
+  the timer). The wire id translation stays: the CT0 xml template 20471
+  becomes the C4 display id 1000471 through the 1000000 offset.
+  148 comment lines of 662 become 128 of 642.
+- Verified: `task fmt`, `go build ./...`, the hunt suite,
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
