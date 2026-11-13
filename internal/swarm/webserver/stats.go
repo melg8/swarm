@@ -13,43 +13,32 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The statistics collector of the web layer: a human paced sampler
-// that reads the lifetime counters of every registry tracker (and the
-// process metrics of the Go runtime) into bounded rings, so the
-// statistics tab answers "how did the fleet behave over the last day"
-// with real history instead of only the current snapshot values.
-//
-// Layering: the counters live in state.Bot (the single source of
-// truth); this collector only aggregates copies at its own cadence and
-// never sits on a hotpath (one walk per 15 seconds per bot).
-//
-// Retention: every ring holds statsRingCapacity samples. When a ring
-// fills, every second sample is dropped (the half-on-full compaction):
-// the fresh data stays at the full 15 second resolution, the older
-// data ages into coarser resolutions, and the memory stays strictly
-// bounded whatever the process uptime.
+// The statistics collector: a human paced sampler that reads the lifetime
+// counters of every registry tracker and the Go runtime metrics into bounded
+// rings, so the statistics tab answers how the fleet behaved over the last day
+// with real history. The counters stay in state.Bot; the collector aggregates
+// copies at its own cadence and never sits on a hotpath (one walk per 15
+// seconds per bot). Every ring holds statsRingCapacity samples and drops every
+// second one when full, so the fresh data keeps the 15 second resolution, the
+// older data ages coarser, and the memory stays bounded whatever the uptime.
 
 // Sampling and retention constants.
 const (
-    // statsSamplePeriod is the sampler cadence: 15 seconds resolve a
-    // kill timeline well while a 24/7 run stays cheap.
+    // statsSamplePeriod is the sampler cadence: 15 seconds resolve a kill
+    // timeline.
     statsSamplePeriod = 15 * time.Second
-    // statsRingCapacity is the fixed sample count of every ring: the
-    // compaction keeps the memory bounded, the capacity sets the fine
-    // resolution window (2048 x 15 s = 8.5 hours).
+    // statsRingCapacity sets the fine resolution window (2048 x 15 s = 8.5
+    // hours).
     statsRingCapacity = 2048
-    // statsEventsCapacity bounds the event ring of one bot: the rare
-    // transitions (deaths, relogins, level changes) and the kill
-    // deltas of the last sample windows.
+    // statsEventsCapacity bounds the rare transitions and the kill deltas of a
+    // bot.
     statsEventsCapacity = 64
-    // statsHistoryMaxPoints bounds the downsampled history the
-    // endpoints serve: the charts draw a few hundred points.
+    // statsHistoryMaxPoints bounds the downsampled history the endpoints serve.
     statsHistoryMaxPoints = 256
 )
 
-// Phase codes of the per bot samples: the compact one byte storage of
-// the hunt phase. The mapping mirrors the phase strings the hunt loop
-// publishes; an unmapped phase lands in the unknown bucket.
+// Phase codes of the per bot samples: the mapping mirrors the published phase
+// strings, an unmapped phase lands in the unknown bucket.
 const (
     phaseUnknown uint8 = iota
     phaseEngage
@@ -93,9 +82,8 @@ func phaseCode(phase string) uint8 {
     return phaseUnknown
 }
 
-// botSample is one aggregated observation of a bot at a sample time:
-// the cumulative counters (monotonic unless the tracker resets) and
-// the instantaneous vitals, packed for the ring.
+// botSample is one observation of a bot: the cumulative counters (monotonic
+// unless the tracker resets) and the instantaneous vitals, packed for the ring.
 type botSample struct {
     at       int64 // unix seconds
     exp      int64
@@ -104,8 +92,7 @@ type botSample struct {
     deaths   int32
     sessions int32
     level    int32
-    // hpPct is the health percentage 0..100, -1 while the vitals are
-    // unknown (a connecting or offline bot).
+    // hpPct is the health percentage 0..100, -1 while the vitals are unknown.
     hpPct    int16
     phase    uint8
     flags    uint8 // bit 0 online, bit 1 in combat
@@ -178,10 +165,9 @@ type statsEvent struct {
     Value int64  `json:"value"`
 }
 
-// sampleRing is the fixed capacity ring of one series with the
-// half-on-full compaction. The layout mirrors combatFeed: a
-// preallocated array walked by head and count, so the steady state
-// allocates nothing.
+// sampleRing is the fixed capacity ring of one series with the half-on-full
+// compaction: a preallocated array walked by head and count, so the steady
+// state allocates nothing.
 type sampleRing struct {
     samples [statsRingCapacity]botSample
     head    int
@@ -200,8 +186,8 @@ func (r *sampleRing) append(s botSample) {
     }
 }
 
-// compact drops every second sample keeping the chronological order:
-// the ring count halves, the resolution of the kept half doubles.
+// compact drops every second sample in chronological order, doubling the
+// resolution.
 func (r *sampleRing) compact() {
     kept := 0
     for i := range r.count {
@@ -217,8 +203,8 @@ func (r *sampleRing) compact() {
     r.count = kept
 }
 
-// walk calls visit for every sample of the window in chronological
-// order. The window cut of zero walks the whole ring.
+// walk calls visit for every sample of the window in chronological order (zero
+// walks the whole ring).
 func (r *sampleRing) walk(
     now time.Time, window time.Duration, visit func(botSample),
 ) {
@@ -250,18 +236,16 @@ func (r *sampleRing) last() (botSample, bool) {
     return r.samples[index], true
 }
 
-// botSeries is the collected history of one bot id: the ring, the
-// event log and the baselines the derived views compute against.
+// botSeries is the history of one bot id: the ring, the event log and the
+// baselines.
 type botSeries struct {
     bot *state.Bot
-    // based marks that the baselines hold real character values: the
-    // anchor waits for the first valid sample (level > 0), so a series
-    // opened inside a reconnect gap does not anchor its baselines on
-    // the zeroed tracker character.
+    // based marks that the baselines hold real character values: the anchor
+    // waits for the first sample with level > 0, never the zeroed character of
+    // a reconnect gap.
     based bool
-    // expBase, adenaBase and levelBase anchor the "gained" views: the
-    // values of the first valid sample of the series (a deleveling drop
-    // reads as a real loss of the net view).
+    // expBase, adenaBase and levelBase anchor the "gained" views at the first
+    // valid sample, so a deleveling drop reads as a real loss of the net view.
     expBase   int64
     adenaBase int64
     levelBase int32
@@ -364,10 +348,9 @@ func (c *statsCollector) run() {
     }
 }
 
-// sample walks every registered tracker once, appends the per bot
-// samples with their transition events, then aggregates the fleet and
-// the process into the fleet ring. The caller must NOT hold the
-// collector lock (the tracker reads take their own locks).
+// sample walks every registered tracker once, appends the per bot samples with
+// their transition events, then aggregates the fleet and the process into the
+// fleet ring. The caller must not hold the collector lock.
 func (c *statsCollector) sample(now time.Time) {
     var mem runtime.MemStats
     runtime.ReadMemStats(&mem)
@@ -404,9 +387,8 @@ func (c *statsCollector) sample(now time.Time) {
     }
 }
 
-// fleetAggregates accumulates the fleet wide totals of one sampling
-// round (the long running bots only, the acceptance tests run their
-// own worlds).
+// fleetAggregates accumulates the fleet wide totals of one round (the long
+// running bots only, the acceptance tests run their own worlds).
 type fleetAggregates struct {
     registered int32
     online     int32
@@ -441,16 +423,13 @@ func botSampleOf(
     }
 }
 
-// carryGapSample fills a sample that landed inside the reconnect gap:
-// ResetSession zeroed the tracker character and the fresh UserInfo of
-// the new session has not arrived yet, so the character facts read as
-// zeros. The character does not change while the bot is away (the
-// exp, the adena and the level of the relogin answer come back exactly
-// as they were, a death penalty lands before the logout), so the
-// sample carries the last known values instead of recording a zero
-// flash that crashes the history charts and fakes level 0 events. The
-// connection facts (the online flag, the packet rate, the phase) stay
-// untouched - they are real.
+// carryGapSample fills a sample inside the reconnect gap: ResetSession zeroed
+// the tracker character and the new UserInfo has not arrived, so the character
+// facts read as zeros. The character does not change while the bot is away (the
+// relogin answer returns exp, adena and level exactly as they were, a death
+// penalty lands before the logout), so the sample carries the last known values
+// instead of a zero flash that crashes the charts; the connection facts (online
+// flag, packet rate, phase) stay untouched.
 func carryGapSample(sample *botSample, previous botSample) {
     sample.exp = previous.exp
     sample.adena = previous.adena
@@ -458,10 +437,10 @@ func carryGapSample(sample *botSample, previous botSample) {
     sample.hpPct = previous.hpPct
 }
 
-// sampleBot reads one tracker into its series (with the transition
-// events of the sample gap) and folds the long running bots into the
-// fleet aggregates. The tracker reads run without the collector lock;
-// the series and packet counter updates take it.
+// sampleBot reads one tracker into its series with the transition events of the
+// gap and folds the long running bots into the fleet aggregates. The tracker
+// reads run without the collector lock, the series and packet counter updates
+// take it.
 func (c *statsCollector) sampleBot(
     bot *state.Bot, now time.Time, agg *fleetAggregates,
 ) {
@@ -508,11 +487,10 @@ func (c *statsCollector) sampleBot(
     }
 }
 
-// appendSampleLocked folds one packed sample into its series: a sample
-// that landed inside the reconnect gap carries the last known
-// character, the first valid sample anchors the series baselines and
-// the transition events of the sample gap note against the previous
-// sample. The caller must hold the collector lock.
+// appendSampleLocked folds one sample into its series: a gap sample carries the
+// last known character, the first valid sample anchors the baselines, and the
+// transition events note against the previous sample. The caller must hold the
+// collector lock.
 func (c *statsCollector) appendSampleLocked(
     series *botSeries, now time.Time, sample botSample,
 ) {
@@ -532,10 +510,10 @@ func (c *statsCollector) appendSampleLocked(
     }
 }
 
-// seriesFor returns the series of a bot id, opening a fresh one when
-// the tracker object changed (the acceptance manager replaces the
-// trackers in place) so the counters of a new tracker never read as a
-// drop of the old series. The caller must hold the collector lock.
+// seriesFor returns the series of a bot id, opening a fresh one when the
+// tracker object changed (the acceptance manager replaces trackers in place),
+// so the counters of a new tracker never read as a drop of the old series. The
+// caller must hold the lock.
 func (c *statsCollector) seriesFor(id string, bot *state.Bot) *botSeries {
     series, ok := c.bots[id]
     if !ok || series.bot != bot {
@@ -546,11 +524,10 @@ func (c *statsCollector) seriesFor(id string, bot *state.Bot) *botSeries {
     return series
 }
 
-// noteBotEventsLocked derives the transition events of the sample gap
-// from the counter deltas: the kills fold into one kill event per
-// sample, the rare transitions (deaths, relogins, level changes,
-// online flips) record one event each. The caller must hold the
-// collector lock.
+// noteBotEventsLocked derives the transition events from the counter deltas:
+// the kills fold into one event per sample, the rare transitions (deaths,
+// relogins, level changes, online flips) record one each. The caller must hold
+// the collector lock.
 func (c *statsCollector) noteBotEventsLocked(
     series *botSeries, now time.Time, sample, previous botSample,
 ) {
@@ -577,9 +554,7 @@ func (c *statsCollector) noteBotEventsLocked(
     }
 }
 
-// botPacketRate returns the observed packet rate of a bot: the packet
-// counter delta over the nominal sample period. The caller must hold
-// the collector lock.
+// botPacketRate returns the packet counter delta over the nominal period.
 func (c *statsCollector) botPacketRate(id string, packets int64) float64 {
     last, ok := c.lastPackets[id]
     c.lastPackets[id] = packets
@@ -590,8 +565,7 @@ func (c *statsCollector) botPacketRate(id string, packets int64) float64 {
     return float64(packets-last) / statsSamplePeriod.Seconds()
 }
 
-// compactFleetLocked halves the fleet slice the same way the per bot
-// rings compact. The caller must hold the collector lock.
+// compactFleetLocked halves the fleet slice like the per bot rings do.
 func (c *statsCollector) compactFleetLocked() {
     kept := c.fleet[:0]
     for i := 0; i < len(c.fleet); i += 2 {

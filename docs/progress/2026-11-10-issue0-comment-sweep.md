@@ -1628,6 +1628,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the webserver suite (8.3 s),
   `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
 
+### 2026-11-13 - webserver/stats.go keeps the sampler rules
+
+- 20 blocks compress: the collector keeps the layering (the counters in
+  `state.Bot`, the collector aggregate at its own cadence, never a
+  hotpath, one walk per 15 s per bot), the bounded rings with the
+  half-on-full compaction (2048 x 15 s = 8.5 h of fine resolution,
+  64 events, 256 served history points), the phase code mapping, the
+  health percentage -1 marker, the baselines anchored at the first
+  sample with level > 0 so a reconnect gap never anchors on the zeroed
+  character, the deleveling drop reading as a real loss, the gap carry
+  (the relogin answer returns exp, adena and level exactly; a death
+  penalty lands before the logout) and the lock rule of `sample`.
+  115 comment lines of 601 become 89 of 575.
+- Verified: `task fmt`, `go build ./...`, the webserver suite,
+  `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
