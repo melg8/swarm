@@ -6,32 +6,22 @@ package navmesh
 
 import "math"
 
-// corridorSlack is the priced deviation the shortcut region grows
-// beyond the search corridor: the slope strips of the merged mesh
-// staircase (the height run edges step the strips one cell aside),
-// the corridor chain threads them one strip wide and the funnel
-// through the chain pivots at the span ends the sliding portals
-// force - the walk the terrain allows cuts the staircase diagonally
-// through the strips the chain left out. The flood prices the
-// deviation like the search step and caps it at the slack, the
-// shortcut chords thread the grown region through the real link
-// spans only (the owner zigzag report of the raw answer).
+// corridorSlack is the priced deviation the shortcut region grows beyond
+// the search corridor: the staircase strips step one cell aside at the
+// height run edges, so the walk the terrain allows cuts them diagonally
+// from the chain (docs/navmesh.md, the shortcut pass).
 const corridorSlack = 96
 
-// smoothScanWindow caps how far the greedy scan walks back per anchor
-// before it accepts the next waypoint: a bound on the worst case
-// work of one merge attempt round (the deep far-end probes that fail
-// early dominate the cost, the cap keeps the pass inside the search
-// budget of the caller).
+// smoothScanWindow caps how far the greedy scan walks back per anchor, a
+// bound on the worst case work of one merge attempt (the deep far-end
+// probes that fail early dominate the cost).
 const smoothScanWindow = 256
 
 // corridorRegion grows the search corridor into the walk region the
-// shortcut chords may thread: a multi source flood from the chain
-// polygons over the open links, priced like the search step (the
-// entry distance times the averaged polygon prices, polyCost) and
-// capped at the slack over the free chain. The avoid queries keep
-// the bare chain (the bans wall the search, the region must not
-// reopen the banned ground the chain already avoided).
+// shortcut chords may thread: a multi source flood over the open links,
+// priced like a search step (polyCost) and capped at the slack. The avoid
+// queries keep the bare chain, since the region must not reopen the banned
+// ground the search already avoided.
 //
 //nolint:cyclop,gocognit,funlen // the portal and wall checks
 func (m *Mesh) corridorRegion(corridor []PolyRef, filter Filter,
@@ -107,13 +97,11 @@ func (m *Mesh) corridorRegion(corridor []PolyRef, filter Filter,
     return region
 }
 
-// regionChord answers whether the straight segment walks the region:
-// from the start polygon it exits every rectangle through an open
-// link span whose span holds the crossing, every polygon it enters
-// belongs to the region, and the visited polygon list rides along
-// for the wall clearance check of the caller. The walk crosses only
-// the links of the polygon it leaves, so the stacked layers stay on
-// the connected surface.
+// regionChord answers whether the straight segment walks the region: every
+// exit crosses an open link span that holds the point, every entered
+// polygon belongs to the region, and the visited list rides along for the
+// wall clearance check. The walk crosses only the links of the polygon it
+// leaves, so the stacked layers stay on the connected surface.
 //
 //nolint:cyclop,gocognit,funlen // the wall and guard branches
 func (m *Mesh) regionChord(startRef PolyRef, a, b Pos,
@@ -227,15 +215,12 @@ func (m *Mesh) regionCross(tile *Tile, poly *Poly, side uint8,
     return 0
 }
 
-// shortenCorridorWaypoints folds the funnel waypoints into the
-// longest chords the corridor region allows (the greedy farthest
-// visible walk of the shortcut pass): a chord must walk the region
-// (regionChord: every crossed span open, every entered polygon in
-// the region) and keep the clearance from the walls of the polygons
-// it visits - the armed guard answers the walls instead of the mesh
-// spans (the server accurate raster). The answer holds a subset of
-// the funnel positions: the first, the last and every pivot no safe
-// chord skips.
+// shortenCorridorWaypoints folds the funnel waypoints into the longest
+// chords the corridor region allows: a chord must walk the region
+// (regionChord) and keep the clearance from the walls it visits - the
+// armed guard answers the walls instead of the mesh spans. The answer holds
+// the first, the last and every pivot no safe chord skips, so it never adds
+// a turn.
 func (m *Mesh) shortenCorridorWaypoints(corridor []PolyRef,
     wps []funnelWp, filter Filter,
 ) []Pos {
@@ -276,12 +261,10 @@ func (m *Mesh) shortenCorridorWaypoints(corridor []PolyRef,
     return merged
 }
 
-// chordWalksRegion answers whether the straight chord from the
-// waypoint "from" to the waypoint "to" walks the corridor region
-// safely: the region chord crosses only open spans of region
-// polygons, and the walls keep the clearance - the armed guard (the
-// server accurate raster) answers the whole chord instead of the
-// mesh wall spans.
+// chordWalksRegion answers whether the straight chord walks the region
+// safely: the region chord crosses only open spans, and the walls keep the
+// clearance - the armed guard answers the whole chord instead of the mesh
+// wall spans.
 func (m *Mesh) chordWalksRegion(corridor []PolyRef, from, to funnelWp,
     region map[PolyRef]struct{}, walls map[PolyRef]*[4][]wallSpan,
     visited *[]PolyRef, filter Filter,

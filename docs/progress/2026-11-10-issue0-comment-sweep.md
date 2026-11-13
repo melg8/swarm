@@ -2182,6 +2182,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the npcdata suite (0.4 s),
   `golangci-lint run ./internal/swarm/npcdata/...` 0 issues.
 
+### 2026-11-13 - pathfind/navmesh/corridor.go keeps the chord contract
+
+- 6 blocks compress: the file keeps the `corridorSlack` 96 priced
+  deviation and the `smoothScanWindow` 256 bound, the bare chain of an
+  avoid query (the region must not reopen the banned ground), the
+  region chord rule (an open span holds every exit, only the links of
+  the left polygon cross, so the stacked layers stay connected), the
+  clearance gate of the armed guard and the "never adds a turn" answer
+  contract. The corridor region rules move to a new bullet of the
+  shortcut pass section of `docs/navmesh.md` with the staircase strip
+  reason, the `polyCost` flood price and the cap. 57 comment lines of
+  314 become 40 of 298, no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the navmesh suite (30.2 s),
+  `golangci-lint run ./internal/swarm/pathfind/navmesh/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

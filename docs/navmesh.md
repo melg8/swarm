@@ -669,6 +669,19 @@ the pass never dead ends. The wall distance comparison relaxes by
 `smoothEpsilon` 1e-6: the pivots sit exactly one radius off the wall
 edges, so a chord through them must survive the float rounding.
 
+- **The corridor region** (`corridor.go`): the chords may deviate up to
+  `corridorSlack` 96 units beyond the search chain, because the slope
+  strips of the merged staircase step one cell aside at every height
+  run edge while the chain threads them one strip wide, so the walk the
+  terrain allows cuts the staircase diagonally through the strips the
+  chain left out. The multi source flood prices the deviation like a
+  search step (`polyCost`) and caps it at the slack; the chords thread
+  the grown region through the real link spans only. An avoid query
+  keeps the bare chain - the bans wall the search, and the region must
+  not reopen the ground the chain already avoided. The greedy scan
+  walks back at most `smoothScanWindow` 256 waypoints per anchor, a
+  bound on one merge attempt.
+
 ## The wall oracle (the SegmentGuard seam)
 
 The mesh wall spans are the side level approximation of the walls:
