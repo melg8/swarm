@@ -8,9 +8,9 @@ import (
     "time"
 )
 
-// StartedAt returns the moment the tracker was created (the uptime
-// anchor that survives the reconnects): the statistics view derives
-// the long run rates of the bot from it.
+// StartedAt returns the moment the tracker was created, the uptime anchor that
+// survives the reconnects; the statistics view derives the long run rates from
+// it.
 func (b *Bot) StartedAt() time.Time {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -18,10 +18,9 @@ func (b *Bot) StartedAt() time.Time {
     return b.started
 }
 
-// SessionStartedAt returns the moment of the current login (the
-// uptime anchor Started survives the reconnects): the bounded waits
-// of the hunt loop - the skill list gate of the first town trip -
-// measure against it so every reconnect re-arms them.
+// SessionStartedAt returns the moment of the current login: the bounded waits
+// of the hunt loop - the skill list gate of the first town trip - measure
+// against it, so every reconnect re-arms them.
 func (b *Bot) SessionStartedAt() time.Time {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -59,10 +58,9 @@ func (b *Bot) Status() Status {
     return b.status
 }
 
-// Phase returns the last published hunt loop phase of the bot. It is
-// empty before the loop sets it (the manual only sessions and the
-// pre-world sessions never set it). The web UI maps it to a human
-// readable activity banner.
+// Phase returns the last published hunt loop phase, empty before the loop sets
+// it (the manual only and pre-world sessions never do); the web UI maps it to
+// an activity banner.
 func (b *Bot) Phase() string {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -70,11 +68,9 @@ func (b *Bot) Phase() string {
     return b.phase
 }
 
-// SetPhase publishes the current hunt loop phase so the web UI can
-// show a human readable activity banner (hunting, walking to town,
-// selling, deleveling). The hunt loop calls this on every phase
-// transition (and a steady state refresh is a no-op so the per tick
-// call never churns the event stream).
+// SetPhase publishes the current hunt loop phase for the activity banner of the
+// web UI (hunting, walking to town, selling, deleveling). A steady state
+// refresh is a no-op, so the per tick call never churns the event stream.
 func (b *Bot) SetPhase(phase string) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -86,11 +82,9 @@ func (b *Bot) SetPhase(phase string) {
     b.touch()
 }
 
-// SetKind tags the role of the bot in the process: KindLongRunning
-// for the 24/7 fleet bots, KindAcceptance for the temp bots of the
-// acceptance test manager. The kind is set once at construction and
-// never changes; the web UI reads it through Info() to split the bot
-// list of the sidebar into the long-running and the acceptance groups.
+// SetKind tags the role of the bot: KindLongRunning for the 24/7 fleet bots,
+// KindAcceptance for the temp bots of the acceptance manager. It is set once
+// and never changes; the web UI splits its sidebar on it.
 func (b *Bot) SetKind(kind string) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -116,9 +110,8 @@ func (b *Bot) SetOffline() {
     b.recordLocked("left the world")
 }
 
-// SetHuntingZone configures the hunting square of the bot for the web
-// map display. The zone survives the session resets (it is a policy,
-// not an observation).
+// SetHuntingZone configures the hunting square of the map view. The zone
+// survives the session resets: it is a policy, not an observation.
 func (b *Bot) SetHuntingZone(cx int32, cy int32, half int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -126,13 +119,11 @@ func (b *Bot) SetHuntingZone(cx int32, cy int32, half int32) {
     b.touch()
 }
 
-// SetHuntingZones publishes the hunting zone registry of the map
-// view: every zone of the region with the active marker of the zone
-// the loop hunts in. A repeated identical zone set only refreshes the
-// timestamp: the hunt loop republishes on every zone state change
-// (a zone pick, a death, a demotion), but the 227 zone registry is
-// the same on most of those calls, so the defensive copy was pure
-// allocation churn (4 MB over a 3 minute fleet run with 100 bots).
+// SetHuntingZones publishes the zone registry of the map view with the active
+// marker of the zone the loop hunts in. A repeated identical set returns early:
+// the loop republishes on every zone state change but the 227 zone registry is
+// the same on most of them, and the defensive copy was 4 MB of churn over a 3
+// minute 100 bot fleet run.
 func (b *Bot) SetHuntingZones(zones []ZoneView) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -144,13 +135,11 @@ func (b *Bot) SetHuntingZones(zones []ZoneView) {
     b.touch()
 }
 
-// SetKillMarks publishes the recent kill ring of the hunt loop: the
-// ground positions where the bot's targets died. The marks feed the
-// fleet wide cross layer of the map (Registry.FleetKillMarks serves
-// them for every bot of the process), so the crosses accumulate
-// across the bot switches of the web view. A repeated identical set
-// only refreshes the timestamp: the hunt loop republishes the ring
-// with every spot view refresh.
+// SetKillMarks publishes the recent kill ring: the ground positions where the
+// targets died. The marks feed the fleet wide cross layer of the map
+// (Registry.FleetKillMarks serves them for every bot), so the crosses
+// accumulate across the bot switches. A repeated identical set returns early:
+// the loop republishes the ring with every spot view refresh.
 func (b *Bot) SetKillMarks(marks []KillMarkView) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -176,9 +165,9 @@ func (b *Bot) KillMarks() []KillMarkView {
     return marks
 }
 
-// killMarksEqual reports whether two kill mark slices are element
-// wise equal. The comparison lets SetKillMarks skip the defensive
-// copy while the hunt ring holds the same kills.
+// killMarksEqual reports whether two kill mark slices are equal, so
+// SetKillMarks skips the defensive copy while the hunt ring holds the same
+// kills.
 func killMarksEqual(a, b []KillMarkView) bool {
     if len(a) != len(b) {
         return false
@@ -192,9 +181,9 @@ func killMarksEqual(a, b []KillMarkView) bool {
     return true
 }
 
-// zoneViewsEqual reports whether two zone view slices are element wise
-// equal. The comparison is used by SetHuntingZones to skip the
-// defensive copy when the published zones have not changed.
+// zoneViewsEqual reports whether two zone view slices are equal, so
+// SetHuntingZones skips the defensive copy when the published zones have not
+// changed.
 func zoneViewsEqual(a, b []ZoneView) bool {
     if len(a) != len(b) {
         return false
@@ -208,10 +197,9 @@ func zoneViewsEqual(a, b []ZoneView) bool {
     return true
 }
 
-// SetLoginCooldown arms the login cooldown of the supervisor: an
-// emergency logout of the hunt loop asks for a pause before the
-// next session starts, so the mobs reset and the character
-// regenerates in peace while it runs.
+// SetLoginCooldown arms the login cooldown: an emergency logout asks for a
+// pause before the next session starts, so the mobs reset and the character
+// regenerates in peace.
 func (b *Bot) SetLoginCooldown(pause time.Duration) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -235,25 +223,22 @@ func (b *Bot) LoginCooldownRemaining() time.Duration {
     return remaining
 }
 
-// DangerSpot is one recorded emergency logout position: the ground the
-// character had to leave stays dangerous until the level changes (the
-// zone regression of the hunt loop counts the recent spots of its
-// square against it).
+// DangerSpot is one recorded emergency logout position: the ground stays
+// dangerous until the level changes, and the zone regression counts the recent
+// spots of its square against it.
 type DangerSpot struct {
     X  int32
     Y  int32
     At time.Time
 }
 
-// The danger spot ring cap: eight recent emergency logouts name the
-// ground that keeps kicking the character out without keeping a
-// per-mountain ledger of every spot of the world.
+// The danger spot ring cap: eight recent emergency logouts name the ground that
+// keeps kicking the character out without a per-mountain ledger of the world.
 const dangerSpotCap = 8
 
-// NoteDangerSpot records the position of one emergency logout into the
-// capped ring of the recent danger spots. The ring survives the session
-// resets (an emergency logout ends the loop instance that would count
-// it), so the next session's zone regression still sees how hostile
+// NoteDangerSpot records the position of one emergency logout. The ring
+// survives the session resets (an emergency logout ends the loop instance that
+// would count it), so the next session's zone regression still sees how hostile
 // the ground was.
 func (b *Bot) NoteDangerSpot(x int32, y int32) {
     b.mu.Lock()
@@ -266,9 +251,8 @@ func (b *Bot) NoteDangerSpot(x int32, y int32) {
     b.touch()
 }
 
-// DangerSpots returns the emergency logout spots younger than the
-// window (the regression of the hunt loop decides which zones they
-// count against; the level change clears the whole bookkeeping there).
+// DangerSpots returns the emergency logout spots younger than the window; the
+// hunt loop regression decides which zones they count against.
 func (b *Bot) DangerSpots(window time.Duration) []DangerSpot {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -283,13 +267,11 @@ func (b *Bot) DangerSpots(window time.Duration) []DangerSpot {
     return spots
 }
 
-// SetDeathRegression records the hunting cell the loop regressed
-// away from after a death (the emergency logout counts as one
-// through the same cell note). The cell bookkeeping itself lives in
-// the per-session hunt loop, which the supervisor rebuilds on every
-// relogin; the tracker outlives the sessions, so the fresh loop
-// reads this record before it resumes a ground the login landed on
-// and refuses the deadly cell until the heat cools.
+// SetDeathRegression records the hunting cell the loop regressed away from
+// after a death (an emergency logout counts through the same cell note). The
+// cell bookkeeping lives in the per-session loop the supervisor rebuilds on
+// every relogin, so the tracker carries the record: the fresh loop refuses the
+// deadly cell until the heat cools.
 func (b *Bot) SetDeathRegression(cellID string) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -298,10 +280,9 @@ func (b *Bot) SetDeathRegression(cellID string) {
     b.touch()
 }
 
-// DeathRegression returns the cell id of the last recorded death
-// regression and the moment it happened (an empty id when none was
-// recorded). The caller applies its own cool down window: the heat
-// of the cell decays with the death half-life, the record only
+// DeathRegression returns the cell id of the last death regression and the
+// moment it happened (an empty id when none was recorded). The caller applies
+// its own cool down: the heat decays with the death half-life, the record only
 // carries the fact.
 func (b *Bot) DeathRegression() (string, time.Time) {
     b.mu.RLock()
@@ -310,10 +291,9 @@ func (b *Bot) DeathRegression() (string, time.Time) {
     return b.deathCell, b.deathCellAt
 }
 
-// SetEmergencyLogout records the honest reason of the intentional
-// emergency logout: the supervisor consumes it when the session
-// unwinds and replaces the misleading socket-close error of the lost
-// record with it.
+// SetEmergencyLogout records the honest reason of the intentional emergency
+// logout: the supervisor consumes it when the session unwinds and replaces the
+// misleading socket-close error of the lost record with it.
 func (b *Bot) SetEmergencyLogout(reason string) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -321,9 +301,9 @@ func (b *Bot) SetEmergencyLogout(reason string) {
     b.touch()
 }
 
-// ConsumeEmergencyLogout returns the recorded emergency logout reason
-// once: the first lost-session record after the logout carries it, the
-// later network drops of the same supervisor report themselves.
+// ConsumeEmergencyLogout returns the recorded reason once: the first
+// lost-session record carries it, the later network drops of the same
+// supervisor report themselves.
 func (b *Bot) ConsumeEmergencyLogout() (string, bool) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -334,11 +314,11 @@ func (b *Bot) ConsumeEmergencyLogout() (string, bool) {
     return reason, reason != ""
 }
 
-// ResetSession clears the observed world state before a new login. The
-// server starts a fresh known list on every session, so the objects and
-// inventory of a lost session must not leak into the next one. The event
-// log, the packet counter and the session start time survive so the
-// history and the uptime stay continuous across reconnects.
+// ResetSession clears the observed world state before a new login: the server
+// starts a fresh known list on every session, so the objects and inventory of a
+// lost session must not leak into the next one. The event log, the packet
+// counter and the session start time survive, so the history and the uptime
+// stay continuous across reconnects.
 func (b *Bot) ResetSession() {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -363,9 +343,8 @@ func (b *Bot) ResetSession() {
     b.clearShoppingPlanLocked()
     b.phase = ""
     b.phaseAt = time.Time{}
-    // The hunt internals of the dead session carry no meaning
-    // for the next one: the loop republishes them after its
-    // first tick.
+    // The hunt internals of the dead session carry no meaning: the loop
+    // republishes them after its first tick.
     b.hunt = HuntDiagnostics{} //nolint:exhaustruct_v5 // the zero view resets
     b.huntPublishedAt = time.Time{}
     b.huntLastAction = ""

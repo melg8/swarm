@@ -1809,6 +1809,25 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite,
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - state/bot_session.go keeps the session policies
+
+- 21 blocks compress: the tracker keeps the two uptime anchors (the
+  tracker `started` and the per login `sessionAt`, which re-arms the
+  bounded waits on every reconnect), the `SetPhase` no-op on a steady
+  state, the kind split of the sidebar, the hunting zone as a policy
+  that survives the resets, the early return of an identical zone set
+  (the 227 zone registry, 4 MB of churn over a 3 minute 100 bot run)
+  and of an identical kill ring, the 8 spot danger ring that outlives
+  the session, the death regression cell the fresh loop reads after a
+  relogin, the one-shot emergency logout reason that replaces the
+  misleading socket-close error of the lost record, and the
+  `ResetSession` rule (a fresh known list per session; the event log,
+  the packet counter and the session start survive). Two stale "only
+  refreshes the timestamp" lines corrected: the setters return early.
+  104 comment lines of 376 become 83 of 355.
+- Verified: `task fmt`, `go build ./...`, the state suite,
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
