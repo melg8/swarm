@@ -870,6 +870,16 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `abstract.go` fell from 26.1 to 17.5 percent (108
   comment lines of 617), no block above 8 lines.
 
+### 2026-11-12 - huntaudit/audit.go packs the audit origin into one sentence
+
+- 5 blocks compress: the 23 line package doc, the character constants,
+  the spot wait, the default z and the offline poll. The 62 unit leash
+  miss moves to the audit paragraph of `docs/hunting_cells.md`; the
+  package doc keeps the recipe, the reason and the resume contract.
+- Verified: `task fmt`, `go build ./...`, the huntaudit package, `task
+  lint:new`. `audit.go` fell from 18.3 to 15.6 percent (94 comment
+  lines of 604), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -895,9 +905,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `gear/shopping.go`, `hunt/loop_zone.go`,
 `webserver/navmesh_geometry.go`, `hunt/kite_ledger.go`,
 `hunt/kite_lane.go`, `hunt/city_shopping.go`, `hunt/town_merchants.go`,
-`acceptance/delevel.go`, `pathfind/navbuild/sheet.go` and
-`pathfind/navmesh/abstract.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the
+`acceptance/delevel.go`, `pathfind/navbuild/sheet.go`,
+`pathfind/navmesh/abstract.go` and `huntaudit/audit.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.

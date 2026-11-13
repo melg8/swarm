@@ -88,7 +88,11 @@ The `-hunt-audit` CLI (the `huntaudit` package, the port of the spot
 audit) measures the live geometry of the registry: the probe
 character visits every cell focus through the database position
 injection, dumps the attackable population it sees and the evidence
-JSON feeds the next regeneration.
+JSON (resumable, one record per spot) feeds the next regeneration.
+The anchors were clustered from the spawn polygon squares, never
+measured live: one measured spot's leash square fenced out its whole
+observed spider mass by 62 units, so every anchor is measured against
+the live spawn positions first.
 
 ## The rotation (hunt/cell_policy.go, hunt/cell_metrics.go)
 

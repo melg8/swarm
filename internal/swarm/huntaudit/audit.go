@@ -2,29 +2,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package huntaudit measures the real hunting ground geometry on the
-// live Mobius C1 stack: for every cell of the registry it injects the
-// probe character at the anchor (the database position rewrite of the
-// acceptance scenarios - the character wakes up standing exactly on
-// the anchor), waits out the knownlist broadcast and dumps every
-// attackable npc the character actually sees (name, template, level,
-// position, distance from the anchor, the leash verdict).
-//
-// The audit exists because the registry anchors were clustered from
-// the spawn polygon squares, never measured against the live spawn
-// positions: the 2026-09-13 test3 round caught a spot whose leash
-// square fenced out the whole observed spider mass by 62 units (the
-// bots starved on a ground that held mobs), and the fix procedure the
-// owner defined is exactly this tool - spawn at the center of every
-// point, dump what it really sees, then re-generate the zones from
-// the measurement (tools/regenerate_spots_from_audit.py).
-//
-// The output JSON is the evidence file: one record per audited spot
-// with the injected anchor, the position the server actually placed
-// the character on, and the full npc population with distances. The
-// run is resumable - the tool reloads its own output at startup and
-// skips the spots already measured - so a long registry audits across
-// several foreground runs without repeating the work.
+// Package huntaudit measures the real hunting ground geometry on the live
+// Mobius C1 stack: for every cell of the registry it injects the probe
+// character at the anchor through the database position rewrite, waits out the
+// knownlist broadcast and dumps every attackable npc the character sees (name,
+// template, level, position, distance from the anchor, the leash verdict). The
+// registry anchors are clustered from the spawn polygon squares, never measured
+// live, so a leash square can fence out the whole observed mob mass and starve
+// the bots. The JSON output is the evidence file; a run reloads its own output
+// and skips the measured spots, so a long registry audits across several runs.
 package huntaudit
 
 import (
@@ -46,9 +32,8 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The character creation constants of the probe: the same elven
-// fighter recipe every temp character of the acceptance scenarios
-// uses (see acceptance/runner.go).
+// The character creation constants of the probe: the same elven fighter recipe
+// every temp character of the acceptance scenarios uses (acceptance/runner.go).
 const (
     elfRaceID    = 1
     elfFighterID = 18
@@ -94,9 +79,8 @@ type Config struct {
     Fresh bool
 }
 
-// Default wait of one spot visit: the region knownlist broadcast
-// completes within a second of the world entry, the window also
-// covers one respawn cycle of the elven grounds (15-20 s) so a
+// Default wait of one spot visit: the knownlist broadcast completes within a
+// second of the world entry, and 15-20 s also covers one respawn cycle so a
 // recently cleared ground shows its live population.
 const defaultWait = 12 * time.Second
 
@@ -113,11 +97,9 @@ const (
     offlinePollTimeout = 45 * time.Second
 )
 
-// The default z of the injected position: the elven hunting grounds
-// sit around -3500..-3700 and the server corrects the z of a stored
-// position through its own ValidateLocation on the world entry - the
-// knownlist grid only depends on x and y, so the exact z never
-// affects the measurement.
+// The default z of the injected position: the server corrects the z through its
+// own ValidateLocation and the knownlist grid only depends on x and y, so the
+// exact height never affects the measurement.
 const defaultZ = -3600
 
 // NpcRecord is one observed attackable npc of a spot visit.
@@ -516,12 +498,10 @@ func resolveCharacter(
     return id, nil
 }
 
-// waitCharacterOffline polls the character row until the server
-// flushed the previous probe session (the online flag drops with the
-// logout store; a character that left in combat stores fifteen
-// seconds later). The poll never fails the visit: a character that
-// stayed marked online (a crashed server left the flag set) resets
-// anyway - the position UPDATE below clears the flag itself.
+// waitCharacterOffline polls the character row until the server flushed the
+// previous probe session (a character that left in combat stores fifteen
+// seconds later). A character stuck marked online (a crashed server left the
+// flag) does not fail the visit: the position UPDATE clears the flag.
 func waitCharacterOffline(db *acceptance.DB, charID int64, logger *log.Logger) {
     deadline := time.Now().Add(offlinePollTimeout)
     query := "SELECT online FROM characters WHERE charId=" +
