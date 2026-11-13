@@ -1828,6 +1828,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite,
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - acceptance/db.go keeps the wire facts
+
+- 20 blocks compress: the client keeps the deployed endpoints (socket
+  `~/mysql_tmp/mysql.sock` first, TCP 127.0.0.1:3306, root, database
+  `l2jmobiusc1`), the 10 second deadline, the capability flags of the
+  4.1 handshake with `mysql_native_password` (the empty password of the
+  passwordless root), the `maxPacketSize` 1<<24-1, the header bytes and
+  the COM_QUERY 0x03, the NULL `0xFB` marker, the "1046 No database
+  selected" reason of the default schema, the 0xFE lead with a short
+  body as the only row block end discriminator (a row may start with
+  0xFE or 0x00) and the sql state marker block. 100 comment lines of
+  533 become 87 of 520.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

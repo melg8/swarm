@@ -19,11 +19,10 @@ import (
     "time"
 )
 
-// Default database endpoints of the deployed Mobius stack (see
-// tools/mobius_env.sh): the game server itself talks to MariaDB over
-// TCP as the passwordless root user, so the same channel serves the
-// test character injection. The unix socket of the sandbox layout is
-// tried first because it never depends on name resolution.
+// Default database endpoints of the deployed Mobius stack: the game server
+// talks to MariaDB as the passwordless root user, so the same channel serves
+// the test character injection; the unix socket of the sandbox layout is tried
+// first, it never depends on name resolution.
 const (
     defaultDBAddress = "127.0.0.1:3306"
     defaultDBUser    = "root"
@@ -31,16 +30,14 @@ const (
     defaultDBSocket  = "~/mysql_tmp/mysql.sock"
 )
 
-// dbTimeout bounds the connect, the read and the write waits of the
-// wire client. The queries of the character reset are point lookups,
-// a slow answer means the database is down.
+// dbTimeout bounds the connect, the read and the write waits; the queries of
+// the character reset are point lookups, a slow answer means the database is
+// down.
 const dbTimeout = 10 * time.Second
 
-// Client capability flags of the handshake response (the MariaDB
-// wire protocol, see the connection phase docs of the MariaDB
-// knowledge base): the 4.1 protocol framing plus the named auth
-// plugin so the empty password auth of the passwordless root account
-// works.
+// Client capability flags of the handshake response (the MariaDB wire
+// protocol): the 4.1 protocol framing plus the named auth plugin, so the empty
+// password of the passwordless root account authenticates.
 const (
     clientProtocol41    = 0x00000200
     clientPluginAuth    = 0x00080000
@@ -50,8 +47,7 @@ const (
 // maxPacketSize is the client limit announced in the handshake.
 const maxPacketSize = 1<<24 - 1
 
-// Packet header bytes, the COM_QUERY command byte and the auth
-// plugin name of the stack.
+// Packet header bytes, the COM_QUERY command byte and the auth plugin name.
 const (
     okHeader         = 0x00
     errHeader        = 0xFF
@@ -63,25 +59,23 @@ const (
 // nullValue marks a NULL column of a text result row.
 const nullValue = 0xFB
 
-// DB is a one connection MariaDB wire client speaking exactly the
-// subset the character reset needs: the 4.1 handshake with the
-// mysql_native_password plugin, then COM_QUERY text results. It
-// exists so the acceptance runner can inject the test characters
-// without pulling a driver dependency into the module.
+// DB is a one connection MariaDB wire client speaking exactly the subset the
+// character reset needs - the 4.1 handshake with the mysql_native_password
+// plugin, then COM_QUERY text results - so the runner injects the test
+// characters without a driver dependency.
 type DB struct {
     conn net.Conn
     // sequence is the packet sequence byte: it restarts per command
     // and increments per packet of one exchange.
     sequence byte
-    // queryLog observes every executed statement (the acceptance run
-    // log installs its mirror so the character injection trail rides
-    // the run file). The nil observer keeps the hot path free.
+    // queryLog observes every executed statement (the run log mirrors them);
+    // nil is free.
     queryLog func(statement string)
 }
 
-// SetQueryLog installs (or with nil removes) the statement observer.
-// It is called between the injections, never while a statement is in
-// flight, so the plain field read needs no lock.
+// SetQueryLog installs (or with nil removes) the statement observer. It is
+// called between the injections, never while a statement is in flight, so the
+// plain field read needs no lock.
 func (db *DB) SetQueryLog(log func(statement string)) {
     db.queryLog = log
 }
@@ -102,8 +96,8 @@ type DBConfig struct {
     Database string
 }
 
-// DefaultDBConfig returns the endpoint configuration of the deployed
-// Mobius stack (TCP 127.0.0.1:3306, the passwordless root).
+// DefaultDBConfig returns the endpoint of the deployed stack: TCP
+// 127.0.0.1:3306, root.
 func DefaultDBConfig() DBConfig {
     return DBConfig{
         Address:  defaultDBAddress,
@@ -119,9 +113,8 @@ func DefaultDBConfig() DBConfig {
 //nolint:exhaustruct_v5 // the zero defaults are intended
 var dbDialer = &net.Dialer{Timeout: dbTimeout}
 
-// expandHome resolves a leading ~ of a path against the home
-// directory. The sandbox socket path is expressed with it so the
-// config reads like the tools scripts that define it.
+// expandHome resolves a leading ~ of a path against the home directory, so the
+// sandbox socket path reads like the tools scripts that define it.
 func expandHome(path string) string {
     if !strings.HasPrefix(path, "~") {
         return path
@@ -134,10 +127,9 @@ func expandHome(path string) string {
     return home + path[1:]
 }
 
-// ConnectDB opens the wire client against the configured endpoint:
-// the unix socket first (it never depends on the name resolution of
-// the loopback address), the TCP fallback second. Both channels end
-// in the same handshake.
+// ConnectDB opens the wire client against the configured endpoint: the unix
+// socket first (it never depends on the name resolution), the TCP fallback
+// second. Both end in the same handshake.
 func ConnectDB(config DBConfig) (*DB, error) {
     var lastErr error
     for _, dial := range dbDialFuncs(config) {
@@ -194,8 +186,7 @@ func dbDialFuncs(config DBConfig) []func() (net.Conn, error) {
     return dials
 }
 
-// handshake performs the 4.1 greeting exchange with the
-// mysql_native_password auth of the configured account.
+// handshake performs the 4.1 greeting exchange with the native auth.
 func (db *DB) handshake(config DBConfig) error {
     if err := db.conn.SetDeadline(time.Now().Add(dbTimeout)); err != nil {
         return fmt.Errorf("deadline: %w", err)
@@ -209,17 +200,17 @@ func (db *DB) handshake(config DBConfig) error {
         return err
     }
     if plugin != authPluginNative {
-        // The deployed stack authenticates the passwordless root
-        // with the classic native scramble; anything else means the
-        // endpoint is not the expected server.
+        // The deployed stack authenticates the passwordless root with the
+        // classic native scramble; anything else means the endpoint is not the
+        // expected server.
         return fmt.Errorf("auth plugin %q is not %q", plugin,
             authPluginNative)
     }
     if err := db.writePacket(handshakeResponse(config)); err != nil {
         return fmt.Errorf("send handshake response: %w", err)
     }
-    // The empty password answer is one empty auth block; the server
-    // may also bounce an auth switch request first.
+    // The empty password answer is one empty auth block; an auth switch may
+    // come first.
     for {
         payload, err := db.readPacket()
         if err != nil {
@@ -229,8 +220,8 @@ func (db *DB) handshake(config DBConfig) error {
         case okHeader:
             return nil
         case eofHeader:
-            // An auth switch request: the native plugin with the
-            // empty password answers with an empty packet.
+            // An auth switch request: the native plugin answers empty for an
+            // empty password.
             if err := db.writePacket(nil); err != nil {
                 return fmt.Errorf("send auth switch answer: %w", err)
             }
@@ -253,9 +244,8 @@ func handshakeResponse(config DBConfig) []byte {
     payload = append(payload, byte(len(config.Password)))
     payload = append(payload, config.Password...)
     if config.Database != "" {
-        // The default schema of the session: without it every query
-        // answers "1046 No database selected" (the deployed Mobius
-        // database is l2jmobiusc1).
+        // The default schema: without it every query answers "1046 No database
+        // selected".
         payload = append(payload, config.Database...)
         payload = append(payload, 0)
     }
@@ -265,10 +255,9 @@ func handshakeResponse(config DBConfig) []byte {
     return payload
 }
 
-// Query runs one SQL statement and returns the text result rows.
-// Statements without a result set (UPDATE, DELETE, INSERT) answer an
-// empty slice. Every value comes back as the raw string of the
-// column, NULL as an empty string.
+// Query runs one SQL statement and returns the text result rows; statements
+// without a result set (UPDATE, DELETE, INSERT) answer an empty slice. Every
+// value comes back as the raw column string, NULL as an empty string.
 func (db *DB) Query(sql string) ([][]string, error) {
     if err := db.conn.SetDeadline(time.Now().Add(dbTimeout)); err != nil {
         return nil, fmt.Errorf("deadline: %w", err)
@@ -306,10 +295,9 @@ func (db *DB) Query(sql string) ([][]string, error) {
         if err != nil {
             return nil, fmt.Errorf("read row: %w", err)
         }
-        // The end of the row block is the EOF packet: the 0xFE lead
-        // with a short body. A row may well START with 0xFE or 0x00
-        // (a length prefix of a long or an empty column value), so
-        // the length is the only discriminator here.
+        // The end of the row block is the EOF packet: the 0xFE lead with a
+        // short body. A row may well start with 0xFE or 0x00 (a long length
+        // prefix or an empty value), so the length is the only discriminator.
         if payload[0] == eofHeader && len(payload) < 9 {
             return rows, nil
         }
@@ -404,8 +392,8 @@ func (db *DB) protocolError(payload []byte, context string) error {
     if len(payload) >= 3 && payload[0] == errHeader {
         code := int(payload[1]) | int(payload[2])<<8
         message := payload[3:]
-        // The sql state marker block ('#' plus five characters)
-        // follows the code when the server speaks the 4.1 errors.
+        // The sql state marker block ('#' plus five characters) follows the 4.1
+        // errors.
         if len(message) > 6 && message[0] == '#' {
             message = message[6:]
         }
@@ -416,8 +404,7 @@ func (db *DB) protocolError(payload []byte, context string) error {
     return fmt.Errorf("db %s: unexpected payload % x", context, payload)
 }
 
-// parseGreetingPlugin reads the auth plugin name of the server
-// greeting packet.
+// parseGreetingPlugin reads the auth plugin name of the server greeting.
 func parseGreetingPlugin(payload []byte) (string, error) {
     // int<1> protocol version.
     if len(payload) < 2 {
@@ -437,8 +424,8 @@ func parseGreetingPlugin(payload []byte) (string, error) {
     if pos >= len(payload) {
         return "", errors.New("short greeting packet")
     }
-    // int<1> auth plugin data length (zero when the server omits
-    // it: the classic 21 byte default applies).
+    // int<1> auth plugin data length, zero when omitted (the classic 21 byte
+    // default).
     dataLen := int(payload[pos])
     pos++
     // string[10] reserved.
