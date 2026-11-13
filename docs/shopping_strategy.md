@@ -285,6 +285,20 @@ the magic buylists (Unoren's 3014701, Ariel's 3014801) - no planner
 change needed, only a new `gear.Profile` implementation and its
 shop lists.
 
+**The purchase entries and the shop widget.** `Gain` is the net
+paperdoll score delta (weapon pAtk times attack speed, armor pDef,
+jewel mDef, the shield expected block value) and the widget shows it
+next to the price. `PlanPurchaseQueue` appends the wanted tail (at
+most `shoppingQueueTail` 8 entries) behind the affordable plan, each
+tail entry carrying the adena still `Missing` before everything
+through it is affordable. `SellFirst` lists the equipped object ids a
+purchase displaces and `SellCredit` sums their sell value
+(referencePrice/2), credited to the buying trip, so the adena on hand
+only needs to cover the difference. The executor drops a stackable
+order only when the live count already covers `OwnedStack+Count` (a
+budget capped partial restock stays a real order), and a shop whose
+tax rate exceeds `shopTaxLimit` 2.0 is rejected as broken data.
+
 ## The numbers of a full elven shop run
 
 The full melee dress of the elven village (top of every slot) costs

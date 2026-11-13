@@ -746,6 +746,19 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `town_sell.go` fell from 35.6 to 24.2 percent (90
   comment lines of 372), no block above 8 lines.
 
+### 2026-11-12 - gear/shopping.go points at the strategy doc
+
+- 14 blocks compress: the shop struct and its tax note, the seven
+  purchase field notes, the two limits, the phase planner header (the
+  weapon milestone, the armor set, the jewel floor, the shield), the
+  queue planner and the phased walk. The doc gained `The purchase
+  entries and the shop widget`: the gain scoring, the eight entry tail,
+  the SellFirst/SellCredit contract, the OwnedStack staleness rule and
+  the tax sanity bound.
+- Verified: `task fmt`, `go build ./...`, the gear tests, `task
+  lint:new`. `shopping.go` fell from 60.8 to 45.8 percent (49 comment
+  lines of 107), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -767,8 +780,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/walk_params.go`, `pathfind/navmesh/smooth.go`, `gear/burst.go`,
 `gear/shopping_candidates.go`, `hunt/town_segment.go`,
 `acceptance/plaza_herbiel.go`, `pathfind/click_validate.go`,
-`cmd/counterprobe/world.go`, `hunt/lure.go` and `hunt/town_sell.go`
-(second passes). Next: a fresh `task comment:audit --top 10` pick (the
+`cmd/counterprobe/world.go`, `hunt/lure.go`, `hunt/town_sell.go` and
+`gear/shopping.go` (second passes). Next: a fresh `task comment:audit
+--top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
