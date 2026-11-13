@@ -1964,6 +1964,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the session suite,
   `golangci-lint run ./internal/swarm/session/...` 0 issues.
 
+### 2026-11-13 - connection/game_apply.go keeps the apply contract
+
+- 12 blocks compress: the file keeps the zero allocation scratch struct
+  contract, the `placementHeading` echo rule (the echo of a claim
+  carries the server side arm heading, while the claimed facing lives in
+  the client field the server never broadcasts back), the bow cycle
+  gauge contract (the RED gauge max is the disable window the kite
+  retreat plans against, the other colors carry no bow timing), the
+  capped attack target list, the mandatory Appearing answer to a self
+  teleport, the whole-list replacement of the skill list, the quest
+  journal push points (`EnterWorld.java:303`, live verified,
+  `docs/quest_protocol.md`), the aliasing rules of the three conversion
+  helpers and the buff list replacement. 87 comment lines of 735 become
+  71 of 719.
+- Verified: `task fmt`, `go build ./...`, the connection suite (10.5 s),
+  `golangci-lint run ./internal/swarm/connection/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

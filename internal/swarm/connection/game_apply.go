@@ -4,11 +4,10 @@
 
 package connection
 
-// The world packet apply paths of the game session, split out of
-// the game.go god file: one apply function per packet family, each
-// parsing into the reusable scratch struct of the client (zero
-// allocation parsing, see GameClient) and mirroring the field walk
-// into the state tracker.
+// The world packet apply paths of the game session: one apply function per
+// packet family, each parsing into the reusable scratch struct of the client
+// (zero allocation parsing, see GameClient) and mirroring the field walk into
+// the state tracker.
 
 import (
     "time"
@@ -231,16 +230,13 @@ func (gc *GameClient) applyValidateLocation(payload []byte) {
     }
 }
 
-// placementHeading passes the broadcast heading through, except while
-// the claimed positions own the stream (the cursor key escape): the
-// echo of a claim carries the server side move heading (the arm
-// direction - ValidateLocation reads the location's heading, the
-// claimed facing lands in the client heading field the server does
-// not broadcast back), so the echo would flip the displayed facing
-// back to the arm line every claim. The claims set the facing
-// themselves (see state.Bot.ApplySelfFacing); the normal placements
-// own it again once the mouse clicks resume (WalkTo clears the
-// claims gate).
+// placementHeading passes the broadcast heading through, except while the
+// claimed positions own the stream (the cursor key escape): the echo of a claim
+// carries the server side move heading (the arm direction, since
+// ValidateLocation reads the location heading while the claimed facing lands in
+// the client heading field the server never broadcasts back), so it would flip
+// the displayed facing every claim. The claims set the facing themselves;
+// WalkTo clears the claims gate and the placements own it again.
 func (gc *GameClient) placementHeading(
     heading int32, objectID int32,
 ) int32 {
@@ -269,11 +265,10 @@ func (gc *GameClient) applyStatusUpdate(payload []byte) {
     }
 }
 
-// applySetupGauge parses SetupGauge and hands the bow cycle timing to
-// the tracker: the RED gauge is the bow shot commit, and its max is
-// the exact disable window the kite retreat plans against. Other
-// gauge colors (skill casts, the water breath, the mount feed) carry
-// no bow timing and are skipped by the parser gate.
+// applySetupGauge hands the bow cycle timing to the tracker: the RED gauge is
+// the bow shot commit and its max is the exact disable window the kite retreat
+// plans against. The other gauge colors (skill casts, the water breath, the
+// mount feed) carry no bow timing.
 func (gc *GameClient) applySetupGauge(payload []byte) {
     if err := fromgameserver.ParseSetupGaugePacket(
         &gc.setupGauge, payload); err != nil {
@@ -296,9 +291,8 @@ func (gc *GameClient) applyAttack(payload []byte) {
         return
     }
     if gc.tracker != nil {
-        // The tracker list is capped like the packet struct: the count
-        // clamps to the capacity so the extra hits of a wide multi
-        // attack never index past the array.
+        // The tracker list is capped like the packet struct, so the extra hits
+        // of a wide multi attack never index past the array.
         count := min(gc.attack.HitCount, state.AttackTargets)
         attack := state.Attack{
             AttackerID:  gc.attack.AttackerID,
@@ -497,10 +491,9 @@ func (gc *GameClient) applyTeleport(payload []byte) {
             Z:        tele.Z,
             Heading:  tele.Heading,
         })
-        // The server keeps the character teleporting until the client
-        // confirms the finished teleport with Appearing: without it the
-        // character AI silently ignores every move request (the village
-        // revive left the bot stuck).
+        // The server keeps the character teleporting until the client confirms
+        // with Appearing: without it the AI silently ignores every move
+        // request.
         if gc.tracker.SelfObjectID() == tele.ObjectID {
             if err := gc.sendPacket(
                 togameserver.NewAppearingPacket()); err != nil {
@@ -570,10 +563,8 @@ func (gc *GameClient) applyItemList(payload []byte) {
     gc.logger.Printf("Inventory listed with %d items", len(items))
 }
 
-// applySkillList parses SkillList and replaces the learned skill set
-// of the tracker (the web UI renders it and computes the learning
-// queue from it). The server sends the whole list, so a merge is
-// never needed.
+// applySkillList replaces the learned skill set of the tracker. The server
+// sends the whole list, so a merge is never needed.
 func (gc *GameClient) applySkillList(payload []byte) {
     if err := fromgameserver.ParseSkillListPacket(
         &gc.skillList, payload); err != nil {
@@ -589,11 +580,10 @@ func (gc *GameClient) applySkillList(payload []byte) {
     gc.logger.Printf("Skill list with %d skills", len(skills))
 }
 
-// applyQuestList parses the quest journal packet (opcode 0x98) and
-// lands the whole journal in the tracker. The server pushes it at
-// world entry (EnterWorld.java:303, live verified - see
+// applyQuestList lands the whole quest journal (opcode 0x98) in the tracker.
+// The server pushes it at world entry (EnterWorld.java:303, live verified, see
 // docs/quest_protocol.md) and after every quest state change, so the
-// replacement semantics of ApplyQuestList keep the tracker exact.
+// replacement semantics keep the tracker exact.
 func (gc *GameClient) applyQuestList(payload []byte) {
     if err := fromgameserver.ParseQuestListPacket(
         &gc.questList, payload); err != nil {
@@ -611,9 +601,8 @@ func (gc *GameClient) applyQuestList(payload []byte) {
         len(gc.questList.Quests), len(gc.questList.Items))
 }
 
-// convertQuestEntries copies the parsed quest entries into the state
-// view: the parse buffer is reused by the next packet, so the values
-// must not alias it.
+// convertQuestEntries copies the parsed entries into the state view: the parse
+// buffer is reused by the next packet, so the values must not alias it.
 func convertQuestEntries(
     source []fromgameserver.QuestListEntry,
 ) []state.QuestEntryView {
@@ -628,10 +617,9 @@ func convertQuestEntries(
     return entries
 }
 
-// convertQuestItems copies the parsed quest item stacks into the
-// state view (the object id is inventory detail the tracker owns
-// through the ordinary item packets; the journal names the quest
-// bound items).
+// convertQuestItems copies the parsed stacks into the state view: the journal
+// names the quest bound items, the object ids being inventory detail of the
+// item packets.
 func convertQuestItems(
     source []fromgameserver.QuestItemEntry,
 ) []state.QuestItemView {
@@ -646,10 +634,8 @@ func convertQuestItems(
     return items
 }
 
-// convertSkills copies the parsed entries into state entries through
-// a fresh slice: the state layer stores its own map, but the parse
-// buffer is reused by the next packet, so the values must not alias
-// it.
+// convertSkills copies the parsed entries through a fresh slice: the state
+// layer stores its own map, but the parse buffer is reused by the next packet.
 func (gc *GameClient) convertSkills(
     source []fromgameserver.SkillListEntry,
 ) []state.LearnedSkill {
@@ -665,12 +651,10 @@ func (gc *GameClient) convertSkills(
     return skills
 }
 
-// applyAbnormalStatusUpdate parses AbnormalStatusUpdate and replaces
-// the active effect list of the tracker: the buff casting of the hunt
-// loop skips the buffs that already run, the web UI buffs widget
-// renders the list with the remaining durations. The server sends
-// the whole list whenever an effect changes, so a merge is never
-// needed.
+// applyAbnormalStatusUpdate replaces the active effect list: the buff casting
+// skips the effects that already run and the buffs widget renders the remaining
+// durations. The server sends the whole list whenever an effect changes, so a
+// merge is never needed.
 func (gc *GameClient) applyAbnormalStatusUpdate(payload []byte) {
     if err := fromgameserver.ParseAbnormalStatusUpdatePacket(
         &gc.abnormalStatus, payload); err != nil {
@@ -710,9 +694,9 @@ func (gc *GameClient) applyInventoryUpdate(payload []byte) {
     gc.tracker.ApplyInventoryUpdate(items)
 }
 
-// convertInventoryItems copies the parsed items into state items through
-// the reused conversion buffer. The state layer copies the item values
-// into its own inventory map, so the buffer is not retained.
+// convertInventoryItems copies the parsed items through the reused conversion
+// buffer; the state layer copies the values into its own inventory map, so the
+// buffer is not retained.
 func (gc *GameClient) convertInventoryItems(
     source []fromgameserver.InventoryItem,
 ) []state.InventoryItem {
