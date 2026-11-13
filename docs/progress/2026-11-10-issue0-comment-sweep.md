@@ -794,6 +794,20 @@ corner probe is a length, not a leg at all.
   lint:new`. `kite_ledger.go` fell from 29.8 to 17.5 percent (25
   comment lines of 143), no block above 8 lines.
 
+### 2026-11-12 - hunt/kite_lane.go keeps the straight ray rule
+
+- 21 blocks compress: the lane header, the rung count, the chaser
+  weighing notes, the contact ray (the 21 s same-cell stand), the gap
+  bisector, the train direction, the degenerate scene, the rung
+  ladder, the escape angles (the walled west ray spot), the lane
+  resolution, the terrain contract, the anchor leash and the
+  half-plane gate. No docs change: `docs/hunting.md` already carries
+  the straight ray rule, the rung ladder, the escape angles, the
+  half-plane guard and the contact scene.
+- Verified: `task fmt`, `go build ./...`, the kite tests, `task
+  lint:new`. `kite_lane.go` fell from 43.7 to 27.6 percent (90
+  comment lines of 326), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -817,8 +831,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `acceptance/plaza_herbiel.go`, `pathfind/click_validate.go`,
 `cmd/counterprobe/world.go`, `hunt/lure.go`, `hunt/town_sell.go` and
 `gear/shopping.go`, `hunt/loop_zone.go`,
-`webserver/navmesh_geometry.go` and `hunt/kite_ledger.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
+`webserver/navmesh_geometry.go`, `hunt/kite_ledger.go` and
+`hunt/kite_lane.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
