@@ -4,14 +4,11 @@
 
 package webserver
 
-// The state dump endpoint of the web UI: a plain text report of
-// everything the tracker knows about one bot - the character sheet,
-// the inventory and equipment, the world objects around with their
-// combat state, the active walk plan, the hunting zone, the recent
-// chat and a deep window of the rolling event log (the hunt loop
-// decisions mirror into it, see the logger wiring of cmd/swarm). The
-// Dump state button of the HUD copies the report into the clipboard,
-// so a live session problem report comes with the full debugging
+// The state dump endpoint: a plain text report of everything the tracker knows
+// about one bot (the character sheet, the inventory and equipment, the
+// surrounding objects with their combat state, the walk plan, the zone, the
+// chat and a deep event window). The Dump state button of the HUD copies it
+// into the clipboard, so a live problem report arrives with the debugging
 // material attached instead of a screenshot.
 
 import (
@@ -26,9 +23,9 @@ import (
     "github.com/melg8/swarm/internal/version"
 )
 
-// dumpEventLimit bounds the event window of the dump: the snapshot
-// streams the newest 100 for the UI log tail, the dump reads six
-// times deeper - the story of a stuck session lives minutes back.
+// dumpEventLimit bounds the dump event window: six times the newest 100 the
+// snapshot streams for the UI log tail, because the story of a stuck session
+// lives minutes back.
 const dumpEventLimit = 600
 
 // dumpChatLimit bounds the chat window of the dump.
@@ -47,11 +44,9 @@ func (s *Server) handleBotDump(w http.ResponseWriter, r *http.Request) {
     }
 }
 
-// BuildStateDump assembles the plain text debug report of the bot.
-// The layout mirrors the order a debugging session reads it in: the
-// identity and the phase first, then the character where it stands,
-// then what surrounds it, then the inventory, then the movement plan
-// and at the end the long event log.
+// BuildStateDump assembles the plain text debug report in reading order: the
+// identity and the phase, the character, its surroundings, the inventory, the
+// movement plan and the long event log last.
 func BuildStateDump(bot *state.Bot) string {
     snap := bot.Snapshot()
     events := bot.NewestEvents(dumpEventLimit)
@@ -72,10 +67,8 @@ func BuildStateDump(bot *state.Bot) string {
     return b.String()
 }
 
-// writeDumpHeader writes the report title, the build identity and
-// the session summary. The build line pins the exact code state the
-// report came from - a live problem report never leaves room for
-// guessing which commit produced it.
+// writeDumpHeader writes the title, the build identity and the session summary;
+// the build line pins the exact code state the report came from.
 func writeDumpHeader(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintf(b, "swarm state dump\n")
     fmt.Fprintf(b, "build: %s\n", version.Identity())
@@ -125,14 +118,10 @@ func writeDumpCharacter(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintln(b)
 }
 
-// writeDumpBuffs lists the active effects of the character with
-// their remaining time: the buff strip state the web UI renders,
-// in the report so a problem report answers "what was up and for
-// how long" without a browser (the guide buff round of issue #35
-// paid exactly this gap - the dump could not show the support
-// magic never landed). The applied age derives from the full
-// duration the remaining seconds drain against (Total - Left, the
-// recast detection of SetBuffs keeps the total honest).
+// writeDumpBuffs lists the active effects with their remaining time, so a
+// report answers what was up and for how long without a browser. The applied
+// age derives from the full duration (Total - Left; the recast detection of
+// SetBuffs keeps it honest).
 func writeDumpBuffs(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintf(b, "buffs (%d):\n", len(snap.Buffs))
     for i := range snap.Buffs {
@@ -183,17 +172,10 @@ func writeDumpZone(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintf(b, "  character inside: %v\n\n", inside)
 }
 
-// dumpSlotNames maps the item body part mask to the paperdoll slot
-// name; masks outside the table fall back to the hex form. The masks
-// mirror the Mobius BodyPart enum (entity/item/enums/BodyPart.java):
-// 0x02 the right ear, 0x04 the left ear, 0x08 the neck, 0x10 the
-// right finger, 0x20 the left finger, 0x40 the head, 0x800 the legs,
-// 0x1000 the feet, 0x2000 the back, 0x4000 the two hand weapon and
-// 0x8000 the one-piece armor; the pair families carry the OR of their
-// two slots (0x6 the earrings, 0x30 the rings). The old table shifted
-// the jewel and armor labels (a Cloth Cap printed as lfinger, a
-// Necklace of Magic as lear ear), which read like a corrupted
-// paperdoll in the field reports while the equipment was fine.
+// dumpSlotNames maps the item body part mask to the paperdoll slot name (masks
+// outside the table fall back to the hex form), mirroring the Mobius BodyPart
+// enum: 0x4000 the two hand weapon, 0x8000 the one-piece armor, and the pair
+// families carry the OR of their two slots (0x6 the earrings, 0x30 the rings).
 var dumpSlotNames = map[int32]string{
     0x01:    "underwear",
     0x02:    "rear ear",
@@ -248,11 +230,8 @@ func writeDumpInventory(b *strings.Builder, snap state.Snapshot) {
     for _, line := range equipped {
         fmt.Fprintln(b, line)
     }
-    // The paperdoll holes an equipment section hides: the report only
-    // prints the occupied slots, so a character farming without its
-    // legs armor (the 2026-09-12 04:58 pantsless dump) read as a fine
-    // outfit - the missing legs line was invisible. The empty families
-    // now name themselves right below the equipment.
+    // The report prints the occupied slots only, so the empty families name
+    // themselves right below the equipment: a missing legs line was invisible.
     if empty := dumpEmptySlots(snap.Inventory); len(empty) > 0 {
         fmt.Fprintf(b, "empty slots: %s\n", strings.Join(empty, ", "))
     }
@@ -263,13 +242,11 @@ func writeDumpInventory(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintln(b)
 }
 
-// dumpEmptySlots lists the paperdoll slot families no equipped item
-// covers: the armor and hand slots, the necklace and the unfilled pair
-// halves (one earring or ring equipped names the other half empty).
-// The two hand weapon blocks the left hand and the one-piece armor the
-// legs, so those stay unlisted while the blocker is worn. The
-// underwear and hair slots stay out: no gear of the catalogs ever
-// fills them and they would read as permanent holes.
+// dumpEmptySlots lists the paperdoll families no equipped item covers, the
+// unfilled pair halves included (one earring or ring equipped names the other
+// half empty). The two hand weapon blocks the left hand and the one-piece armor
+// the legs, so those stay unlisted while the blocker is worn; underwear and
+// hair never fill and stay out.
 func dumpEmptySlots(items []state.InventoryItemSnapshot) []string {
     covered := make(map[int32]int, len(items))
     twoHand, onePiece := false, false
@@ -332,9 +309,8 @@ func enchSuffix(enchant int16) string {
     return fmt.Sprintf(" +%d", enchant)
 }
 
-// writeDumpObjects writes the known world objects sorted by their
-// distance to the character - the closest first, the combat state and
-// the targets included (a mob holding the character is the aggro).
+// writeDumpObjects writes the known objects closest first, with the combat
+// state and the targets (a mob holding the character is the aggro).
 func writeDumpObjects(b *strings.Builder, snap state.Snapshot) {
     c := snap.Character
     type ranked struct {
@@ -393,19 +369,12 @@ func writeDumpObjects(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintln(b)
 }
 
-// writeDumpWalkPlan writes the active walk plan of the hunt loop: the
-// whole segment from the planning origin (where we wanted to go from) to
-// the final destination (where we want to arrive), with every passed
-// waypoint marked, the per waypoint timing (when the follower reached
-// it and how long the segment took - a point the bot dawdles on shows its
-// cost right on the line) and the waypoint the follower currently
-// aims at emphasized with its walking time - a stuck or drifting walk
-// reads at a glance. When the live plan is already gone (the walk
-// arrived, timed out or the loop left the phase), the most recent
-// plan prints instead - the report of a stuck segment needs the whole
-// planned walk even when the walk is over (the owner pathfind test
-// round: the double click plans, the bot walks, the dump names the
-// waypoint it stuck on).
+// writeDumpWalkPlan writes the active walk plan: the whole segment from the
+// planning origin to the final destination, every passed waypoint with its
+// arrival moment and segment duration, and the aimed waypoint with its walking
+// time, so a stuck or drifting walk reads at a glance. A gone plan (arrived,
+// timed out, phase left) prints its last snapshot instead: a stuck segment
+// needs the whole planned walk.
 func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
     if snap.WalkPath == nil {
         if snap.LastWalkPath == nil {
@@ -427,21 +396,13 @@ func writeDumpWalkPlan(b *strings.Builder, snap state.Snapshot) {
         snap.WalkStart, snap.WalkAt, snap.WalkWpAt)
 }
 
-// writeWalkPlanSection prints one walk plan section under the given
-// header prefix: the waypoint count with the search word of the mesh
-// contract the plan answers (a plan some mesh search produced names
-// the word, the direct segments no mesh search produced name nothing),
-// the follower cursor, the planning origin, the walk zero point (the
-// started line the timing suffixes read against), every waypoint with
-// the aimed one emphasized and the final destination. The timing
-// suffixes print from the observed arrival times (the walkWpAt
-// record): a passed waypoint carries its moment on the walk timeline
-// (t+) and the segment duration from the previous waypoint (or the
-// start), the aimed one carries the time the walk already spends on
-// it - the stuck segment number. The last walk plan reads the same
-// suffixes against the moment the plan ended (the finished walk keeps
-// the segment durations, an unfinished one shows how long the follower
-// sat on the waypoint it never confirmed).
+// writeWalkPlanSection prints one plan under the header prefix: the waypoint
+// count with the mesh contract word (direct segments name nothing), the
+// follower cursor, the origin, the walk zero point the timing suffixes read
+// against, the waypoints and the destination. A passed waypoint carries its
+// moment on the walk timeline (t+) and its segment duration; the aimed one
+// carries the time spent on it, the stuck number. The last plan reads the same
+// suffixes against the moment it ended.
 func writeWalkPlanSection(
     b *strings.Builder, headerPrefix string,
     path []state.WalkPoint, origin *state.WalkPoint, index int,
@@ -456,10 +417,9 @@ func writeWalkPlanSection(
     if search != nil {
         fmt.Fprintf(b, "%s%d waypoints, mesh, aiming at wp %d):\n",
             headerPrefix, len(path), target)
-        // The full search contract rides its own line: the mesh word
-        // alone rebuilds a lookalike, the approach radius and the
-        // ban circles rebuild the very search (the paste a dump into
-        // the HUD flow restores the plan through the parser).
+        // The full search contract rides its own line: the mesh word alone
+        // rebuilds a lookalike, the approach radius and the bans rebuild the
+        // very search.
         fmt.Fprintf(b, "  search approach %.0f", search.Approach)
         if len(search.Avoid) > 0 {
             circles := make([]string, len(search.Avoid))
@@ -508,12 +468,9 @@ func writeWalkPlanSection(
     fmt.Fprintln(b)
 }
 
-// walkPassedSuffix renders the timing suffix of a passed waypoint
-// line: ", t+12.4s, segment 5.2s" - the moment the follower reached the
-// waypoint on the walk timeline and the duration of the segment that
-// ended there. An empty string keeps the plain line when the walk
-// carries no timing view (an arrival was never observed - the zero
-// entries of the record, or a plan older than the timing tracking).
+// walkPassedSuffix renders ", t+12.4s, segment 5.2s" for a passed waypoint: the
+// arrival moment on the walk timeline and the segment duration that ended
+// there; an unobserved arrival keeps the plain line.
 func walkPassedSuffix(start time.Time, wpAt []time.Time, i int) string {
     if start.IsZero() || i >= len(wpAt) || wpAt[i].IsZero() {
         return ""
@@ -527,12 +484,9 @@ func walkPassedSuffix(start time.Time, wpAt []time.Time, i int) string {
         walkDur(wpAt[i].Sub(start)), walkDur(wpAt[i].Sub(segmentStart)))
 }
 
-// walkTargetSuffix renders the timing suffix of the aimed waypoint
-// line: " (walking 45.2s)" - the time the walk already spends on
-// the segment that has not confirmed its arrival yet, the stuck number
-// of a dawdling point. The segment opened at the previous waypoint's
-// arrival (or the walk start); the live plan measures up to now,
-// the ended one up to the moment the plan was last seen alive.
+// walkTargetSuffix renders " (walking 45.2s)" for the aimed waypoint: the time
+// spent on the segment since the previous arrival (or the start), measured up
+// to now or to the moment the ended plan was last seen alive.
 func walkTargetSuffix(
     start time.Time, at time.Time, wpAt []time.Time, i int,
 ) string {
@@ -554,9 +508,8 @@ func walkTargetSuffix(
     return fmt.Sprintf(" (walking %s)", walkDur(end.Sub(segmentStart)))
 }
 
-// walkDur renders one walk timing: sub minute durations keep the
-// tenth of a second (the per waypoint cost lives there), the longer
-// ones round to the second (the minute shape reads faster).
+// walkDur keeps the tenth of a second under a minute and rounds the longer
+// ones.
 func walkDur(d time.Duration) string {
     if d < time.Minute {
         return fmt.Sprintf("%.1fs", d.Seconds())
@@ -592,9 +545,7 @@ func writeDumpChat(b *strings.Builder, snap state.Snapshot) {
     fmt.Fprintln(b)
 }
 
-// writeDumpEvents writes the deep event window - the game events, the
-// web commands and the mirrored hunt loop decisions in chronological
-// order.
+// writeDumpEvents writes the deep event window in chronological order.
 func writeDumpEvents(b *strings.Builder, events []state.Event) {
     fmt.Fprintf(b, "events (%d):\n", len(events))
     for i := range events {

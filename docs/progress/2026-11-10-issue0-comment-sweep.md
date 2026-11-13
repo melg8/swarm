@@ -1613,6 +1613,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite,
   `golangci-lint run ./internal/swarm/state/...`.
 
+### 2026-11-13 - webserver/dump.go keeps the report layout
+
+- 16 blocks compress: the dump keeps the plain text report contract
+  (the Dump state button copies it into the clipboard, so a live
+  problem report arrives with the material attached), the six times
+  deeper event window (600 against the newest 100 of the snapshot),
+  the build identity line, the buff age `Total - Left`, the BodyPart
+  mask table with 0x4000 two hand and 0x8000 one-piece, the pair OR
+  families (0x6, 0x30), the empty slot families with the two hand and
+  one-piece blockers, the walk plan timing suffixes from `walkWpAt`
+  (`t+`, segment, walking) and the last plan reading against the
+  moment it ended. 119 comment lines of 605 become 70 of 556.
+- Verified: `task fmt`, `go build ./...`, the webserver suite (8.3 s),
+  `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
