@@ -1598,6 +1598,21 @@ corner probe is a length, not a leg at all.
   connection, acceptance and packets suites, `golangci-lint run` over
   the same packages.
 
+### 2026-11-13 - state/inventory.go keeps the item rules
+
+- 24 blocks compress: the file keeps the type2 families (0 weapon,
+  1 armor, 2 jewel, 3 quest, 4 adena, 5 common), the 80 slot
+  `MaximumSlotsForNoDwarf` limit, the UserInfo paperdoll slot order
+  with the C1 duplicate right hand and the 0 empty marker, the
+  one-piece armor against the legs slot, the InventoryUpdate codes
+  (1 add, 2 modify, 3 remove), the UserInfo broadcast after every
+  equip, the `referencePrice/2` sell value, the `is_sellable=false`
+  server skip, the duplicate-gear-first and value-per-weight ranking,
+  the demanded book rule and the keep set of the planned equips.
+  121 comment lines of 503 become 95 of 477; no block above 8.
+- Verified: `task fmt`, `go build ./...`, the state suite,
+  `golangci-lint run ./internal/swarm/state/...`.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

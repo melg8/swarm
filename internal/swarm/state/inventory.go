@@ -23,15 +23,14 @@ const (
     itemType2Item   = 5
 )
 
-// inventorySlotLimit is the player inventory slot limit of the Mobius
-// server (PlayerConfig MaximumSlotsForNoDwarf, 80 by default).
+// inventorySlotLimit is the PlayerConfig MaximumSlotsForNoDwarf slot limit
+// (80).
 const inventorySlotLimit = 80
 
-// Paperdoll slot indices in the order the UserInfo packet writes its
-// paperdoll object id block (see UserInfo.writeImpl). The slots are the
-// equip positions of the character; the object id 0 means the slot is
-// empty. The last entry is a C1 duplicate of the right hand the server
-// writes to fill the 15 slot block and carries no extra information.
+// Paperdoll slot indices in the order the UserInfo paperdoll object id block
+// writes them (UserInfo.writeImpl): the object id 0 means an empty slot, and
+// the last entry is a C1 duplicate of the right hand the server writes to fill
+// the 15 slot block.
 const (
     // PaperdollUnderwear is the underwear slot.
     PaperdollUnderwear = iota
@@ -53,8 +52,7 @@ const (
     PaperdollLHand
     // PaperdollGloves is the gloves slot.
     PaperdollGloves
-    // PaperdollChest is the chest slot (a one-piece armor occupies
-    // it and blocks the legs slot).
+    // PaperdollChest is the chest slot; a one-piece armor blocks the legs slot.
     PaperdollChest
     // PaperdollLegs is the legs slot.
     PaperdollLegs
@@ -62,19 +60,17 @@ const (
     PaperdollFeet
     // PaperdollBack is the back (cloak) slot.
     PaperdollBack
-    // PaperdollDuplicateRHand is the C1 duplicate of the right hand
-    // slot of the paperdoll block.
+    // PaperdollDuplicateRHand is the C1 duplicate of the right hand slot.
     PaperdollDuplicateRHand
     // PaperdollSlots is the number of paperdoll slots of the block.
     PaperdollSlots
 )
 
-// InventoryItem is one entry of the inventory packets. Type2 tells the
-// item family: 0 weapon, 1 armor, 2 jewel, 3 quest item, 4 adena,
-// 5 common item. BodyPart is the slot mask of the item template (0x80
-// right hand, 0x400 chest and so on, see the packet layer); an
-// unequipped item carries the mask of the slot it would occupy.
-// Change carries the InventoryUpdate code: 1 add, 2 modify, 3 remove.
+// InventoryItem is one entry of the inventory packets. Type2 tells the family
+// (0 weapon, 1 armor, 2 jewel, 3 quest, 4 adena, 5 common), BodyPart the slot
+// mask of the template (0x80 right hand, 0x400 chest; an unequipped item
+// carries its slot mask), and Change the InventoryUpdate code (1 add, 2 modify,
+// 3 remove).
 type InventoryItem struct {
     ObjectID int32
     ItemID   int32
@@ -98,8 +94,7 @@ type InventoryStats struct {
     Adena         int32
 }
 
-// ApplyItemList replaces the tracked inventory with the full list from
-// the ItemList packet.
+// ApplyItemList replaces the tracked inventory with the full ItemList packet.
 func (b *Bot) ApplyItemList(items []InventoryItem) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -109,10 +104,9 @@ func (b *Bot) ApplyItemList(items []InventoryItem) {
     b.recordLocked("inventory listed: " + strconv.Itoa(len(items)) + " items")
 }
 
-// ApplyPaperdoll stores the equipped object ids of the paperdoll slots
-// as the UserInfo packet reported them (0 = empty slot). The server
-// broadcasts UserInfo after every equip and unequip, so the mapping
-// stays current while the session lives.
+// ApplyPaperdoll stores the equipped object ids the UserInfo packet reported (0
+// = empty). The server broadcasts UserInfo after every equip and unequip, so
+// the mapping stays current while the session lives.
 func (b *Bot) ApplyPaperdoll(ids [PaperdollSlots]int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -121,8 +115,8 @@ func (b *Bot) ApplyPaperdoll(ids [PaperdollSlots]int32) {
     b.touch()
 }
 
-// PaperdollSlotObjectIDs returns the equipped object ids of the paperdoll
-// slots in the UserInfo slot order (0 = empty slot).
+// PaperdollSlotObjectIDs returns the equipped object ids in UserInfo slot
+// order.
 func (b *Bot) PaperdollSlotObjectIDs() [PaperdollSlots]int32 {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -130,10 +124,9 @@ func (b *Bot) PaperdollSlotObjectIDs() [PaperdollSlots]int32 {
     return b.paperdoll
 }
 
-// InventoryItems returns a copy of every tracked inventory item: the
-// equipped gear and the carried items together, in the canonical
-// widget order of the dense store. The gear managers use it as their
-// working set.
+// InventoryItems returns a copy of every tracked item (the equipped gear and
+// the carried items together) in the canonical widget order of the dense store;
+// the gear managers use it as their working set.
 func (b *Bot) InventoryItems() []InventoryItem {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -143,9 +136,8 @@ func (b *Bot) InventoryItems() []InventoryItem {
     return items
 }
 
-// InventoryHasItem reports whether the character carries at least
-// one item of the display id: the spellbook gate of the learning
-// walk reads it.
+// InventoryHasItem reports whether the character carries an item of the display
+// id: the spellbook gate of the learning walk reads it.
 func (b *Bot) InventoryHasItem(itemID int32) bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -158,9 +150,8 @@ func (b *Bot) InventoryHasItem(itemID int32) bool {
     return false
 }
 
-// ApplyInventoryUpdate applies added, modified and removed inventory
-// items from the InventoryUpdate packet. The batch restores the
-// canonical order once at its end (see inventoryStore).
+// ApplyInventoryUpdate applies the added, modified and removed items of one
+// InventoryUpdate packet; the batch restores the canonical order at its end.
 func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -173,11 +164,9 @@ func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
                 changed = true
                 b.recordLocked("received " + inventoryItemName(item))
             }
-            // The full record comparison catches the equip flag
-            // flips of the UseItem toggles too, not only the
-            // count changes: the version keyed scans of the
-            // hunt loop and the web view refresh both need
-            // every real state change.
+            // The full record comparison catches the equip flips of the UseItem
+            // toggles too, so the version keyed scans see every real state
+            // change.
             if !ok || previous != item {
                 changed = true
             }
@@ -195,9 +184,9 @@ func (b *Bot) ApplyInventoryUpdate(items []InventoryItem) {
     }
 }
 
-// InventoryVersion returns the count of inventory and paperdoll
-// mutations so far: unchanged since a previous read means the
-// cached equipment scans of the hunt loop stay valid.
+// InventoryVersion returns the count of inventory and paperdoll mutations so
+// far: an unchanged read means the cached equipment scans of the hunt loop stay
+// valid.
 func (b *Bot) InventoryVersion() uint64 {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -205,11 +194,9 @@ func (b *Bot) InventoryVersion() uint64 {
     return b.inventoryVersion
 }
 
-// InventoryItemState returns the tracked state of one inventory
-// item by its object id: the equipped flag, the stack count and
-// whether the item exists at all. The manual command gate of the
-// hunt loop watches it for the server confirmation of a queued
-// use, drop or destroy.
+// InventoryItemState returns the tracked state of one item by object id: the
+// equipped flag, the stack count and whether it exists. The manual command gate
+// watches it for the server confirmation of a queued use, drop or destroy.
 func (b *Bot) InventoryItemState(objectID int32) (InventoryItem, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -244,21 +231,18 @@ func (b *Bot) InventoryStats() InventoryStats {
     return stats
 }
 
-// DestroyableItems returns up to limit junk inventory items: not
-// equipped, not adena, preferring non stackable equipment drops and
-// quest items over common stackables.
+// DestroyableItems returns up to limit junk items: not equipped and not adena,
+// the equipment drops and quest items ahead of the common stackables.
 func (b *Bot) DestroyableItems(limit int) []InventoryItem {
     return b.DestroyableItemsExcluding(nil, limit)
 }
 
-// DestroyableItemsExcluding filters the destroy candidates with a keep
-// set of object ids: the hunt loop passes the planned equips of the
-// auto equipment (the looted or bought upgrades waiting for their use
-// item request), and a kept item is never destroyed for bag space -
-// the bot wears it instead. The spellbooks of the unlocked queued
-// lessons stay out like the sell flow (a book burned for bag space
-// comes back as a full priced buy). The ranking of the rest is
-// unchanged.
+// DestroyableItemsExcluding filters the candidates with a keep set of object
+// ids: the hunt loop passes the planned equips (the looted or bought upgrades
+// waiting for their use item request), and a kept item is never destroyed for
+// bag space, the bot wears it instead. The spellbooks of the unlocked queued
+// lessons stay out too: a book burned for bag space comes back as a full priced
+// buy.
 func (b *Bot) DestroyableItemsExcluding(
     keep map[int32]bool, limit int,
 ) []InventoryItem {
@@ -283,8 +267,8 @@ func (b *Bot) DestroyableItemsExcluding(
     return candidates
 }
 
-// destroyRank orders destroy candidates: gear drops and quest items
-// first, common stackables last, object ids breaking ties.
+// destroyRank orders the candidates: gear drops and quest items first,
+// stackables last.
 func destroyRank(item InventoryItem) int {
     switch item.Type2 {
     case itemType2Quest:
@@ -296,33 +280,26 @@ func destroyRank(item InventoryItem) int {
     }
 }
 
-// isGearFamily reports whether the item type2 belongs to the equipment
-// families that drop as single non stackable pieces.
+// isGearFamily reports whether the type2 belongs to the single piece equipment
+// families.
 func isGearFamily(type2 int16) bool {
     return type2 == itemType2Weapon || type2 == itemType2Armor ||
         type2 == itemType2Jewel
 }
 
-// SellableItems returns the inventory items a shop trip sells, sorted
-// most junky first (see SellableItemsExcluding).
+// SellableItems returns the items a shop trip sells, sorted most junky first.
 func (b *Bot) SellableItems() []InventoryItem {
     return b.SellableItemsExcluding(nil)
 }
 
-// SellableItemsExcluding returns the inventory items a shop trip
-// sells, sorted most junky first: duplicate gear drops (all pieces of
-// an item id but one) first, then the lowest sell value per unit
-// weight - the cheap heavy items the user of the inventory wants to
-// get rid of first. Equipped gear, adena and quest items are never
-// returned, and neither are the object ids of the keep set: the hunt
-// loop passes the planned equips of the auto equipment (the looted or
-// bought upgrades waiting for their use item request), so an item the
-// bot is about to wear is never sold for its instant adena. The
-// spellbooks of the unlocked queued lessons stay out too (see
-// demandedBooksLocked): a bought or looted book feeds its lesson,
-// selling it for referencePrice/2 only buys it back full priced at
-// the next learning trip. The server silently skips items it refuses
-// to sell, so the caller must tolerate entries that come back.
+// SellableItemsExcluding returns the items a shop trip sells, sorted most junky
+// first: duplicate gear drops (all pieces of an item id but one), then the
+// lowest sell value per unit weight. Equipped gear, adena and quest items never
+// sell, and neither do the keep set object ids (the planned equips), so an item
+// the bot is about to wear is never sold for its instant adena. The spellbooks
+// of the queued lessons stay out too (demandedBooksLocked): a book feeds its
+// lesson, and selling it for referencePrice/2 only buys it back full priced.
+// The server silently skips the items it refuses to sell.
 func (b *Bot) SellableItemsExcluding(keep map[int32]bool) []InventoryItem {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -363,9 +340,8 @@ func (b *Bot) SellableItemsExcluding(keep map[int32]bool) []InventoryItem {
     return candidates
 }
 
-// sellRank orders the sell candidates: duplicated gear pieces first
-// (every piece of an item id but the lowest object id), everything else
-// after. The caller must hold the read lock or own the maps.
+// sellRank orders the sell candidates: the duplicated gear pieces first (every
+// piece of an item id but the lowest object id), everything else after.
 func sellRank(
     item InventoryItem, gearCount map[int32]int, gearKept map[int32]int32,
 ) int {
@@ -385,11 +361,10 @@ func boolToInt(value bool) int {
     return 0
 }
 
-// sellValuePerWeight returns the sell value of one unit of the item
-// (reference price / 2, like the Mobius RequestSellItem computes it)
-// divided by its unit weight. Low values are cheap heavy junk that
-// frees the most weight for the least adena lost; unknown items with no
-// price and no weight count as the junkiest.
+// sellValuePerWeight returns the sell value of one unit (reference price / 2,
+// like the Mobius RequestSellItem) divided by its unit weight. Low values are
+// cheap heavy junk that frees the most weight for the least adena lost; unknown
+// items with no price and no weight count as the junkiest.
 func sellValuePerWeight(item InventoryItem) float64 {
     sell := npcdata.ItemPrice(item.ItemID) / 2
     weight := npcdata.ItemWeight(item.ItemID)
@@ -412,9 +387,9 @@ type LootItem struct {
     Z        int32
 }
 
-// GroundItemByID returns the tracked ground item with the given object
-// id. The manual pickup command of the web UI resolves its click
-// through it; a picked up or vanished item reports false.
+// GroundItemByID returns the tracked ground item of the object id; the manual
+// pickup command of the web UI resolves its click through it, a vanished item
+// reports false.
 func (b *Bot) GroundItemByID(objectID int32) (LootItem, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -445,9 +420,8 @@ func (b *Bot) NearestGroundItem(maxDistance float64) (LootItem, bool) {
 }
 
 // NearestGroundItemExcluding returns the closest ground item within the
-// given distance, skipping the object ids whose skip deadline is still
-// in the future and the points outside the zone (nil zone or nil skip
-// map mean no limit).
+// distance, skipping the object ids whose skip deadline is still ahead and the
+// points outside the zone (a nil zone or skip map means no limit).
 func (b *Bot) NearestGroundItemExcluding(
     maxDistance float64, skipped map[int32]time.Time, zone ZoneArea,
 ) (LootItem, bool) {
