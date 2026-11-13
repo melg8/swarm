@@ -20,105 +20,87 @@ import (
 // The quest trip engine: the imperative chain runner the acceptance
 // scenarios drive on a manual loop (the loop never ticks, the trip owns
 // every move). It consumes a QuestChain - the accept conversation, then
-// the stage ladder by the journal cond - and every conversation goes
-// through DriveDialog with the static entry prefix. The server side:
-// docs/quest_protocol.md.
+// the stage ladder by the journal cond - through DriveDialog with the
+// static entry prefix. The server side: docs/quest_protocol.md.
 
-// questNpcScanRadius bounds the world scan that finds a quest npc
-// station (the knownlist push of the approach walk).
+// questNpcScanRadius bounds the scan that finds a quest npc station.
 const questNpcScanRadius = 6000.0
 
-// questNpcFindWait bounds the wait for a quest npc to appear in the
-// tracker world before the trip gives up on the station.
+// questNpcFindWait bounds the wait for a quest npc to appear.
 const questNpcFindWait = 30 * time.Second
 
-// questWalkTimeout bounds one walk to a station or a kill ground: the
-// far class transfer segments run tens of thousands of units, so the
-// bound holds the whole walk plus the re-plans.
+// questWalkTimeout bounds one walk to a station or a kill ground: the far
+// class transfer segments run tens of thousands of units.
 const questWalkTimeout = 10 * time.Minute
 
 // questSegmentLen bounds one planned segment: the 37,500 unit Gludio to
-// the Ruins of Agony line would burn the 1M expansion cap of one search
-// (~200k per segment), so the route splits the path.
+// the Ruins of Agony line would burn the 1M expansion cap of one search.
 const questSegmentLen = 8000.0
 
-// questStuckWait is the position silence that marks a stuck segment: no
-// cell of movement for this window re-plans it. The var (not a const) is
-// a test seam.
+// questStuckWait is the position silence that marks a stuck segment; the
+// var (not a const) is a test seam.
 var questStuckWait = 5 * time.Second
 
-// questMoveStartWait bounds the move start watchdog: a click whose
-// movement never started names its waypoint dead, past the once-per-second
-// broadcast gate and under the stuck window (the var is a test seam).
+// questMoveStartWait bounds the move start watchdog: past the broadcast
+// gate and under the stuck window (the var is a test seam).
 var questMoveStartWait = 3 * time.Second
 
-// questTransferArriveRadius is the arrival gate of a gatekeeper
-// teleport: the arrival square of the teleporter xml plus the server
-// scatter.
+// questTransferArriveRadius is the arrival gate of a gatekeeper teleport:
+// the arrival square plus the server scatter.
 const questTransferArriveRadius = 2000.0
 
-// questTransferArriveWait bounds the wait for the teleport arrival: the
-// server answers with the TeleportToLocation burst within a second, and
-// the bound covers a slow tick (the var is a test seam).
+// questTransferArriveWait bounds the wait for the teleport arrival; the
+// server answers the burst within a second (the var is a test seam).
 var questTransferArriveWait = 20 * time.Second
 
-// questRestSitHP is the health share the kill stage retreats at: the
-// Ruins of Agony pair measured 70-80 percent of the bar, well above the
-// health floor.
+// questRestSitHP is the health share the kill stage retreats at (the
+// Ruins of Agony pair measured 70-80 percent of the bar).
 const questRestSitHP = 55.0
 
 // questRestStandHP is the health share the rest stands up at.
 const questRestStandHP = 85.0
 
-// questRestTimeout bounds one rest: a timeout stands up and continues
-// anyway (the health floor still guards; the var is a test seam).
+// questRestTimeout bounds one rest; a timeout stands up and continues
+// anyway (the var is a test seam).
 var questRestTimeout = 3 * time.Minute
 
-// questPotionItemID is the healing potion of the quest trips (the
-// Lesser Healing Potion of the classic item table).
+// questPotionItemID is the Lesser Healing Potion (1060).
 const questPotionItemID = 1060
 
-// questTransitFightTimeout bounds one transit fight of the route
-// walk: an aggressive mob that chases the walking character must die
-// inside it or the walk gives up on the segment.
+// questTransitFightTimeout bounds one transit fight of the route walk: a
+// chasing mob must die inside it or the walk gives up on the segment.
 const questTransitFightTimeout = 2 * time.Minute
 
-// questEquipConfirmWait bounds the wait for the inventory mutation
-// after one equip request of EquipBaggedGear.
+// questEquipConfirmWait bounds the inventory mutation of one equip.
 const questEquipConfirmWait = 5 * time.Second
 
 // questEquipMaxActions bounds the equip loop of one dress-up call.
 const questEquipMaxActions = 20
 
-// questArriveRadius is the arrival distance of a quest walk: inside
-// the interaction distance (250) the dialog talks work, so the walk
-// stops just short of the station.
+// questArriveRadius is the arrival distance of a quest walk: inside the
+// interaction distance (250) the dialog talks work.
 const questArriveRadius = 200.0
 
 // questWalkPoll is the position poll period of a quest walk.
 const questWalkPoll = 400 * time.Millisecond
 
-// questKillScanRadius bounds the engage scan for the quest mobs
-// around the character standing on the kill ground.
+// questKillScanRadius bounds the engage scan of the kill ground.
 const questKillScanRadius = 1600.0
 
-// questKillStageTimeout bounds the whole kill stage: a respawn too slow
-// or a drop rate worse than the data claims reports the stage.
+// questKillStageTimeout bounds the whole kill stage: a slow respawn or a
+// worse drop rate reports the stage.
 const questKillStageTimeout = 20 * time.Minute
 
-// questKillAttackPeriod paces the attack requests of the kill engage:
-// the Mobius double click semantics need the repeated request to start
-// the fight.
+// questKillAttackPeriod paces the attack requests: the Mobius double click
+// semantics need the repeated request to start the fight.
 const questKillAttackPeriod = 700 * time.Millisecond
 
-// questHealthFloor aborts the trip when the character falls below the
-// health share: a dying character is the caller's decision, not the
-// engine's.
+// questHealthFloor aborts the trip: a dying character is the caller's
+// decision, not the engine's.
 const questHealthFloor = 20.0
 
-// FindQuestNpc waits for the quest npc station to appear in the tracker
-// world and returns its live object, resolving the display id onto the
-// wire template id (+npcdata.NPCDisplayOffset).
+// FindQuestNpc waits for the quest npc station and returns its live
+// object, resolving the display id onto the wire template id.
 func (l *Loop) FindQuestNpc(
     npc QuestNpc, wait time.Duration,
 ) (state.AttackTarget, error) {
@@ -140,16 +122,14 @@ func (l *Loop) FindQuestNpc(
 }
 
 // WalkQuestStation walks to a quest station (an npc cell or a kill
-// ground reference): the public form of the quest walk the
-// acceptance scenarios drive on a manual loop.
+// ground reference) for the acceptance scenarios.
 func (l *Loop) WalkQuestStation(x int32, y int32, z int32) error {
     return l.walkToQuestPoint(x, y, z, questWalkTimeout)
 }
 
-// walkToQuestPoint walks to a station and waits for the arrival poll to
-// close inside the arrival radius. The z of a kill ground is unknown to
-// the chain data, so the caller passes the current self z (the server
-// walk corrects the height).
+// walkToQuestPoint walks to a station and waits for the arrival poll. The
+// z of a kill ground is unknown to the chain data, so the caller passes
+// the current self z (the server walk corrects the height).
 func (l *Loop) walkToQuestPoint(
     x int32, y int32, z int32, timeout time.Duration,
 ) error {
@@ -174,9 +154,8 @@ func (l *Loop) walkToQuestPoint(
     }
 }
 
-// fightTransitAttackers clears the mobs that chase the walking
-// character: the fight engages the nearest attacker until no living
-// mob targets us, then the walk re-plans its segment.
+// fightTransitAttackers clears the mobs that chase the walking character
+// until no living mob targets us, then the walk re-plans its segment.
 func (l *Loop) fightTransitAttackers() error {
     attacker, ok := l.tracker.NearestAttacker()
     if !ok {
@@ -215,17 +194,16 @@ func (l *Loop) fightTransitAttackers() error {
     }
 }
 
-// closeAndAttack swings at a mob: inside the engage radius the attack
-// runs the fight, outside it the character walks up first (the server
-// does not move the character on a distant attack).
+// closeAndAttack swings at a mob: inside the engage radius the attack runs
+// the fight, outside it the character walks up first (the server does not
+// move the character on a distant attack).
 func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
     selfX, selfY, _, ok := l.tracker.SelfPosition()
     if !ok {
         return errors.New("no self position for the fight")
     }
-    // The weapon in hand picks the engage distance: a bow user
-    // shoots from the weapon range, the melee walk would only delay
-    // the shot (see engageRadiusFor).
+    // The weapon in hand picks the engage distance: a bow shoots from the
+    // weapon range (see engageRadiusFor).
     if math.Hypot(float64(x-selfX), float64(y-selfY)) > l.engageRadiusFor() {
         if l.now().Sub(l.questWalkAt) < walkRequestPeriod {
             return nil
@@ -246,30 +224,28 @@ func (l *Loop) closeAndAttack(x, y, z, objectID int32) error {
 
 // walkQuestRoute walks to the destination through planned geodata
 // segments: the route splits into questSegmentLen hops along the straight
-// line and every hop plans its own waypoints; a failed search falls back
-// to the raw direct click. The walk re-plans a stuck segment.
+// line and every hop plans its own waypoints; a failed search falls back to
+// the raw direct click. The walk re-plans a stuck segment.
 //
 //nolint:gocognit // the quest segment branches read best side by side
 func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
     deadline := l.now().Add(timeout)
     for {
-        // A seated character cannot walk: every click of the seated
-        // answers ActionFailed. The stand runs first (a lost toggle
-        // of the previous rest, a server side surprise).
+        // A seated character answers every click with ActionFailed: the
+        // stand runs first.
         if l.tracker.SelfSitting() {
             l.logf("quest: the walk waits for the stand up")
             if err := l.ensureStanding(); err != nil {
                 return err
             }
         }
-        // The transit defense: an aggressive mob that targets the
-        // character interrupts the walk; the fight clears the chasers,
-        // then the walk replans.
+        // The transit defense: the fight clears the chasers, then the walk
+        // replans.
         if err := l.fightTransitAttackers(); err != nil {
             return err
         }
-        // The aggressive transit mobs grind the walking character
-        // down: keep the health buffer full on the way.
+        // The transit mobs grind the walking character down: keep the
+        // health buffer full on the way.
         if l.tracker.SelfHealthPercent() < questWalkPotionHP {
             if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
                 return err
@@ -291,8 +267,8 @@ func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
         if l.followPlannedSegment(selfX, selfY, selfZ, segX, segY, deadline) {
             continue
         }
-        // No geodata path for the segment: the direct click, the
-        // server stops it at an obstacle and the loop re-plans above.
+        // No geodata path for the segment: the direct click, which the
+        // server stops at an obstacle.
         now := l.now()
         if now.Sub(l.questWalkAt) < walkRequestPeriod {
             pace(questWalkPoll)
@@ -316,9 +292,8 @@ func (l *Loop) walkQuestRoute(x int32, y int32, timeout time.Duration) error {
     }
 }
 
-// questSegmentTarget picks the segment destination: the goal itself
-// inside the last stretch, the point questSegmentLen along the
-// straight line otherwise.
+// questSegmentTarget picks the segment destination: the goal inside the
+// last stretch, the point questSegmentLen along the straight line else.
 func questSegmentTarget(selfX, selfY, x, y int32) (int32, int32) {
     dist := math.Hypot(float64(x-selfX), float64(y-selfY))
     if dist <= questSegmentLen {
@@ -335,25 +310,23 @@ func questSegmentTarget(selfX, selfY, x, y int32) (int32, int32) {
 type waypointOutcome int
 
 const (
-    // waypointReached means the follower arrived; a lapsed segment
-    // budget ends the plan the same way and the caller re-plans.
+    // waypointReached means the follower arrived; a lapsed segment budget
+    // ends the plan the same way.
     waypointReached waypointOutcome = iota
-    // waypointStalled means the character walked and then stopped
-    // short of the waypoint: the segment is dead and the route
-    // re-plans.
+    // waypointStalled means the character stopped short: the segment is
+    // dead and the route re-plans.
     waypointStalled
-    // waypointBlocked means the click never started the movement, so
-    // the deterministic plan would name the identical waypoint again:
-    // the follower skips it within this plan.
+    // waypointBlocked means the click never started the movement, so the
+    // follower skips the waypoint within this plan.
     waypointBlocked
     // waypointFailed means a request error ended the waypoint and the
     // caller falls back to the direct click.
     waypointFailed
 )
 
-// followPlannedSegment plans the geodata path of one segment and
-// walks its waypoints; blocked waypoints skip within the plan, since
-// a re-plan from the same position answers the identical waypoint.
+// followPlannedSegment plans the geodata path of one segment and walks its
+// waypoints; blocked ones skip within the plan, since a re-plan from the
+// same position answers the identical waypoint.
 func (l *Loop) followPlannedSegment(
     selfX, selfY, selfZ, segX, segY int32, deadline time.Time,
 ) bool {
@@ -372,9 +345,8 @@ func (l *Loop) followPlannedSegment(
     // complete still walks its closest reachable waypoints.
     partial := !result.Found
     waypoints := result.Waypoints
-    // The segment plan starts at the character's own cell resolved on
-    // the pack: this measures the frame offset the waypoint clicks
-    // ride (click_frame.go).
+    // The plan starts at the own cell resolved on the pack: this measures
+    // the frame offset the waypoint clicks ride (click_frame.go).
     frameOffset := measureFrameOffset(selfZ, waypoints[0].Z)
     if partial {
         l.logf("quest: walking a partial segment toward (%d, %d), "+
@@ -398,13 +370,12 @@ func (l *Loop) followPlannedSegment(
         }
     }
     if blocked == len(waypoints) {
-        // No waypoint of the plan could start a walk: the direct click
-        // keeps the failure bounded instead of looping the plan.
+        // No waypoint could start a walk: the direct click keeps the
+        // failure bounded instead of looping the plan.
         return false
     }
-    // The degenerate plan guard: a waypoint inside the approach radius
-    // of the character would "complete" without moving a cell and spin
-    // the planner. A plan that moved nothing reports false.
+    // A waypoint inside the approach radius would "complete" without
+    // moving a cell and spin the planner: no movement reports false.
     afterX, afterY, _, ok := l.tracker.SelfPosition()
     if ok && afterX == selfX && afterY == selfY {
         return false
@@ -413,9 +384,8 @@ func (l *Loop) followPlannedSegment(
     return true
 }
 
-// followWaypoint walks toward the waypoint until the tracker counts it
-// reached or the walk stalls; the verdict separates a dead segment, a
-// dead click and a request error.
+// followWaypoint walks toward the waypoint until it is reached or the walk
+// stalls; the verdict separates a dead segment, a dead click and an error.
 //
 //nolint:cyclop,funlen,gocognit // the refusal branches read side by side
 func (l *Loop) followWaypoint(
@@ -442,8 +412,8 @@ func (l *Loop) followWaypoint(
         if index == len(waypoints)-1 {
             radius = questArriveRadius
         }
-        // The anchored distance keeps the vintage shift out of the
-        // arrival test (waypointDistanceAnchored).
+        // The anchored distance keeps the vintage shift out of the arrival
+        // test (waypointDistanceAnchored).
         if waypointDistanceAnchored(wp, selfX, selfY, selfZ,
             frameOffset) <= radius {
             return waypointReached
@@ -455,9 +425,8 @@ func (l *Loop) followWaypoint(
         } else if stuckSince.IsZero() {
             stuckSince = l.now()
         }
-        // The potions ride the follower poll: one planned segment runs
-        // over a minute, and drinking only between the segments arrived
-        // at 39 percent.
+        // The potions ride the follower poll: one planned segment runs over
+        // a minute, and drinking between the segments arrived at 39 percent.
         if err := l.drinkHealingPotionAt(questWalkPotionHP); err != nil {
             l.logf("quest: the potion drink failed: %v", err)
 
@@ -467,7 +436,7 @@ func (l *Loop) followWaypoint(
             return waypointStalled
         }
         // The move start watchdog: a click that started no movement is
-        // dead - the wait runs to the verdict instead of re-clicking.
+        // dead, so the wait runs to the verdict.
         now := l.now()
         if sent && selfX == clickX && selfY == clickY {
             if now.Sub(clickAt) >= questMoveStartWait &&
@@ -481,9 +450,9 @@ func (l *Loop) followWaypoint(
 
             continue
         }
-        // The pacing: no request while the character walks; a repeat
-        // click only for the standing one, gated by the walk period
-        // (the flood protector mutes above one action per second).
+        // The pacing: no request while the character walks; a repeat click
+        // only for the standing one (the flood protector mutes above one
+        // action per second).
         if sent && (moving || now.Sub(l.questWalkAt) < walkRequestPeriod) {
             pace(questWalkPoll)
 
@@ -502,9 +471,8 @@ func (l *Loop) followWaypoint(
     }
 }
 
-// clickQuestWaypoint clicks one waypoint: the click carries the
-// geodata height of the waypoint, transported into the server frame of
-// the walked surface (click_frame.go).
+// clickQuestWaypoint clicks one waypoint: the click carries the geodata
+// height, transported into the server frame of the walked surface.
 func (l *Loop) clickQuestWaypoint(
     wp pathfind.Vec3, frameOffset float64, selfZ int32,
 ) error {
@@ -517,8 +485,7 @@ func (l *Loop) clickQuestWaypoint(
 }
 
 // awaitSegmentProgress waits until the character moves a meaningful
-// distance from the click position or the deadline lapses; false
-// marks a stalled click.
+// distance or the deadline lapses; false marks a stalled click.
 func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
     startX, startY, _, ok := l.tracker.SelfPosition()
     if !ok {
@@ -544,8 +511,7 @@ func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
             return true
         }
         // The move start watchdog: a click that started no movement is
-        // dead, and the route gives up instead of standing out the walk
-        // budget (moveStartWindow).
+        // dead, and the route gives up instead of standing out the budget.
         if l.now().Sub(clickAt) >= questMoveStartWait &&
             !l.tracker.SelfWalking() {
             return false
@@ -554,8 +520,7 @@ func (l *Loop) awaitSegmentProgress(segX, segY int32, deadline time.Time) bool {
     }
 }
 
-// questItemCount sums the journal counters of the quest item ids of
-// a kill stage.
+// questItemCount sums the journal counters of a kill stage.
 func questItemCount(tracker *state.Bot, itemIDs []int32) int32 {
     total := int32(0)
     for _, itemID := range itemIDs {
@@ -568,9 +533,9 @@ func questItemCount(tracker *state.Bot, itemIDs []int32) int32 {
     return total
 }
 
-// DriveQuestChain runs one quest chain end to end: the accept
-// conversation when the journal lacks the quest, then the stage ladder
-// until the exit talk drops it. Every failure names its stage.
+// DriveQuestChain runs one quest chain end to end: the accept conversation
+// when the journal lacks the quest, then the stage ladder until the exit
+// talk drops it. Every failure names its stage.
 func (l *Loop) DriveQuestChain(
     ctx context.Context, chain QuestChain,
 ) error {
@@ -610,9 +575,8 @@ func (l *Loop) DriveQuestChain(
     }
 }
 
-// driveQuestStage runs one stage of the ladder: the optional gatekeeper
-// segment first (the station sits in another town), then the talk half
-// walks and drives the dialog route, the kill half farms the ground.
+// driveQuestStage runs one stage: the optional gatekeeper segment first,
+// then the talk half drives the dialog route, the kill half farms.
 func (l *Loop) driveQuestStage(
     ctx context.Context, chain QuestChain, stage QuestStage,
 ) error {
@@ -632,10 +596,9 @@ func (l *Loop) driveQuestStage(
     return l.driveQuestTalk(chain, stage.TalkNpc, route)
 }
 
-// driveQuestTransfer rides one gatekeeper hop: the walk to the
-// teleporter, the talk that opens the first page (the html action
-// cache validates only the open page), the showTeleports list, the
-// destination button and the arrival wait.
+// driveQuestTransfer rides one gatekeeper hop: the walk, the talk that
+// opens the first page (the html action cache validates only the open
+// page), the showTeleports list, the destination button and the arrival.
 func (l *Loop) driveQuestTransfer(
     ctx context.Context, transfer QuestTransfer,
 ) error {
@@ -653,8 +616,8 @@ func (l *Loop) driveQuestTransfer(
             transfer.Gatekeeper.Name, err)
     }
     // The arrival generation the conversation starts from: the server
-    // validates every bypass against the links of the page it sent last,
-    // so a page left over from an earlier talk never satisfies a wait.
+    // validates every bypass against the links of the last page, so a page
+    // left over from an earlier talk never satisfies a wait.
     _, _, talkGen := l.game.LastHTMLDialogArrival()
     l.logf("quest: talking to the gatekeeper %s (object %d), "+
         "riding the teleport to %s",
@@ -666,14 +629,14 @@ func (l *Loop) driveQuestTransfer(
         return err
     }
     // The evidence of the hop: the command the button carries (sent
-    // verbatim - the server matches the cached page link byte for
-    // byte) and the geometry its interaction distance gate reads.
+    // verbatim, the server matches the cached link byte for byte) and the
+    // geometry its interaction distance gate reads.
     l.logf("quest: teleporting to %s via %q (npc %d, %s)",
         teleport.Label, teleport.Command, target.ObjectID,
         l.transferGeometry(target.ObjectID))
     // The list page arrives one round trip after the showTeleports
-    // bypass: a teleport riding it sits inside the flood protector
-    // window of the previous bypass and is dropped (dialogBypassPace).
+    // bypass: a teleport riding it sits inside the flood protector window
+    // and is dropped (dialogBypassPace).
     pacer.wait()
     if err := l.game.SendBypass(teleport.Command); err != nil {
         return fmt.Errorf("the teleport send: %w", err)
@@ -682,16 +645,14 @@ func (l *Loop) driveQuestTransfer(
     return l.awaitTransferArrival(ctx, transfer)
 }
 
-// openTransferList opens the teleport list of the gatekeeper and returns
-// the destination button: the talk, the showTeleports bypass and the
-// list page wait. The pacer carries the flood protector window.
+// openTransferList opens the teleport list and returns the destination
+// button: the talk, the showTeleports bypass and the list page wait.
 func (l *Loop) openTransferList(
     target state.AttackTarget, transfer QuestTransfer, talkGen uint64,
     pacer *bypassPacer,
 ) (*BypassButton, error) {
     // The talk opens the first page (the walk-in gate of the html action
-    // cache); the pull follows one pace later, so a walk that landed
-    // outside the interaction distance still opens the dialog.
+    // cache); the pull follows one pace later.
     if err := l.game.ClickObject(target.ObjectID); err != nil {
         return nil, fmt.Errorf("the gatekeeper click: %w", err)
     }
@@ -732,8 +693,8 @@ func (l *Loop) openTransferList(
 }
 
 // transferGeometry renders the server range check of a teleport bypass:
-// RequestBypassToServer drops the command beyond Npc.INTERACTION_DISTANCE
-// (250 units, 3D) from the page origin.
+// RequestBypassToServer drops it beyond Npc.INTERACTION_DISTANCE (250
+// units, 3D) from the page origin.
 func (l *Loop) transferGeometry(npcObjID int32) string {
     npcX, npcY, npcZ, npcOK := l.tracker.ObjectPosition(npcObjID)
     selfX, selfY, selfZ, selfOK := l.tracker.SelfPosition()
@@ -751,8 +712,8 @@ func (l *Loop) transferGeometry(npcObjID int32) string {
 }
 
 // awaitTransferPage waits for a dialog page past minGen that carries the
-// wanted button (the showTeleports entry or a destination label): the
-// generation gate keeps an older page from satisfying the wait.
+// wanted button; the generation gate keeps an older page from satisfying
+// the wait.
 func (l *Loop) awaitTransferPage(
     npcObjID int32, destLabel string, minGen uint64, wait time.Duration,
 ) ([]BypassButton, uint64, error) {
@@ -779,9 +740,8 @@ func (l *Loop) awaitTransferPage(
     }
 }
 
-// awaitTransferArrival waits until the tracker places the character at
-// the arrival square of the teleport (the TeleportToLocation answer; the
-// connection layer sends the Appearing confirmation).
+// awaitTransferArrival waits until the tracker places the character at the
+// arrival square (the connection layer sends the Appearing answer).
 func (l *Loop) awaitTransferArrival(
     ctx context.Context, transfer QuestTransfer,
 ) error {
@@ -818,7 +778,7 @@ func (l *Loop) awaitTransferArrival(
 }
 
 // driveQuestTalk finds the station npc, walks into the interaction
-// distance and drives the dialog route through the walker.
+// distance and drives the dialog route.
 func (l *Loop) driveQuestTalk(
     chain QuestChain, npc QuestNpc, route []DialogStep,
 ) error {
@@ -839,13 +799,11 @@ func (l *Loop) driveQuestTalk(
     return l.DriveDialog(target.ObjectID, route)
 }
 
-// questRetreatDistance is how far the retreat walks out of the mob
-// radius before the sitting rest starts.
+// questRetreatDistance walks the retreat out of the mob radius.
 const questRetreatDistance = 2600.0
 
-// retreatAndRest walks the tired hunter out of the quest mob radius,
-// sits the health back to the stand threshold and returns to the kill
-// ground; the direction runs away from the nearest quest mob.
+// retreatAndRest walks the tired hunter out of the mob radius, sits the
+// health back and returns to the kill ground, away from the nearest mob.
 func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
     _, _, selfZ, ok := l.tracker.SelfPosition()
     if !ok {
@@ -872,9 +830,9 @@ func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
         awayX, awayY, selfZ, questWalkTimeout); err != nil {
         return fmt.Errorf("the retreat walk: %w", err)
     }
-    // The retreat point sits outside the aggro radius, but a locked
-    // chaser covers the distance faster than the sit heals: nothing
-    // may target the character when the sit lands.
+    // The retreat point sits outside the aggro radius, but a locked chaser
+    // covers it faster than the sit heals: nothing may target the sitting
+    // character.
     if err := l.fightTransitAttackers(); err != nil {
         return fmt.Errorf("the retreat fight: %w", err)
     }
@@ -887,9 +845,9 @@ func (l *Loop) retreatAndRest(ctx context.Context, stage QuestStage) error {
         stage.Kill.GroundX, stage.Kill.GroundY, selfZ, questWalkTimeout)
 }
 
-// farmQuestStage runs a kill stage: the walk to the ground and the
-// engage loop over the quest mobs until the journal counters fill. A
-// dead ground rests for the respawn.
+// farmQuestStage runs a kill stage: the walk to the ground and the engage
+// loop until the journal counters fill; a dead ground rests for the
+// respawn.
 //
 //nolint:cyclop,gocognit // the hunt and quest checks read side by side
 func (l *Loop) farmQuestStage(
@@ -930,8 +888,8 @@ func (l *Loop) farmQuestStage(
         if l.tracker.SelfHealthPercent() <= 0 {
             return errors.New("the character died on the kill ground")
         }
-        // The retreat policy: a tired hunter walks out of the mob
-        // radius, sits the health back and returns.
+        // The retreat policy: a tired hunter walks out, sits the health
+        // back and returns.
         if l.tracker.SelfHealthPercent() < questRestSitHP {
             if err := l.retreatAndRest(ctx, stage); err != nil {
                 return err
@@ -951,8 +909,8 @@ func (l *Loop) farmQuestStage(
 
             continue
         }
-        // A quest mob stands in the scan radius: the tired character
-        // drinks a potion instead of sitting down in the camp.
+        // A quest mob stands in range: the tired character drinks a potion
+        // instead of sitting down in the camp.
         if err := l.drinkHealingPotion(); err != nil {
             return err
         }
@@ -965,8 +923,7 @@ func (l *Loop) farmQuestStage(
 }
 
 // ensureStanding stands the character up and waits for the server
-// confirmation: every walk click of a seated character answers
-// ActionFailed.
+// confirmation: every walk click of a seated character answers ActionFailed.
 func (l *Loop) ensureStanding() error {
     if !l.tracker.SelfSitting() {
         return nil
@@ -987,9 +944,8 @@ func (l *Loop) ensureStanding() error {
     return errors.New("the character stays seated")
 }
 
-// restBetweenFights parks a tired character until the sitting
-// regeneration reaches the stand threshold; a healthy one returns at
-// once.
+// restBetweenFights parks a tired character until the sitting regeneration
+// reaches the stand threshold; a healthy one returns at once.
 func (l *Loop) restBetweenFights(ctx context.Context) error {
     if l.tracker.SelfHealthPercent() >= questRestSitHP {
         return nil
@@ -1006,9 +962,8 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 
             return fmt.Errorf("cancelled: %w", err)
         }
-        // A fresh attacker aborts the rest: the sitting regeneration
-        // loses to any chaser still swinging (stand up, the caller's
-        // fight clears it, the next rest tries again).
+        // A fresh attacker aborts the rest: the sitting regeneration loses
+        // to any chaser still swinging (the caller's fight clears it).
         if attacker, ok := l.tracker.NearestAttacker(); ok {
             l.logf("quest: the rest aborted - %s attacks",
                 attacker.Name)
@@ -1039,24 +994,22 @@ func (l *Loop) restBetweenFights(ctx context.Context) error {
 }
 
 // questWalkPotionHP is the health share the route walk drinks at: the
-// assisting mobs along the segments grind a passing character down.
+// assisting mobs grind a passing character down.
 const questWalkPotionHP = 80.0
 
-// questPotionReuse is the reuse delay of the healing potions (the C1
-// item table pins 10 s on the Lesser Healing Potion): the server drops a
-// use request inside the window, so the engine paces its own sends.
+// questPotionReuse is the reuse delay of the healing potions (10 s on the
+// Lesser Healing Potion): the server drops a use request inside the window,
+// so the engine paces its own sends.
 const questPotionReuse = 10 * time.Second
 
 // drinkHealingPotion restores the health mid fight: the Lesser Healing
-// Potion of the inventory (when one is left), a no-op for a healthy
-// character.
+// Potion of the bag (when one is left), a no-op for a healthy character.
 func (l *Loop) drinkHealingPotion() error {
     return l.drinkHealingPotionAt(questRestSitHP)
 }
 
-// drinkHealingPotionAt drinks the first healing potion of the bag when
-// the health sits below the threshold and the reuse window has lapsed (a
-// no-op above either gate or with the bag empty of potions).
+// drinkHealingPotionAt drinks the first healing potion when the health
+// sits below the threshold and the reuse window has lapsed.
 func (l *Loop) drinkHealingPotionAt(threshold float64) error {
     if l.tracker.SelfHealthPercent() >= threshold {
         return nil
@@ -1084,9 +1037,9 @@ func (l *Loop) drinkHealingPotionAt(threshold float64) error {
     return nil
 }
 
-// EquipBaggedGear dresses the character from the bag: the blocking
-// auto equipment for the manual loop, one planned upgrade per cycle
-// until the paperdoll holds no further upgrade or the budget lapses.
+// EquipBaggedGear dresses the character from the bag: the blocking auto
+// equipment for the manual loop, one planned upgrade per cycle until the
+// paperdoll holds no further upgrade or the budget lapses.
 func (l *Loop) EquipBaggedGear() error {
     if l.equip == nil || l.game == nil {
         return errors.New("the equip manager is not wired")
@@ -1122,8 +1075,7 @@ func (l *Loop) EquipBaggedGear() error {
     return errors.New("the equip loop reached the action budget")
 }
 
-// awaitInventoryMutation waits until the tracker reports a new
-// inventory version (an InventoryUpdate the use request triggered).
+// awaitInventoryMutation waits for a new inventory version.
 func (l *Loop) awaitInventoryMutation(
     before uint64, wait time.Duration,
 ) bool {

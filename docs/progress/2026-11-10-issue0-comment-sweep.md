@@ -1058,6 +1058,18 @@ corner probe is a length, not a leg at all.
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues, no line above
   80 columns.
 
+### 2026-11-13 - quest_trip.go, the trip engine
+
+- 74 blocks compress, the file falls from 228 comment lines of 1140
+  (20.0 percent) to 180 of 1093 (16.5 percent): the constant registry
+  keeps the number and the one server rule it names (the 37,500 unit
+  Gludio segment against the 1M search cap, the 70-80 percent retreat
+  bar, the 10 s potion reuse), the waypoint outcome ladder states each
+  outcome in one line, and the inline notes keep the flood protector
+  pacing, the page generation gate and the move start watchdog.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
