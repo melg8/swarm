@@ -1931,6 +1931,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - acceptance/level_milestone.go keeps the M1 contract
+
+- 16 blocks compress: the scenario keeps the identity slot (`temp8`
+  after the soak `temp7`), the default level 10 in the middle of the M1
+  ladder (the elven bands below stay winnable, the liren 16-19 band
+  stays out of reach), the level 20 cap of the injectable table, the 15
+  minute budget (the 2.2 min weapon run, the mid band walk, the near
+  threshold kills and the death penalty farm back), the 100k wallet and
+  20k sp, the twentieth of the level span tail with the Kaboo Orc exp
+  176 at rate 1 and the level 10 span 22972, the `ElvenFighter.xml`
+  lvlUpgainData 1..20 table (the level 15 row matching the farm
+  readiness 280/111/112), the near threshold exp never reaching the
+  threshold, the elf spawn start with an empty bag and the pass line of
+  the observed level N+1. 90 comment lines of 382 become 76 of 368.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

@@ -14,63 +14,57 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The level milestone scenario identity: the account is the next free
-// temp slot after the soak temp7, the password equals the account (the
-// Mobius login auto-creates missing accounts).
+// The level milestone scenario identity: the account is the next free temp slot
+// after the soak temp7, the password equals the account (the login auto-creates
+// missing accounts).
 const (
     milestoneScenarioID = "level-milestone"
     milestoneAccount    = "temp8"
     milestonePassword   = "temp8"
 )
 
-// milestoneDefaultLevel is the default injected level: 10 sits in the
-// middle of the M1 ladder (the elven registry bands below it stay
-// winnable for a fresh dressed character, the liren band above it
-// stays out of reach), so the default run exercises the full
-// building block - the injection, the shopping round, the zone walk
-// and the level-up - at a moderate cost. Later milestones inject
-// their own level through the env variable.
+// milestoneDefaultLevel is the default injected level: 10 sits in the middle of
+// the M1 ladder (the elven bands below stay winnable for a fresh dressed
+// character, the liren band above stays out of reach), so the default run
+// exercises the whole building block - the injection, the shopping round, the
+// zone walk and the level-up - at a moderate cost. A later milestone injects
+// its own level through the env variable.
 const milestoneDefaultLevel = 10
 
-// milestoneMaxLevel is the highest injectable level: the elven
-// fighter vitals table covers the levels of the solo ladder the M1
-// milestone tops out at (the liren 16-19 band leaves the character
-// at 20), and the experience table holds the matching thresholds.
+// milestoneMaxLevel is the highest injectable level: the elven fighter vitals
+// table covers the levels of the solo ladder the M1 milestone tops out at (the
+// liren 16-19 band leaves the character at 20) and the experience table holds
+// the matching thresholds.
 const milestoneMaxLevel = 20
 
-// milestoneTimeout bounds the whole run: the weapon run shopping
-// round measured 2.2 min, the walk to the mid bands a few more
-// minutes, the near-threshold experience needs only a handful of
-// kills and a death mid-run pays the penalty and farms back - a
-// quarter of an hour keeps the slowest honest run inside the bound
-// (the same budget shape the zone return scenario uses).
+// milestoneTimeout bounds the whole run: the weapon run shopping round measured
+// 2.2 min, the walk to the mid bands a few more, the near-threshold experience
+// needs a handful of kills and a death mid-run pays the penalty and farms back,
+// so a quarter of an hour keeps the slowest honest run inside the bound.
 const milestoneTimeout = 15 * time.Minute
 
-// The injected wallet of the milestone start state: the same values
-// the farm readiness scenario uses (the shopping strategy reaches
-// the full gear set of the elven village shops with the 100k wallet,
-// the 20k sp buys the affordable lessons of the band).
+// The injected wallet of the milestone start state, the same values the farm
+// readiness scenario uses: the 100k wallet dresses the full set, the 20k sp
+// buys the band lessons.
 const (
     milestoneWallet = 100000
     milestoneSP     = 20000
 )
 
-// milestoneXPTailDivisor shapes the near-threshold experience: the
-// injected character starts one twentieth of its level span below
-// the next threshold, so a handful of kills of the band mobs (the
-// Kaboo Orc of the elven lands carries exp 176 at rate 1, the span
-// at level 10 is 22972) reaches the level-up within minutes instead
-// of the tens of kills the full span would demand.
+// milestoneXPTailDivisor shapes the near-threshold experience: the character
+// starts one twentieth of its level span below the next threshold, so a handful
+// of band mobs (the Kaboo Orc carries exp 176 at rate 1, the span at level 10
+// is 22972) reaches the level-up within minutes instead of the tens of kills
+// the full span would demand.
 const milestoneXPTailDivisor = 20
 
 // checkMilestoneLevel is the condition id of the level-up check.
 const checkMilestoneLevel = "level"
 
-// milestoneLevel reads the injected level from the
-// SWARM_LEVEL_MILESTONE_LEVEL environment variable (1..20); a missing
-// or invalid value falls back to the default. The env shape mirrors
-// the soak duration knob so the later milestone acceptances drive
-// the building block without code changes.
+// milestoneLevel reads the injected level from SWARM_LEVEL_MILESTONE_LEVEL
+// (1..20); a missing or invalid value falls back to the default. The env shape
+// mirrors the soak duration knob, so a later milestone drives the block without
+// code changes.
 func milestoneLevel() int32 {
     raw := os.Getenv("SWARM_LEVEL_MILESTONE_LEVEL")
     if raw == "" {
@@ -85,14 +79,13 @@ func milestoneLevel() int32 {
     return int32(level) //nolint:gosec // bounded by the checked range
 }
 
-// elvenFighterVitals holds the level-up gain vitals of the elven
-// fighter (classId 18), floored to integers: hp, mp and cp per level,
-// read from the Mobius C1 player template
+// elvenFighterVitals holds the level-up gain vitals of the elven fighter
+// (classId 18), floored to integers: hp, mp and cp per level, from the Mobius
+// C1 player template
 // dist/game/data/stats/players/templates/StartingClass/ElvenFighter.xml
-// (lvlUpgainData levels 1..20; the level 15 values match the farm
-// readiness constants 280/111/112). The scenario injects the values
-// of the start level so the database row agrees with the template
-// the server would have leveled the character along.
+// (lvlUpgainData 1..20; the level 15 row matches the farm readiness constants
+// 280/111/112). The scenario injects the start level values, so the database
+// row agrees with the server template.
 var elvenFighterVitals = [...]vitals{
     {HP: 89, MP: 30, CP: 35},    // level 1
     {HP: 101, MP: 35, CP: 40},   // level 2
@@ -123,11 +116,10 @@ type vitals struct {
     CP int32
 }
 
-// milestoneXPTail returns the experience carved off the next level
-// threshold: one milestoneXPTailDivisor of the level span, never
-// less than 1 so the injected exp always sits strictly below the
-// threshold (a character exactly at the threshold would be the next
-// level already).
+// milestoneXPTail returns the experience carved off the next level threshold:
+// one milestoneXPTailDivisor of the level span, never less than 1, so the
+// injected exp sits strictly below the threshold (a character at the threshold
+// would be the next level).
 func milestoneXPTail(level int32) int64 {
     threshold := soakExperienceTable[level]
     span := threshold - soakExperienceTable[level-1]
@@ -139,12 +131,11 @@ func milestoneXPTail(level int32) int64 {
     return tail
 }
 
-// levelMilestoneReset builds the start state of the level milestone
-// scenario: the character at the requested level with the near
-// threshold experience, the wallet and the sp of the farm readiness
-// round, an empty bag (the shopping strategy dresses the character
-// for its band) and the creation spawn point of the elven village
-// (the zone ladder walks it out to the hunting ground on its own).
+// levelMilestoneReset builds the start state: the character at the requested
+// level with the near threshold experience, the wallet and sp of the farm
+// readiness round, an empty bag (the shopping strategy dresses it for its band)
+// and the creation spawn point of the elven village, which the zone ladder
+// walks out to the hunting ground on its own.
 func levelMilestoneReset(account string, level int32) characterReset {
     gain := elvenFighterVitals[level-1]
 
@@ -165,14 +156,13 @@ func levelMilestoneReset(account string, level int32) characterReset {
     }
 }
 
-// levelMilestoneScenario runs the generalized farm readiness: a
-// character injected at level N (env selectable, default 10) with the
-// near-threshold experience and the shopping wallet enters the world,
-// dresses itself through the village shops, walks to its band hunting
-// ground and farms the last kills to the level-up. The pass line is
-// the observed level N+1 (the UserInfo the server broadcasts on the
-// level-up refreshes the tracker level); the metrics trail receives
-// one row either way.
+// levelMilestoneScenario runs the generalized farm readiness: a character
+// injected at level N (env selectable, default 10) with the near-threshold
+// experience and the shopping wallet enters the world, dresses through the
+// village shops, walks to its band hunting ground and farms the last kills to
+// the level-up. The pass line is the observed level N+1 (the UserInfo broadcast
+// on the level-up refreshes the tracker level); the trail gets one row either
+// way.
 func levelMilestoneScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(levelMilestoneChecks())
@@ -225,11 +215,10 @@ func levelMilestoneScenario(ctx context.Context, m *Manager, t *Test) error {
         cancelSession, sessionDone)
 }
 
-// milestoneWatch observes the session until the character reaches the
-// target level: every monitor tick refreshes the level check and the
-// death edge tracker; the reached level hands over to the pass
-// teardown, the context end (the manager timeout among others) fails
-// the run.
+// milestoneWatch observes the session until the character reaches the target
+// level: every tick refreshes the level check and the death edge tracker; the
+// reached level hands over to the pass teardown, the context end (the manager
+// timeout among others) fails the run.
 func milestoneWatch(
     ctx context.Context, test *Test, tracker *state.Bot, level int32,
     start *soakRunStart, deaths *deathEdgeTracker,
@@ -283,9 +272,8 @@ func milestonePass(
     return nil
 }
 
-// milestoneFail tears the supervised session down (when it was
-// launched), writes the FAIL metrics row and returns the error as the
-// scenario verdict.
+// milestoneFail tears the supervised session down (when it was launched),
+// writes the FAIL metrics row and returns the error as the scenario verdict.
 func milestoneFail(
     test *Test, level int32, err error,
     cancel context.CancelFunc, done chan error,
@@ -299,9 +287,8 @@ func milestoneFail(
     return err
 }
 
-// evaluateMilestoneLevel refreshes the level-up check from the live
-// tracker state: the detail line carries the observed level and the
-// experience distance to the threshold.
+// evaluateMilestoneLevel refreshes the level-up check: the detail carries the
+// observed level and the experience distance to the threshold.
 func evaluateMilestoneLevel(tracker *state.Bot, test *Test, level int32) {
     if tracker.Status() != state.StatusOnline {
         return
@@ -335,9 +322,8 @@ func levelMilestoneChecks() []Check {
     }
 }
 
-// writeMilestoneOutcomeMetrics appends the metrics row of a finished
-// milestone run (pass or fail): the same trail shape the soak
-// scenario writes, with the milestone scenario label.
+// writeMilestoneOutcomeMetrics appends the metrics row of a finished run, pass
+// or fail, in the soak trail shape with the milestone scenario label.
 func writeMilestoneOutcomeMetrics(
     test *Test, tracker *state.Bot, start *soakRunStart,
     elapsed time.Duration, deathCount int, failed bool, reason string,
@@ -362,9 +348,9 @@ func writeMilestoneOutcomeMetrics(
     })
 }
 
-// writeMilestoneFailMetrics appends the metrics row of a run that
-// never reached the world (a setup or injection failure): the fail
-// reason rides along, the numeric fields stay zero.
+// writeMilestoneFailMetrics appends the metrics row of a run that never reached
+// the world (a setup or injection failure): the reason rides along, the numeric
+// fields stay zero.
 func writeMilestoneFailMetrics(test *Test, level int32, reason string) {
     writeSoakMetrics(test, soakMetrics{
         Date:        nowUTC(),
