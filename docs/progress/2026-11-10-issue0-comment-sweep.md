@@ -1070,6 +1070,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - cell_policy.go, the second pass
+
+- 75 blocks compress, the file falls from 225 comment lines of 1095
+  (20.5 percent) to 195 of 1069 (18.3 percent): the decision constants
+  keep their number and the server rule behind it (the 15-20 s elven
+  respawn, the +8 adena edge, the 25 percent hysteresis, the 15 and 20
+  percent buy taxes), and the economy notes keep the starve, ripeness
+  and death-regression relations. The partition economy stays in
+  docs/hunting_cells.md.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
