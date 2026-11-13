@@ -990,6 +990,23 @@ corner probe is a length, not a leg at all.
   `task lint:new`. `search.go` fell from 21.7 to 16.9 percent (141
   comment lines of 832), no block above 8 lines.
 
+### 2026-11-13 - pathfind/navmesh/tile.go repairs the shuffled nolints
+
+- 50 blocks compress: the 12 line package doc, the geometry and format
+  constant notes, the area and side notes, the tile and grid struct
+  notes, the poly, link and node field notes, the accessor notes, the
+  three decoder entries, the span packer, the grid builder, the encoder
+  and the v3 decoder notes.
+- Four `//nolint:dupl` blocks carried a scrambled reason (the
+  continuation line sat above the directive, leaving a truncated
+  sentence); each is one coherent line now.
+- `docs/navmesh.md` gains the `PolyRef` packing (column 16 bits at 48,
+  row at 32, index plus one low) and the negative `To` external target
+  encoding.
+- Verified: `task fmt`, `go build ./...`, the full navmesh package,
+  `task lint:new`. `tile.go` fell from 20.2 to 14.3 percent (132
+  comment lines of 926), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -1020,8 +1037,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go`,
 `acceptance/botlog/botlog.go`, `cmd/counterprobe/detect.go` and
 `hunt/recovery_heal.go`, `hunt/navmesh_navigator.go`, `hunt/equip.go`
-`from_game_server/user_info.go` and `pathfind/search.go` (second
-passes). Next: a fresh `task comment:audit --top 10` pick (the
+`from_game_server/user_info.go`, `pathfind/search.go` and
+`pathfind/navmesh/tile.go` (second passes). Next: a fresh `task
+comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.

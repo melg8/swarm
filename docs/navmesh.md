@@ -67,7 +67,11 @@ version 2 (the uint16 quantization) packs the same way.
 - **The external links** name their target by region key and polygon
   index; a missing neighbour tile resolves to a wall at runtime and
   re-stitches nothing (the link simply stays unused until the tile
-  appears).
+  appears). A link with a negative `To` names the external target
+  `-(index into ExtLinks)-1`.
+- **The references** pack the region key and the polygon index into one
+  `PolyRef` (the column 16 bits at 48, the row at 32, the polygon index
+  plus one in the low 32, so zero is the null reference).
 - **The BVTree** is the Detour `dtCreateBVTree` port: quantized
   bounds (cell units on the horizontal axes, 16 unit steps above
   -8192 on the height axis), median split along the longest axis,

@@ -2,18 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package navmesh is the production Detour-style navigation mesh
-// runtime of the feature/new-pathfind port (docs/navmesh.md): tiles
-// of rectangle polygons built offline from the l2j geodata by
-// internal/swarm/pathfind/navbuild, loaded lazily by the Mesh and
-// answered by the Query (the nearest polygon resolution, the A*
-// corridor search, the funnel string pulling).
-//
-// The tile carries the walkable surfaces as rectangle polygons: the
-// region local cell bounds, the four exact corner heights of the
-// geodata cells at the corners and the Detour-style link chains whose
-// portal spans keep every crossing inside the open cell pairs of the
-// shared edge (the NSWE wall fidelity of docs/recast_pathfinding.md).
+// Package navmesh is the production Detour-style navigation mesh runtime
+// (docs/navmesh.md): tiles of rectangle polygons built offline from the l2j
+// geodata by internal/swarm/pathfind/navbuild, loaded lazily by the Mesh and
+// answered by the Query (the nearest polygon resolution, the A* corridor
+// search, the funnel string pulling). A tile carries the region local cell
+// bounds, the four corner heights of its geodata cells and the Detour-style
+// link chains whose portal spans keep every crossing inside the open cell pairs
+// of the shared edge (the NSWE wall fidelity of docs/recast_pathfinding.md).
 package navmesh
 
 import (
@@ -23,10 +19,8 @@ import (
     "math"
 )
 
-// World geometry constants, mirroring internal/swarm/pathfind
-// (geometry.go: World.TILE_SIZE and the region anchors of the l2j
-// grid). They are duplicated here so the runtime stays a self
-// contained leaf package.
+// World geometry constants, mirroring internal/swarm/pathfind (geometry.go);
+// the copy keeps the runtime a self contained leaf package.
 const (
     // regionCellsSide is the cell count of one region side (2048).
     regionCellsSide = 2048
@@ -34,27 +28,24 @@ const (
     cellSizeWorld = 16
     // tileWorldSize is the world size of one region (32768).
     tileWorldSize = regionCellsSide * cellSizeWorld
-    // tileZeroCol/Row are the region file name anchors: the region of
-    // world x is floor(x/tileWorldSize) + tileZeroCol.
+    // tileZeroCol/Row anchor the region keys: see RegionOfWorld.
     tileZeroCol = 20
     tileZeroRow = 18
-    // heightFloor is the world height the BVTree quantization anchors
-    // on (the geodata height range is well inside +-8192).
+    // heightFloor is the height the BVTree quantization anchors on (the geodata
+    // range stays well inside +-8192).
     heightFloor = -8192
 )
 
-// Polygon area ids. The area carries the water semantics of the grid
-// engine: the water polys multiply the step cost by the swim area
-// cost (the dry filters exclude them, the escape prices them high).
+// Polygon area ids: the water polygons multiply the step cost by the swim area
+// cost (the escape pays 8x).
 const (
     AreaGround uint8 = 0
     AreaWater  uint8 = 1
 )
 
-// Poly sides: the side of the rectangle a link leaves through. The
-// naming follows the cell axes (SideMinX = the x==X0 edge); the NSWE
-// compass of the geodata maps west/east/north/south onto
-// minx/maxx/miny/maxy respectively.
+// Poly sides: the rectangle side a link leaves through, in cell axes (SideMinX
+// is the x==X0 edge); the geodata NSWE maps west/east/north/south onto
+// minx/maxx/miny/maxy.
 const (
     SideMinX uint8 = 0
     SideMaxX uint8 = 1
@@ -62,27 +53,17 @@ const (
     SideMaxY uint8 = 3
 )
 
-// Tile format constants: the magic word, the version and the sizes of
-// the wire structures (every section is 4 byte aligned, little
-// endian). Version 2 quantizes the polygon bounds and the link spans
-// to uint16 cell units (the region fits 2048 cells per side, the
-// heights stay int16), the external link region keys to int16 and
-// keeps the link chain offsets uint32 (the dense regions carry over
-// a million links). Version 3 is the columnar layout: the polygon
-// planes, the poly ordered link chains (the implicit CSR, no Next
-// wire), the packed side and span word and the uniform bucket grid
-// instead of the bounding volume tree - the section split probe
-// named the tree and the link records the compressed mass
-// (docs/fastpath_research.md section 11). The decode reads every
-// version.
+// Tile format constants: the magic, the version and the wire sizes (every
+// section 4 byte aligned, little endian). Version 3 is the current columnar
+// layout; the decode reads the version 1 (the int32 records) and version 2 (the
+// uint16 quantization) packs too - docs/fastpath_research.md section 11.
 const (
     tileMagic = 0x31574E53 // 'SWN1' little endian
 
     tileVersion = 3
 
-    // TileWireVersionCurrent is the wire version EncodeTile writes
-    // (the pack upgrade pass compares the decoded header version
-    // against it).
+    // TileWireVersionCurrent is the wire version EncodeTile writes (the pack
+    // upgrade pass compares the decoded header version against it).
     TileWireVersionCurrent = tileVersion
 
     tileHeaderSize = 40
@@ -99,54 +80,46 @@ const (
 
     bvNodeWireSize = 16
 
-    // The version 3 grid index: the bucket count per axis and the
-    // cell span of one bucket (the region is 2048 cells per side).
+    // The version 3 grid index: the bucket count per axis (64) and the cell
+    // span of one bucket (32).
     gridSide        = 64
     gridBucketCells = regionCellsSide / gridSide
     gridBuckets     = gridSide * gridSide
 )
 
-// ErrBadTile reports a tile file that is not a navigation mesh tile
-// of the version this package reads.
+// ErrBadTile reports a tile file that is not a readable navigation mesh tile.
 var ErrBadTile = errors.New("not a navmesh tile")
 
-// Tile is one parsed navigation mesh tile: the rectangle polygons of
-// one geodata region, their link chains and the bounding volume tree.
-// A tile is immutable after decoding and safe for concurrent reads.
+// Tile is one parsed navigation mesh tile; it is immutable after decoding and
+// safe for concurrent reads.
 type Tile struct {
     Col, Row int16
-    // Climb is the height step the links respect (the 40 unit
-    // HEIGHT_INCREASE_LIMIT the server movement validation uses).
+    // Climb is the height step the links respect (the climb limit of the server
+    // movement validation).
     Climb int32
-    // Polys are the rectangle polygons in region local cell bounds
-    // (X0 <= x < X1, Y0 <= y < Y1).
+    // Polys are the rectangle polygons in region local cell bounds.
     Polys []Poly
     // Links is the flat link store every polygon chains into through
     // FirstLink/Link.Next.
     Links []Link
-    // ExtLinks holds the cross region link targets the Links with a
-    // negative To resolve into.
+    // ExtLinks holds the cross region targets the negative To links name.
     ExtLinks []ExtLink
-    // BVTree is the quantized bounding volume tree over the polygon
-    // bounds (the Detour layout: axis 0 = world x, axis 1 = height,
-    // axis 2 = world y). The v3 tiles answer nil: the Grid replaces
-    // it.
+    // BVTree is the quantized bounding volume tree over the polygon bounds (the
+    // Detour layout: axis 0 = world x, axis 1 = height, axis 2 = world y); a v3
+    // tile answers nil and Grid serves it.
     BVTree []BVNode
-    // Grid is the uniform bucket index of the v3 tiles (nil for the
-    // v1/v2 tiles: the BVTree serves those).
+    // Grid is the uniform bucket index of the v3 tiles (nil for v1/v2).
     Grid *TileGrid
 
-    // worldMinX/worldMinY are derived at decode: the world anchor of
-    // the region (the min corner of cell 0 0).
+    // worldMinX/worldMinY are the world anchor of the region (the min corner of
+    // cell 0 0), derived at decode.
     worldMinX, worldMinY float64
 }
 
-// TileGrid is the uniform spatial index of the v3 tiles: the 64x64
-// bucket grid of polygon ids over the region footprint. A polygon
-// lists in every bucket its cell rectangle touches, the entries of
-// one bucket run in increasing polygon order (the conservative 2D
-// candidate set; the query post filters the height window and the
-// caller tests the exact 3D geometry).
+// TileGrid is the uniform spatial index of the v3 tiles: the 64x64 bucket grid
+// of polygon ids, a polygon listed in every bucket its rectangle touches, the
+// entries of one bucket in increasing polygon order. The query post filters the
+// height window and the caller tests the exact 3D geometry.
 type TileGrid struct {
     Offsets []uint32
     Entries []uint32
@@ -154,17 +127,13 @@ type TileGrid struct {
 
 // Poly is one rectangle navigation polygon.
 type Poly struct {
-    // X0, Y0, X1, Y1 are the region local cell bounds (half open:
-    // the polygon covers the cells X0 <= cx < X1, Y0 <= cy < Y1; the
-    // world rectangle spans the grid vertices X0*cell .. X1*cell).
+    // X0, Y0, X1, Y1 are the region local cell bounds, half open: the polygon
+    // covers the cells X0 <= cx < X1, Y0 <= cy < Y1.
     X0, Y0, X1, Y1 int32
-    // H00/H10/H01/H11 are the corner heights, taken from the geodata
-    // cells at the inside corners: H00 = cell (X0, Y0), H10 = cell
-    // (X1-1, Y0), H01 = cell (X0, Y1-1), H11 = cell (X1-1, Y1-1).
-    // The interior height is the bilinear interpolation of the four.
+    // H00/H10/H01/H11 are the heights of the inside corner cells (X0,Y0),
+    // (X1-1,Y0), (X0,Y1-1) and (X1-1,Y1-1); the interior interpolates them.
     H00, H10, H01, H11 int16
-    // FirstLink indexes the first link of the chain (-1: the polygon
-    // has no links - an isolated surface).
+    // FirstLink indexes the first link of the chain (-1: an isolated surface).
     FirstLink int32
     // Area is AreaGround or AreaWater.
     Area uint8
@@ -172,17 +141,16 @@ type Poly struct {
 
 // Link is one polygon-to-polygon connection leaving through a side.
 type Link struct {
-    // Side is the rectangle side the link crosses (SideMinX..).
+    // Side is the rectangle side the link crosses.
     Side uint8
-    // To names the neighbor: >= 0 the polygon index inside the same
-    // tile, < 0 the external target -(index into ExtLinks)-1.
+    // To names the neighbor: >= 0 a polygon of the same tile, < 0 the external
+    // target -(index into ExtLinks)-1.
     To int32
     // Next chains the next link of the same polygon (-1: the end).
     Next int32
-    // T0/T1 bound the portal: the inclusive cell range along the
-    // crossing axis where the geodata walls are open (side minx/maxx:
-    // the y cell range; side miny/maxy: the x cell range). The
-    // funnel may only cross the shared edge inside this span.
+    // T0/T1 bound the portal: the inclusive cell range along the crossing axis
+    // where the geodata walls are open (minx/maxx sides name the y range, the
+    // others the x range); the funnel may only cross inside this span.
     T0, T1 int32
 }
 
@@ -192,17 +160,16 @@ type ExtLink struct {
     Poly     uint32
 }
 
-// BVNode is one node of the tile bounding volume tree: quantized
-// bounds with the leaf escape encoded as a negative index (the Detour
-// dtBVNode layout).
+// BVNode is one node of the tile bounding volume tree: quantized bounds, the
+// leaf escape encoded as a negative index (the Detour dtBVNode layout).
 type BVNode struct {
     BMin [3]uint16
     BMax [3]uint16
     I    int32
 }
 
-// PolyRef identifies one polygon of one tile: the packed region key
-// and the polygon index (0 is the null reference).
+// PolyRef identifies one polygon of one tile: the packed region key and the
+// polygon index (0 is the null reference).
 type PolyRef uint64
 
 // RefOf packs a region key and a polygon index into a reference.
@@ -235,16 +202,13 @@ func RegionOfWorld(x, y float64) (int16, int16) {
 // TileWorldSize returns the world size of one region tile (32768).
 func TileWorldSize() float64 { return tileWorldSize }
 
-// TileZeroCol returns the region file name anchor of the world x
-// axis (the region of world x is floor(x/tileWorldSize) + 20).
+// TileZeroCol returns the region key anchor of the world x axis.
 func TileZeroCol() int16 { return tileZeroCol }
 
-// TileZeroRow returns the region file name anchor of the world y
-// axis (the anchor the region row derives from, 18).
+// TileZeroRow returns the region key anchor of the world y axis.
 func TileZeroRow() int16 { return tileZeroRow }
 
-// WorldMinX returns the world x anchor of the region (the min corner
-// of the local cell column 0).
+// WorldMinX returns the world x anchor of the region.
 func (t *Tile) WorldMinX() float64 { return t.worldMinX }
 
 // WorldMinY returns the world y anchor of the region.
@@ -258,9 +222,8 @@ func (t *Tile) WorldRect(p *Poly) (x0, y0, x1, y1 float64) {
         t.worldMinY + float64(p.Y1)*cellSizeWorld
 }
 
-// HeightAt returns the bilinear surface height of the polygon at a
-// world position (the position may lie outside the rectangle: the
-// interpolation clamps u and v into [0, 1]).
+// HeightAt returns the bilinear surface height of the polygon at a world
+// position, clamped onto the rectangle.
 func (t *Tile) HeightAt(p *Poly, worldX, worldY float64) float64 {
     x0, y0, x1, y1 := t.WorldRect(p)
     u := (worldX - x0) / (x1 - x0)
@@ -275,12 +238,9 @@ func (t *Tile) HeightAt(p *Poly, worldX, worldY float64) float64 {
     return (1-u)*(1-v)*h00 + u*(1-v)*h10 + (1-u)*v*h01 + u*v*h11
 }
 
-// ClosestPoint returns the point of the polygon surface closest to
-// the world position in 3D: the position itself with the surface
-// height when the footprint contains it, otherwise the clamped
-// boundary point with the interpolated edge height. This is the
-// closestPointOnPoly of the Detour query model - the heights are the
-// exact bilinear surface of the four geodata corner cells.
+// ClosestPoint returns the point of the polygon surface closest to the world
+// position in 3D (the closestPointOnPoly of the Detour query model): the
+// position itself when the footprint contains it, else the clamped boundary.
 func (t *Tile) ClosestPoint(p *Poly, x, y, _ float64) (cx, cy, cz float64) {
     x0, y0, x1, y1 := t.WorldRect(p)
     px := math.Max(x0, math.Min(x1, x))
@@ -289,9 +249,8 @@ func (t *Tile) ClosestPoint(p *Poly, x, y, _ float64) (cx, cy, cz float64) {
     return px, py, t.HeightAt(p, px, py)
 }
 
-// Portal returns the world segment of the link portal: the open span
-// of the shared edge the funnel may cross. The segment runs along the
-// polygon side, from the T0 cell boundary to the T1+1 cell boundary.
+// Portal returns the world segment of the link portal: the open span of the
+// shared edge the funnel may cross, from the T0 boundary to the T1+1 one.
 func (t *Tile) Portal(p *Poly, link *Link) (ax, ay, bx, by float64) {
     switch link.Side {
     case SideMinX:
@@ -315,10 +274,7 @@ func (t *Tile) Portal(p *Poly, link *Link) (ax, ay, bx, by float64) {
     return ax, ay, bx, by
 }
 
-// DecodeTile parses the raw bytes of one tile file. The wire
-// versions decode: version 1 (the int32 bounds and spans), version 2
-// (the uint16 quantization) and version 3 (the columnar layout with
-// the bucket grid index).
+// DecodeTile parses the raw bytes of one tile file; every wire version decodes.
 //
 //nolint:cyclop,funlen // the wire sections read side by side
 func DecodeTile(data []byte) (*Tile, error) {
@@ -397,13 +353,9 @@ func DecodeTile(data []byte) (*Tile, error) {
     return tile, nil
 }
 
-// decodePolysV1 reads the version 1 polygon section (the int32
-// bounds).
+// decodePolysV1 reads the version 1 polygon section (the int32 bounds).
 //
-// two wire layouts differ in the bounds width and the version
-// pairs stay readable side by side.
-//
-//nolint:dupl // the v1 body mirrors decodePolys on purpose: the
+//nolint:dupl // the v1 body mirrors decodePolys in the bounds width only
 func decodePolysV1(data []byte, offset *int, tile *Tile) error {
     size := len(tile.Polys) * polyWireSizeV1
     if *offset+size > len(data) {
@@ -428,13 +380,9 @@ func decodePolysV1(data []byte, offset *int, tile *Tile) error {
     return validatePolys(tile)
 }
 
-// decodePolys reads the version 2 polygon section (the uint16
-// quantized bounds).
+// decodePolys reads the version 2 polygon section (the uint16 bounds).
 //
-// two wire layouts differ in the bounds width and the version
-// pairs stay readable side by side.
-//
-//nolint:dupl // the v2 body mirrors decodePolysV1 on purpose: the
+//nolint:dupl // the v2 body mirrors decodePolysV1 in the bounds width only
 func decodePolys(data []byte, offset *int, tile *Tile) error {
     size := len(tile.Polys) * polyWireSize
     if *offset+size > len(data) {
@@ -459,8 +407,7 @@ func decodePolys(data []byte, offset *int, tile *Tile) error {
     return validatePolys(tile)
 }
 
-// validatePolys checks the decoded polygon bounds (the shared
-// invariant of both wire versions).
+// validatePolys checks the decoded polygon bounds.
 func validatePolys(tile *Tile) error {
     for i := range tile.Polys {
         poly := &tile.Polys[i]
@@ -475,13 +422,10 @@ func validatePolys(tile *Tile) error {
     return nil
 }
 
-// decodeLinksV1 reads the version 1 link section (the int32 spans)
-// and validates the chains.
+// decodeLinksV1 reads the version 1 link section (the int32 spans) and checks
+// the chains.
 //
-// two wire layouts differ in the span width and the version pairs
-// stay readable side by side.
-//
-//nolint:dupl // the v1 body mirrors decodeLinks on purpose: the
+//nolint:dupl // the v1 body mirrors decodeLinks in the span width only
 func decodeLinksV1(data []byte, offset *int, tile *Tile) error {
     size := len(tile.Links) * linkWireSizeV1
     if *offset+size > len(data) {
@@ -501,13 +445,10 @@ func decodeLinksV1(data []byte, offset *int, tile *Tile) error {
     return validateLinks(tile)
 }
 
-// decodeLinks reads the version 2 link section (the uint16 spans)
-// and validates the chains.
+// decodeLinks reads the version 2 link section (the uint16 spans) and validates
+// the chains.
 //
-// two wire layouts differ in the span width and the version pairs
-// stay readable side by side.
-//
-//nolint:dupl // the v2 body mirrors decodeLinksV1 on purpose: the
+//nolint:dupl // the v2 body mirrors decodeLinksV1 in the span width only
 func decodeLinks(data []byte, offset *int, tile *Tile) error {
     size := len(tile.Links) * linkWireSize
     if *offset+size > len(data) {
@@ -527,8 +468,7 @@ func decodeLinks(data []byte, offset *int, tile *Tile) error {
     return validateLinks(tile)
 }
 
-// validateLinks checks the decoded link chains (the shared invariant
-// of both wire versions).
+// validateLinks checks the decoded link chains.
 func validateLinks(tile *Tile) error {
     for i := range tile.Links {
         link := &tile.Links[i]
@@ -554,8 +494,7 @@ func validateLinks(tile *Tile) error {
     return nil
 }
 
-// decodeExtLinksV1 reads the version 1 external link section (the
-// int32 region keys).
+// decodeExtLinksV1 reads the version 1 external link section (the int32 keys).
 func decodeExtLinksV1(data []byte, offset *int, tile *Tile) error {
     size := len(tile.ExtLinks) * extLinkWireSizeV1
     if *offset+size > len(data) {
@@ -573,8 +512,7 @@ func decodeExtLinksV1(data []byte, offset *int, tile *Tile) error {
     return nil
 }
 
-// decodeExtLinks reads the version 2 external link section (the
-// int16 region keys).
+// decodeExtLinks reads the version 2 external link section (the int16 keys).
 func decodeExtLinks(data []byte, offset *int, tile *Tile) error {
     size := len(tile.ExtLinks) * extLinkWireSize
     if *offset+size > len(data) {
@@ -612,9 +550,8 @@ func decodeBVTree(data []byte, offset *int, tile *Tile) error {
     return nil
 }
 
-// packLinkSpan folds the side and the crossing span into one word
-// (the side 2 bits, the t0 and the t1 12 bits each: the spans fit the
-// 2048 cell region side).
+// packLinkSpan folds the side and the crossing span into one word (2 bits for
+// the side, 12 each for t0 and t1: the spans fit the 2048 cell region side).
 func packLinkSpan(side uint8, t0, t1 int32) uint32 {
     return uint32(side) | uint32(t0)<<2 | uint32(t1)<<14
 }
@@ -630,10 +567,9 @@ func zigzag(v int64) uint64 { return uint64(v<<1) ^ uint64(v>>63) }
 // unzigzag unfolds the signed delta.
 func unzigzag(v uint64) int64 { return int64(v>>1) ^ -int64(v&1) }
 
-// buildGridIndex buckets the polygon rectangles into the uniform grid
-// (the encode side of the v3 spatial index). The entries of one
-// bucket run in increasing polygon order and the stream stores the
-// per bucket zigzag uvarint deltas.
+// buildGridIndex buckets the polygon rectangles into the uniform grid, the
+// entries of one bucket in increasing polygon order and the stream carrying per
+// bucket zigzag uvarint deltas.
 func buildGridIndex(polys []Poly) (offsets []uint32, stream []byte,
     entries int,
 ) {
@@ -687,12 +623,8 @@ func buildGridIndex(polys []Poly) (offsets []uint32, stream []byte,
     return offsets, stream, total
 }
 
-// EncodeTile serializes a tile into the version 3 wire format: the
-// columnar polygon planes, the poly ordered link chains (the CSR
-// offsets, no Next on the wire), the packed span words, the zigzag
-// uvarint target deltas and the bucket grid index. The derived world
-// anchor is NOT part of the wire format - it recomputes from the
-// region key.
+// EncodeTile serializes a tile into the version 3 wire format; the world anchor
+// is no part of the wire and recomputes from the region key.
 //
 //nolint:cyclop,funlen // the encoder walks the sections in wire order
 func EncodeTile(tile *Tile) ([]byte, error) {
@@ -723,9 +655,8 @@ func EncodeTile(tile *Tile) ([]byte, error) {
         }
     }
 
-    // The link chains: the CSR offsets, the span plane and the
-    // zigzag uvarint target deltas (the delta against the source
-    // polygon keeps the neighbour targets in the one byte range).
+    // The link chains: the CSR offsets, the span plane and the zigzag uvarint
+    // target deltas against the source polygon (mostly one byte).
     offsets := make([]uint32, len(tile.Polys)+1)
     spans := make([]uint32, 0, len(tile.Links))
     toStream := make([]byte, 0, len(tile.Links)*2)
@@ -920,8 +851,8 @@ func decodeTileV3(data []byte, offset *int, tile *Tile) error {
         if end > chainOffsets[i] {
             poly.FirstLink = int32(chainOffsets[i])
         } else {
-            // The isolated surface: the empty chain answers -1 (the
-            // wire CSR only carries the non empty chains).
+            // The isolated surface: the empty chain answers -1 (the CSR carries
+            // the non empty chains only).
             poly.FirstLink = -1
         }
         for e := chainOffsets[i]; e < end; e++ {
