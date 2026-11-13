@@ -13,10 +13,9 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// AttackTarget repeats the attack request for a target that is already
-// selected. This is the second click of the Mobius semantics: the server
-// resolves it to onForcedAttack and notifies the player AI with the
-// ATTACK intention, which starts the chase and the auto attack.
+// AttackTarget repeats the attack request for an already selected target:
+// the second click of the Mobius semantics, which the server resolves to
+// onForcedAttack and the ATTACK intention of the player AI.
 func (gc *GameClient) AttackTarget(objectID int32) error {
     if objectID == 0 {
         return nil
@@ -47,8 +46,7 @@ func (gc *GameClient) sendAttackRequest(
 }
 
 // PickupItem clicks a ground item: the server walks the character to it
-// and adds it to the inventory (the movement is broadcast as
-// MoveToLocation and the pickup as GetItem with a StopMove to self).
+// and picks it up.
 func (gc *GameClient) PickupItem(item state.LootItem) error {
     request := togameserver.NewActionRequestPacket()
     request.ObjectID = item.ObjectID
@@ -75,11 +73,9 @@ func (gc *GameClient) DestroyItem(objectID int32, count int32) error {
     return nil
 }
 
-// UseItem uses an inventory item. Equippable items toggle their
-// equipped state (the same packet equips and unequips, see
-// UseItem.runImpl -> useEquippableItem), other items run their item
-// handler. The web UI drives it from the equipment widget: double
-// click and drag-and-drop of the cells.
+// UseItem uses an inventory item: an equippable toggles its equipped
+// state (one packet for both directions, UseItem.runImpl) and every other
+// item runs its handler.
 func (gc *GameClient) UseItem(objectID int32) error {
     request := togameserver.NewRequestUseItem()
     request.ObjectID = objectID
@@ -91,11 +87,8 @@ func (gc *GameClient) UseItem(objectID int32) error {
     return nil
 }
 
-// Say sends a chat message on the given ChatType client channel: the
-// web UI chat input drives it through the say command of the hunt
-// loop. The whisper channel carries the recipient name, every other
-// channel leaves it empty. The Say2 packet validates itself (an
-// invalid chat disconnects the session server side).
+// Say sends a chat message on the ChatType channel; only the whisper
+// channel carries a recipient. An invalid chat disconnects the session.
 func (gc *GameClient) Say(text string, channel int32, target string) error {
     request := togameserver.NewSay(text, channel)
     request.Target = target
@@ -106,11 +99,9 @@ func (gc *GameClient) Say(text string, channel int32, target string) error {
     return nil
 }
 
-// DropItem drops an inventory item on the ground at the given world
-// position: the server only accepts drops within 150 units of the
-// player (see RequestDropItem.runImpl), so the caller passes the
-// character position. Stackable items drop a partial stack through the
-// count, the server splits the stack itself.
+// DropItem drops an inventory item at the given position: the server
+// accepts drops only within 150 units of the player
+// (RequestDropItem.runImpl) and splits a partial stack itself.
 func (gc *GameClient) DropItem(
     objectID int32, count int32, x int32, y int32, z int32,
 ) error {
@@ -129,10 +120,8 @@ func (gc *GameClient) DropItem(
     return nil
 }
 
-// SellItems sells inventory items to the targeted merchant. The packet
-// uses the standard inventory sell list of the official client (list id
-// 0): the server prices every item itself at referencePrice/2, answers
-// with InventoryUpdate removals and adds the adena.
+// SellItems sells items to the targeted merchant through the standard
+// sell list (id 0); the server prices every item at referencePrice/2.
 func (gc *GameClient) SellItems(items []state.InventoryItem) error {
     request := togameserver.NewRequestSellItemPacket()
     entries := make([]togameserver.SellItemEntry, 0, len(items))
@@ -151,12 +140,11 @@ func (gc *GameClient) SellItems(items []state.InventoryItem) error {
     return nil
 }
 
-// BuyItems buys items from the buylist of the targeted merchant. The
-// server requires the selected merchant within the interaction
-// distance and prices every entry itself (the reference price with
-// the town tax), so the request carries item ids and counts only.
-// Buying shares the transaction flood protector with selling, so the
-// caller paces it like the sell batches.
+// BuyItems buys from the buylist of the targeted merchant: the server
+// requires the merchant within the interaction distance and prices every
+// entry itself (the reference price plus the town tax), so the request
+// carries item ids and counts only. Buying shares the transaction flood
+// protector with selling, so the caller paces it like a sell batch.
 func (gc *GameClient) BuyItems(listID int32, items []gear.Purchase) error {
     request := togameserver.NewRequestBuyItemPacket()
     request.ListID = listID
@@ -184,10 +172,9 @@ func (gc *GameClient) RequestInventory() error {
     return nil
 }
 
-// ActionSitStand toggles between sitting and standing (RequestActionUse
-// action 0). The hunt loop uses it to rest at low HP: the sitting
-// regeneration is faster. The server refuses the transition while
-// moving, casting or attacking, so the caller sends it only while idle.
+// ActionSitStand toggles sitting and standing (RequestActionUse action
+// 0) to rest at low HP; the server refuses it while moving, casting or
+// attacking, so the caller sends it only while idle.
 func (gc *GameClient) ActionSitStand() error {
     request := togameserver.NewRequestActionUsePacket()
     request.ActionID = togameserver.ActionSitStand
@@ -198,12 +185,10 @@ func (gc *GameClient) ActionSitStand() error {
     return nil
 }
 
-// ClickObject selects a world object through the plain client click
-// (Action 0x04): the NpcClick handler of the server selects the npc
-// AND remembers it as the last folk the character talked to - the
-// RequestAcquireSkill learning resolves its trainer through exactly
-// that. The hunt loop clicks the skill teacher with it before the
-// lesson requests.
+// ClickObject selects an object through the plain client click (Action
+// 0x04): the NpcClick handler selects the npc and remembers it as the
+// last folk talked to, which the RequestAcquireSkill trainer resolves
+// through.
 func (gc *GameClient) ClickObject(objectID int32) error {
     if objectID == 0 {
         return nil
@@ -227,19 +212,13 @@ func (gc *GameClient) ClickObject(objectID int32) error {
 }
 
 // InteractPull fires the attack analog of the npc interaction: the
-// second plain client click on an already selected npc (the client
-// double click). The Mobius NpcClick handler resolves it to the
-// interact branch - for a folk npc out of the interaction distance
-// the player AI takes the INTERACT intention and walks the character
-// to the npc along the straight line (thinkInteract moves the pawn
-// to 36 units), opening the dialog on arrival; within the distance
-// it just opens the dialog. The interaction distance is therefore
-// met whatever the geometry between the character and the npc does.
-// It is deliberately NOT the real attack request (AttackTarget, the
-// 0x0A packet the guard engage drives): no forced attack intention,
-// no swings, the folk npc never takes damage - and a plain click on
-// an npc the character does not hold yet only selects it, so the
-// pull is safe at any range.
+// second plain click on an already selected npc. The NpcClick interact
+// branch walks the character to the npc along the straight line when out
+// of the interaction distance (thinkInteract, 36 units) and opens the
+// dialog; it is deliberately not the attack request (AttackTarget, the
+// 0x0A packet the guard engage drives), so no forced attack intention
+// starts and the folk npc never takes damage. The pull is safe at any
+// range, since an unselected npc only takes the selection.
 func (gc *GameClient) InteractPull(objectID int32) error {
     if objectID == 0 {
         return nil
@@ -262,17 +241,12 @@ func (gc *GameClient) InteractPull(objectID int32) error {
     return nil
 }
 
-// ClearTarget drops a selection the loop no longer owns (see the
-// hunt's clearServerSelection): the client cannot unselect directly -
-// the C1 protocol has no deselect request and the server never clears
-// a selection on its own (only the next selection replaces it) - so
-// the self click is the official client way out: Action 0x04 on the
-// own object id runs through the PlayerClick handler, selects the
-// character itself (MyTargetSelected of the own id, the friendly npc
-// or the abandoned fight target is gone) and the follow intention on
-// self moves nothing. A selection that already IS the own object is
-// left alone: a second self click only re-sends ActionFailed and
-// re-arms the follow-self intention.
+// ClearTarget drops a selection the loop no longer owns: C1 has no
+// deselect request and the server never clears a selection on its own,
+// so the self click is the official client way out (Action 0x04 on the
+// own object id selects the character itself, and the follow intention
+// on self moves nothing). A selection that already is the own object is
+// left alone, since a second self click only re-sends ActionFailed.
 func (gc *GameClient) ClearTarget() error {
     objectID := gc.tracker.SelfObjectID()
     selected := gc.tracker.SelfTargetID()
@@ -296,10 +270,10 @@ func (gc *GameClient) ClearTarget() error {
     return nil
 }
 
-// AcquireSkill learns one lesson of the class skill tree at the
-// teacher the character last talked to (see ClickObject): the server
-// charges the SP, consumes the required skill book and answers with
-// a fresh SkillList.
+// AcquireSkill learns one lesson of the class skill tree at the teacher
+// the character last talked to (see ClickObject): the server charges the
+// SP, consumes the required skill book and answers with a fresh
+// SkillList.
 func (gc *GameClient) AcquireSkill(skillID int32, level int32) error {
     request := togameserver.NewRequestAcquireSkillPacket()
     request.SkillID = skillID
@@ -313,10 +287,9 @@ func (gc *GameClient) AcquireSkill(skillID int32, level int32) error {
     return nil
 }
 
-// UseMagicSkill casts a learned active skill: a strike at the
-// selected target, a self buff on the caster. The server runs the
-// cast flow (the range check, the mana cost, the reuse delay) and
-// answers the refusals with ActionFailed.
+// UseMagicSkill casts a learned active skill (a strike at the selected
+// target, a self buff on the caster); the server runs the range, mana and
+// reuse checks and answers the refusals with ActionFailed.
 func (gc *GameClient) UseMagicSkill(skillID int32) error {
     request := togameserver.NewRequestMagicSkillUsePacket()
     request.SkillID = skillID
@@ -328,9 +301,9 @@ func (gc *GameClient) UseMagicSkill(skillID int32) error {
 }
 
 // RestartAtVillage revives a dead character at the nearest village
-// restart point, exactly like the death dialog of the official client
-// (RequestRestartPoint 0x6D type 0). The server refuses the request
-// while the character is alive, so the caller sends it only after death.
+// restart point (RequestRestartPoint 0x6D type 0), like the death dialog
+// of the official client; the server refuses it while the character is
+// alive.
 func (gc *GameClient) RestartAtVillage() error {
     request := togameserver.NewRequestRestartPointPacket()
     request.PointType = togameserver.RestartTypeVillage

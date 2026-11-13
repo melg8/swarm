@@ -2133,6 +2133,24 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the npcdata suite (0.4 s),
   `golangci-lint run ./internal/swarm/npcdata/...` 0 issues.
 
+### 2026-11-13 - connection/game_actions.go keeps the click semantics
+
+- 14 blocks compress: the file keeps the two click meanings of the
+  Mobius handler (the second click of `AttackTarget` forces the attack
+  and the ATTACK intention, while `InteractPull` takes the interact
+  branch, walks the character to 36 units with `thinkInteract` and
+  never damages the folk npc), the C1 fact that no deselect request
+  exists so `ClearTarget` clicks the own object id, the
+  `ClickObject` trainer memory behind `AcquireSkill`, the 150 unit
+  drop reach, the `referencePrice/2` sale pricing and the shared
+  transaction flood protector of selling and buying, the
+  `RequestActionUse` 0 sit toggle, the `referencePrice` plus town tax
+  buy pricing and the use item toggle. 85 comment lines of 342 become
+  58 of 316, no block above 8 lines.
+- Verified: `task fmt`, `go build ./...`, the connection suite
+  (10.7 s), `golangci-lint run ./internal/swarm/connection/...`
+  0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
