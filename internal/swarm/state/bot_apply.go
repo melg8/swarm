@@ -124,12 +124,10 @@ func (b *Bot) ApplyPlacement(p Placement) {
     b.touch()
 }
 
-// ApplyMovement updates the current position and destination of a moving
-// object, computing the heading from the movement direction like the
-// server does for its creatures. A zero distance packet is the arrival
-// broadcast of the server: the object stands at the destination and
-// keeps the heading it moved with, exactly like the official client
-// renders it.
+// ApplyMovement updates the position and destination of a moving object,
+// computing the heading from the direction like the server does. A zero
+// distance packet is the arrival broadcast: the object stands at the
+// destination and keeps its heading.
 func (b *Bot) ApplyMovement(m Movement) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -174,14 +172,11 @@ func (b *Bot) ApplyMovement(m Movement) {
 }
 
 // ApplyPawnMovement updates a chasing object: it runs toward the point
-// `distance` in front of its target and faces the target. The packet
-// rides an attack chase, so it refreshes the combat state and the
-// target reference - with one exception: the Mobius player AI moves
-// the pawn toward a folk npc for the interact intention too (the walk
-// to the ~36 unit talk distance), and a known non attackable npc pawn
-// marks no combat (selecting a buffer or a shop is an interaction, not
-// a fight). The played character is handled as well because the server
-// broadcasts its own chase to it.
+// `distance` in front of its target and faces it. The packet refreshes the
+// combat state and the target, with one exception: the Mobius player AI walks a
+// pawn toward a folk npc for the interact intention too (the ~36 unit talk
+// distance), and a known non attackable npc pawn marks no combat. The played
+// character is handled too, the server broadcasts its own chase to it.
 func (b *Bot) ApplyPawnMovement(m PawnMovement) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -221,11 +216,9 @@ func (b *Bot) ApplyPawnMovement(m PawnMovement) {
     b.touch()
 }
 
-// applySelfPawnMovementLocked tracks the played character chasing its
-// attack target. A pawn movement toward a known non attackable npc is
-// the interact walk of the Mobius player AI (the talk distance
-// approach): it updates the target reference but marks no combat. The
-// caller must hold the state write lock.
+// applySelfPawnMovementLocked tracks the played character chasing its attack
+// target; a pawn movement toward a known non attackable npc is the interact
+// walk of the Mobius player AI, which updates the target but marks no combat.
 func (b *Bot) applySelfPawnMovementLocked(
     m PawnMovement, destX int32, destY int32, now time.Time,
 ) {
@@ -263,29 +256,25 @@ func pawnDestination(m PawnMovement) (int32, int32) {
     return stopX, stopY
 }
 
-// ApplyAttack updates the attacker placement and marks the attacker and
-// every known hit target as fighting. The attacker faces its first hit
-// target, exactly like the official client renders it: the Attack packet
-// carries the attacker and the target positions but no heading, and the
-// server set the attacker heading toward the target before broadcasting
-// (see Creature.doAttack). When the played character is the target, the
-// trailing target location doubles as a position update of it.
+// ApplyAttack updates the attacker placement and marks the attacker and every
+// known hit target as fighting. The attacker faces its first hit target: the
+// packet carries no heading, the server set it toward the target before
+// broadcasting (Creature.doAttack). When the played character is the target,
+// the trailing target location doubles as its position update.
 func (b *Bot) ApplyAttack(a Attack) {
     b.ApplyAttackAt(a, b.now())
 }
 
-// ApplyShotGauge records a bow shot cycle announced by the RED
-// SetupGauge packet: the max field of the packet is the full disable
-// window the server enforces from the shot commit, in milliseconds
-// (see CharacterState.BowCycleAt). A non positive cycle and a gauge
-// of any other color are ignored by the parser gate (IsBowCycle),
-// so the caller passes only bow cycles.
+// ApplyShotGauge records a bow shot cycle of the RED SetupGauge packet: the max
+// field is the full disable window the server enforces from the shot commit, in
+// milliseconds (CharacterState.BowCycleAt). The parser gate (IsBowCycle) drops
+// other colors and non-positive cycles.
 func (b *Bot) ApplyShotGauge(cycle time.Duration) {
     b.ApplyShotGaugeAt(cycle, b.now())
 }
 
-// ApplyShotGaugeAt is the timestamped twin of ApplyShotGauge: the
-// repro scenes stage a gauge a controlled age in the past.
+// ApplyShotGaugeAt is the timestamped twin of ApplyShotGauge for the repro
+// scenes.
 func (b *Bot) ApplyShotGaugeAt(cycle time.Duration, at time.Time) {
     if cycle <= 0 {
         return
@@ -297,13 +286,10 @@ func (b *Bot) ApplyShotGaugeAt(cycle time.Duration, at time.Time) {
     b.touch()
 }
 
-// ApplyAttackAt is the timestamped twin of ApplyAttack: the packet
-// lands with the given arrival time instead of the wall clock. The
-// live session always feeds time.Now (through ApplyAttack); the
-// timestamped form serves the repro scenes that stage a shot a
-// controlled age in the past (the kite windup tests - the shot
-// freshness and the fight freshness age at different rates, and a
-// backdated broadcast pins the boundary between them).
+// ApplyAttackAt is the timestamped twin of ApplyAttack: the packet lands with
+// the given arrival time. The live session feeds time.Now through ApplyAttack;
+// the repro scenes backdate a shot to pin the boundary of the shot and fight
+// freshness windows.
 func (b *Bot) ApplyAttackAt(a Attack, at time.Time) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -356,13 +342,11 @@ func (b *Bot) ApplyAttackAt(a Attack, at time.Time) {
     }
 }
 
-// recordSwingEventsLocked feeds the swing animation of the web view
-// with one event per hit: the blows that land record the swing, the
-// evaded ones record the miss float (the viewer shows both, so a
-// fight stays legible even when the blows start missing). The Mobius
-// Attack packet carries the miss flag of every hit; a missed blow
-// carries no swing streak and no damage number. The caller must hold
-// the write lock.
+// recordSwingEventsLocked feeds the swing animation of the web view with one
+// event per hit: landed blows record the swing, evaded ones the miss float, so
+// a fight stays legible when the blows start missing. The Mobius Attack packet
+// carries the miss flag of every hit; a miss carries no swing streak and no
+// damage number.
 func (b *Bot) recordSwingEventsLocked(a Attack, now time.Time) {
     for i := range a.TargetCount {
         if a.HitFlags[i]&attackHitMissFlag != 0 {
@@ -403,17 +387,14 @@ func (b *Bot) recordSwingEventsLocked(a Attack, now time.Time) {
     }
 }
 
-// critHintWindow bounds the critical correlation: the Attack
-// broadcast and its StatusUpdate HP drops ride the same read loop
-// back to back, so half a second is generous while the false
-// positives (an unrelated hit on the same victim inside the window)
-// stay rare. The wrong "Crit!" label is cosmetic only.
+// critHintWindow bounds the critical correlation: the Attack broadcast and its
+// StatusUpdate HP drops ride the same read loop, so half a second is generous
+// while the false positives stay rare. A wrong label is cosmetic only.
 const critHintWindow = 500 * time.Millisecond
 
-// noteCritHintLocked remembers the victims of the landed critical
-// blows of an Attack broadcast (the hint the next HP drops read): a
-// dual weapon critting twice counts two awaited drops. The caller
-// must hold the write lock.
+// noteCritHintLocked remembers the victims of the landed critical blows (the
+// hint the next HP drops read); a dual weapon critting twice counts two awaited
+// drops.
 func (b *Bot) noteCritHintLocked(a Attack, now time.Time) {
     for i := range a.TargetCount {
         if a.CritFlags[i] && a.HitFlags[i]&attackHitMissFlag == 0 {
@@ -428,15 +409,11 @@ func (b *Bot) noteCritHintLocked(a Attack, now time.Time) {
     }
 }
 
-// critHintLocked reports whether the observed HP drop of the given
-// victim labels as a critical blow: the hint matches the victim, the
-// window is live and an awaited drop count remains (each labeled
-// drop consumes one - a plain follow-up hit of the same victim stays
-// plain). The caller must hold the write lock.
-// Known trade-off of the one slot: a MIXED broadcast (a plain hit
-// followed by a crit on the same victim) lets the plain hit's drop
-// consume the label first - the two floats swap their labels, which
-// is cosmetic only.
+// critHintLocked reports whether an HP drop labels as a critical blow: the hint
+// matches the victim, the window is live and an awaited drop remains (each
+// labeled drop consumes one). With a mixed broadcast (a plain hit followed by a
+// crit on the same victim) the plain drop consumes the label first and the
+// floats swap, which is cosmetic only.
 func (b *Bot) critHintLocked(victimID int32, now time.Time) bool {
     if b.critVictim != victimID || b.critVictimAt.IsZero() ||
         b.critVictimHits <= 0 {
@@ -502,10 +479,8 @@ func (b *Bot) ApplyNpcInfo(info NpcInfo) {
     cold.TemplateID = info.TemplateID
     obj.Attackable = info.Attackable
     obj.Aggressive = npcdata.NPCIsAggressive(info.TemplateID)
-    // The enemy weapon family: the NpcInfo equipment block names the
-    // template rhand item, and the anti-archer gate of the hunt kite
-    // layer refuses to engage a bow wielding enemy (a ranged
-    // opponent cannot be outrun, the standing trade answers it).
+    // The anti-archer gate of the hunt kite layer refuses a bow wielding enemy:
+    // a ranged opponent cannot be outrun, the standing trade answers it.
     obj.BowWielding = npcBowWielding(info.RightHandItem)
     cold.AggroRange = npcdata.NPCAggroRange(info.TemplateID)
     obj.Level = npcdata.NPCLevel(info.TemplateID)
@@ -584,9 +559,9 @@ func (b *Bot) ApplyItemInfo(info ItemInfo) {
     b.recordLocked("item dropped: " + itemName(cold.Name, info.TemplateID))
 }
 
-// RemoveObject deletes an object that left the known list. When the
-// bot itself targeted the object, the target is dropped as well: the
-// server answers the removal only with the DeleteObject broadcast.
+// RemoveObject deletes an object that left the known list, dropping the own
+// target too: the server answers the removal only with the DeleteObject
+// broadcast.
 func (b *Bot) RemoveObject(objectID int32) {
     b.mu.Lock()
     defer b.mu.Unlock()
@@ -612,10 +587,9 @@ const (
     AttrMaxMP   = 0x0C
     AttrCurLoad = 0x0E
     AttrMaxLoad = 0x0F
-    // AttrAtkSpd is the ATK_SPD attribute: the live physical attack
-    // speed of the character, rebroadcast on every equipment or buff
-    // change of it. The bow fight reads it for the cooldown window
-    // (the C1 formulas: 500000/pAtkSpd + reuseDelay*333/pAtkSpd).
+    // AttrAtkSpd is the live physical attack speed, rebroadcast on every
+    // equipment or buff change; the bow fight reads it for the cooldown window
+    // (the C1 formula 500000/pAtkSpd + reuseDelay*333/pAtkSpd).
     AttrAtkSpd = 0x12
 )
 
@@ -653,8 +627,7 @@ func (b *Bot) ApplyStatusUpdate(objectID int32, attrs []Attribute) {
         b.noteKillLocked(objectID, now)
     }
     if obj.Dead && b.char.TargetID == objectID {
-        // A killed target is no target anymore: the server keeps
-        // the corpse selected, the tracker drops it so the HUD
+        // The server keeps the corpse selected; the tracker drops it so the HUD
         // and the hunt loop see the actual "no target" state.
         b.clearSelfTargetLocked("target died")
     }
@@ -683,12 +656,10 @@ func (b *Bot) applyCharAttr(attr Attribute) {
     }
 }
 
-// applySelfStatusLocked applies the vitals attributes of the played
-// character: the damage bookkeeping first (it reads the previous HP),
-// then the values, and the alive to dead transition counts one death
-// (exactly one per demise - the village restart that follows revives
-// without counting, see metrics.go). The caller must hold the write
-// lock.
+// applySelfStatusLocked applies the vitals of the played character: the damage
+// bookkeeping first (it reads the previous HP), then the values; the alive to
+// dead transition counts one death, and the village restart that follows
+// revives without counting.
 func (b *Bot) applySelfStatusLocked(attrs []Attribute, now time.Time) {
     wasDead := b.char.MaxHP > 0 && b.char.CurHP <= 0
     b.recordCharDamageLocked(attrs, now)

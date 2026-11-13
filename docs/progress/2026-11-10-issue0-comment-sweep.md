@@ -1677,6 +1677,24 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite,
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - state/bot_apply.go keeps the wire rules
+
+- 16 blocks compress: the appliers keep the arrival broadcast semantics
+  (a zero distance packet stands the object at the destination with its
+  heading kept), the pawn chase exception (the Mobius player AI walks a
+  pawn toward a folk npc for the ~36 unit interact distance and a known
+  non attackable npc marks no combat), the missing Attack heading
+  (`Creature.doAttack` sets it toward the first hit target), the RED
+  SetupGauge bow cycle (the max field is the disable window in
+  milliseconds), the crit hint window 500 ms with the cosmetic mixed
+  broadcast swap, the ATK_SPD cooldown formula
+  `500000/pAtkSpd + reuseDelay*333/pAtkSpd`, the anti-archer gate, the
+  corpse target drop and the one death per demise with the village
+  restart reviving uncounted. 110 comment lines of 702 become 81 of
+  673.
+- Verified: `task fmt`, `go build ./...`, the state suite,
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
