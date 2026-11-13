@@ -6,29 +6,27 @@ package state
 
 import "strconv"
 
-// The snapshot encoding is hand rolled: the event stream marshals the
-// whole world view on every state version change (effectively on every
-// received packet while a web client watches), and the reflection walk
-// of encoding/json dominated that path (a 200 npc snapshot spent
-// 250 us and 104 allocations in the reflector). The append functions
-// below write the exact same bytes encoding/json produces for the
-// snapshot types - field order, number formatting, string escaping
-// (HTML escaping included) and time formatting match the reflection
-// output, pinned by TestSnapshotJSONMatchesReflection.
+// The snapshot encoding is hand rolled: the event stream marshals the whole
+// world view on every state version change (effectively every received packet
+// while a web client watches), and the reflection walk of encoding/json
+// dominated that path (a 200 npc snapshot spent 250 us and 104 allocations).
+// The append functions below write the exact bytes the reflection encoder
+// produces - field order, number formatting, string escaping (HTML included)
+// and time formatting - pinned by TestSnapshotJSONMatchesReflection. The live
+// state encoder reuses the element writers with stack allocated views.
 
-// MarshalJSON encodes the snapshot with the direct writer. The json
-// package calls it for every json.Marshal/json.Encode of a Snapshot.
+// MarshalJSON encodes the snapshot with the direct writer, which the json
+// package calls for every Marshal and Encode of a Snapshot.
 func (s Snapshot) MarshalJSON() ([]byte, error) {
     buf := make([]byte, 0, snapshotJSONSize(s))
 
     return appendSnapshotJSON(buf, s), nil
 }
 
-// AppendJSON appends the snapshot encoding to dst - the streaming
-// paths call it directly on a pre-sized buffer and skip the compacting
-// copy json.Marshal runs over the MarshalJSON result. A nil dst gets
-// the estimated output size allocated up front (one allocation for
-// the whole document).
+// AppendJSON appends the snapshot encoding to dst, so the streaming paths skip
+// the compacting copy json.Marshal runs over the MarshalJSON result. A nil dst
+// gets the estimated output size allocated up front, one allocation for the
+// whole document.
 func (s Snapshot) AppendJSON(dst []byte) []byte {
     if dst == nil {
         dst = make([]byte, 0, snapshotJSONSize(s))
@@ -37,9 +35,9 @@ func (s Snapshot) AppendJSON(dst []byte) []byte {
     return appendSnapshotJSON(dst, s)
 }
 
-// snapshotJSONSize estimates the encoded length: the fixed frame plus
-// rough per entry costs and the raw string lengths, so the append
-// writer keeps everything in one allocation.
+// snapshotJSONSize estimates the encoded length (the fixed frame, rough per
+// entry costs and the raw string lengths), so the append writer keeps
+// everything in one allocation.
 func snapshotJSONSize(s Snapshot) int {
     size := 640 + len(s.ID) + len(s.Phase) + len(s.Status) +
         len(s.Character.Name)
@@ -78,9 +76,8 @@ func snapshotJSONSize(s Snapshot) int {
     return size
 }
 
-// appendSnapshotJSON writes the snapshot object in the field order of
-// the struct declaration. Splitting the linear field walk only
-// obscures the wire format (see appendCharacterJSON).
+// appendSnapshotJSON writes the snapshot object in the field order of the
+// struct declaration, the wire format the reflection encoder produces.
 //
 //nolint:funlen // linear field order
 func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
@@ -144,9 +141,8 @@ func appendSnapshotJSON(dst []byte, s Snapshot) []byte {
     return dst
 }
 
-// appendCharacterJSON writes the character view object. Splitting
-// the linear field walk only obscures the wire format; the field
-// order mirrors the struct declaration like the reflection encoder.
+// appendCharacterJSON writes the character view object in the field order of
+// the declaration.
 //
 //nolint:funlen // linear field order
 func appendCharacterJSON(dst []byte, c CharacterSnapshot) []byte {
@@ -231,8 +227,7 @@ func appendCharacterJSON(dst []byte, c CharacterSnapshot) []byte {
     return dst
 }
 
-// appendObjectsJSON writes the world object array (nil becomes null
-// like the reflection encoder).
+// appendObjectsJSON writes the world object array (nil becomes null).
 func appendObjectsJSON(dst []byte, objects []ObjectSnapshot) []byte {
     if objects == nil {
         return append(dst, `null`...)
@@ -249,9 +244,8 @@ func appendObjectsJSON(dst []byte, objects []ObjectSnapshot) []byte {
     return dst
 }
 
-// appendObjectJSON writes one world object view. The linear field
-// walk mirrors the struct declaration; splitting it only obscures
-// the wire format.
+// appendObjectJSON writes one world object view in the field order of the
+// declaration.
 //
 //nolint:funlen // linear field order
 func appendObjectJSON(dst []byte, o ObjectSnapshot) []byte {
@@ -271,9 +265,8 @@ func appendObjectJSON(dst []byte, o ObjectSnapshot) []byte {
     dst = strconv.AppendBool(dst, o.Aggressive)
     dst = append(dst, `,"aggroRange":`...)
     dst = strconv.AppendInt(dst, int64(o.AggroRange), 10)
-    // The social fields of the npc: the clan help range draws the
-    // assist links of the map, the mask string pairs the clan mates
-    // (the empty mask of the clan less npcs costs a pair of quotes).
+    // The social fields: the clan help range feeds the assist links of the map
+    // and the mask pairs the clan mates.
     dst = append(dst, `,"clanHelpRange":`...)
     dst = strconv.AppendInt(dst, int64(o.ClanHelpRange), 10)
     dst = append(dst, `,"clanMask":`...)
@@ -346,9 +339,7 @@ func appendInventoryJSON(dst []byte, items []InventoryItemSnapshot) []byte {
     return dst
 }
 
-// appendInventoryItemJSON writes one equipment widget item. The live
-// state encoder reuses it with a stack allocated view, so the element
-// encoding stays byte identical between the two paths.
+// appendInventoryItemJSON writes one equipment widget item.
 //
 //nolint:funlen // linear field order
 func appendInventoryItemJSON(dst []byte, item InventoryItemSnapshot) []byte {
@@ -421,8 +412,7 @@ func appendEventsJSON(dst []byte, events []Event) []byte {
     return dst
 }
 
-// appendEventJSON writes one rolling event log entry. The live state
-// encoder reuses it with the ring record directly.
+// appendEventJSON writes one rolling event log entry.
 func appendEventJSON(dst []byte, event Event) []byte {
     dst = append(dst, `{"time":`...)
     dst = appendJSONTime(dst, event.Time)
@@ -449,8 +439,7 @@ func appendChatJSON(dst []byte, chat []ChatEvent) []byte {
     return dst
 }
 
-// appendChatEventJSON writes one chat window line. The live state
-// encoder reuses it with the ring record directly.
+// appendChatEventJSON writes one chat window line.
 func appendChatEventJSON(dst []byte, line ChatEvent) []byte {
     dst = append(dst, `{"time":`...)
     dst = appendJSONTime(dst, line.Time)
@@ -464,10 +453,9 @@ func appendChatEventJSON(dst []byte, line ChatEvent) []byte {
     return append(dst, '}')
 }
 
-// appendWalkPlanFieldsJSON writes the walk plan field group of the
-// snapshot: the waypoint array plus the origin, the follower cursor,
-// the destination and the search contract (the Snapshot and the live
-// state encoders share the exact field order).
+// appendWalkPlanFieldsJSON writes the walk plan field group: the waypoints plus
+// the origin, the follower cursor, the destination and the search contract, in
+// the field order the Snapshot and the live encoder share.
 func appendWalkPlanFieldsJSON(
     dst []byte, points []WalkPoint, origin *WalkPoint, index int,
     dest *WalkPoint, search *WalkSearch,
@@ -484,8 +472,8 @@ func appendWalkPlanFieldsJSON(
     return appendWalkSearchJSON(dst, search)
 }
 
-// appendWalkSearchJSON writes the mesh search contract of the walk
-// plan (null when the plan came from no mesh search).
+// appendWalkSearchJSON writes the mesh search contract (null when no mesh
+// search produced the plan).
 func appendWalkSearchJSON(dst []byte, search *WalkSearch) []byte {
     if search == nil {
         return append(dst, `null`...)
@@ -532,8 +520,7 @@ func appendWalkPathJSON(dst []byte, points []WalkPoint) []byte {
     return dst
 }
 
-// appendWalkPointPtrJSON writes an optional walk point (null when
-// absent).
+// appendWalkPointPtrJSON writes an optional walk point (null when absent).
 func appendWalkPointPtrJSON(dst []byte, point *WalkPoint) []byte {
     if point == nil {
         return append(dst, `null`...)
@@ -542,8 +529,7 @@ func appendWalkPointPtrJSON(dst []byte, point *WalkPoint) []byte {
     return appendWalkPointJSON(dst, *point)
 }
 
-// appendWalkPointJSON writes one walk plan waypoint. The live state
-// encoder reuses it with the published plan directly.
+// appendWalkPointJSON writes one walk plan waypoint.
 func appendWalkPointJSON(dst []byte, point WalkPoint) []byte {
     dst = append(dst, `{"x":`...)
     dst = strconv.AppendInt(dst, int64(point.X), 10)
@@ -555,10 +541,9 @@ func appendWalkPointJSON(dst []byte, point WalkPoint) []byte {
     return append(dst, '}')
 }
 
-// appendShoppingPlanJSON writes the published shopping plan object
-// (null when none is published). The live state encoder reuses it
-// with the published plan under the read lock; the entries array of
-// a live plan is never nil (SetShoppingPlan clears empty plans).
+// appendShoppingPlanJSON writes the published shopping plan (null when none is
+// published). A live plan never carries nil entries: SetShoppingPlan clears
+// empty plans.
 func appendShoppingPlanJSON(dst []byte, plan *ShoppingPlanView) []byte {
     if plan == nil {
         return append(dst, `null`...)
@@ -586,9 +571,8 @@ func appendShoppingPlanJSON(dst []byte, plan *ShoppingPlanView) []byte {
     return dst
 }
 
-// appendShoppingEntryJSON writes one planned purchase of the shopping
-// plan. The field order mirrors the struct declaration like the
-// reflection encoder.
+// appendShoppingEntryJSON writes one planned purchase in the field order of the
+// declaration.
 //
 //nolint:funlen // linear field order
 func appendShoppingEntryJSON(dst []byte, entry ShoppingEntryView) []byte {
@@ -649,8 +633,8 @@ func appendShoppingEntryJSON(dst []byte, entry ShoppingEntryView) []byte {
     return dst
 }
 
-// appendSkillsJSON writes the learned skill array (null when the
-// character knows no skills yet).
+// appendSkillsJSON writes the learned skill array (null when no skills are
+// known).
 func appendSkillsJSON(dst []byte, skills []SkillSnapshot) []byte {
     if skills == nil {
         return append(dst, `null`...)
@@ -666,8 +650,8 @@ func appendSkillsJSON(dst []byte, skills []SkillSnapshot) []byte {
     return append(dst, ']')
 }
 
-// appendSkillSnapshotJSON writes one learned skill. The field order
-// mirrors the struct declaration like the reflection encoder.
+// appendSkillSnapshotJSON writes one learned skill in the field order of the
+// declaration.
 func appendSkillSnapshotJSON(dst []byte, skill SkillSnapshot) []byte {
     dst = append(dst, `{"skillId":`...)
     dst = strconv.AppendInt(dst, int64(skill.SkillID), 10)
@@ -686,8 +670,8 @@ func appendSkillSnapshotJSON(dst []byte, skill SkillSnapshot) []byte {
     return dst
 }
 
-// appendSkillPlanJSON writes the learning queue (null when the class
-// is unknown or nothing is left to learn).
+// appendSkillPlanJSON writes the learning queue (null when nothing is left to
+// learn).
 func appendSkillPlanJSON(dst []byte, plan *SkillPlanView) []byte {
     if plan == nil {
         return append(dst, `null`...)
@@ -715,8 +699,8 @@ func appendSkillPlanJSON(dst []byte, plan *SkillPlanView) []byte {
     return dst
 }
 
-// appendSkillPlanEntryJSON writes one queued lesson. The field order
-// mirrors the struct declaration like the reflection encoder.
+// appendSkillPlanEntryJSON writes one queued lesson in the field order of the
+// declaration.
 func appendSkillPlanEntryJSON(dst []byte, entry SkillPlanEntry) []byte {
     dst = append(dst, `{"skillId":`...)
     dst = strconv.AppendInt(dst, int64(entry.SkillID), 10)
@@ -747,8 +731,7 @@ func appendSkillPlanEntryJSON(dst []byte, entry SkillPlanEntry) []byte {
     return dst
 }
 
-// appendBuffsJSON writes the active effect list (null when the
-// character runs no effects).
+// appendBuffsJSON writes the active effect list (null when no effect runs).
 func appendBuffsJSON(dst []byte, buffs []BuffSnapshot) []byte {
     if buffs == nil {
         return append(dst, `null`...)
@@ -765,8 +748,8 @@ func appendBuffsJSON(dst []byte, buffs []BuffSnapshot) []byte {
     return dst
 }
 
-// appendBuffSnapshotJSON writes one active effect. The field order
-// mirrors the struct declaration like the reflection encoder.
+// appendBuffSnapshotJSON writes one active effect in the field order of the
+// declaration.
 func appendBuffSnapshotJSON(dst []byte, buff BuffSnapshot) []byte {
     dst = append(dst, `{"skillId":`...)
     dst = strconv.AppendInt(dst, int64(buff.SkillID), 10)
@@ -789,8 +772,8 @@ func appendBuffSnapshotJSON(dst []byte, buff BuffSnapshot) []byte {
     return dst
 }
 
-// appendSkillStatesJSON writes the live cast and reuse windows (null
-// when no window runs).
+// appendSkillStatesJSON writes the live cast and reuse windows (null when none
+// runs).
 func appendSkillStatesJSON(dst []byte, states []SkillStateView) []byte {
     if states == nil {
         return append(dst, `null`...)
@@ -808,7 +791,6 @@ func appendSkillStatesJSON(dst []byte, states []SkillStateView) []byte {
 }
 
 // appendSkillStateViewJSON writes one skill cast and reuse window.
-// The live state encoder reuses it with a stack allocated view.
 func appendSkillStateViewJSON(dst []byte, state SkillStateView) []byte {
     dst = append(dst, `{"skillId":`...)
     dst = strconv.AppendInt(dst, int64(state.SkillID), 10)
@@ -844,9 +826,7 @@ func appendCombatEventsJSON(dst []byte, events []CombatEventView) []byte {
     return dst
 }
 
-// appendCombatEventViewJSON writes one combat animation beat. The live
-// state encoder reuses it with a stack allocated view of the feed
-// record.
+// appendCombatEventViewJSON writes one combat animation beat.
 func appendCombatEventViewJSON(dst []byte, view CombatEventView) []byte {
     dst = append(dst, `{"seq":`...)
     dst = strconv.AppendUint(dst, view.Seq, 10)
@@ -908,7 +888,6 @@ func appendZoneViewsJSON(dst []byte, zones []ZoneView) []byte {
 }
 
 // appendZoneViewJSON writes one zone registry entry of the map view.
-// The live state encoder reuses it with the stored view directly.
 //
 //nolint:funlen // wire-format encoder: one statement per field
 func appendZoneViewJSON(dst []byte, zone ZoneView) []byte {
@@ -964,12 +943,8 @@ func appendZoneViewJSON(dst []byte, zone ZoneView) []byte {
     return append(dst, '}')
 }
 
-// appendDiagnosticsJSON writes the health view object of the
-// snapshot: the liveness ages and rates, the combat nuance, the
-// known list summary and the hunt internals. The field order
-// mirrors the struct declaration like the reflection encoder.
-//
-
+// appendDiagnosticsJSON writes the health view object: the liveness ages and
+// rates, the combat nuance, the known list summary and the hunt internals.
 func appendDiagnosticsJSON(dst []byte, d Diagnostics) []byte {
     dst = append(dst, `{"phaseForMs":`...)
     dst = strconv.AppendInt(dst, d.PhaseForMs, 10)
@@ -1017,10 +992,7 @@ func appendObjectCountsJSON(dst []byte, c ObjectCounts) []byte {
     return append(dst, '}')
 }
 
-// appendHuntDiagnosticsJSON writes the hunt internals object. The
-// field order mirrors the struct declaration.
-//
-
+// appendHuntDiagnosticsJSON writes the hunt internals object.
 func appendHuntDiagnosticsJSON(dst []byte, h HuntDiagnostics) []byte {
     dst = append(dst, `{"targetId":`...)
     dst = strconv.AppendInt(dst, int64(h.TargetID), 10)

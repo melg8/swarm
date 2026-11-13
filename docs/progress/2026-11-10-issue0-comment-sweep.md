@@ -2086,6 +2086,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - state/snapshot_json.go keeps the byte contract
+
+- 30 blocks compress: the header keeps the hand rolled encoder rationale
+  (a 200 npc snapshot spent 250 us and 104 allocations in the reflector),
+  the byte identity contract (field order, number formatting, string
+  escaping with HTML, time formatting) pinned by
+  `TestSnapshotJSONMatchesReflection`, and the element writers reused by
+  the live encoder with stack allocated views (the fact moved up from
+  five repeated per function notes). The per function repeats of "the
+  field order mirrors the struct declaration" and "the live state
+  encoder reuses it" are dropped, the encoder contract now stated once.
+  Two dangling `//` separator lines that carried no `//nolint` directive
+  removed. 110 comment lines of 1069 become 84 of 1041.
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
