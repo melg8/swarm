@@ -1948,6 +1948,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - session/anomalies.go keeps the rank rules
+
+- 18 blocks compress: the scan keeps the threshold intent (the counts
+  flag what wasted real minutes in the six hour fleet runs, the
+  background chatter stays quiet), the thread thresholds (12 repeats,
+  300 s clusters, 3 logouts, 300 s fights, 3 trip reasons, 5 deaths in
+  600 s, 600 s stalls, 120 s churn, 300 s gaps), the digit normalizer,
+  the closed-socket signature of an older emergency logout, the
+  "where to look" promise with the per finding drill-down line, the
+  failed against successful trip endings (the farm spot return and the
+  combat handover never count), the `tripFailed` marker list and the
+  respawn clock suspect of a long fight (the server recycles object
+  ids). 90 comment lines of 759 become 78 of 747.
+- Verified: `task fmt`, `go build ./...`, the session suite,
+  `golangci-lint run ./internal/swarm/session/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

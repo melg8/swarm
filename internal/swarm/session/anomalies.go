@@ -12,10 +12,9 @@ import (
     "strings"
 )
 
-// The anomaly scan thresholds. Every threshold trades noise against
-// coverage: the counts below flag the patterns that wasted real minutes
-// in the observed six hour fleet runs while ignoring the healthy
-// background chatter of the world.
+// The anomaly scan thresholds trade noise against coverage: the counts flag the
+// patterns that wasted real minutes in the six hour fleet runs while ignoring
+// the healthy background chatter of the world.
 const (
     // patternMinCount flags a repeated decision line shape.
     patternMinCount = 12
@@ -38,9 +37,8 @@ const (
     gapReportSec = int64(300)
 )
 
-// digitRun matches a run of digits (the pattern normalizer collapses
-// the variable parts of a repeated line: object ids, coordinates,
-// counters).
+// digitRun matches a run of digits: the normalizer collapses the variable parts
+// of a repeated line (object ids, coordinates, counters).
 var digitRun = regexp.MustCompile(`[0-9]+`)
 
 // patternStat accumulates one repeated story line shape.
@@ -78,12 +76,10 @@ type anomalyBot struct {
     first    int64
     last     int64
     patterns map[string]*patternStat
-    // logoutAt collects the emergency logout moments (story markers and
-    // the honest logout events of later builds).
+    // logoutAt collects the emergency logout story markers and logout events.
     logoutAt []int64
-    // closedLost counts the lost sessions whose reason names the
-    // self-closed socket (the emergency logout signature of the builds
-    // before the honest reason line).
+    // closedLost counts the lost sessions whose reason names the self-closed
+    // socket, the emergency logout signature of an older build.
     closedLost   int
     killOutliers []fightMark
     mobs         map[string]*mobAnomaly
@@ -134,10 +130,9 @@ type anomalyScan struct {
     last  int64
 }
 
-// RunAnomalies streams the journal once and prints the ranked findings
-// of the long-run behavior: the tool answers "where should I look"
-// without the agent reading the whole session. Every finding carries
-// its own drill-down command line for -session-query.
+// RunAnomalies streams the journal once and prints the ranked findings of the
+// long-run behavior, so the reader gets "where to look" without the whole
+// session. Every finding carries its own -session-query drill-down line.
 func RunAnomalies(path string, out io.Writer) error {
     scan := &anomalyScan{
         bots:  make(map[string]*anomalyBot),
@@ -212,8 +207,8 @@ func (a *anomalyBot) apply(r record) {
     }
 }
 
-// applyStory folds one story line: the pattern counter over the Hunt
-// decision shapes and the emergency logout markers.
+// applyStory folds one story line into the pattern counter and the emergency
+// logout markers.
 func (a *anomalyBot) applyStory(r record) {
     a.storyMinutes[r.T/60]++
     if strings.Contains(r.M, "emergency logout") {
@@ -271,8 +266,8 @@ func (a *anomalyBot) applyTripEnd(r record) {
     stat.last = r.T
 }
 
-// applyLost folds one lost session: the closed-socket signature of the
-// emergency logout and the session lifetime against the last entry.
+// applyLost folds one lost session: the closed-socket signature and the
+// lifetime since entry.
 func (a *anomalyBot) applyLost(r record) {
     a.losts++
     if strings.Contains(r.R, "use of closed network connection") {
@@ -322,8 +317,7 @@ func (a *anomalyBot) medianLifetime() int64 {
     return live[len(live)/2]
 }
 
-// churnCount returns the sessions that lived shorter than the churn
-// threshold.
+// churnCount returns the sessions shorter than the churn threshold.
 func (a *anomalyBot) churnCount() int {
     churn := 0
     for _, life := range a.lifetimes {
@@ -335,9 +329,8 @@ func (a *anomalyBot) churnCount() int {
     return churn
 }
 
-// mutedCount replicates the story cap of the live journal over the
-// per-minute counters: a healthy bot stays under the cap, a flooded one
-// mutes the difference.
+// mutedCount replicates the story cap of the live journal over the per-minute
+// counters: a healthy bot stays under it, a flooded one mutes the difference.
 func (a *anomalyBot) mutedCount() int {
     muted := 0
     for _, count := range a.storyMinutes {
@@ -390,8 +383,8 @@ func (a *anomalyBot) topPatterns() []*patternStat {
     return stats
 }
 
-// slowMobs returns the mob species whose longest fight crossed the
-// outlier threshold.
+// slowMobs returns the mob species whose longest fight crossed the outlier
+// threshold.
 func (a *anomalyBot) slowMobs() []*mobAnomaly {
     var mobs []*mobAnomaly
     for _, mob := range a.mobs {
@@ -412,11 +405,10 @@ type tripLoop struct {
     stat   *reasonStat
 }
 
-// tripLoops returns the FAILED trip end reasons that repeated enough
-// to count as a loop, ranked by count. The failure vocabulary: the
-// aborted trips, the timeouts, the refused walks - the successful
-// endings ("back at the farm spot", the combat handover) never loop
-// anything.
+// tripLoops returns the failed trip end reasons that repeated enough to count
+// as a loop, ranked by count: the aborted trips, the timeouts, the refused
+// walks. The successful endings (the farm spot return, the combat handover)
+// never loop anything.
 func (a *anomalyBot) tripLoops() []tripLoop {
     var loops []tripLoop
     for reason, stat := range a.tripReasons {
@@ -431,9 +423,8 @@ func (a *anomalyBot) tripLoops() []tripLoop {
     return loops
 }
 
-// tripFailed reports whether a trip end reason names a failure: the
-// markers of the aborted, timed out and refused endings of the town
-// trip machinery.
+// tripFailed reports whether a trip end reason names a failure: the markers of
+// the aborted, timed out and refused town trip endings.
 func tripFailed(reason string) bool {
     for _, marker := range [...]string{
         "abort", "fail", "timeout", "timed out", "no walkable",
@@ -520,8 +511,8 @@ func (r *anomalyRender) drillLine(bot string, from int64, to int64) string {
         r.path, bot, hhmm(from), hhmm(to))
 }
 
-// logoutFindings flags the emergency logout loops: the bot that keeps
-// re-entering the ground that keeps kicking it out.
+// logoutFindings flags the emergency logout loops: the bot keeps re-entering
+// hot ground.
 func (r *anomalyRender) logoutFindings(a *anomalyBot) []finding {
     findings := make([]finding, 0, 1)
     logouts := len(a.logoutAt)
@@ -570,8 +561,8 @@ func (r *anomalyRender) logoutFindings(a *anomalyBot) []finding {
     return findings
 }
 
-// patternFindings flags the repeated decision lines: a loop that
-// re-issues the same decision shape every tick wasted the whole window.
+// patternFindings flags the repeated decision lines: a loop re-issuing the same
+// shape every tick wasted the whole window.
 func (r *anomalyRender) patternFindings(a *anomalyBot) []finding {
     patterns := a.topPatterns()
     findings := make([]finding, 0, len(patterns))
@@ -600,11 +591,10 @@ func (r *anomalyRender) patternFindings(a *anomalyBot) []finding {
     return findings
 }
 
-// tripFindings flags the town trip loops: one FAILED trip reason
-// repeating over the session burned its cooldowns without progress.
-// The successful endings (the farm spot return, the combat handover)
-// never count - a bot that keeps finishing its trips is healthy
-// whatever the reason distribution looks like.
+// tripFindings flags the town trip loops: one failed reason repeating over the
+// session burned its cooldowns without progress. The successful endings (the
+// farm spot return, the combat handover) never count; a bot that keeps
+// finishing its trips is healthy whatever the reason distribution looks like.
 func (r *anomalyRender) tripFindings(a *anomalyBot) []finding {
     loops := a.tripLoops()
     findings := make([]finding, 0, len(loops))
@@ -630,10 +620,9 @@ func (r *anomalyRender) tripFindings(a *anomalyBot) []finding {
     return findings
 }
 
-// fightFindings flags the fight duration outliers: one mob species the
-// journal credits with fights of many minutes names either a genuinely
-// stalled engage or a fight clock that never reset between the kills of
-// a respawned (id-recycled) spawn point.
+// fightFindings flags the fight duration outliers: a mob species credited with
+// fights of many minutes names either a stalled engage or a fight clock that
+// never reset between the kills of a respawned (id-recycled) spawn point.
 func (r *anomalyRender) fightFindings(a *anomalyBot) []finding {
     slow := a.slowMobs()
     findings := make([]finding, 0, len(slow)+1)
@@ -673,9 +662,8 @@ func (r *anomalyRender) fightFindings(a *anomalyBot) []finding {
     return findings
 }
 
-// deathFindings flags the death streaks: a burst of deaths in one
-// window is either a delevel run or a death loop, the positions tell
-// them apart.
+// deathFindings flags the death streaks: a burst of deaths is either a delevel
+// run or a death loop, and the positions tell them apart.
 func (r *anomalyRender) deathFindings(a *anomalyBot) []finding {
     bursts := a.deathBursts()
     findings := make([]finding, 0, len(bursts))
@@ -725,8 +713,8 @@ func (r *anomalyRender) stallFindings(a *anomalyBot) []finding {
     return findings
 }
 
-// gapFindings flags the offline stretches and the flood mute: the
-// mute count names how much of the story the cap swallowed.
+// gapFindings flags the offline stretches and the flood mute, whose count names
+// how much of the story the cap swallowed.
 func (r *anomalyRender) gapFindings(a *anomalyBot) []finding {
     findings := make([]finding, 0, len(a.gaps)+1)
     for _, gap := range a.gaps {
