@@ -1199,6 +1199,15 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - webserver/dump_parse.go keeps the repro contract only
+
+- 10 blocks compress: the parser keeps the tolerant read rule, the
+  minimal repro set, the Apply API replay invariants and the last walk
+  plan fallback; the per helper examples stay one line each. 156
+  comment lines of 872 become 123 of 839.
+- Verified: `task fmt`, `go build ./...`, the webserver suite (8.3 s),
+  `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

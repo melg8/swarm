@@ -2,19 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The dump parser: the inverse of BuildStateDump (dump.go). It reads
-// the plain text dump back into the state.Snapshot view structs so a
-// dump captured from a long-lived user server (tools/dump_state.sh)
-// reconstructs the exact world a misbehaving bot saw. See the
-// dump-state-repro skill for the reproduction workflow.
+// The dump parser reverses BuildStateDump (dump.go): it reads the plain text
+// dump of a long-lived user server (tools/dump_state.sh) back into the
+// state.Snapshot view structs, so a captured dump reconstructs the world a
+// misbehaving bot saw (the dump-state-repro skill holds the workflow).
 //
-// The parser is line-oriented and tolerant: it skips blank lines and
-// section headers, reads the indented key:value lines it knows, and
-// leaves unknown fields at their zero value. The goal is enough
-// state to reproduce a behavior (the character position, the world
-// objects around it, the target, the walk plan), not a byte-exact
-// round trip (the dump carries presentation fields the view structs
-// do not store).
+// The parser is tolerant: unknown lines and missing sections stay at their zero
+// value, and only a known field that fails to parse returns an error. The goal
+// is a behavior repro, not a byte exact round trip.
 package webserver
 
 import (
@@ -24,17 +19,10 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// ParseDump reads the plain text dump of BuildStateDump into the
-// state.Snapshot view structs. The returned snapshot carries the
-// identity, the character, the attackers, the hunting zone, the
-// equipment, the bag, the world objects, the walk plan and the recent
-// combat/chat/events that the dump printed - the minimal repro set of
-// the dump-state-repro skill.
-//
-// The parser is tolerant: unknown lines and missing sections are
-// skipped, the fields the dump does not carry stay at their zero
-// value. A parse error of a known field returns the error so the
-// caller can decide whether to trust the partial snapshot.
+// ParseDump reads the plain text dump of BuildStateDump into the view
+// structs: the identity, the character, the attackers, the hunting zone, the
+// equipment, the bag, the objects, the walk plan and the recent events - the
+// minimal repro set. A known field that fails to parse returns the error.
 func ParseDump(dump string) (state.Snapshot, error) {
     p := &dumpParser{ //nolint:exhaustruct_v5 // pos/snap start zero
         lines: strings.Split(dump, "\n"),
@@ -43,20 +31,14 @@ func ParseDump(dump string) (state.Snapshot, error) {
     return p.parse()
 }
 
-// ApplyDump replays a parsed snapshot into a fresh state.Bot through
-// the public Apply API, so the storage invariants (the SoA split of
-// the world store, the object id index map, the version counter) hold
-// exactly like a live session built them. Use this when a dump-driven
-// repro test needs the real storage layout (the hunt tick scans the
-// dense hot array, the target search walks the index map); use
-// ParseDump alone when the test only asserts on the view fields.
+// ApplyDump replays a parsed snapshot into a fresh state.Bot through the Apply
+// API, so the storage invariants (the SoA split, the id index, the version
+// counter) hold like a live session built them. Use it when the repro needs the
+// real dense layout; ParseDump alone suffices for view assertions.
 //
-// The replay covers the character, the world objects, the hunting
-// zone, the walk plan and the rolling events. The inventory, the
-// combat events and the chat are view-only projections of the live
-// state (they carry presentation fields the Apply API does not take),
-// so they stay on the snapshot and do not round-trip through the bot.
-// A test that needs them reads them off the returned snapshot.
+// The replay covers the character, the objects, the hunting zone, the walk plan
+// and the events. The inventory, the combat events and the chat stay on the
+// snapshot: the Apply API does not take their presentation fields.
 func ApplyDump(bot *state.Bot, snap state.Snapshot) {
     applyDumpCharacter(bot, snap.Character)
     applyDumpObjects(bot, snap.Objects)
@@ -89,13 +71,10 @@ func ApplyDump(bot *state.Bot, snap state.Snapshot) {
     }
 }
 
-// applyDumpCharacter replays the character view into the bot. The
-// SetCharacter call seeds the identity and the position; the
-// ApplyUserInfo call fills the level, the stats, the max HP/MP and
-// the load; the ApplyStatusUpdate calls set the current HP/MP. The
-// target id and the sit/stand state ride along through ApplyUserInfo
-// (the dump does not carry them as separate fields, the hunt loop
-// derives them from the packets).
+// applyDumpCharacter replays the character view: SetCharacter seeds the
+// identity and the position, ApplyUserInfo the level, the stats, the max
+// HP/MP, the load, the target and the sit state, and ApplyStatusUpdate the
+// current HP/MP.
 func applyDumpCharacter(bot *state.Bot, c state.CharacterSnapshot) {
     bot.SetCharacter(c.Name, c.ObjectID, c.ClassID, c.X, c.Y, c.Z,
         c.CurHP, c.CurMP)
@@ -126,12 +105,9 @@ func applyDumpCharacter(bot *state.Bot, c state.CharacterSnapshot) {
     })
 }
 
-// applyDumpObjects replays the world object views into the bot. Each
-// object becomes an ApplyNpcInfo (for npcs) or ApplyItemInfo (for
-// items) call, followed by an ApplyStatusUpdate that sets the current
-// HP/MP (the ApplyNpcInfo call only seeds the max from the template).
-// The dead flag drops the object to 0 HP; the attackable flag stays
-// on the hot record.
+// applyDumpObjects replays the object views: ApplyNpcInfo or ApplyItemInfo,
+// then an ApplyStatusUpdate that sets the current HP/MP (the info call only
+// seeds the max from the template). The dead flag drops the object to 0 HP.
 func applyDumpObjects(bot *state.Bot, objects []state.ObjectSnapshot) {
     for i := range objects {
         o := &objects[i]
@@ -181,11 +157,9 @@ func applyDumpItem(bot *state.Bot, o *state.ObjectSnapshot) {
     })
 }
 
-// dumpParser walks the dump line by line, tracking the current
-// section and dispatching the indented key:value lines to the
-// matching field reader. The section header switches the dispatch
-// table; blank lines separate sections but do not end them (a
-// section runs until the next header).
+// dumpParser walks the dump line by line, dispatching the indented key:value
+// lines to the reader of the current section. A section runs until the next
+// header; blank lines do not end it.
 type dumpParser struct {
     lines []string
     pos   int
@@ -431,10 +405,8 @@ func scanLoadLine(c *state.CharacterSnapshot, val string) {
     c.Adena = parseInt32(takeAfter(val, "adena "))
 }
 
-// parseAttackers reads the "attackers (N):" section. The attackers
-// are a subset of the world objects (the living attackable npcs that
-// hold the character as their target); they are already captured by
-// parseObjects, so this section is a no-op for the snapshot.
+// parseAttackers reads the "attackers (N):" section: a subset of the objects
+// parseObjects already captures, so it is a no-op for the snapshot.
 func (p *dumpParser) parseAttackers() error {
     p.skipIndented()
 
@@ -619,11 +591,9 @@ func parseObjectLine(line string) (state.ObjectSnapshot, bool) {
     return obj, true
 }
 
-// parseWalkPlan reads the "walk plan (N waypoints, aiming at wp M):"
-// section, or its post walk form "last walk plan (...)" (the most
-// recent plan kept after its walk ended - the stuck segment report).
-// The last flag routes the fields into the last plan view of the
-// snapshot.
+// parseWalkPlan reads the "walk plan (N waypoints, aiming at wp M):" section
+// or its post walk form "last walk plan (...)" (the plan a stuck segment
+// report needs). The last flag routes the fields into the last plan view.
 func (p *dumpParser) parseWalkPlan(header string, last bool) error {
     if strings.Contains(header, "none") {
         return nil
@@ -681,11 +651,9 @@ func (p *dumpParser) parseWalkPlan(header string, last bool) error {
     return nil
 }
 
-// parseWalkPlanSearch reads the search word of the walk plan header
-// ("N waypoints, mesh, aiming..." vs "N waypoints, aiming..."): the
-// marker of a plan some mesh search produced, nil for the direct segments
-// no mesh search produced (the header names no word). The approach
-// radius and the ban circles ride the "search ..." line (see
+// parseWalkPlanSearch reads the search word of the walk plan header: the
+// marker of a plan some mesh search produced, nil for direct segments. The
+// approach radius and the ban circles ride the "search ..." line (see
 // parseWalkSearchLine).
 func parseWalkPlanSearch(header string) *state.WalkSearch {
     middle := takeBefore(takeAfter(header, "waypoints"),
@@ -862,8 +830,7 @@ func takeAfter(s, needle string) string {
 }
 
 // afterToken returns the substring after the first run of non-space
-// characters following a separator. It is a helper for the scan
-// helpers above that read "key: value rest" lines.
+// characters following a separator (the "key: value rest" scan helper).
 func afterToken(s, sep string) string {
     rest := takeAfter(s, sep)
     rest = strings.TrimLeft(rest, " ")
