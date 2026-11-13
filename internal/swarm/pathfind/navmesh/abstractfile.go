@@ -11,25 +11,14 @@ import (
     "time"
 )
 
-// The abstract sidecar format: the persistent coarse layer of one
-// region (docs/fastpath_research.md section 2). The pack build
-// serializes the cluster graph next to the tile (the X_Y.ab
-// sidecar); the runtime loads it instead of re-scanning the decoded
-// tile, so the coarse search starts warm and the tile decodes stay
-// inside the refinement hops.
-//
-// The wire: a 56 byte header, the node records (the inline edge
-// index lists), the edge records and the run length encoded link
-// components. The derived structures (the cluster index map and the
-// per node class dedupe) rebuild at the decode - the edge dedupe of
-// the build keeps one edge per class, so the first class mapping per
-// stored edge reconstructs the map exactly.
-//
-// Version 2 adds the tile checksum guard (the head and the tail
-// CRC32 of the tile file bytes in the header bytes 48..56): the
-// deployment copies that lose the file mtimes (a plain cp or an
-// archive extraction) keep serving the sidecars, the mtime only
-// packs stay on the version 1 guard.
+// The abstract sidecar format: the persistent coarse layer of one region (the
+// X_Y.ab file next to the tile, docs/fastpath_research.md section 2). The pack
+// build serializes the cluster graph so the runtime loads it instead of
+// re-scanning the decoded tile: a 56 byte header, the node records with their
+// inline edge index lists, the edge records and the run length encoded link
+// components. The derived structures (the cluster index and the per node class
+// dedupe) rebuild at the decode. Version 2 guards the tile with the CRC32 of
+// its head and tail (header bytes 48..56), the mtime guard stays for version 1.
 
 const (
     abstractMagic        = 0x31424153 // 'SAB1' little endian
@@ -124,11 +113,10 @@ func EncodeAbstract(abstract *regionAbstract) ([]byte, error) {
     return data, nil
 }
 
-// DecodeAbstract parses one abstract sidecar.
+// DecodeAbstract parses one abstract sidecar and rebuilds its derived
+// structures.
 //
-// forwards opaquely (query, diff) behind the export.
-//
-//nolint:cyclop,gocognit,funlen,revive // wire order walk; the graph
+//nolint:cyclop,gocognit,funlen,revive // wire order walk of the sections
 func DecodeAbstract(data []byte) (*regionAbstract, error) {
     if len(data) < abstractHeaderSize {
         return nil, fmt.Errorf("%w: the abstract %d bytes is too short",
@@ -255,9 +243,8 @@ func DecodeAbstract(data []byte) (*regionAbstract, error) {
         }
     }
 
-    // The class dedupe rebuilds from the stored edges: the build kept
-    // one edge per class, the first mapping per stored edge
-    // reconstructs the map.
+    // The class dedupe rebuilds from the stored edges: the build kept one edge
+    // per class, so the mapping per stored edge reconstructs the map.
     for i := range abstract.nodes {
         node := &abstract.nodes[i]
         for _, edgeIdx := range node.edges {

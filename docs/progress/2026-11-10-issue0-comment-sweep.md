@@ -1362,6 +1362,20 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
   `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
 
+### 2026-11-13 - pathfind/navmesh/abstractfile.go repairs a torn doc comment
+
+- The 18 line sidecar format block becomes 8: the pack build
+  serializes the cluster graph next to the tile, the 56 byte header with
+  the node edge index lists, the edge records and the run length encoded
+  link components, the derived structures rebuilt at the decode and the
+  version 2 CRC32 guard in header bytes 48..56 against the version 1
+  mtime guard.
+- Repaired in passing: the `DecodeAbstract` doc comment carried a torn
+  fragment ("forwards opaquely (query, diff) behind the export.") and an
+  `//nolint` reason cut mid sentence ("wire order walk; the graph"); both
+  now name the decoder and the wire order walk.
+- 35 comment lines of 296 become 22 of 283.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
