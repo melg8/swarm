@@ -177,6 +177,20 @@ left the zone.
   visible at all (the zero-enemy last resort). The running fights
   outside the ground still finish where they stand
   (`adoptOutZoneFight`), the hurt-under-attack flee stays first.
+- **The deck gate** (`cellEnemiesVisible`): a pickable mob on a
+  different deck than the character - a z gap past `deckReachableZ`
+  (400) - reads as unreachable, because the straight line crosses the
+  railing and the deck edge, the server geodata correction collapses
+  the click onto the walker and the move is silently canceled. The
+  2026-09-14 dump showed the freeze exactly: a level 14 character on
+  the Elven Village terrace (z -2992) with its held cell on the field
+  deck (z -3576), the field mobs pickable and visible, the engage on
+  a direct walk that never moved, and the pathfound return never
+  armed. The gate drops the cross-deck mobs from the visible reading,
+  the engage falls through to `returnToZone` and the pathfinder walks
+  the ramp down. A mob with an unreported z (0) passes the gate - the
+  same convention the level filter uses for an unresolved template -
+  and a missing self position falls back to the knownlist reading.
 - **The ranged-kill loot** (`noteKillPosition`, `killApproachWalk`):
   a mob killed at range (the bow lure, the caster spells) drops at
   its corpse; the loot phase records the corpse position, walks

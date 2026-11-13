@@ -759,6 +759,18 @@ corner probe is a length, not a leg at all.
   lint:new`. `shopping.go` fell from 60.8 to 45.8 percent (49 comment
   lines of 107), no block above 8 lines.
 
+### 2026-11-12 - hunt/loop_zone.go keeps the deck gate
+
+- 8 blocks compress: the fence, the held ground, the enemy visibility
+  (the 23 line deck gate header), the target leash, the inside check
+  and the default square. `docs/hunting_cells.md` gained `The deck
+  gate` bullet: the 400 unit z threshold, the collapsed click, the
+  2026-09-14 terrace dump, the unresolved z pass and the missing self
+  position fallback.
+- Verified: `task fmt`, `go build ./...`, the zone and cell tests,
+  `task lint:new`. `loop_zone.go` fell from 45.2 to 33.1 percent (42
+  comment lines of 127), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -781,8 +793,8 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `gear/shopping_candidates.go`, `hunt/town_segment.go`,
 `acceptance/plaza_herbiel.go`, `pathfind/click_validate.go`,
 `cmd/counterprobe/world.go`, `hunt/lure.go`, `hunt/town_sell.go` and
-`gear/shopping.go` (second passes). Next: a fresh `task comment:audit
---top 10` pick (the
+`gear/shopping.go` and `hunt/loop_zone.go` (second passes). Next: a
+fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.
