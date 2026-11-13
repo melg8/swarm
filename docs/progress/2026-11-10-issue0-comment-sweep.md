@@ -1981,6 +1981,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the connection suite (10.5 s),
   `golangci-lint run ./internal/swarm/connection/...` 0 issues.
 
+### 2026-11-13 - acceptance/scroll_escape.go keeps the cast facts
+
+- 17 blocks compress: the scenario keeps the Keltir glade start 5 000
+  units south of the village, the `isAggressive="false"` datapack
+  attribute (a missing one defaults to aggressive, and the 20 second
+  stationary cast must never be interrupted), the "no race respawn zone
+  covers the cell" rule that lands the scroll on the town ring, the
+  twelve non-chaotic `elf_town` respawn points inside a 1 114 by 1 072
+  box with `RandomRespawnInTownEnabled` on, the 950 unit radius covering
+  the box plus the 50 unit `OffsetOnTeleportEnabled` offset, the skill
+  2013 `skill0000` vortex icon of `skillgrp.txt`, its `SOEItemID` display
+  id, the manual autonomy hook (the live loop would start a town trip of
+  its own) and the 250 ms poll that never lets the cast window slip. 87
+  comment lines of 424 become 76 of 413.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

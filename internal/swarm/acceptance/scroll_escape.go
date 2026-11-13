@@ -15,38 +15,34 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The scroll escape acceptance scenario: the level 15 fighter stands
-// on the Keltir glade 5 000 units south of the elven village with one
-// Scroll of Escape in the bag and uses it. The scenario verifies the
-// whole scroll leg of the town trip - the skill 2013 cast window of
-// the snapshot with the blue-white vortex icon the C1 client draws
-// for it (skill0000), the item consumption and the teleport landing
-// on the elven town respawn ring.
+// The scroll escape acceptance scenario: the level 15 fighter stands on the
+// Keltir glade 5 000 units south of the elven village with one Scroll of Escape
+// and uses it. The scenario verifies the whole scroll leg of the town trip: the
+// skill 2013 cast window with the blue-white vortex icon the C1 client draws
+// for it (skill0000), the item consumption and the landing on the elven town
+// respawn ring.
 
 // scrollEscapeScenarioID is the scenario registry id.
 const scrollEscapeScenarioID = "scroll-escape"
 
-// The temp account of the scenario: the next free slot after the city
-// shopping errand (temp25). The password equals the account (the
-// Mobius login auto-creates missing accounts).
+// The temp account of the scenario, the next free slot after the city shopping
+// errand (temp25); the password equals the account (the login auto-creates
+// missing accounts).
 const (
     scrollEscapeAccount  = "temp26"
     scrollEscapePassword = "temp26"
 )
 
-// scrollEscapeTimeout bounds the whole run: the reset, the login
-// handshake, the 20 second cast, the landing and the graceful
-// shutdown - the budget keeps the slowest honest run inside.
+// scrollEscapeTimeout bounds the whole run: the reset, the login handshake, the
+// 20 second cast, the landing and the graceful shutdown.
 const scrollEscapeTimeout = 5 * time.Minute
 
-// The start ground of the scenario: the Keltir glade of the elven
-// starting grounds (the oren02_2119_08 territory), far enough from
-// the town ring to prove the travel. Every Keltir of the ground
-// carries isAggressive="false" in the datapack (a missing attribute
-// would default to aggressive), so the 20 second stationary cast is
-// never interrupted, and no race respawn zone covers the cell, so
-// the scroll lands on the town ring instead of a starting ground
-// respawn.
+// The start ground: the Keltir glade of the elven starting grounds (the
+// oren02_2119_08 territory), far enough from the town ring to prove the travel.
+// Every Keltir carries isAggressive="false" in the datapack (a missing
+// attribute would default to aggressive), so the 20 second stationary cast is
+// never interrupted, and no race respawn zone covers the cell, so the scroll
+// lands on the town ring instead of a starting ground respawn.
 const (
     scrollEscapeSpawnX = 45496
     scrollEscapeSpawnY = 44544
@@ -54,21 +50,20 @@ const (
     scrollEscapeLevel  = 15
 )
 
-// The teleport landing of the scroll: the twelve non-chaotic respawn
-// points of elf_town (dist/game/data/mapregion/elf_town.xml) spread a
-// 1 114 by 1 072 box; the server picks one at random because Player
-// .ini keeps RandomRespawnInTownEnabled on. The radius around the box
-// center covers every point plus the 50 unit teleport offset of
-// OffsetOnTeleportEnabled.
+// The teleport landing: the twelve non-chaotic respawn points of elf_town
+// (dist/game/data/mapregion/elf_town.xml) spread a 1 114 by 1 072 box, and the
+// server picks one at random because Player.ini keeps
+// RandomRespawnInTownEnabled on. The radius around the box center covers every
+// point plus the 50 unit offset of OffsetOnTeleportEnabled.
 const (
     scrollEscapeTownX      = 45355
     scrollEscapeTownY      = 49561
     scrollEscapeTownRadius = 950.0
 )
 
-// The skill of the scroll and the default icon the C1 client draws
-// for it: the decrypted skillgrp.txt points skill 2013 at
-// icon.skill0000, the blue-white vortex of the unstuck art.
+// The skill of the scroll and the icon the C1 client draws for it: the
+// decrypted skillgrp.txt points skill 2013 at icon.skill0000, the blue-white
+// vortex of the unstuck art.
 const (
     scrollEscapeSkillID = 2013
     scrollEscapeIcon    = "skill0000"
@@ -82,9 +77,9 @@ const scrollEscapePoll = 250 * time.Millisecond
 // to reach the live inventory after the world entry.
 const scrollEscapeInventoryWait = 30 * time.Second
 
-// scrollEscapeDrainWait bounds the wait for the escape goroutine
-// once every check holds: the landing poll of the loop runs at the
-// same quarter second, so the goroutine answers almost at once.
+// scrollEscapeDrainWait bounds the wait for the escape goroutine once every
+// check holds: its landing poll runs at the same quarter second, so it answers
+// almost at once.
 const scrollEscapeDrainWait = 5 * time.Second
 
 // The condition ids of the scenario.
@@ -102,9 +97,9 @@ const (
     checkScrollLanded = "landed"
 )
 
-// scrollEscapeReset returns the start state of the scenario: the
-// level 15 vitals on the Keltir glade with one Scroll of Escape in
-// the bag (the display id the hunt economy injects).
+// scrollEscapeReset returns the start state: the level 15 vitals on the Keltir
+// glade with one Scroll of Escape in the bag (the display id the hunt economy
+// injects).
 func scrollEscapeReset(account string) characterReset {
     return characterReset{
         Account: account,
@@ -123,8 +118,7 @@ func scrollEscapeReset(account string) characterReset {
     }
 }
 
-// scrollEscapeChecks builds the initial check list of the scenario in
-// its narrative order.
+// scrollEscapeChecks builds the initial check list in its narrative order.
 func scrollEscapeChecks() []Check {
     return []Check{
         {
@@ -154,11 +148,10 @@ func scrollEscapeChecks() []Check {
     }
 }
 
-// scrollEscapeScenario runs the scroll round: the temp character
-// wakes with the scroll in the bag, the hunt loop stays in the manual
-// mode so no hunt or trip competes with the cast, the acceptance seam
-// uses the scroll and the watch verifies the cast, the icon, the
-// consumption and the landing.
+// scrollEscapeScenario runs the scroll round: the temp character wakes with the
+// scroll in the bag, the hunt loop stays manual so no hunt or trip competes
+// with the cast, and the watch verifies the cast, the icon, the consumption and
+// the landing.
 func scrollEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(scrollEscapeChecks())
@@ -189,9 +182,8 @@ func scrollEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
         cancelSession, sessionDone)
 }
 
-// prepareScrollEscapeState creates the temp character and injects the
-// start state: the level 15 fighter with one scroll in the bag on the
-// Keltir glade.
+// prepareScrollEscapeState creates the temp character and injects the start
+// state: the level 15 fighter with one scroll in the bag on the Keltir glade.
 func prepareScrollEscapeState(m *Manager, test *Test) error {
     if err := m.ensureCharacter(scrollEscapeAccount,
         scrollEscapePassword, scrollEscapeAccount,
@@ -208,10 +200,9 @@ func prepareScrollEscapeState(m *Manager, test *Test) error {
     return nil
 }
 
-// watchScrollEscape drives the scroll and the watch: the escape seam
-// runs in its own goroutine (the arrival wait is a blocking poll) and
-// every quarter second the scenario reads the cast, the bag and the
-// position.
+// watchScrollEscape drives the scroll and the watch: the escape seam runs in
+// its own goroutine (the arrival wait is a blocking poll) while the scenario
+// reads the cast, the bag and the position every quarter second.
 func watchScrollEscape(
     ctx context.Context, tracker *state.Bot, test *Test,
     loop *hunt.Loop, cancelSession context.CancelFunc,
@@ -261,10 +252,9 @@ func stopScrollEscapeSession(
     return cause
 }
 
-// startScrollEscapeSession launches the supervised scenario session
-// with the loop hook that keeps the loop in the manual mode and hands
-// it to the scenario (the scroll use needs the live loop, the
-// autonomy would start a town trip of its own).
+// startScrollEscapeSession launches the supervised session with the loop hook
+// that keeps the loop manual and hands it to the scenario: the scroll use needs
+// the live loop, and the autonomy would start a town trip of its own.
 func startScrollEscapeSession(
     ctx context.Context, m *Manager, test *Test,
 ) (context.CancelFunc, chan error, <-chan *hunt.Loop) {
@@ -289,9 +279,9 @@ func startScrollEscapeSession(
     return cancelSession, sessionDone, loopCh
 }
 
-// awaitScrollEscapeLoop waits for the hook delivery of the session
-// loop: the hook runs right after the world entry, so the answer is
-// ready by the time the online wait returns.
+// awaitScrollEscapeLoop waits for the hook delivery of the session loop, which
+// runs right after the world entry, so the answer is ready by the time the
+// online wait returns.
 func awaitScrollEscapeLoop(
     ctx context.Context, loopCh <-chan *hunt.Loop,
 ) (*hunt.Loop, error) {
@@ -326,9 +316,9 @@ func waitScrollPresent(ctx context.Context, tracker *state.Bot) error {
     }
 }
 
-// finishScrollEscapeSession stops the bot after the pass and drains
-// the escape goroutine: the landing poll ends within the quarter
-// second of the successful check.
+// finishScrollEscapeSession stops the bot after the pass and drains the escape
+// goroutine, whose landing poll ends within the quarter second of the
+// successful check.
 func finishScrollEscapeSession(
     test *Test, escapeDone <-chan bool, cancelSession context.CancelFunc,
     sessionDone chan error, landing string,
@@ -350,9 +340,9 @@ func finishScrollEscapeSession(
     return nil
 }
 
-// scrollEscapeWatch accumulates the latches of the scenario: the
-// cast, the icon and the consumption retire their checks once seen,
-// the landing latches the ring position.
+// scrollEscapeWatch accumulates the latches: the cast, the icon and the
+// consumption retire their checks once seen, the landing latches the ring
+// position.
 type scrollEscapeWatch struct {
     castSeen       bool
     castDetail     string
@@ -374,8 +364,7 @@ func (w *scrollEscapeWatch) evaluate(tracker *state.Bot, test *Test) {
     w.evaluateLanding(tracker, test)
 }
 
-// evaluateScroll latches the cast window, its icon and the item
-// consumption: the scroll leaves the bag when the cast consumes it.
+// evaluateScroll latches the cast window, its icon and the item consumption.
 func (w *scrollEscapeWatch) evaluateScroll(
     tracker *state.Bot, test *Test,
 ) {
