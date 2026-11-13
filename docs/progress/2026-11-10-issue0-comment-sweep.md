@@ -1218,6 +1218,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (28.0 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - state/bot_model.go keeps the packet verdicts only
+
+- 21 blocks compress: the model keeps the bow commit point and the
+  C1 cooldown formula (500000/pAtkSpd + reuseDelay*333/pAtkSpd), the
+  RED gauge over the stale ATK_SPD after a relogin, the cannot see
+  target refusal, the landed hit split of the provocation, the Mobius
+  hit flags (0x80 miss, 0x20 crit) and the freshness windows (5 s walk,
+  3 s fight, 3 s under attack). 134 comment lines of 411 become 86 of
+  363.
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

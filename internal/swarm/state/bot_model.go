@@ -30,21 +30,17 @@ const snapshotEvents = 100
 // attack or NpcInfo combat flag.
 const combatWindow = 10 * time.Second
 
-// defaultSelfCollision is the collision radius of the played character
-// when no packet carries it (UserInfo has no collision field). The map
-// uses it for the exact arrival projection of the own moves.
+// defaultSelfCollision is the collision radius when no packet carries it
+// (UserInfo has no collision field); the map projects the own moves with it.
 const defaultSelfCollision = 9.0
 
-// underAttackWindow is how long a recent hit on the character keeps the
-// rest logic from sitting down: sitting into the blows of a mob that is
-// still swinging would only prolong the fight.
+// underAttackWindow keeps the rest logic from sitting down into the blows of a
+// mob that is still swinging.
 const underAttackWindow = 3 * time.Second
 
-// combatEventTTL bounds how long an animation event stays in the
-// snapshot feed: the SSE poll delivers a snapshot every 300 ms, so
-// a two second window guarantees every event reaches the web view
-// at least once while the sequence dedupe keeps the replays
-// silent.
+// combatEventTTL bounds how long an animation event stays in the snapshot feed:
+// the SSE poll delivers one every 300 ms, so two seconds reach the web view at
+// least once while the sequence dedupe keeps the replays silent.
 const combatEventTTL = 2 * time.Second
 
 // combatEventMax bounds the animation feed length so a burst of
@@ -85,60 +81,35 @@ type CharacterState struct {
     AutoAttacking   bool
     CombatUntil     time.Time
     CombatActiveAt  time.Time
-    // CannotSeeTargetAt records when the server last answered the
-    // attack with "Cannot see target." - the geodata line of sight to
-    // the target is blocked (an obstacle between the character and the
-    // target), the hunt loop walks around it instead of re-requesting
-    // the refused attack.
+    // CannotSeeTargetAt is the last "Cannot see target." answer: the geodata
+    // line of sight is blocked, so the hunt walks around instead of
+    // re-requesting the attack.
     CannotSeeTargetAt time.Time
     FightingTargetID  int32
     TargetID          int32
     Sitting           bool
     LastHitAt         time.Time
-    // LastLandedHitAt and LastLandedHitTarget record the last blow of
-    // the played character that actually landed (the miss flagged
-    // swings of the Attack packet skip): the deleveling provocation
-    // separates a guard that ignores landed damage (a stale AI state,
-    // worth switching the guard) from a fight stage where not a
-    // single blow landed yet (the level gap miss streak of the town
-    // guards, worth keep provoking).
+    // LastLandedHitAt and LastLandedHitTarget record the last blow that landed
+    // (miss flagged swings skip): the deleveling provocation tells a guard that
+    // ignores landed damage from the level gap miss streak worth provoking.
     LastLandedHitAt     time.Time
     LastLandedHitTarget int32
-    // LastSelfShotAt stamps the broadcast of the played character's
-    // own Attack packet - hit or miss. The Mobius server commits the
-    // bow shot the moment it builds the packet: the hit roll, the
-    // arrow consumption and the HitTask schedule all happen before
-    // the broadcast (Creature.doAttack -> doAttackHitByBow), and the
-    // damage task carries no attacker movement check, so the shot is
-    // final once the packet arrived. For the bow fight this is the
-    // release moment the kite retreat rides: everything after it is
-    // the cooldown the character may spend walking away (issue #60).
+    // LastSelfShotAt stamps the broadcast of the own Attack packet, hit or
+    // miss. The Mobius server commits a bow shot before the broadcast
+    // (Creature.doAttackHitByBow) and the damage task checks no movement, so
+    // the retreat after it spends the cooldown, nothing else.
     LastSelfShotAt time.Time
-    // PAtkSpd carries the live physical attack speed of the played
-    // character (the StatusUpdate ATK_SPD attribute 0x12 the server
-    // rebroadcasts whenever the equipment or the buffs move it). The
-    // bow fight reads it through SelfPAtkSpd for the cooldown window
-    // math: the C1 disable window is timeAtk + reuse =
-    // 500000/pAtkSpd + reuseDelay*333/pAtkSpd (Creature.
-    // calculateTimeBetweenAttacks / calculateReuseTime), so the walk
-    // window that spends the whole cooldown walking scales with the
-    // weapon speed the server actually runs (issue #60, the third
-    // round - the owner ask: the proper archering delays from the C1
-    // Mobius formulas, not a fixed guess).
+    // PAtkSpd is the live attack speed (the StatusUpdate ATK_SPD attribute
+    // 0x12, rebroadcast when gear or buffs move it). The bow cooldown reads
+    // 500000/pAtkSpd + reuseDelay*333/pAtkSpd (the C1
+    // calculateTimeBetweenAttacks and calculateReuseTime).
     PAtkSpd int32
-    // BowCycleAt and BowCycle record the RED SetupGauge broadcast of
-    // the played character (the packet carries no object id: it is
-    // sent only to the affected client). The server sends
-    // SetupGauge(RED, sAtk + reuse) the moment it commits a bow shot
-    // (Creature.doAttackHitByBow), so the max field is the exact
-    // disable window of the bow in milliseconds - the windup plus
-    // the reuse tail the character must stand through before the
-    // server accepts a move or a re-shot. The kite reads it instead
-    // of the pAtkSpd formula because the ATK_SPD attribute is not
+    // BowCycleAt and BowCycle record the RED SetupGauge of the committed bow
+    // shot (the packet names no object, it goes to the affected client only):
+    // the max field is the exact disable window, windup plus reuse tail. The
+    // kite reads it over the pAtkSpd formula, because ATK_SPD is not
     // rebroadcast after a relogin until the gear changes (see
-    // docs/kite_timing_findings.md and the 2026-11-09 acceptance
-    // run: the formula windup fired the retreat click inside the
-    // real windup and the server answered ActionFailed).
+    // docs/kite_timing_findings.md).
     BowCycleAt  time.Time
     BowCycle    time.Duration
     CurrentLoad int32
@@ -201,17 +172,14 @@ func (c CharacterState) inCombat(now time.Time) bool {
     return c.AutoAttacking || c.CombatUntil.After(now)
 }
 
-// walkingFreshWindow bounds how long the moving flag of the character
-// still counts as an actually running walk without a fresh movement
-// update: the server broadcasts the walking position continuously, so
-// a silent stretch means the walk ended or stalled.
+// walkingFreshWindow bounds how long the moving flag still counts without a
+// fresh movement update: the server broadcasts the walking position
+// continuously, so a silent stretch means the walk ended or stalled.
 const walkingFreshWindow = 5 * time.Second
 
-// fightingFreshWindow bounds how long the last attack or chase step of
-// the character still counts as an actually running fight: swings and
-// chase steps arrive at a sub second cadence while the auto attack
-// runs, so a few seconds without either means the fight stopped even
-// when the auto attack flag or the combat window still claim otherwise.
+// fightingFreshWindow bounds how long the last attack or chase step still
+// counts as a running fight: both arrive at a sub second cadence, so a few
+// silent seconds mean the fight stopped.
 const fightingFreshWindow = 3 * time.Second
 
 // fightingFresh reports whether the fight of the character is running
@@ -247,9 +215,8 @@ type NpcInfo struct {
     WalkSpeed       int32
     MoveSpeedMult   float64
     CollisionRadius float64
-    // RightHandItem is the template rhand item id of the npc (the
-    // NpcInfo equipment block): the hunt resolves the enemy weapon
-    // family from it (the anti-archer gate of the kite layer).
+    // RightHandItem is the template rhand item id: the hunt resolves the
+    // enemy weapon family from it (the anti-archer gate of the kite).
     RightHandItem int32
     Running       bool
     InCombat      bool
@@ -272,8 +239,7 @@ type PlayerInfo struct {
     Running         bool
     InCombat        bool
     Dead            bool
-    // Sitting carries the wait state of the observed player: false
-    // while it stands, true while it sits (the rest icon of the map).
+    // Sitting is the wait state of the observed player (the map rest icon).
     Sitting bool
     X       int32
     Y       int32
@@ -328,22 +294,17 @@ type Placement struct {
 // AttackTargets is the capacity of the Attack target list.
 const AttackTargets = 4
 
-// attackHitMissFlag mirrors the Mobius Hit flag of a missed swing
-// (Hit.java HITFLAG_MISS, bit pattern 0x80): the Attack packet
-// carries it per hit, so the tracker can tell a landed blow from an
-// evaded one. The packet reader hands the byte over as a signed
-// int8, so the flag reads as a negative value.
+// attackHitMissFlag mirrors the Mobius HITFLAG_MISS (0x80) per hit flag, so a
+// landed blow reads apart from an evaded one. The reader hands the byte over
+// as a signed int8, so the flag reads negative.
 const attackHitMissFlag int8 = -128
 
-// attackHitCritFlag mirrors the Mobius Hit flag of a critical blow
-// (Hit.java HITFLAG_CRIT, bit pattern 0x20): the Attack packet
-// carries it per hit, so the tracker can label the damage float of
-// that blow as a critical one.
+// attackHitCritFlag mirrors the Mobius HITFLAG_CRIT (0x20) per hit flag, so
+// the tracker labels the damage float of that blow as critical.
 const attackHitCritFlag int8 = 0x20
 
-// CritFromHitFlag reports the Mobius HITFLAG_CRIT verdict of one raw
-// hit flags byte (the connection layer reads the parsed hits of the
-// Attack packet and copies the verdict into state.Attack.CritFlags).
+// CritFromHitFlag reports the Mobius HITFLAG_CRIT verdict of one hit flags byte
+// (the connection layer copies it into state.Attack.CritFlags).
 func CritFromHitFlag(flag int8) bool {
     return flag&attackHitCritFlag != 0
 }
@@ -358,38 +319,29 @@ type Attack struct {
     TargetY    int32
     TargetZ    int32
     TargetIDs  [AttackTargets]int32
-    // HitFlags carries the per hit flags (see attackHitMissFlag and
-    // attackHitCritFlag) of the TargetIDs entries.
+    // HitFlags carries the per hit flags of the TargetIDs entries.
     HitFlags [AttackTargets]int8
-    // CritFlags carries the per hit critical verdicts derived from
-    // HitFlags (the web view labels the damage floats with them).
+    // CritFlags carries the critical verdicts derived from HitFlags.
     CritFlags   [AttackTargets]bool
     TargetCount int
 }
 
 // Combat event kinds of the web view animation feed.
 const (
-    // CombatEventAttack is a swing: the attacker placement runs in
-    // X and Y, the hit target placement in TargetX and TargetY.
+    // CombatEventAttack is a swing: the attacker placement in X and Y, the
+    // target placement in TargetX and TargetY.
     CombatEventAttack = "attack"
-    // CombatEventDamage is a hit landing: TargetID is the hurt
-    // unit, Amount the HP it lost and X/Y its placement at the
-    // moment.
+    // CombatEventDamage is a hit landing: TargetID is the hurt unit, Amount
+    // the HP it lost, X and Y its placement.
     CombatEventDamage = "damage"
-    // CombatEventMiss is an evaded blow: the swing was thrown at
-    // TargetID but the server resolved it as a miss (the Hit.java
-    // MISS flag). The viewer draws the miss float instead of a
-    // damage number, so a fight stays legible when blows start
-    // missing.
+    // CombatEventMiss is an evaded blow (the Hit.java MISS flag): the viewer
+    // draws a miss float instead of a damage number.
     CombatEventMiss = "miss"
 )
 
-// CombatEvent is one observed beat of the combat animation feed
-// of the web view: an attack swing of the Attack broadcast, a
-// damage landing of a StatusUpdate HP drop (Crit marks the blows
-// the server resolved as critical) or a miss float of an evaded
-// blow. The monotonic sequence lets the client replay every event
-// exactly once across the repeated snapshots of the event stream.
+// CombatEvent is one beat of the animation feed: a swing, a damage landing of
+// a StatusUpdate HP drop (Crit marks a critical) or a miss. The monotonic
+// sequence lets the client replay every event exactly once.
 type CombatEvent struct {
     Seq        uint64
     Kind       string
