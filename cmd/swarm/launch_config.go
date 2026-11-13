@@ -18,21 +18,16 @@ import (
     "github.com/melg8/swarm/internal/swarm/proxy"
 )
 
-// The launch configuration file (the -config flag): the file driven
-// way to describe the swarm. The JSON file carries the shared launch
-// parameters (the login server, the web interface, the geodata and
-// proxy wiring) and the fleet composition - the bot types with their
-// counts - so a deployment tunes its swarm by editing a file instead
-// of maintaining a CLI flag line. An explicitly set flag always wins
-// over the file (the flag stays the emergency override of a broken
-// config), and running without -config keeps the plain flag defaults
-// of parseFlags: the default configuration is the fallback, not a
-// requirement (owner issue #12).
+// The launch configuration file (the -config flag): the JSON file carries the
+// shared launch parameters (login, web, geodata, proxy wiring) and the fleet
+// composition (the bot types with their counts), so a deployment tunes its
+// swarm by editing a file instead of a CLI flag line. An explicitly set flag
+// always wins over the file, and a launch without -config keeps the plain flag
+// defaults: the default configuration is the fallback, not a requirement.
 
-// launchConfig is the parsed -config file: the shared launch
-// parameters plus the swarm composition. The zero values mean "not
-// set in the file" - the matching flag default applies then, so a
-// minimal file of just the bots array is complete.
+// launchConfig is the parsed -config file. The zero values mean "not set in the
+// file", so the matching flag default applies and a minimal file of just the
+// bots array is complete.
 type launchConfig struct {
     Login      string    `json:"login"`
     Account    string    `json:"account"`
@@ -50,24 +45,20 @@ type launchConfig struct {
     Bots       []botSpec `json:"bots"`
 }
 
-// botSpec is one entry of the swarm composition: a bot type and how
-// many bots of that type the fleet launches. An empty type is the
-// default fighter, so {"count": 3} reads as three fighters. The
-// optional kite section carries the per-spec overrides of the kite
-// fight (the tuning knobs of owner issue #29) - an archer typed spec
-// only, the fighters have no kite to tune.
+// botSpec is one entry of the swarm composition: a bot type and how many bots
+// of it the fleet launches. An empty type is the default fighter, so {"count":
+// 3} reads as three fighters; the optional kite section tunes the archer fight
+// only.
 type botSpec struct {
     Type  string       `json:"type"`
     Count int          `json:"count"`
     Kite  *botKiteSpec `json:"kite"`
 }
 
-// botKiteSpec is the JSON shape of the per-spec kite overrides. The
-// pointer fields distinguish "not set in the file" (the shipped
-// tuning applies) from an explicit value, so a profile names exactly
-// the knobs it tunes - the standing-archer baseline is
-// {"enabled": false} and the tuned profile edits the numbers, both
-// without a rebuild between the measurement runs.
+// botKiteSpec is the JSON shape of the per-spec kite overrides. The pointers
+// distinguish "not set in the file" (the shipped tuning applies) from an
+// explicit value, so a profile names exactly the knobs it tunes without a
+// rebuild between measurement runs.
 type botKiteSpec struct {
     Enabled       *bool    `json:"enabled"`
     RetreatRadius *float64 `json:"retreatRadius"`
@@ -76,10 +67,9 @@ type botKiteSpec struct {
     ReengageDelay *string  `json:"reengageDelay"`
 }
 
-// toParams reads the spec into the hunt params: the unset fields
-// keep the shipped defaults (DefaultKiteParams), the set fields
-// override. The durations arrive as Go duration strings ("3s",
-// "500ms" - validate checked the parse already).
+// toParams reads the spec into the hunt params: unset fields keep
+// DefaultKiteParams, set fields override. Durations arrive as Go duration
+// strings (validate checked the parse).
 func (s *botKiteSpec) toParams() hunt.KiteParams {
     p := hunt.DefaultKiteParams()
     if s.Enabled != nil {
@@ -105,49 +95,38 @@ func (s *botKiteSpec) toParams() hunt.KiteParams {
     return p
 }
 
-// botPlan is one expanded fleet slot: the type the bot runs and the
-// account (and character) name it connects under. The kite override
-// rides the slot the same way - the plan is the whole per-bot
-// identity the fleet launches with. The account ladder walks the
-// whole composition in order: two fighters then two archers over the
-// base test1 make test1, test2, test3, test4.
+// botPlan is one expanded fleet slot: the type, the account (and character)
+// name and the kite override, the whole per-bot identity. The account ladder
+// walks the composition in order: two fighters then two archers over test1 make
+// test1..test4.
 type botPlan struct {
     Type    string
     Account string
     Kite    *botKiteSpec
 }
 
-// botTypeFighter is the melee bot type: the elven fighter of the
-// current hunt loop. The empty type of a bot spec reads as this
-// constant, so {"count": 3} means three fighters.
+// botTypeFighter is the melee type: the elven fighter of the hunt loop, the
+// reading of an empty spec type.
 const botTypeFighter = "fighter"
 
-// botTypeArcher is the ranged bot type: the archetype of the ranged
-// weapon preference with kiting (see the archetype issue linked from
-// #13). The launch side accepts it today; the hunt side behaviors
-// land with their own slices (the bow-aware radii and the lure
-// profiles of the current loop already serve a bow-equipped bot).
+// botTypeArcher is the ranged type: the ranged weapon preference with kiting.
+// The bow-aware radii and the lure profiles of the hunt loop serve a
+// bow-equipped bot.
 const botTypeArcher = "archer"
 
-// implementedBotTypes lists the bot types the fleet can launch today.
-// The fighter is the melee hunt bot; the archer is the ranged
-// archetype whose kiting behavior lands in its own slices (the first
-// round rides PR #15). A config naming anything else fails validation
-// with this list in the message, so a config written for a newer
-// swarm refuses loudly instead of silently degrading.
+// implementedBotTypes lists the launchable bot types. A config naming anything
+// else fails validation with this list in the message, so a config written for
+// a newer swarm refuses loudly instead of silently degrading.
 var implementedBotTypes = map[string]bool{
     botTypeFighter: true,
     botTypeArcher:  true,
 }
 
-// defaultLaunchConfig is the built-in default of the -config file:
-// the flag defaults for the shared parameters with the default swarm
-// composition of three melee warriors and three archers (the owner
-// picked the six bot default; the account ladder walks the
-// composition, so the fleet runs test1..test3 as fighters and
-// test4..test6 as archers). The shipped configs/swarm.json mirrors
-// it, and a launch without -config keeps the plain single fighter of
-// the flag form (the tests pin the file/default equality).
+// defaultLaunchConfig is the built-in default of the -config file: the flag
+// defaults with three fighters and three archers (the ladder runs test1..test3
+// as fighters and test4..test6 as archers). The shipped configs/swarm.json
+// mirrors it; a launch without -config keeps the plain single fighter of the
+// flag form.
 func defaultLaunchConfig() launchConfig {
     return launchConfig{
         Login:      defaultLoginAddress,
@@ -170,11 +149,10 @@ func defaultLaunchConfig() launchConfig {
     }
 }
 
-// loadLaunchConfig reads and validates one launch configuration
-// file. Unknown fields refuse the load (a typo'd key silently
-// falling back to a default is the worst failure mode a config file
-// can have), and the composition checks run before the caller can
-// build anything from the file.
+// loadLaunchConfig reads and validates one launch configuration file. Unknown
+// fields refuse the load (a typo'd key silently falling back to a default is
+// the worst failure mode a config file can have), and the composition checks
+// run before anything builds.
 func loadLaunchConfig(path string) (launchConfig, error) {
     data, err := os.ReadFile(path)
     if err != nil {
@@ -196,11 +174,10 @@ func loadLaunchConfig(path string) (launchConfig, error) {
     return cfg, nil
 }
 
-// validate checks the fleet composition of the file: every type must
-// be an implemented bot type and every count positive. The shared
-// parameters carry no constraint beyond the launch path itself (an
-// unreachable login address fails at connect time with its own
-// error, exactly like the flag form).
+// validate checks the composition: every type implemented and every count
+// positive. The shared parameters carry no constraint beyond the launch path
+// itself (an unreachable login fails at connect time, exactly like the flag
+// form).
 func (lc launchConfig) validate() error {
     if len(lc.Bots) == 0 {
         return errors.New(
@@ -230,12 +207,10 @@ func (lc launchConfig) validate() error {
     return nil
 }
 
-// validateKiteSpec checks the optional kite section of one bot spec
-// (owner issue #29): the section is an archer knob (the fighters have
-// no kite fight to tune), the distances must be positive and the
-// durations must parse as Go duration strings. A broken line refuses
-// the launch with the spec index and the field name - the same
-// fail-loudly contract the rest of the file follows.
+// validateKiteSpec checks the optional kite section of one bot spec: an archer
+// knob, the distances positive and the durations parsing as Go duration
+// strings. A broken line refuses the launch with the spec index and the field
+// name.
 func validateKiteSpec(i int, typ string, kite *botKiteSpec) error {
     if kite == nil {
         return nil
@@ -276,10 +251,9 @@ func validateKiteSpec(i int, typ string, kite *botKiteSpec) error {
     return nil
 }
 
-// expand turns the composition into the flat fleet plan: the account
-// ladder walks every slot of every spec in file order, so the fleet
-// accounts stay test1, test2, test3... whatever the mix of types is
-// (the ladder semantics of the plain -bots flag carry over).
+// expand turns the composition into the flat fleet plan: the account ladder
+// walks every slot of every spec in file order, so the accounts stay test1,
+// test2... whatever the type mix is.
 func (lc launchConfig) expand() []botPlan {
     plans := make([]botPlan, 0, lc.totalBots())
     for _, spec := range lc.Bots {
@@ -321,12 +295,9 @@ func implementedTypeList() string {
     return strings.Join(types, ", ")
 }
 
-// applyLaunchConfig folds a loaded file into the flag configuration.
-// An explicitly set flag wins over the file (the emergency override
-// of a broken config), an empty file field means "keep the flag
-// default", and the file composition replaces the -bots count unless
-// -bots itself was explicit (then the flag form wins whole: the plain
-// ladder of N fighters).
+// applyLaunchConfig folds a loaded file into the flag configuration: an
+// explicit flag wins, an empty file field keeps the flag default, and the file
+// composition replaces the -bots count unless -bots itself was explicit.
 func applyLaunchConfig(cfg *config, lc launchConfig,
     explicit map[string]bool,
 ) {
@@ -338,30 +309,26 @@ func applyLaunchConfig(cfg *config, lc launchConfig,
         cfg.proxy = true
     }
     if explicit["bots"] {
-        // The explicit -bots flag replaces the composition whole: the
-        // classic ladder of N fighters, exactly like a launch without
-        // a config file.
+        // The explicit -bots flag replaces the composition: the classic ladder
+        // of N fighters, exactly like a launch without a config file.
         cfg.botPlans = classicFleetPlan(cfg.account, cfg.bots)
 
         return
     }
-    // The composition expands over the resolved base account: an
-    // explicit -account flag overrides the file value, and the fleet
-    // ladder must follow the flag (the plan and cfg.account can never
-    // disagree or the single bot path and the fleet path would launch
-    // different sessions off one config).
+    // The composition expands over the resolved base account: an explicit
+    // -account flag overrides the file value, and the ladder must follow it or
+    // the single bot path and the fleet path would launch different sessions
+    // off one config.
     resolved := lc
     resolved.Account = cfg.account
     cfg.botPlans = resolved.expand()
     cfg.bots = len(cfg.botPlans)
 }
 
-// foldStringFields folds the shared string parameters of the file
-// into the flag configuration through one table: the flag name (for
-// the explicit-override check), the file value (empty means "not set
-// in the file") and the assignment. The bool flags stay in
-// applyLaunchConfig - their false is indistinguishable from omitted,
-// so only a true file value folds.
+// foldStringFields folds the shared string parameters through one table: the
+// flag name for the explicit-override check, the file value (empty means "not
+// set") and the assignment. The bool flags stay in applyLaunchConfig: their
+// false is indistinguishable from omitted, so only a true file value folds.
 func foldStringFields(cfg *config, lc launchConfig,
     explicit map[string]bool,
 ) {
@@ -411,10 +378,8 @@ func foldStringFields(cfg *config, lc launchConfig,
     }
 }
 
-// classicFleetPlan builds the composition of the plain -bots flag: N
-// fighters on the account ladder. The launch paths read one plan
-// whatever its origin (the flag or the file), so the fleet code
-// carries a single shape.
+// classicFleetPlan builds the composition of the plain -bots flag: N fighters
+// on the account ladder. Both launch paths read one plan shape.
 func classicFleetPlan(base string, count int) []botPlan {
     plans := make([]botPlan, 0, count)
     for i := range count {
@@ -428,8 +393,8 @@ func classicFleetPlan(base string, count int) []botPlan {
     return plans
 }
 
-// compositionText renders the plan for the launch log line: the head
-// of "2 fighter, 1 archer" the operator reads back.
+// compositionText renders the plan for the launch log line ("2 fighter, 1
+// archer").
 func compositionText(plans []botPlan) string {
     counts := map[string]int{}
     order := []string{}

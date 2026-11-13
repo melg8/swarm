@@ -1695,6 +1695,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the state suite,
   `golangci-lint run ./internal/swarm/state/...` 0 issues.
 
+### 2026-11-13 - cmd/swarm/launch_config.go keeps the config contract
+
+- 20 blocks compress: the file keeps the `-config` layout (shared
+  parameters plus the bot type composition), the explicit-flag
+  override, the zero value "not set" rule with the flag default as the
+  fallback, the empty type reading as the fighter, the archer-only kite
+  section with the pointer fields distinguishing unset from explicit,
+  the 3 + 3 default (test1..test3 fighters, test4..test6 archers)
+  mirrored by `configs/swarm.json`, the unknown-field refusal and the
+  archer-only positive distance and Go duration validation. The
+  dated owner-issue references drop. 110 comment lines of 448 become
+  75 of 413.
+- Verified: `task fmt`, `go build ./...`, the cmd/swarm tests,
+  `golangci-lint run ./cmd/swarm/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
