@@ -10,53 +10,48 @@ import (
     "github.com/melg8/swarm/internal/swarm/npcdata"
 )
 
-// The ranged luring tool of the melee hunter: a bow plus a quiver of
-// arrows. The melee profile scores bows zero (the profile's Weapon
-// ladder ranks the close combat damage), so the bow never competes
-// with the weapon milestone - the shop strategy plans it in its own
-// phase behind the weapon: a melee bot that owns a sword buys the
-// next bow rung the wallet affords and keeps its quiver stocked, so
-// the hunt loop can pull fenced mobs from range (see hunt/lure.go).
-// The mystic profiles never lure: they already cast from range.
+// The ranged luring tool of the melee hunter: a bow plus a quiver of arrows.
+// The melee profile scores bows zero, so the bow never competes with the weapon
+// milestone: the shop strategy plans it in its own phase behind the weapon, so
+// a melee bot that owns a sword buys the next bow rung the wallet affords and
+// keeps its quiver stocked while the hunt loop pulls fenced mobs from range
+// (see hunt/lure.go). The mystic profiles never lure, they cast from range
+// already.
 
 // weaponTypeBow is the gear weapon family of the bows.
 const weaponTypeBow = "BOW"
 
 // The quiver economics of the luring.
 const (
-    // arrowRestockFloor is the arrow count the restock triggers at:
-    // below it the next town trip tops the quiver back up.
+    // arrowRestockFloor is the arrow count the restock triggers at.
     arrowRestockFloor = 150
-    // arrowRestockTarget is the quiver size the restock buys to: one
-    // batch lasts a hundred lures (one to three shots each) plus the
-    // bow skill casts between the town trips.
+    // arrowRestockTarget is the quiver size the restock buys to: one batch
+    // lasts a hundred lures (one to three shots each) plus the bow skill casts
+    // between the town trips.
     arrowRestockTarget = 600
 )
 
-// bowLurer reports whether the profile fights in melee and therefore
-// wants the ranged luring tool: the melee fighter profile only (the
-// mystic attacks from range already, a custom test profile takes the
-// safe default of no bow).
+// bowLurer reports whether the profile fights in melee and therefore wants the
+// ranged luring tool: the melee fighter only (the mystic attacks from range
+// already, a custom profile takes the safe default of no bow).
 func bowLurer(profile Profile) bool {
     _, ok := profile.(MeleeFighter)
 
     return ok
 }
 
-// BowLurer is the exported form of bowLurer: the hunt loop's junk
-// keep set consults it to protect the luring tool from the sell and
-// destroy flows (the bow scores zero under the melee profile, so the
-// plain planned equips never hold it).
+// BowLurer is the exported form of bowLurer: the junk keep set of the hunt loop
+// consults it to protect the luring tool from the sell and destroy flows (the
+// bow scores zero under the melee profile, so the plain planned equips never
+// hold it).
 func BowLurer(profile Profile) bool {
     return bowLurer(profile)
 }
 
-// quiverCarrier reports whether the profile shoots bow ammo: the
-// melee lurer (the ranged tool) and the archer (the primary weapon)
-// both keep a quiver. The shop strategy's arrow restock phase and
-// the hunt loop's junk keep set consult it - the arrow stacks score
-// zero under every profile (a consumable, not gear), so without the
-// explicit keep the junk flows would sell the ammo at the first
+// quiverCarrier reports whether the profile shoots bow ammo: the melee lurer
+// (the ranged tool) and the archer (the primary weapon). The arrow restock
+// phase and the junk keep set consult it, since the arrow stacks score zero
+// under every profile (a consumable, not gear) and would be sold at the first
 // vendor visit.
 func quiverCarrier(profile Profile) bool {
     switch profile.(type) {
@@ -67,25 +62,24 @@ func quiverCarrier(profile Profile) bool {
     }
 }
 
-// QuiverCarrier is the exported form of quiverCarrier: the quiver
-// restock and the ammo keeps of the hunt loop.
+// QuiverCarrier is the exported form of quiverCarrier, for the restock and the
+// ammo keeps.
 func QuiverCarrier(profile Profile) bool {
     return quiverCarrier(profile)
 }
 
-// IsArcher reports whether the profile is the archer: the hunt loop
-// arms the quiver onto the paperdoll for it (the ammo is not planner
-// managed, see Archer in profile.go).
+// IsArcher reports whether the profile is the archer, for whom the hunt loop
+// arms the quiver onto the paperdoll (the ammo is not planner managed, see
+// Archer in profile.go).
 func IsArcher(profile Profile) bool {
     _, ok := profile.(Archer)
 
     return ok
 }
 
-// OwnedBow scans the inventory for the best bow the character owns
-// (equipped or bagged) and reports its attack stat. A character
-// without any bow answers zero. The luring bow upgrade and the city
-// shopping errand price their bow step against it.
+// OwnedBow scans the inventory for the best bow (equipped or bagged) and
+// reports its attack stat, zero without a bow. The luring bow upgrade and the
+// city errand price their bow step against it.
 func OwnedBow(equipment Equipment) int32 {
     var best int32
     for _, item := range equipment.Items {
@@ -101,10 +95,10 @@ func OwnedBow(equipment Equipment) int32 {
     return best
 }
 
-// bowOffers resolves the bows the catalog sells with their cheapest
-// offers: the highest attack first. The bows score zero under the
-// melee profile, so the generic candidate build never lists them -
-// this scan reads the buylists directly.
+// bowOffers resolves the bows the catalog sells with their cheapest offers, the
+// highest attack first. The bows score zero under the melee profile, so the
+// generic candidate build never lists them and this scan reads the buylists
+// directly.
 func bowOffers(catalog Catalog) []purchaseCandidate {
     type offer struct {
         listID   int32
@@ -159,10 +153,8 @@ func bowOffers(catalog Catalog) []purchaseCandidate {
     return bows
 }
 
-// arrowItemID resolves the ammo the catalog sells: the cheapest arrow
-// item of the buylists (the quiver standard of the deployment - the
-// Wooden Arrow of the elven shops). Zero when the merchants sell no
-// arrows at all.
+// arrowItemID resolves the cheapest arrow item of the buylists (the Wooden
+// Arrow of the elven shops), zero when the merchants sell no arrows at all.
 func arrowItemID(catalog Catalog) int32 {
     type offer struct {
         listID   int32
@@ -180,9 +172,9 @@ func arrowItemID(catalog Catalog) int32 {
                 stats, gear := npcdata.ItemGearStats(itemID)
                 if !gear || stats.Type != "EtcItem" ||
                     stats.BodyPart != "lhand" || stats.WeaponType != "" {
-                    // The ammo discriminator: an etc item that rides
-                    // the left hand is a quiver item (the Mobius
-                    // arrow xml: etcitem_type ARROW, bodypart lhand).
+                    // The ammo discriminator: an etc item that rides the left
+                    // hand is a quiver item (the Mobius arrow xml: etcitem_type
+                    // ARROW, bodypart lhand).
                     continue
                 }
                 price := int64(float64(npcdata.ItemPrice(itemID)) *
@@ -203,8 +195,7 @@ func arrowItemID(catalog Catalog) int32 {
     return best
 }
 
-// arrowOffer resolves the cheapest catalog offer of the given arrow
-// item: the list and the merchant of the restock purchase.
+// arrowOffer resolves the cheapest catalog offer of the given arrow item.
 func arrowOffer(
     catalog Catalog, itemID int32,
 ) (int32, int32, int64, bool) {
@@ -233,8 +224,8 @@ func arrowOffer(
     return bestList, bestMerchant, bestPrice, found
 }
 
-// ownedArrowCount sums the arrow stacks of the inventory (the
-// equipped quiver included).
+// ownedArrowCount sums the arrow stacks of the inventory, the equipped quiver
+// included.
 func ownedArrowCount(equipment Equipment, itemID int32) int32 {
     var count int32
     for _, item := range equipment.Items {
@@ -246,23 +237,19 @@ func ownedArrowCount(equipment Equipment, itemID int32) int32 {
     return count
 }
 
-// bowPhase plans the ranged tooling: the melee lurer's bow upgrade
-// behind its weapon milestone (the virtual paperdoll carries the
-// worn or the just planned melee weapon, a bare-handed hunter spends
-// the wallet on the sword before the luring tool), then the quiver
-// restock for every bow shooter - the melee lurer's tool ammo and the
-// archer's primary ammo alike (the archer's weapon milestone bought
-// the bow itself: the profile ranks the bows, so the generic weapon
-// candidates carry them).
+// bowPhase plans the ranged tooling: the melee lurer's bow upgrade behind its
+// weapon milestone (a bare-handed hunter spends the wallet on the sword first),
+// then the quiver restock for every bow shooter, the lurer's tool ammo and the
+// archer's primary ammo alike (the archer's weapon milestone bought the bow
+// itself, since the profile ranks the bows).
 func (w *planWalk) bowPhase() {
     if w.tailDone() {
         return
     }
     if bowLurer(w.profile) {
         if w.virtual[SlotRHand].Score <= 0 {
-            // No melee weapon worn or planned: the weapon milestone
-            // owns the wallet first, the tool follows on the next
-            // trip.
+            // No melee weapon worn or planned: the weapon milestone owns the
+            // wallet first and the tool follows on the next trip.
             return
         }
         w.planBowUpgrade()
@@ -276,13 +263,13 @@ func (w *planWalk) bowPhase() {
     w.planArrowRestock()
 }
 
-// planBowUpgrade emits the best affordable bow strictly stronger than
-// the owned one: one bow per trip.
+// planBowUpgrade emits the best affordable bow strictly stronger than the owned
+// one.
 func (w *planWalk) planBowUpgrade() {
     owned := OwnedBow(w.equipment)
-    // The bows this walk already planned count as owned: the tail
-    // walk continues the phases past the wallet and must not
-    // re-purchase the rung the affordable walk just bought.
+    // The bows this walk already planned count as owned: the tail walk
+    // continues past the wallet and must not re-purchase the rung the
+    // affordable walk just bought.
     for _, purchase := range w.purchases {
         stats, ok := npcdata.ItemGearStats(purchase.ItemID)
         if ok && stats.WeaponType == "BOW" && stats.PAtk > owned {
@@ -325,9 +312,8 @@ func (w *planWalk) planBowUpgrade() {
     }
 }
 
-// planArrowRestock emits the quiver top-up: the arrow batch that
-// refills the inventory to the restock target when the owned count
-// fell under the floor.
+// planArrowRestock emits the quiver top-up: the batch that refills the
+// inventory to the restock target when the owned count fell under the floor.
 func (w *planWalk) planArrowRestock() {
     itemID := arrowItemID(w.catalog)
     if itemID == 0 {
@@ -344,8 +330,8 @@ func (w *planWalk) planArrowRestock() {
     count := arrowRestockTarget - owned
     price := unit * int64(count)
     if price > w.budget {
-        // The affordable part of the batch still flies: a partial
-        // restock beats an empty quiver.
+        // The affordable part of the batch still flies: a partial restock beats
+        // an empty quiver.
         count = int32(w.budget / unit)
         if count <= 0 {
             return

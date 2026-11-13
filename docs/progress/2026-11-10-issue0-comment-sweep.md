@@ -2030,6 +2030,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the gear suite (0.4 s),
   `golangci-lint run ./internal/swarm/gear/...` 0 issues.
 
+### 2026-11-13 - gear/bow.go keeps the luring economics
+
+- 20 blocks compress: the file keeps the bow behind the weapon
+  milestone (a melee bot with a sword buys the next rung and keeps the
+  quiver stocked while the hunt loop pulls fenced mobs from range, see
+  `hunt/lure.go`), the mystic profiles never luring, the 150 arrow
+  restock floor and the 600 target (a batch lasting a hundred lures of
+  one to three shots plus the bow skill casts), the melee plus archer
+  quiver carriers (the arrows score zero as a consumable and would be
+  sold at the first vendor), the `BOW` type, the ammo discriminator (an
+  etc item on the lhand is the `etcitem_type ARROW` of the Mobius xml),
+  the arrow offer tie break and the partial batch rule (a partial
+  restock beats an empty quiver). 80 comment lines of 377 become 66 of
+  363.
+- Verified: `task fmt`, `go build ./...`, the gear suite (0.4 s),
+  `golangci-lint run ./internal/swarm/gear/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
