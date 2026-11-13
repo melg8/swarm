@@ -13,19 +13,14 @@ import (
     "sync"
 )
 
-// Recorder keeps the decrypted server-to-client packet stream of one bot
-// session so a connecting game client can be brought up to the current
-// world state (the replay) and then continue with the live feed.
-//
-// Every entry owns an immutable copy of its payload: entries are shared
-// with replay readers and live subscribers, and the senders that encrypt
-// the payloads in place always work on their own copies.
-//
-// The history is bounded: the first recorderPrologueEntries entries (the
-// char selected packet and the enter world burst) and a rolling tail are
-// always kept, the middle is dropped once the byte cap is reached. A
-// dropped middle only degrades the replayed world state, never the
-// cipher chains (the proxy re-encrypts everything it sends).
+// Recorder keeps the decrypted server-to-client stream of one bot
+// session so a connecting client can replay the world state and then
+// continue with the live feed. Every entry owns an immutable payload
+// copy: replay readers and live subscribers share it, and the senders
+// that encrypt in place work on their own copies. The history is
+// bounded: the prologue entries (char selected and the enter world
+// burst) and a rolling tail always stay, the middle drops at the byte
+// cap - a dropped middle degrades the replay, never the cipher chains.
 type Recorder struct {
     mu          sync.Mutex
     entries     []RecorderEntry

@@ -79,17 +79,14 @@ func acceptanceLogDir(cfg config) string {
     }
 }
 
-// runHuntAuditCLI measures the live hunting ground geometry: the
-// probe account visits every cell focus of the registry through the
-// database position injection and the evidence file collects the
-// attackable npc population of every ground with the polygon leash
-// verdicts. The stack must be up (login 2106, game 7777, MariaDB
-// 3306) - the audit is the live measurement the registry
-// regeneration builds on (tools/generate_hunt_cells.py). The run
-// resumes from the evidence file, so an interrupted audit continues
-// with the next unaudited cell; -audit-fresh starts over. The exit
-// code reflects
-// the audit completion (0 when every spot of the filter measured).
+// runHuntAuditCLI measures the live hunting ground geometry: the probe
+// account visits every cell focus through the database position
+// injection, and the evidence file collects the attackable npc
+// population of every ground with the polygon leash verdicts. The
+// stack must be up (login 2106, game 7777, MariaDB 3306); the run
+// resumes from the evidence file (-audit-fresh starts over) and exits
+// 0 once every spot of the filter measured. The registry regeneration
+// builds on this measurement (tools/generate_hunt_cells.py).
 func runHuntAuditCLI(cfg config) {
     log.Println("Starting swarm hunt audit CLI")
     log.Printf("Build: %s", version.Identity())
@@ -122,20 +119,14 @@ func runHuntAuditCLI(cfg config) {
     log.Println("Hunt audit: PASS")
 }
 
-// runAcceptanceCLI drives the acceptance scenarios headless: the
-// process launches no fleet bot supervisor, only the acceptance
-// manager. The "list" value prints the available scenario ids and
-// exits; "all" runs every scenario in definition order; "all-parallel"
-// launches them at once and collects every failure; a specific id
-// runs just that one. The exit code reflects the outcome (0 for a
-// pass, 1 for a fail) so an agent or a CI gate can drive the suite
-// without the web UI.
-//
-// The web interface stays optional: pass `-web 127.0.0.1:8080` to
-// watch the run from the UI, or `-web ""` to keep the process silent.
-// The proxy and the geodata engine load only when the scenarios need
-// them (the proxy relay scenario arms its own ephemeral proxy through
-// the manager, so the main -proxy flag stays off here).
+// runAcceptanceCLI drives the acceptance scenarios headless: no fleet
+// supervisor, only the acceptance manager. "list" prints the ids and
+// exits, "all" runs every scenario in definition order, "all-parallel"
+// launches them at once and collects every failure, and an id runs
+// just that one; the exit code is 0 on a pass and 1 on a fail, so an
+// agent or a CI gate drives the suite without the web UI. `-web
+// address` watches the run from the UI (`-web ""` keeps it silent);
+// the proxy relay scenario arms its own ephemeral proxy.
 func runAcceptanceCLI(cfg config) {
     log.Println("Starting swarm acceptance CLI")
     log.Printf("Build: %s", version.Identity())

@@ -34,20 +34,14 @@ type PackStats struct {
     TileBytes int64
 }
 
-// BuildPack builds every requested region of the geodata directory
-// into tiles of the output directory and stitches the region borders.
-// The two phases keep the memory flat: phase A builds one region,
+// BuildPack builds every requested region into a tile of the output
+// directory and stitches the region borders. Phase A builds one region,
 // writes its tile and retains only the border strips (a few dozen
-// kilobytes per region), phase B re-decodes the tiles whose
-// neighbours exist and appends the external links. A region whose
-// tile file is newer than its region file is skipped unless force is
-// set. The log callback reports one line per region (nil mutes).
-//
-// The phases run in a worker pool (opts.Workers goroutines at most,
-// one region in flight per worker): the region builds and the tile
-// stitches are file disjoint, so the pack scales over the cores
-// without locking (the strips map freezes after phase A and phase B
-// reads it concurrently). Workers <= 0 answers runtime.NumCPU().
+// kilobytes per region); phase B re-decodes the tiles whose neighbours
+// exist and appends the external links, so the memory stays flat. A
+// newer tile skips its region unless force is set. The log callback
+// reports one line per region. The phases run in a worker pool
+// (opts.Workers, NumCPU when <= 0), file disjoint and lock free.
 func BuildPack(geodataDir, outDir string, keys []navmesh.RegionKey,
     opts Options, force bool, log func(format string, args ...any),
 ) (PackStats, error) {

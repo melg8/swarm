@@ -14,21 +14,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The stuck points scenario (the 2026-09-20 fleet freeze report): the
-// characters wake on the two terrace spots the owner reported the
-// fleet frozen on - 43632 50560 -2960 and 41920 52128 -3000 - and
-// cannot build a route anywhere from them. Both spots stand on link
-// components the strict edge only mesh link graph cannot leave (52
-// and 29 polygons, the 640x752 and the 592x432 boxes) while the grid
-// engine plans out of the very same cells through the diagonal
-// squeezes the server movement channels allow. The components
-// outgrew the old 320 pocket side, so the pocket escape declined and
-// the route attempts answered the bare not found (or the partial
-// that walks to the component's inner boundary and strands it there)
-// - the bots stood frozen. The widened escape bound plus the
-// horizontal displacement floor of the exit scan answer the walk out;
-// the scenarios pin the contract: from each reported position the bot
-// builds a route and leaves the strand on its own.
+// The stuck points scenario: the two terrace spots the fleet froze on
+// (43632 50560 -2960, 41920 52128 -3000) stand on strict edge link
+// components (52 and 29 polygons, 640x752 and 592x432 boxes) the mesh
+// cannot leave, though the grid engine plans out of the same cells
+// through the diagonal squeezes. The components outgrew the 320 pocket
+// side, so the pocket escape declined and stranded the route at the
+// inner boundary; the widened escape bound and the exit scan's
+// horizontal displacement floor walk out. The scenarios pin the walk.
 const (
     // stuckPointAX/Y/Z is the first reported spot (heading 21963).
     stuckPointAX = 43632

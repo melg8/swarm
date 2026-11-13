@@ -50,19 +50,14 @@ func (gc *GameCrypt) Enabled() bool {
     return gc.enabled
 }
 
-// Encrypt transforms outbound payload bytes in place.
-//
-// The cipher is a running XOR chain: out[i] = data[i] ^ key[i&7] ^ out[i-1].
-// The byte loop processes one byte at a time, which on the 100 bot fleet
-// path means ~100 bytes per packet times ~100 packets per second per bot
-// = 1M byte iterations per second just for the game cipher. The optimized
-// form processes 8 byte chunks through a SWAR (SIMD Within A Register)
-// prefix XOR scan: the key repeats every 8 bytes, so a full chunk XORs
-// with one uint64 key load, then a three step shift-and-XOR prefix scan
-// (8, 16, 32 bit shifts) produces the running XOR of all 8 bytes in one
-// register, and the chain value from the previous chunk broadcasts into
-// every byte through a multiply by 0x0101010101010101. The remainder tail
-// (1 to 7 bytes) falls back to the byte loop.
+// Encrypt transforms outbound payload bytes in place: the running XOR
+// chain out[i] = data[i] ^ key[i&7] ^ out[i-1]. A byte loop would cost
+// ~1M iterations per second on the 100 bot fleet (100 bytes per packet,
+// 100 packets per second per bot), so the loop walks 8 byte chunks: one
+// uint64 key load, a three step shift-and-XOR prefix scan (8, 16, 32
+// bit shifts) for the chunk's running XOR, and the previous chain value
+// broadcast through a multiply by 0x0101010101010101. The 1 to 7 byte
+// tail falls back to the byte loop.
 func (gc *GameCrypt) Encrypt(data []byte) {
     if !gc.enabled || len(data) == 0 {
         return

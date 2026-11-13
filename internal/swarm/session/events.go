@@ -3,18 +3,13 @@
 // SPDX-License-Identifier: MIT
 
 // Package session owns the persistent session journal of the bot: an
-// append-only JSONL file in logs/ that records everything that happened
-// from the application start (the event story of the tracker, periodic
-// samples of the character state and the structured hunt events), and
-// the compact agent-facing report rendered from it.
-//
-// The problem it solves: the state dump is a point-in-time snapshot and
-// the tracker event log is a 512-entry ring, so a long-lived run on the
-// user machine (8-24 hours) left no trace to analyze after the fact.
-// The journal keeps the full story on disk; the web UI "session dump"
-// button and the -session-report CLI render the compact report an
-// agent reads to answer why the bot farmed little money, how many
-// stalls it hit and what led to ineffective fights.
+// append-only JSONL file in logs/ that records the whole run from the
+// application start (the tracker event story, periodic character
+// samples and the structured hunt events) plus the compact report
+// rendered from it. The state dump is a point-in-time snapshot and the
+// tracker event log a 512-entry ring, so a 8-24 hour run left no trace
+// to analyze; the journal keeps the full story on disk for the web UI
+// "session dump" and the -session-report CLI.
 package session
 
 import "time"
@@ -63,12 +58,10 @@ const (
 // record is one JSONL line of the journal: a flat struct with short
 // keys and omitempty fields so a kill line reads
 // {"t":1730000000,"b":"test1","e":"kill","mob":"Kaboo Orc","lvl":4,
-// "dur":8.2,"hp":87} - roughly 80 bytes. The flat shape keeps the
-// offline reader a single json.Unmarshal per line, no kind switch.
-//
-// The fields overlap between kinds by design (dur is the fight seconds
-// of a kill and the stall seconds of a stall); the aggregator reads the
-// subset its kind defines.
+// "dur":8.2,"hp":87} - roughly 80 bytes - and the offline reader is a
+// single json.Unmarshal per line, no kind switch. Fields overlap
+// between kinds by design (dur is the fight seconds of a kill and the
+// stall seconds of a stall); the aggregator reads its kind's subset.
 type record struct {
     // T is the unix second of the event.
     T int64 `json:"t"`

@@ -2,19 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package pathfind finds walkable paths over L2j geodata files for long
-// distance movement. The algorithm is a Go port of L2jGeodataPathFinder
-// (https://github.com/k0t9i/L2jGeodataPathFinder), the pathfinder used by
-// L2Bot2.0: an A* search over the geodata cell grid with wall (NSWE) and
-// height checks, a supercover line rasterization for line of sight and a
-// string pulling post smoothing that collapses the raw cell path into
-// turning points. The geodata file format follows the Mobius C1 game
-// server (GeoEngine.java): headerless little endian region files named
-// X_Y.l2j.
-//
-// The package is self contained: it only reads .l2j files from disk and
-// never talks to the game server, so it works without a running bot and
-// can later serve as a movement service or a hunt helper library.
+// Package pathfind finds walkable paths over L2j geodata for long
+// distance movement: a Go port of L2jGeodataPathFinder
+// (https://github.com/k0t9i/L2jGeodataPathFinder, the pathfinder of
+// L2Bot2.0) - an A* search over the geodata cell grid with wall (NSWE)
+// and height checks, supercover rasterization for line of sight and
+// string pulling that collapses the cell path into turning points. The
+// file format follows the Mobius C1 GeoEngine: headerless little
+// endian X_Y.l2j regions. The package only reads files, never a bot.
 package pathfind
 
 import "math"

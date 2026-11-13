@@ -4,21 +4,14 @@
 
 package navbuild
 
-// The fake cell repair: the C1 geodata pack carries whole areas with
-// no recorded data - the l2j uninitialized filler of one layer at
-// height 0 with the walls fully open (the east halves of the column
-// 17 regions, the whole 17_23). The filler builds into a floating
-// plateau 3.8k units above the sea floor with cliffs against every
-// real neighbour: the town segments strand on it (the Gludio Gludin bay
-// crossing, the Gludin town cells inside the filler area).
-//
-// The repair rebuilds the filler from the nearest real cells: the
-// multi source BFS walks the fake area from the real land and the
-// real water borders, every fake cell blends the two nearest source
-// heights by the BFS distances (the fake bay turns into the sea floor
-// water the swim route needs, the gaps between the real land patches
-// turn into the connecting ground), and the polish pass pulls the
-// residual over climb steps together until the filled surface walks.
+// The fake cell repair: the C1 pack carries whole areas with no
+// recorded data - the l2j uninitialized filler of one layer at height
+// 0 with every wall open (the east halves of the column 17 regions,
+// the whole 17_23). The filler builds into a floating plateau 3.8k
+// units above the sea floor and strands the town segments. The repair
+// walks it from the real land and water borders by multi source BFS,
+// blends each fake cell from the two nearest source heights by their
+// distances, and the polish pass pulls the over climb steps together.
 
 // fakeLayer reports the l2j uninitialized filler cell: exactly one
 // layer, height 0, every wall open. The pattern holds 99.97 percent

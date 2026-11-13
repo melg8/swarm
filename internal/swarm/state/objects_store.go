@@ -4,19 +4,14 @@
 
 package state
 
-// objectStore is the world object storage of one bot session, split
-// out of the Bot god object: a dense slot array (no holes, the packet
-// apply paths mutate the records in place and the scans walk the
-// memory sequentially) plus the object id to slot index. The record
-// itself is split into a hot and a cold array (see objectHot and
-// objectCold): both halves are indexed by the same slot, the store
-// keeps them length locked, and the scans stream the compact hot
-// block while the display fields stay in the cold block behind it.
-// The store owns the density invariant: removals swap the last
-// records of both halves into the freed slot and move the index
-// entry, so the arrays never fragment. Every method expects the
-// caller to hold the bot lock (the store itself is not
-// synchronized).
+// objectStore is the world object storage of one bot session: a dense
+// slot array (no holes, the apply paths mutate in place and the scans
+// walk it sequentially) plus the object id to slot index. The records
+// split into a hot and a cold array on the same slot and stay length
+// locked, so the scans stream the compact hot block while the display
+// fields sit in the cold one. A removal swaps the last records of both
+// halves into the freed slot and moves the index entry, so the arrays
+// never fragment. Every method expects the bot lock.
 type objectStore struct {
     hot   []objectHot
     cold  []objectCold

@@ -33,29 +33,21 @@ const (
     // merchant: below the 250 units interaction distance of the server.
     merchantApproachDist = 200.0
     // npcInteractionDist is the server INTERACTION_DISTANCE of 250:
-    // the talk click (ClickObject) and the transactions succeed within
-    // this 3D distance of the npc. The approach walk aims the offset
-    // ring at 150 units 2D, and a small z gap (the trainer hall floor
-    // is 40 units above the approach deck) keeps dist3D above the
-    // approach gate (200) but well within this interaction gate - the
-    // talk click must fire from the offset ring, not wait for the
-    // approach gate that the z gap keeps unreachable (the 2026-09-11
-    // 05:45 dump looped forever on the offset ring).
+    // the talk click and the transactions succeed within this 3D
+    // distance. The approach walk aims the offset ring at 150 units 2D,
+    // and a small z gap (the trainer hall floor is 40 units above the
+    // deck) keeps dist3D above the approach gate (200) but within this
+    // gate, so the talk click fires from the ring instead of waiting
+    // for a gate the z gap keeps unreachable.
     npcInteractionDist = 250.0
     // npcApproachRadius is the geodata search radius of every npc
-    // destination walk (the merchant stops, the teacher stops, the
-    // delevel guard walks): the plan must end at the npc's own point -
-    // the closest walkable surface of it (the customer cell across the
-    // counter, the hall row beside the master) - at most this distance
-    // short of it. A wide radius ends the plan at the FIRST walkable
-    // surface inside its ball instead - the shop edge, up to the whole
-    // radius away - and the character never enters the shop (the
-    // 2026-09-20 report: the wide ring plans held the shop edge while
-    // the requested point sat inside it). The merchant cells without a
-    // modeled floor layer or behind a counter stay reached through the
-    // partial answer: the search walks the corridor to the closest
-    // reachable point and the funnel ends there (the water deck below
-    // the shop - far in z - never satisfies the radius).
+    // destination walk (the merchant, teacher and delevel guard stops):
+    // the plan must end at the npc's own point, at most this far short.
+    // A wide radius ends the plan at the first walkable surface inside
+    // its ball - the shop edge up to the whole radius away - and the
+    // character never enters the shop. A merchant cell with no modeled
+    // floor or behind a counter is reached through the partial answer:
+    // the funnel ends at the closest reachable point.
     npcApproachRadius = 10.0
     // tripApproachRadius is the geodata search radius the non npc trip
     // walks (the farm spot return, the zone return) end within: the
@@ -84,20 +76,14 @@ const (
     // arrived: the list lands within a second of the enter world, and
     // a trip started ahead of it drops the learning stops silently.
     skillListWaitLimit = 10 * time.Second
-    // npcApproachOffset is the 2D distance the bot stops short of
-    // a town npc when the approach walk clicks the ground: the
-    // click targets a point this many units from the npc toward
-    // the bot, keeping the click line outside the building walls.
-    // The server's getValidLocation walks a Bresenham line that
-    // can "step over" onto the roof layer when the click targets
-    // the npc's exact cell inside a building (the 2026-09-11 roof
-    // teleport report: the bot clicked Cobendell's spawn point,
-    // the line crossed the south wall and the height-step
-    // fallback resolved the target onto the roof at z -2456
-    // instead of the ground floor at z -2792). The offset keeps
-    // the click target on the surrounding deck, within the 250
-    // unit server interaction distance but outside the walled
-    // interior.
+    // npcApproachOffset is the 2D distance the bot stops short of a
+    // town npc on the approach walk's ground click: the click targets a
+    // point this many units short toward the bot, keeping the click
+    // line outside the building walls. The server getValidLocation
+    // walks a Bresenham line that steps over onto the roof layer when
+    // the target is the npc's own cell inside a building (the Cobendell
+    // roof answers z -2456 instead of the floor at -2792), so the offset
+    // keeps the click on the deck within the 250 unit interaction range.
     npcApproachOffset = 150.0
     // exactSegmentDeckTolerance bounds the z gap between the merchant
     // spawn z and the plan end cell of the exact merchant segment: the
@@ -107,14 +93,11 @@ const (
     // deck plan is discarded for the ring fallback instead of walked.
     exactSegmentDeckTolerance = 96.0
     // exactSegmentMaxDistance bounds how far from the merchant the exact
-    // segment may plan: the exact search serves the final approach (the
-    // customer cell across the counter), the long haul belongs to the
-    // priced ring search whose hierarchy answers the reachable far
-    // routes in milliseconds. An exact search at a FAR unreachable
-    // destination degenerates into an exhaustive exploration of the
-    // whole mesh component (the Herbiel segment of the farm readiness
-    // round froze the live bot for minutes inside one query) - the
-    // distance gate keeps the exact search inside the neighborhood
-    // where its partial exhaustion stays local and bounded.
+    // segment may plan: it serves the final approach (the customer cell
+    // across the counter), while the priced ring search owns the long
+    // haul. An exact search at a far unreachable destination
+    // degenerates into an exhaustive exploration of the whole mesh
+    // component, so the gate keeps its partial exhaustion local and
+    // bounded.
     exactSegmentMaxDistance = 2000.0
 )

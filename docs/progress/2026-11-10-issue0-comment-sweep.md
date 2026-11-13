@@ -2322,6 +2322,41 @@ corner probe is a length, not a leg at all.
   `golangci-lint run ./internal/swarm/packets/...` 0 issues,
   `task fmt:check` clean.
 
+### 2026-11-13 - the twelve worst blocks drop under the eight line rule
+
+- `acceptance/stuck_points.go`: the two frozen terrace spots and the
+  strict edge components (52 and 29 polygons, 640x752 and 592x432
+  boxes) against the grid engine diagonal squeezes stay, the walk out
+  keeps the widened escape bound and the exit scan displacement floor;
+  46 of 189 become 39 of 182.
+- `pathfind/navbuild/fakerepair.go`: the filler signature (one layer,
+  height 0, all walls open, column 17 and 17_23), the 3.8k plateau and
+  the multi source BFS blend stay; 44 of 207 become 37 of 200.
+- `cmd/swarm/acceptance_mode.go`: both CLI docs compress to the run
+  modes, the exit codes, the optional web UI and the audit's stack
+  ports and resume rule; 50 of 202 become 41 of 193.
+- `hunt/town_params.go`: the four long const docs keep the 250
+  interaction gate against the 200 approach gate, the 10 unit approach
+  radius failure mode, the Cobendell roof z (-2456 against -2792) and
+  the exact segment bound; 92 of 120 become 75 of 103.
+- `pathfind/navbuild/pack.go`: one 8 line doc keeps the two phases,
+  the border strip memory bound, the force skip, the log callback and
+  the worker pool; 68 of 497 become 62 of 491.
+- `crypt/game_crypt.go`: the chain formula, the ~1M byte iterations
+  per second of the byte loop and the SWAR chunk scan stay; 58 of 167
+  become 53 of 162.
+- `proxy/recorder.go`, `state/objects_store.go`, `session/events.go`
+  and `pathfind/geometry.go`: the immutable payload copy, the dense
+  slot store invariants, the 512 entry ring and 8-24 hour run, the
+  supercover and string pulling facts stay; 60/35/76/51 become
+  55/30/69/46 comment lines.
+- `huntdata/cells_elven.go` stays: a generated file carries a DO NOT
+  EDIT hand header, so its doc compresses in the generator instead.
+- Verified: `task fmt`, `go build ./...`, the acceptance (8.9 s),
+  navbuild (35.2 s), hunt (29.7 s), crypt (0.3 s), proxy (6.8 s),
+  state (1.1 s), session (0.4 s) and pathfind (52.6 s) suites,
+  `golangci-lint run` on the eight paths 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
