@@ -11,31 +11,14 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
-// The counter direction detector. The question the owner asked (the
-// shop quarter round): how to detect the counter direction of a
-// merchant and tell it apart from the wall behind the merchant's
-// back. The answer this probe implements works on the raw geodata
-// pack and needs no client:
-//
-//   - The merchant spawn of a counter trader sits inside the roofed
-//     stall (the pack models the stall interior as roof-only cells -
-//     the merchant floor the pack never walks). The stall edge in a
-//     direction shows as the first cell whose layer stack holds a
-//     floor at the spawn z; the wall shows as roof cells continuing
-//     for the whole scan window.
-//   - The counter sits on the FACING side of the merchant (the
-//     merchant looks across the counter at the customers): among the
-//     directions that hold a stall edge within the window, the one
-//     agreeing with the spawn heading wins. A wall behind the back
-//     has no edge at all - it cannot win the vote; an edge on the
-//     wrong side loses the heading agreement.
-//
-// The customer cell lands one cell beyond the detected edge, which
-// the mesh verification (mode stands / scan) then pins exactly.
+// The counter direction detector: along each direction the first cell holding a
+// floor at the spawn height is the stall edge, while the wall behind the back
+// stays roof cells over the whole scan window. The edge agreeing with the spawn
+// heading wins - a wall has no edge and a wrong side loses the agreement. The
+// customer cell lands one cell beyond the edge (docs/hunting.md).
 
-// detectCounter prints the per direction edge profile of every
-// merchant, the detected counter direction and the derived stand
-// cell, plus the agreement verdict against the spawn heading.
+// detectCounter prints the per direction edge profile of every merchant, the
+// detected counter direction and the stand cell.
 func detectCounter(regionOf func(float64, float64) *pathfind.Region) {
     fmt.Println("\n=== counter direction detection")
     for _, m := range merchants {

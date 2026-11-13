@@ -913,6 +913,16 @@ corner probe is a length, not a leg at all.
   lint:new`. `botlog.go` fell from 24.4 to 17.9 percent (59 comment
   lines of 329), no block above 8 lines.
 
+### 2026-11-12 - cmd/counterprobe/detect.go hands the detector to the doc
+
+- 2 blocks compress: the 21 line detector header and the printer note.
+  A new `### The counter direction detector` subsection of
+  `docs/hunting.md` carries the stall edge rule, the 8 cell window,
+  the heading vote and the one cell customer offset.
+- Verified: `task fmt`, `go build ./...`, `go vet` (the tool has no
+  tests), `task lint:new`. `detect.go` fell from 28.6 to 14.8 percent
+  (13 comment lines of 88), no block above 8 lines.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
@@ -940,9 +950,9 @@ share of a struct file stays high by nature), `hunt/quest_chains.go` and
 `hunt/kite_lane.go`, `hunt/city_shopping.go`, `hunt/town_merchants.go`,
 `acceptance/delevel.go`, `pathfind/navbuild/sheet.go`,
 `pathfind/navmesh/abstract.go`, `huntaudit/audit.go`,
-`cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go` and
-`acceptance/botlog/botlog.go` (second passes). Next: a fresh `task
-comment:audit --top 10` pick (the
+`cmd/navmesh-export/main.go`, `cmd/navpack-verify/main.go`,
+`acceptance/botlog/botlog.go` and `cmd/counterprobe/detect.go` (second
+passes). Next: a fresh `task comment:audit --top 10` pick (the
 `proxy/game.go` and `hunt/loop_state.go` entries stay untouched while
 their fragments are active); the share and the block count are
 re-measured at the end.

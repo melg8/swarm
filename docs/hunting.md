@@ -2045,6 +2045,25 @@ The short form:
   TestWorldStandTableJoinsTheSpawnData and
   TestMerchantStandPointResolvesEveryWorldMerchant.
 
+### The counter direction detector (cmd/counterprobe)
+
+The `-mode detect` pass answers the counter stand round question: how
+to tell the counter side of a merchant apart from the wall behind its
+back, from the raw geodata pack and without a client.
+
+- The merchant spawn of a counter trader sits inside the roofed stall
+  (the pack models the stall interior as roof-only cells, no floor at
+  the spawn z). Along a direction the stall edge shows as the first
+  cell whose layer stack holds a floor at the spawn height (within +-96
+  units); the wall behind the back stays roof cells over the whole 8
+  cell scan window.
+- The counter sits on the FACING side (the merchant looks across it at
+  the customers): among the directions with an edge inside the window,
+  the one agreeing with the spawn heading wins. A wall has no edge to
+  vote with and an edge on a wrong side loses the heading agreement.
+- The customer cell lands one cell beyond the detected edge, which the
+  stand and scan passes then pin on the mesh.
+
 ### The cursor key escape (hunt/town_cursor_escape.go)
 
 A live refusal family leaves the routed walk with no click answer at
