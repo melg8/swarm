@@ -1044,6 +1044,20 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite,
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - kite.go keeps the server rules only
+
+- 104 blocks compress, the file falls from 264 comment lines of 1024
+  (25.8 percent) to 214 of 976 (21.9 percent): the constant registry
+  keeps one line per number instead of a paragraph around it, the
+  predicate doc comments state the predicate, and the inline notes keep
+  only the server rule they name (the windup replay, the ActionFailed
+  attribution window, MAX_ATTACK_TIMEOUT, the bow disable formula, the
+  RED SetupGauge priority). The design prose stays in
+  docs/hunting.md and docs/kite_timing_findings.md.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues, no line above
+  80 columns.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
