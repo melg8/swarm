@@ -29,33 +29,22 @@ const (
     gameHandshakeWait = 30 * time.Second
     packetChanSize    = 32
     bufferInitialSize = 4096
-    // validatePositionPeriod paces the client position validation the
-    // official client streams while its character moves: the ticker
-    // only sends when the observed placement actually changed (or the
-    // standing heartbeat elapsed), so a calm session stays quiet.
+    // validatePositionPeriod paces the client position validation: the ticker
+    // sends only when the placement changed (or the standing heartbeat
+    // elapsed), so a calm session stays quiet.
     validatePositionPeriod = time.Second
-    // validatePositionIdleGap bounds the standing heartbeat of the
-    // validation: a character that stands still keeps the server's
-    // clientX/clientY/clientZ view fresh at a whisper rate instead of
-    // the movement rate, far under every flood protector threshold.
+    // validatePositionIdleGap bounds the standing heartbeat: a still character
+    // keeps the server view fresh at a whisper rate, under every flood
+    // protector threshold.
     validatePositionIdleGap = 15 * time.Second
 )
 
-// silentSessionOpcodes lists the outbound maintenance opcodes that
-// never own an ActionFailed answer - the refusal attribution
-// bookkeeping of sendPacket skips them. The set is the complement of
-// the answered family of the reference server (the ActionFailed grep
-// of the Mobius C1 clientpackets: the move, attack, action, skill,
-// item and transaction requests all answer it, the maintenance
-// stream never does): the handshake family (ProtocolVersion 0x00,
-// AuthLogin 0x08, CharacterCreate 0x0B, CharacterSelect 0x0D), the
-// in-session maintenance (ChangeMoveType2 0x1C, Appearing 0x30,
-// RequestNetPing 0xA8 which answers NetPing) and the client position
-// validation stream (ValidatePosition 0x48, which the server answers
-// with nothing at all). Counting any of these as a request would
-// dismiss the genuine walk refusals that arrive while the stream
-// flows - the one second validation ticker alone would shadow every
-// refusal of a moving session (see sendPacket).
+// silentSessionOpcodes lists the outbound maintenance opcodes that never own an
+// ActionFailed answer, so the refusal attribution of sendPacket skips them: the
+// handshake family (ProtocolVersion 0x00, AuthLogin 0x08, CharacterCreate 0x0B,
+// CharacterSelect 0x0D), ChangeMoveType2 0x1C, Appearing 0x30, RequestNetPing
+// 0xA8 and ValidatePosition 0x48 (which the server answers with nothing).
+// Counting them would shadow the genuine walk refusals of a moving session.
 var silentSessionOpcodes = map[byte]bool{
     0x00: true, // ProtocolVersion
     0x08: true, // AuthLogin
@@ -67,18 +56,13 @@ var silentSessionOpcodes = map[byte]bool{
     0xA8: true, // RequestNetPing
 }
 
-// gameSilenceTimeout bounds the absolute packet silence of a live
-// game session. The server answers every RequestNetPing with a
-// NetPing broadcast (RequestNetPing.runImpl sends it unconditionally,
-// ~gamePingPeriod apart), so a healthy connection never goes quiet
-// for minutes even in an empty world at night. A socket that
-// delivers nothing while the ping writes keep "succeeding" is a
-// half-open connection (the host slept, the network black-holed, the
-// server JVM froze): the write side sinks the pings into the OS
-// buffer for a long time, the read side blocks forever and the bot
-// stands in the world doing nothing - exactly the frozen session the
-// 24/7 runs must not tolerate. The var (not a const) is a test seam:
-// the unit tests shorten it to keep the silence case under a second.
+// gameSilenceTimeout bounds the absolute packet silence of a live session. The
+// server answers every RequestNetPing with a NetPing broadcast
+// (RequestNetPing.runImpl sends it unconditionally, ~gamePingPeriod apart), so
+// a healthy connection never goes quiet for minutes. A socket delivering
+// nothing while the ping writes succeed is half-open (the host slept, the
+// network black-holed, the JVM froze): the read side blocks forever and the bot
+// stands frozen, which the 24/7 runs must not tolerate. The var is a test seam.
 var gameSilenceTimeout = 3 * time.Minute
 
 // The session end notifications of the server carry no body, so no
@@ -161,20 +145,14 @@ type GameClient struct {
     statusAttrs    [statusAttrsCapacity]state.Attribute
     htmlMu         sync.Mutex
     lastHTML       fromgameserver.NpcHTMLMessage
-    // htmlGen counts the NpcHTMLMessage packets the connection
-    // received: the arrival generation of the dialog store above.
-    // The hunt-side dialog walker gates its page waits on it (a
-    // page left over from a previous conversation never satisfies
-    // the wait of a fresh talk), so it rides the same lock as
-    // lastHTML and the snapshot read stays consistent.
+    // htmlGen counts the NpcHTMLMessage arrivals: the dialog walker gates a
+    // page wait on the generation, so a page left over from a previous
+    // conversation never satisfies a fresh talk.
     htmlGen uint64
-    // claimsOwnStream gates the echo ticker of the client position
-    // validation while the cursor key escape drives the session:
-    // the claimed placements own the stream exactly the way the
-    // official client's own movement simulation does while the
-    // player walks with the arrows, and the echo of the broadcast
-    // position would fight the claims one broadcast behind (see
-    // ClaimValidatePosition).
+    // claimsOwnStream gates the echo ticker of the position validation while
+    // the cursor key escape drives the session: the claimed placements own the
+    // stream like the official client's own movement, and the broadcast echo
+    // would fight them one broadcast behind (see ClaimValidatePosition).
     claimsOwnStream atomic.Bool
 }
 
@@ -198,11 +176,9 @@ var bufferPool = sync.Pool{
     },
 }
 
-// NewGameClient wraps a game server connection and performs the protocol
-// handshake: sends the unencrypted ProtocolVersion and reads the
-// unencrypted KeyPacket that enables the XOR cipher.
-// The constructor initializes every reusable packet struct (the
-// exhaustruct convention), which exceeds the line budget.
+// NewGameClient wraps a game server connection and performs the handshake: the
+// unencrypted ProtocolVersion and KeyPacket exchange that enables the XOR
+// cipher. The constructor seeds every reusable packet struct.
 func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
     client := &GameClient{
         conn:            conn,
@@ -301,46 +277,38 @@ func (gc *GameClient) SetLogger(logger *log.Logger) {
     gc.logger = logger
 }
 
-// SetTracker attaches the state tracker that observes the session. The
-// tracker is optional; without it the client only logs packets.
+// SetTracker attaches the state tracker; without it the client only logs.
 func (gc *GameClient) SetTracker(tracker *state.Bot) {
     gc.tracker = tracker
 }
 
-// SetTap installs a callback that observes every decrypted server packet
-// of the session, from the first CharSelectionInfo onward (the handshake
-// KeyPacket is unencrypted and never tapped). The callback runs on the
-// session reader goroutine and must copy the payload synchronously: the
-// buffer is reused by the next read. The proxy server installs the
-// history recorder here.
+// SetTap installs a callback that observes every decrypted server packet from
+// the first CharSelectionInfo onward (the KeyPacket is unencrypted). It runs on
+// the reader goroutine and must copy the payload: the buffer is reused by the
+// next read. The proxy installs its history recorder here.
 func (gc *GameClient) SetTap(tap func(payload []byte)) {
     gc.tap = tap
 }
 
-// SetSendTap installs a callback that observes every client packet of the
-// session right before the encryption: the serialized plaintext of the
-// typed send calls and of SendRaw (the acceptance run log installs its
-// outbound decoder here). The callback runs on the sending goroutine and
-// must copy the payload synchronously: the encryption transforms the
-// buffer in place afterwards.
+// SetSendTap installs a callback that observes every client packet right
+// before the encryption (the acceptance run log installs its outbound decoder).
+// It runs on the sending goroutine and must copy the payload: the encryption
+// transforms the buffer in place.
 func (gc *GameClient) SetSendTap(tap func(payload []byte)) {
     gc.sendTap = tap
 }
 
-// notifySendTap hands the plaintext of one outbound packet to the
-// installed observer. The nil check stays on the hot path: the tap is
-// absent on the fleet sessions of the process.
+// notifySendTap hands the plaintext of one outbound packet to the observer; the
+// hot path checks nil because the fleet sessions run without a tap.
 func (gc *GameClient) notifySendTap(payload []byte) {
     if gc.sendTap != nil {
         gc.sendTap(payload)
     }
 }
 
-// SendRaw sends a raw decrypted client packet payload (opcode and body,
-// without wire framing) through the session cipher, exactly like a typed
-// sendPacket call: the encryption and the wire write share the same
-// critical section so hunt loop actions and proxied client packets keep
-// one consistent outbound cipher chain.
+// SendRaw sends a raw payload (opcode and body, no framing) through the session
+// cipher like a typed sendPacket call, under the same critical section, so the
+// outbound cipher chain stays consistent.
 func (gc *GameClient) SendRaw(payload []byte) error {
     if len(payload) == 0 {
         return nil
@@ -353,9 +321,8 @@ func (gc *GameClient) SendRaw(payload []byte) error {
     gc.writeMu.Lock()
     defer gc.writeMu.Unlock()
 
-    // The encryption transforms the buffer in place and the payload
-    // may be backed by a shared proxy buffer, so it is copied into the
-    // reusable outbound scratch first.
+    // The encryption transforms in place and the payload may be a shared proxy
+    // buffer, so it is copied into the outbound scratch first.
     wire := make([]byte, 0, len(payload))
     wire = append(wire, payload...)
     gc.rawWriteBuf = wire
@@ -377,11 +344,9 @@ func (gc *GameClient) PacketCount() int {
     return int(gc.packetCount.Load())
 }
 
-// sendPacket serializes, encrypts and sends a game server packet. The
-// encryption and the wire write share one critical section: the game
-// cipher is a stateful rolling XOR chain, so the encryption order must
-// match the wire order exactly (the run loop and the client action
-// callers run on different goroutines).
+// sendPacket serializes, encrypts and sends a packet. Encryption and the wire
+// write share one critical section: the rolling XOR chain is stateful, so the
+// encryption order must match the wire order across the caller goroutines.
 func (gc *GameClient) sendPacket(data crypt.Serializable) error {
     writer := packet.NewWriter()
     if err := data.ToBytes(writer); err != nil {
@@ -392,15 +357,10 @@ func (gc *GameClient) sendPacket(data crypt.Serializable) error {
     }
     gc.notifySendTap(writer.Bytes())
     if gc.tracker != nil {
-        // The request bookkeeping of the refusal channel: the walk
-        // clicks (opcode 0x01) and the action requests (the equips,
-        // the skills, the transactions) answer ActionFailed the same
-        // way, so their send times decide which arrival may be
-        // attributed to a click at all (an equip refusal riding the
-        // click would otherwise read as a refused walk, see
-        // state.Bot.OtherRequestBetween). The maintenance stream
-        // never owns an ActionFailed answer, so its opcodes stay out
-        // of the bookkeeping (see silentSessionOpcodes).
+        // The refusal bookkeeping: the walk clicks (0x01) and the action
+        // requests answer ActionFailed the same way, so their send times decide
+        // which arrival belongs to a click (see state.Bot.OtherRequestBetween).
+        // The maintenance stream never answers and stays out.
         opcode := writer.Bytes()[0]
         now := time.Now()
         if opcode == togameserver.MoveToLocationPacketID {
@@ -452,9 +412,8 @@ type gamePacket struct {
     err     error
 }
 
-// Run blocks while the character stays in the world. It reads server
-// packets in a dedicated goroutine and sends periodic net ping requests.
-// On context cancellation it sends the logout packet and closes.
+// Run blocks while the character stays in the world: a reader goroutine, the
+// periodic net pings, and the logout packet on context cancellation.
 func (gc *GameClient) Run(ctx context.Context, characterName string) error {
     if gc.tracker != nil {
         gc.tracker.SetOnline(characterName)
@@ -505,13 +464,10 @@ func (gc *GameClient) run(ctx context.Context, characterName string) error {
     return err
 }
 
-// runLoop is the main receive loop of the in game session. The
-// silence watchdog bounds the packet gaps: every received packet
-// re-arms the timer, and a session that stays silent past
-// gameSilenceTimeout unwinds with an error so the supervisor
-// reconnects instead of blocking on a dead socket forever (see
-// gameSilenceTimeout). The validateTicker drives the client position
-// validation of the official client (see validatePosition).
+// runLoop is the receive loop of the session. Every packet re-arms the silence
+// watchdog, and a silence past gameSilenceTimeout unwinds with an error, so the
+// supervisor reconnects instead of blocking on a dead socket. The validate
+// ticker drives the position validation (see validatePosition).
 func (gc *GameClient) runLoop(
     ctx context.Context,
     packets <-chan gamePacket,
@@ -521,10 +477,8 @@ func (gc *GameClient) runLoop(
 ) error {
     silence := time.NewTimer(gameSilenceTimeout)
     defer silence.Stop()
-    // The validation state: the last placement the session reported
-    // and the moment of the last report, so the ticker sends only on
-    // a change (the movement rate) or on the idle heartbeat (see
-    // validatePositionIdleGap).
+    // The validation state: the last placement and report moment, so the ticker
+    // sends on a change or on the idle heartbeat.
     validation := positionValidation{
         x:        0,
         y:        0,
@@ -566,13 +520,10 @@ func (gc *GameClient) runLoop(
     }
 }
 
-// RequestLogout ends the session from another goroutine (the hunt
-// loop of the emergency logout): the logout packet announces the
-// leave while the server still accepts it (out of combat), the
-// socket close forces the rest - the server stores a character
-// that left mid combat fifteen seconds after the combat ends. The
-// read loop of Run notices the closed socket and unwinds the
-// session.
+// RequestLogout ends the session from another goroutine (the emergency logout):
+// the packet announces the leave while the server accepts it (out of combat),
+// and the socket close forces the rest - the server stores a character that
+// left mid combat fifteen seconds after the combat ends.
 func (gc *GameClient) RequestLogout() error {
     if err := gc.sendPacket(&togameserver.Logout{}); err != nil {
         gc.logger.Printf("Failed to announce the logout: %v", err)
@@ -585,12 +536,10 @@ func (gc *GameClient) RequestLogout() error {
     return nil
 }
 
-// Close drops the game connection without the logout announcement.
-// The character selection stage holds no world session, so a plain
-// socket close is the clean exit of a client that never entered the
-// world (the character creation probe of the acceptance runner); the
-// server frees the account the same way it does for a client closing
-// at the char screen.
+// Close drops the connection without the logout announcement: the character
+// selection stage holds no world session, so a plain close is the clean exit of
+// a client that never entered the world (the creation probe of the acceptance
+// runner).
 func (gc *GameClient) Close() error {
     if err := gc.conn.Close(); err != nil {
         return fmt.Errorf(

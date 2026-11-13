@@ -1251,6 +1251,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the webserver suite (8.3 s),
   `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
 
+### 2026-11-13 - connection/game.go keeps the wire contract only
+
+- 20 blocks compress: the session keeps the position validation ticker
+  and its idle heartbeat, the silent maintenance opcode set (the
+  complement of the ActionFailed answered family), the
+  `gameSilenceTimeout` ping rule and its test seam, the stateful cipher
+  ordering under one critical section, the in place encryption copy,
+  the tap copy contract and the 15 s mid-combat store after logout.
+  146 comment lines of 629 become 95 of 578.
+- Verified: `task fmt`, `go build ./...`, the connection suite (10.5 s),
+  `golangci-lint run ./internal/swarm/connection/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
