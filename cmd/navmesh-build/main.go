@@ -2,22 +2,17 @@
 //
 // SPDX-License-Identifier: MIT
 
-// navmesh-build converts the l2j geodata region files into navigation
-// mesh tiles (docs/navmesh.md): the offline half of the
-// feature/new-pathfind port. Every X_Y.l2j region of the geodata
-// directory becomes an X_Y.nm tile in the output directory, the
-// neighbouring regions stitch their border strips, and the audit
-// lines report the sheet decomposition and the link health per
-// region.
+// navmesh-build converts the l2j geodata region files into navigation mesh
+// tiles (docs/navmesh.md): every X_Y.l2j region becomes an X_Y.nm tile, the
+// neighbouring regions stitch their border strips and the audit lines report
+// the sheet decomposition and the link health per region.
 //
 // Usage:
 //
 //    go run ./cmd/navmesh-build -geodata data/geodata -out data/navmesh
 //
-// The build is idempotent: a region whose tile file already carries a
-// newer mtime than the region file is skipped unless -force is set.
-// The pack phases run in parallel (one region in flight per worker,
-// -workers caps the pool, default: every core).
+// The build is idempotent (a tile newer than its region is skipped unless
+// -force): one region in flight per worker, -workers caps the pool.
 package main
 
 import (

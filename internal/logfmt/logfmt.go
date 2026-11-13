@@ -2,20 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package logfmt turns the logging conventions of AGENTS.md from
-// review prose into a check: it parses the production Go files of a
-// tree, finds the call sites of the standard log helpers and asserts
-// the message format rules that survive a static look.
+// Package logfmt turns the logging conventions of AGENTS.md into a check: it
+// parses the production Go files of a tree, finds the standard log helper call
+// sites and asserts the format rules that survive a static look:
 //
-// Two rules are enforced at the call sites:
-//
-//   - period: a log message never ends with a trailing period (the
-//     trailing "\n" of a Printf-style multi-line call is stripped
-//     first);
-//   - capital: a log message starts with a capital letter, a format
-//     verb (a "%v"-first printf) or a lowercase component tag (the
-//     "login#3:", "hunt audit:" prefixes the proxy and the audit
-//     packages use to mark the log stream owner).
+//   - period: no message ends with a trailing period (the newline of a
+//     Printf multi-line call is stripped first);
+//   - capital: a message starts with a capital letter, a format verb (a
+//     "%v"-first printf) or a lowercase component tag ("login#3:").
 package logfmt
 
 import (
@@ -39,27 +33,22 @@ type Violation struct {
     Message string
 }
 
-// tagPattern matches the lowercase component tag prefix the proxy,
-// the hunt audit and the e2e layers mark their log streams with: a
-// short lowercase word run ending in a hash or a colon ("login#%d:",
-// "game#12:", "hunt audit:", "e2e:"). A word run that already carries
-// a format verb ("session %s failed") is not a tag - it is flagged.
+// tagPattern matches the lowercase component tag the proxy, the hunt audit
+// and the e2e layers mark their streams with ("login#%d:", "hunt audit:");
+// a run that already carries a format verb is not a tag and gets flagged.
 var tagPattern = regexp.MustCompile(
     `^[a-z][a-z0-9_-]*( [a-z0-9_-]+)*[#:]`)
 
-// logHelpers are the log package entry points the conventions talk
-// about. The receiver side (log vs a logger field) matches
-// loggerSelector below.
+// logHelpers are the log entry points the conventions cover; the receiver
+// side matches loggerSelector below.
 var logHelpers = map[string]bool{
     "Printf": true, "Println": true,
     "Fatalf": true, "Fatalln": true, "Fatal": true,
 }
 
-// ScanTree walks the .go files under root (production files only -
-// the test files carry the t.Log chatter, not the bot log) and
-// returns the convention violations of their log call sites. Files
-// with the canonical generated marker are skipped, matching the lint
-// exclusions.
+// ScanTree walks the production .go files under root (the test chatter of
+// t.Log is not the bot log) and returns the violations of their log call
+// sites; the generated marker files are skipped like the lint exclusions.
 func ScanTree(root string) ([]Violation, error) {
     violations := []Violation{}
     walkErr := filepath.WalkDir(root, func(
@@ -158,11 +147,8 @@ func isGenerated(content []byte) bool {
     return false
 }
 
-// isLogCall matches the helper call sites: log.Printf(...),
-// s.logger.Printf(...), lc.server.logger.Printf(...), and the
-// package level or local *log.Logger variable named "logger" (the
-// repository convention names its log.Logger fields and vars
-// logger).
+// isLogCall matches log.Printf(...) and the logger.Printf(...) form of the
+// package level *log.Logger or the field named "logger".
 func isLogCall(call *ast.CallExpr) bool {
     selector, ok := call.Fun.(*ast.SelectorExpr)
     if !ok || !logHelpers[selector.Sel.Name] {
@@ -178,10 +164,9 @@ func isLogCall(call *ast.CallExpr) bool {
     return false
 }
 
-// stringLiterals collects the string literals of the message
-// expression in source order: a plain literal, or the parts of a
-// "part one " + "part two" concatenation chain. Dynamic messages
-// (a variable, a call) return nothing - they cannot be checked.
+// stringLiterals collects the literals of the message in source order (a
+// plain literal or the parts of a concatenation); a dynamic message returns
+// nothing and cannot be checked.
 func stringLiterals(expr ast.Expr) []string {
     switch part := expr.(type) {
     case *ast.BasicLit:
@@ -206,10 +191,9 @@ func stringLiterals(expr ast.Expr) []string {
     return nil
 }
 
-// checkMessage applies the two rules to the literal chain: the
-// capital rule reads the first part, the period rule the last one
-// (the message the log actually ends with). Returns the broken rule
-// ids - a doubly broken message reports both.
+// checkMessage applies both rules to the literal chain (the capital rule
+// reads the first part, the period rule the last) and returns the broken
+// rule ids, both for a doubly broken message.
 func checkMessage(literals []string) []string {
     broken := []string{}
     first := strings.TrimLeft(literals[0], " \t")

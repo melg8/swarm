@@ -2287,6 +2287,23 @@ corner probe is a length, not a leg at all.
   the hunt suite (27.7 s), `golangci-lint run` on both packages 0
   issues.
 
+### 2026-11-13 - the remaining long section headers
+
+- `internal/logfmt/logfmt.go` package doc 14 to 8 lines (the two rules
+  and the tag exception only); 51 comment lines of 249 become 35 of 233.
+- `cmd/navmesh-build/main.go` package doc 16 to 11 with the usage line
+  and the idempotence rule; 29 of 163 become 24 of 158.
+- `internal/swarm/webserver/web_build.go` static handler 15 to 7 (the
+  no-cache reason of the validator-less embedded files and the content
+  named pass through); 37 of 119 become 29 of 111.
+- `internal/swarm/pathfind/navmesh/avoid.go` file header 11 to 8 and the
+  state classifier 15 to 8 (a foreign ban walls even inside the own
+  escape ring, the `avoidEscapeRadius` reach and the root node rule);
+  75 of 224 become 64 of 213.
+- Verified: `task fmt`, `go build ./...`, the logfmt (0.5 s), webserver
+  (8.7 s) and navmesh (29.8 s) suites, `go vet ./cmd/navmesh-build/`,
+  `golangci-lint run` on the four packages 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

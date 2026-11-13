@@ -81,21 +81,13 @@ func injectBuildMeta(indexHTML string, build string) string {
     return indexHTML[:at] + "\n  " + meta + indexHTML[at:]
 }
 
-// staticHandler wraps the embedded file server with the build
-// plumbing of the reload check (issue #48):
-//
-//   - "/" and "/index.html" serve the prebuilt index page (the
-//     injected meta) with no-cache, so a reload always picks the
-//     binary's own page;
-//   - every script and style sheet answers with no-cache too - the
-//     embedded files carry no validator (a zero modtime), so without
-//     the header a browser could heuristically keep the OLD asset
-//     even after the reload and the page would still run the stale
-//     code;
-//   - everything else (the map tiles, the icons, the meshes) passes
-//     through untouched - they are content named, they change on
-//     their own schedule, and caching them is what keeps the map
-//     fast.
+// staticHandler wraps the embedded file server with the build plumbing of the
+// reload check: "/" and "/index.html" serve the prebuilt index page with
+// no-cache, and every script and style sheet answers no-cache too, because the
+// embedded files carry no validator (a zero modtime) and a browser could keep
+// an old asset across the reload. The map tiles, the icons and the meshes pass
+// through untouched: they are content named, so caching them keeps the map
+// fast.
 func (s *Server) staticHandler(next http.Handler) http.Handler {
     return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
         isIndex := r.URL.Path == "/" ||

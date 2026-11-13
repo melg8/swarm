@@ -4,17 +4,13 @@
 
 package navmesh
 
-// The avoid areas of the corridor search: the recovery bans of the
-// hunt loop ported onto the rectangle granularity of the mesh. The
-// grid engine walls every covered CELL of a ban; the mesh walls every
-// polygon whose footprint the ban disk TOUCHES - the over-walling
-// direction, deliberately: a funnelled route crosses only corridor
-// polygons, and no corridor polygon touches the disk, so no point of
-// any walked segment ever enters the banned ground (the grid only keeps
-// the cell centers of the smoothed segments out - the mesh guarantee is
-// strictly stronger). A big rectangle grazed by a ban at its corner is
-// walled whole; the detours err long, never through the freeze the
-// ban exists to detour.
+// The avoid areas of the corridor search: the recovery bans of the hunt loop
+// ported onto the rectangle granularity of the mesh. The grid engine walls
+// every covered cell of a ban while the mesh walls every polygon the disk
+// touches - the over-walling direction, deliberately: a funnelled route
+// crosses only corridor polygons, so no walked segment ever enters the banned
+// ground. A rectangle grazed at its corner is walled whole, so the detours err
+// long, never through the freeze the ban exists to detour.
 
 import "math"
 
@@ -107,21 +103,14 @@ func noAvoid() avoidCtx {
     }
 }
 
-// state classifies one polygon of one tile against the circles of
-// the context:
-//
-//   - a polygon touched by a FOREIGN ban is a wall, even when the own
-//     escape ring overlaps it too (the route out of the own ban must
-//     not thread a foreign ban - the grid cellAvoidedEscape rule),
-//   - a polygon touched only by the own ban is an escape polygon while
-//     its footprint reaches within avoidEscapeRadius of the start,
-//     a wall beyond it,
-//   - a polygon no circle touches is free.
-//
-// The start polygon itself carries whatever state it carries: the
-// corridor search creates its root node before any avoid check (the
-// grid start cell is likewise passable by construction), the walls
-// gate only the steps ONTO polygons.
+// state classifies one polygon against the circles of the context: a polygon
+// touched by a foreign ban is a wall even when the own escape ring overlaps it
+// (the grid cellAvoidedEscape rule), a polygon touched only by the own ban is
+// an escape polygon while its footprint reaches within avoidEscapeRadius of
+// the start and a wall beyond it, and a polygon no circle touches is free. The
+// start polygon keeps whatever state it carries, since the search creates the
+// root node before any avoid check and the walls gate only the steps onto
+// polygons.
 func (a avoidCtx) state(tile *Tile, poly *Poly) avoidState {
     if !a.active || tile == nil || poly == nil {
         return avoidFree
