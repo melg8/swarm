@@ -1144,6 +1144,17 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - scans.go second pass keeps the search rules only
+
+- 44 blocks plus a 12 block re-wrap compress the file from 169 comment
+  lines to 144: the target searches keep the projected position rule,
+  the 1500 unit engage radius against the 200 unit bias, the 200 unit
+  help margin and the 600 unit z limit, the single sided ALL clan, the
+  256 bucket median and the pooled scan arrays; the repeated "of the
+  zone" and "living attackable npc" prose drops.
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

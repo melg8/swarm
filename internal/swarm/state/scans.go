@@ -23,8 +23,8 @@ type AttackTarget struct {
     Z        int32
 }
 
-// Zone is a square world area: the hunting policy of the bot (attack
-// and loot inside it only, never wander out). Nil zones mean no limit.
+// Zone is a square world area: the hunting policy (attack and loot inside,
+// never wander out). A nil zone means no limit.
 type Zone struct {
     CX   int32 `json:"cx"`
     CY   int32 `json:"cy"`
@@ -41,16 +41,15 @@ func (z *Zone) Contains(x int32, y int32) bool {
         y >= z.CY-z.Half && y <= z.CY+z.Half
 }
 
-// ZoneArea is the geometric leash contract of the hunt: the target
-// searches, the loot scans and the emptiness readings ask whether a
-// world point belongs to the hunted ground (the square *Zone or the
-// convex *CellZone). A nil area means no limit.
+// ZoneArea is the geometric leash contract: the target searches, the loot scans
+// and the emptiness readings ask whether a point belongs to the hunted ground
+// (the square *Zone or the convex *CellZone). A nil area means no limit.
 type ZoneArea interface {
     Contains(x int32, y int32) bool
 }
 
-// areaNil reports whether a ZoneArea carries no leash at all: a nil
-// interface or a typed nil *Zone, which is not a nil interface.
+// areaNil reports whether a ZoneArea carries no leash: a nil interface or a
+// typed nil *Zone, which is not a nil interface.
 func areaNil(zone ZoneArea) bool {
     if zone == nil {
         return true
@@ -60,9 +59,9 @@ func areaNil(zone ZoneArea) bool {
     return ok && square == nil
 }
 
-// NearestAttacker returns the closest living attackable npc that
-// currently targets the character at its projected position (the mob
-// whose blows land, the chase of the flight).
+// NearestAttacker returns the closest living attackable npc that targets the
+// character at its projected position (the mob whose blows land, the chase of
+// the flight).
 func (b *Bot) NearestAttacker() (AttackTarget, bool) {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -98,9 +97,9 @@ func (b *Bot) NearestAttacker() (AttackTarget, bool) {
     return best, found
 }
 
-// SelfAttackers returns every living attackable npc that targets the
-// character (the full aggro load) at the raw last known positions; a
-// caller that measures a moving chase wants NearestAttacker instead.
+// SelfAttackers returns every living attackable npc that targets the character
+// (the full aggro load) at the raw last known positions; a caller measuring a
+// moving chase wants NearestAttacker.
 func (b *Bot) SelfAttackers() []AttackTarget {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -126,10 +125,10 @@ func (b *Bot) SelfAttackers() []AttackTarget {
     return attackers
 }
 
-// HasBowAttackerBesides reports whether a living attackable npc other
-// than the given object targets the character with a bow in the right
-// hand: the losing-fight verdict never tries to out-kite a ranged
-// enemy. The scan is allocation free (it runs on every engage tick).
+// HasBowAttackerBesides reports whether a living attackable npc other than the
+// given object targets the character with a bow in the right hand: the
+// losing-fight verdict never tries to out-kite a ranged enemy. The scan is
+// allocation free (every engage tick).
 func (b *Bot) HasBowAttackerBesides(objectID int32) bool {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -149,19 +148,18 @@ func (b *Bot) HasBowAttackerBesides(objectID int32) bool {
 }
 
 // NearestAttackable returns the closest living attackable npc within
-// maxDistance of the character, measured at the projected position: the
-// once per second movement broadcast leaves a moving mob far from its
-// last packet position.
+// maxDistance, at the projected position: the once per second movement
+// broadcast leaves a moving mob far from its last packet position.
 func (b *Bot) NearestAttackable(
     maxDistance float64, zone ZoneArea,
 ) (AttackTarget, bool) {
     return b.NearestAttackableExcept(maxDistance, zone, nil)
 }
 
-// NearestAttackableExcept returns the closest living attackable npc of
-// the zone, skipping the given object ids: the engage marks a target
-// that never starts the fight as stuck and searches for a different one
-// for a while. The dense id slice keeps the tick path allocation free.
+// NearestAttackableExcept returns the closest living attackable npc of the
+// zone, skipping the given object ids: the engage marks a target that never
+// starts the fight as stuck and searches elsewhere for a while. The dense id
+// slice keeps the tick path allocation free.
 func (b *Bot) NearestAttackableExcept(
     maxDistance float64, zone ZoneArea, skip []int32,
 ) (AttackTarget, bool) {
@@ -169,17 +167,16 @@ func (b *Bot) NearestAttackableExcept(
         maxDistance, zone, skip, 0, 0, false, false, nil)
 }
 
-// ZoneHasAttackable reports whether at least one living attackable npc
-// stands inside the zone square at its projected position (the
-// emptiness reading of the zone rotation). A nil zone never holds mobs.
+// ZoneHasAttackable reports whether a living attackable npc stands inside the
+// zone at its projected position (the emptiness reading of the rotation). A nil
+// zone never holds mobs.
 func (b *Bot) ZoneHasAttackable(zone ZoneArea) bool {
     return b.ZoneHasAttackableBelow(zone, 0)
 }
 
-// ZoneHasAttackableBelow adds the level ceiling of the engage to the
-// emptiness reading: a square whose survivors all sit above maxLevel is
-// as good as empty (zero disables the filter, an unresolved template
-// passes). A nil zone never holds mobs.
+// ZoneHasAttackableBelow adds the level ceiling of the engage: a square whose
+// survivors all sit above maxLevel is as good as empty (zero disables the
+// filter, an unresolved template passes). A nil zone never holds mobs.
 func (b *Bot) ZoneHasAttackableBelow(zone ZoneArea, maxLevel int32) bool {
     if areaNil(zone) {
         return false
@@ -204,21 +201,18 @@ func (b *Bot) ZoneHasAttackableBelow(zone ZoneArea, maxLevel int32) bool {
     return false
 }
 
-// ZoneHasPickable reports whether the engage target search could take
-// any npc of the zone right now (the level window, the skip list and
-// the social clan fence apply, the distance plays no role). A square
-// whose only survivors sit in fenced packs reads empty, so the
-// rotation never stalls on it. A nil zone never holds pickable
-// targets.
+// ZoneHasPickable reports whether the engage search could take any npc of the
+// zone now (the level window, the skip list and the clan fence apply, the
+// distance does not). A square whose only survivors sit in fenced packs reads
+// empty, so the rotation never stalls on it.
 func (b *Bot) ZoneHasPickable(
     zone ZoneArea, maxLevel int32, skip []int32,
 ) bool {
     return b.ZoneHasPickableWindowed(zone, 0, maxLevel, skip, false)
 }
 
-// ZoneHasPickableWindowed adds the level window floor of the spot
-// hunting: mobs below minLevel pay no adena at the character's level
-// and read as empty (zero disables the floor, an unresolved template
+// ZoneHasPickableWindowed adds the level window floor: mobs below minLevel pay
+// no adena and read as empty (zero disables the floor, an unresolved template
 // passes). avoidBows fences the archers out like the pick itself.
 func (b *Bot) ZoneHasPickableWindowed(
     zone ZoneArea, minLevel int32, maxLevel int32, skip []int32,
@@ -231,9 +225,9 @@ func (b *Bot) ZoneHasPickableWindowed(
     return ok
 }
 
-// AggroThreat describes one aggressive npc an autonomous walk must not
-// pass close to: the projected position, the effective on-sight aggro
-// range and the identity for the logs.
+// AggroThreat describes one aggressive npc an autonomous walk must not pass
+// close to: the projected position, the effective on-sight aggro range and the
+// identity for the logs.
 type AggroThreat struct {
     ObjectID   int32
     TemplateID int32
@@ -241,15 +235,15 @@ type AggroThreat struct {
     X          float64
     Y          float64
     Z          int32
-    // AggroRange is the effective on-sight trigger radius (the server
-    // template value clamped at MaxAggroRange for the Monster type).
+    // AggroRange is the effective trigger radius (the template value clamped at
+    // MaxAggroRange for the Monster type).
     AggroRange float64
 }
 
-// AppendAggroThreats appends the living idle aggressive mobs within
-// maxDistance of the character at their projected positions: a mob that
-// already holds a target is no steering problem, and excludeID drops
-// the current fight target. The callers hand reused buffers in.
+// AppendAggroThreats appends the living idle aggressive mobs within maxDistance
+// at their projected positions: a mob that already holds a target is no
+// steering problem, and excludeID drops the current fight target. The callers
+// hand reused buffers in.
 func (b *Bot) AppendAggroThreats(
     dst []AggroThreat, excludeID int32, maxDistance float64,
 ) []AggroThreat {
@@ -283,9 +277,8 @@ func (b *Bot) AppendAggroThreats(
     return dst
 }
 
-// BlockedTarget describes one living attackable npc the engage target
-// search rejected: the projected position and the human readable
-// reason the targetless diagnostic logs.
+// BlockedTarget describes one living attackable npc the engage search rejected:
+// the projected position and the reason the targetless diagnostic logs.
 type BlockedTarget struct {
     ObjectID int32
     Name     string
@@ -295,11 +288,10 @@ type BlockedTarget struct {
     Reason   string
 }
 
-// NearestBlockedTargets classifies the living attackable npcs around
-// the character exactly the way the engage pick does and returns the
-// nearest ones it rejected with the reason, in the pick's own check
-// order. Mobs that pass every filter stay out - the far target walk
-// reaches them. The limit bounds the diagnostic list.
+// NearestBlockedTargets classifies the living attackable npcs the way the
+// engage pick does and returns the nearest rejected ones with the reason, in
+// the pick's own order. Mobs that pass every filter stay out (the far target
+// walk reaches them). The limit bounds the diagnostic list.
 func (b *Bot) NearestBlockedTargets(
     zone ZoneArea, maxLevel int32, skip []int32, limit int,
 ) []BlockedTarget {
@@ -307,9 +299,8 @@ func (b *Bot) NearestBlockedTargets(
         zone, 0, maxLevel, skip, limit, false)
 }
 
-// NearestBlockedTargetsWindowed adds the level window floor of the spot
-// hunting and the bow fence of the pick, so the diagnostic explains the
-// archer the hunt deliberately passed over.
+// NearestBlockedTargetsWindowed adds the level window floor and the bow fence,
+// so the diagnostic explains the archer the hunt passed over.
 func (b *Bot) NearestBlockedTargetsWindowed(
     zone ZoneArea, minLevel int32, maxLevel int32, skip []int32, limit int,
     avoidBows bool,
@@ -368,11 +359,10 @@ func (b *Bot) NearestBlockedTargetsWindowed(
     return blocked
 }
 
-// blockedReason mirrors the rejection chain of the constrained target
-// search for one scan record and returns the human readable reason
-// (empty when the pick could take the mob): the skip list, the level
-// window, the bow fence, the zone square, the social clan fence. The
-// caller holds the read lock.
+// blockedReason mirrors the rejection chain of the constrained search for one
+// scan record and returns the reason (empty when the pick could take the mob):
+// the skip list, the level window, the bow fence, the zone square, the clan
+// fence. The caller holds the read lock.
 func blockedReason(
     scans []npcScan, cand *npcScan, cold []objectCold,
     zone ZoneArea, minLevel int32, maxLevel int32, skip []int32,
@@ -404,19 +394,17 @@ func blockedReason(
     return ""
 }
 
-// targetPriorityBias converts one priority point of the zone mob list
-// into the distance discount of the target search: small next to the
-// 1500 unit engage radius on purpose, so a mob at the doorstep still
-// beats a far preferred one.
+// targetPriorityBias converts one priority point into the distance discount of
+// the search: small next to the 1500 unit engage radius, so a mob at the
+// doorstep still beats a far preferred one.
 const targetPriorityBias = 200.0
 
-// NearestAttackableConstrained returns the closest living attackable
-// npc of the zone with the hunt safety constraints: mobs above maxLevel
-// never enter a fight (a level gap fight is a death risk, zero
-// disables), and mobs whose clan mates stand within their clan help
-// range are skipped while avoidSocial is set - attacking them pulls the
-// whole camp (the Mobius AttackableAI clan call). The level of an
-// unknown template passes the filter.
+// NearestAttackableConstrained returns the closest living attackable npc with
+// the safety constraints: mobs above maxLevel never enter a fight (a level gap
+// fight is a death risk, zero disables), and mobs whose clan mates stand within
+// their help range are skipped while avoidSocial is set - attacking them pulls
+// the whole camp (the Mobius AttackableAI clan call). An unknown template
+// passes.
 func (b *Bot) NearestAttackableConstrained(
     maxDistance float64, zone ZoneArea, skip []int32,
     maxLevel int32, avoidSocial bool,
@@ -425,12 +413,11 @@ func (b *Bot) NearestAttackableConstrained(
         maxDistance, zone, skip, 0, maxLevel, avoidSocial, false, nil)
 }
 
-// NearestAttackablePreferred adds the zone mob priorities: every
-// priority point biases the pick by targetPriorityBias units of
-// distance, so the engage farms every species while tilting toward the
-// exp rich ones. A nil map keeps the plain nearest-first pick, and
-// avoidBows keeps a bow profile from initiating on an archer (the
-// defensive answer runs through the attacker scan).
+// NearestAttackablePreferred adds the zone mob priorities: every priority point
+// biases the pick by targetPriorityBias units, so the engage tilts toward the
+// exp rich species. A nil map keeps the nearest-first pick, and avoidBows keeps
+// a bow profile from initiating on an archer (the defensive answer runs through
+// the attacker scan).
 func (b *Bot) NearestAttackablePreferred(
     maxDistance float64, zone ZoneArea, skip []int32,
     maxLevel int32, avoidSocial bool, priority map[int32]int32,
@@ -441,10 +428,9 @@ func (b *Bot) NearestAttackablePreferred(
         priority)
 }
 
-// NearestAttackablePreferredWindowed adds the level window floor of the
-// spot hunting: mobs below minLevel pay no adena at the character's
-// level (zero disables the floor, level 0 passes both bounds), and
-// avoidBows applies the bow fence of the preferred pick.
+// NearestAttackablePreferredWindowed adds the level window floor: mobs below
+// minLevel pay no adena (zero disables the floor, level 0 passes both bounds),
+// and avoidBows applies the bow fence of the preferred pick.
 func (b *Bot) NearestAttackablePreferredWindowed(
     maxDistance float64, zone ZoneArea, skip []int32,
     minLevel int32, maxLevel int32, avoidSocial bool,
@@ -455,10 +441,9 @@ func (b *Bot) NearestAttackablePreferredWindowed(
         avoidSocial, avoidBows, priority)
 }
 
-// nearestAttackable is the shared target search core of the public
-// pickers: the plain variant walks the hot storage directly, the
-// constrained one flattens the attackable npcs into scan records first.
-// The level window fences the worthless and the deadly mobs out.
+// nearestAttackable is the shared search core: the plain variant walks the hot
+// storage directly, the constrained one flattens the attackable npcs into scan
+// records first.
 //
 //nolint:cyclop // the zone, level, social and priority filters are one scan
 func (b *Bot) nearestAttackable(
@@ -525,10 +510,9 @@ func (b *Bot) nearestAttackable(
     return best, found
 }
 
-// nearestAttackableSocial is the constrained variant of the target
-// search: one pass flattens the npcs into compact scan records (one
-// projection per npc, clans as bitmasks) and the social pull check
-// walks that flat array. The caller holds the read lock.
+// nearestAttackableSocial is the constrained variant: one pass flattens the
+// npcs into compact scan records (one projection each, clans as bitmasks) and
+// the pull check walks that flat array. The caller holds the read lock.
 func (b *Bot) nearestAttackableSocial(
     maxDistance float64, zone ZoneArea, skip []int32,
     minLevel int32, maxLevel int32, avoidBows bool,
@@ -541,9 +525,8 @@ func (b *Bot) nearestAttackableSocial(
     selfX := float64(b.char.X)
     selfY := float64(b.char.Y)
     nowNano := b.now().UnixNano()
-    // The scan records come from a pool: the search runs under the read
-    // lock (concurrent readers), so a per bot scratch would race, and the
-    // pool shares the memory instead of allocating a block per tick.
+    // The records come from a pool: the search runs under the read lock, so a
+    // per bot scratch would race, and the pool shares the memory.
     scanPtr := npcScanPool.Get().(*[]npcScan)
     scans := (*scanPtr)[:0]
     defer func() {
@@ -579,9 +562,9 @@ func (b *Bot) nearestAttackableSocial(
     return best, found
 }
 
-// socialCandidateKeep reports whether one flattened candidate passes
-// the filters of the constrained search: the skip list, the level
-// window, the bow fence, the zone box and the social pull.
+// socialCandidateKeep reports whether one flattened candidate passes the
+// filters of the constrained search: the skip list, the level window, the bow
+// fence, the zone box and the pull.
 func socialCandidateKeep(
     scans []npcScan, cand *npcScan, zone ZoneArea, skip []int32,
     minLevel int32, maxLevel int32, avoidBows bool,
@@ -606,10 +589,9 @@ func socialCandidateKeep(
     return !socialHelpersNear(scans, cand)
 }
 
-// appendAttackableScans flattens every living attackable npc into the
-// pooled scan array (one projected position per npc, the clans as
-// bitmasks, the template id for the priority bias). The caller holds the
-// read lock.
+// appendAttackableScans flattens every living attackable npc into the pooled
+// array (one projected position each, the clans as bitmasks, the template id
+// for the priority bias). The caller holds the read lock.
 func (b *Bot) appendAttackableScans(
     scans []npcScan, nowNano int64,
 ) []npcScan {
@@ -636,8 +618,7 @@ func (b *Bot) appendAttackableScans(
     return scans
 }
 
-// npcScanPool recycles the flat scan arrays of the constrained target
-// search across the calls (pointer to slice, so the grown capacity
+// npcScanPool recycles the scan arrays (pointer to slice, so the grown capacity
 // travels back into the pool).
 var npcScanPool = sync.Pool{
     New: func() any {
@@ -647,8 +628,8 @@ var npcScanPool = sync.Pool{
     },
 }
 
-// skipContains reports whether the dense skip list holds the id: the
-// lists stay tiny, so the linear walk beats a map hash lookup.
+// skipContains reports whether the dense skip list holds the id: the lists stay
+// tiny, so the linear walk beats a map lookup.
 func skipContains(skip []int32, objectID int32) bool {
     for _, id := range skip {
         if id == objectID {
@@ -659,17 +640,17 @@ func skipContains(skip []int32, objectID int32) bool {
     return false
 }
 
-// socialHelpMargin widens the clan help radius of the target search: a
-// pack mate wandering in while the fight runs would join it.
+// socialHelpMargin widens the clan help radius: a pack mate wandering in while
+// the fight runs would join it.
 const socialHelpMargin = 200.0
 
-// socialHelpZLimit mirrors the Mobius AttackableAI guard: clan mates
-// more than 600 units apart in height never answer the call.
+// socialHelpZLimit mirrors the Mobius AttackableAI guard: clan mates more than
+// 600 units apart in height never answer the call.
 const socialHelpZLimit = 600.0
 
-// npcScan is the compact scan record of one living attackable npc: the
-// projected position, the z level, the clan bitmask and the world slot
-// packed into one cache friendly block.
+// npcScan is the compact record of one living attackable npc: the projected
+// position, the z level, the clan bitmask and the world slot in one cache
+// friendly block.
 type npcScan struct {
     x             float64
     y             float64
@@ -683,17 +664,16 @@ type npcScan struct {
     bowWielding   bool
 }
 
-// socialHelpersNear reports whether attacking the candidate would pull
-// its clan mates: the Mobius AttackableAI lets the attacked npc call
-// every nearby attackable sharing one of its clans (the ALL clan
-// matches everything) within its clanHelpRange.
+// socialHelpersNear reports whether attacking the candidate would pull its clan
+// mates: the Mobius AttackableAI lets the attacked npc call every nearby
+// attackable sharing one of its clans (the ALL clan matches everything) within
+// its clanHelpRange.
 func socialHelpersNear(scans []npcScan, cand *npcScan) bool {
     return socialHelperRecord(scans, cand) != nil
 }
 
-// socialHelperRecord finds the clan mate that fences the candidate out
-// of the target search, nil for a loner: socialHelpersNear and the
-// blocked target diagnostic share it.
+// socialHelperRecord finds the clan mate that fences the candidate out, nil for
+// a loner: socialHelpersNear and the blocked diagnostic share it.
 func socialHelperRecord(scans []npcScan, cand *npcScan) *npcScan {
     if cand.clanHelpRange <= 0 || cand.clanMask == 0 {
         return nil
@@ -725,10 +705,9 @@ func socialHelperRecord(scans []npcScan, cand *npcScan) *npcScan {
     return nil
 }
 
-// clanMaskAssists mirrors the Mobius clan check of the assist call: a
-// shared clan bit calls the helper, and the ALL clan of the attacked
-// npc matches every clan (single sided - a lone ALL mob next to a
-// clanned one does not pull it).
+// clanMaskAssists mirrors the Mobius assist check: a shared clan bit calls the
+// helper, and the ALL clan of the attacked npc matches every clan (single
+// sided - a lone ALL mob next to a clanned one does not pull it).
 func clanMaskAssists(attacked uint64, helper uint64) bool {
     if attacked == 0 || helper == 0 {
         return false
@@ -740,9 +719,9 @@ func clanMaskAssists(attacked uint64, helper uint64) bool {
     return attacked&helper&^npcdata.ClanMaskAll != 0
 }
 
-// NearestNpcByTemplates returns the closest living npc of the given
-// template ids within maxDistance: the town trip finds its merchant with
-// it, and merchants never move, so the raw packet position is honest.
+// NearestNpcByTemplates returns the closest living npc of the given template
+// ids within maxDistance: the town trip finds its merchant with it, and
+// merchants never move, so the raw packet position is honest.
 func (b *Bot) NearestNpcByTemplates(
     templates []int32, maxDistance float64,
 ) (AttackTarget, bool) {
@@ -781,9 +760,9 @@ func (b *Bot) NearestNpcByTemplates(
     return best, found
 }
 
-// templateWanted reports whether the template id is in the wanted set.
-// The merchant lists of the town trips carry a handful of ids, so the
-// linear scan beats a per call map allocation.
+// templateWanted reports whether the template id is in the wanted set: the
+// merchant lists carry a handful of ids, so the linear scan beats a per call
+// map allocation.
 func templateWanted(templateID int32, templates []int32) bool {
     for _, id := range templates {
         if id == templateID {
@@ -794,12 +773,11 @@ func templateWanted(templateID int32, templates []int32) bool {
     return false
 }
 
-// MedianZoneMobLevel returns the median level of the living attackable
-// npcs inside the zone, zero when none is known: the delevel policy
-// compares the character level against it. The scan runs on every hunt
-// tick, so the median comes from a 256 bucket histogram (one pass, zero
-// allocations) with a sort fallback past the bucket bound, which the C1
-// data never reaches. A nil zone returns zero.
+// MedianZoneMobLevel returns the median level of the living attackable npcs
+// inside the zone, zero when none is known: the delevel policy compares the
+// character level against it. The scan runs every hunt tick, so the median
+// comes from a 256 bucket histogram (one pass, zero allocations) with a sort
+// fallback past the bucket bound, which the C1 data never reaches.
 func (b *Bot) MedianZoneMobLevel(zone ZoneArea) int32 {
     b.mu.RLock()
     defer b.mu.RUnlock()
@@ -818,17 +796,16 @@ func (b *Bot) MedianZoneMobLevel(zone ZoneArea) int32 {
     return b.sortedZoneMedian(zone, count)
 }
 
-// zoneMobLevelCandidate reports whether the world record counts
-// toward the zone median: a living, attackable npc of a positive
-// level.
+// zoneMobLevelCandidate reports whether the record counts toward the zone
+// median: a living, attackable npc of a positive level.
 func zoneMobLevelCandidate(obj *objectHot) bool {
     return obj.Kind == kindNPC && obj.Attackable && !obj.Dead &&
         obj.Level > 0
 }
 
-// countZoneMobLevels runs the allocation-free histogram pass over the
-// hot records and reports a level past the bucket bound (the sort
-// fallback re-scans when it arms). The caller holds the bot lock.
+// countZoneMobLevels runs the histogram pass over the hot records and reports a
+// level past the bucket bound (the sort fallback re-scans then). The caller
+// holds the bot lock.
 func (b *Bot) countZoneMobLevels(
     zone ZoneArea, buckets *[256]int32,
 ) (int32, bool) {
@@ -851,9 +828,8 @@ func (b *Bot) countZoneMobLevels(
     return count, overflow
 }
 
-// bucketMedian walks the ascending level axis to the median rank: the
-// first level whose cumulative count passes count/2 (zero when a
-// consistent histogram never reaches it).
+// bucketMedian walks the ascending level axis to the median rank: the first
+// level whose cumulative count passes count/2 (zero when it never does).
 func bucketMedian(buckets *[256]int32, count int32) int32 {
     seen := int32(0)
     for level := 1; level < len(buckets); level++ {
@@ -866,9 +842,9 @@ func bucketMedian(buckets *[256]int32, count int32) int32 {
     return 0
 }
 
-// sortedZoneMedian is the overflow fallback of the median scan: the C1
-// data carries no level past the 256 bucket bound, so the allocation
-// never arms in practice. The caller holds the bot lock.
+// sortedZoneMedian is the overflow fallback of the median scan: the C1 data
+// carries no level past the 256 bucket bound, so the allocation never arms in
+// practice. The caller holds the bot lock.
 func (b *Bot) sortedZoneMedian(zone ZoneArea, count int32) int32 {
     levels := make([]int32, 0, count)
     for i := range b.world.hot {
@@ -884,10 +860,9 @@ func (b *Bot) sortedZoneMedian(zone ZoneArea, count int32) int32 {
     return levels[len(levels)/2]
 }
 
-// projectedPosition estimates where an object is right now: a standing
-// object keeps its packet position, a moving one advances from the
-// segment start at its effective speed (the Mobius
-// Creature.updatePosition loop steps every 100 ms game tick).
+// projectedPosition estimates where an object is now: a standing object keeps
+// its packet position, a moving one advances from the segment start at its
+// effective speed (the Mobius Creature.updatePosition loop steps every 100 ms).
 func projectedPosition(obj *objectHot, nowNano int64) (float64, float64) {
     if !obj.Moving || obj.MoveAt == 0 {
         return float64(obj.X), float64(obj.Y)
