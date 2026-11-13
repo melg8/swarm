@@ -14,13 +14,11 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// monitorPeriod paces the condition evaluation of the running
-// scenarios: every tick reads the tracker state and rewrites the
-// check list.
+// monitorPeriod paces the condition evaluation of the running scenarios.
 const monitorPeriod = 2 * time.Second
 
-// onlineWait bounds the wait for the world entry of a session: past
-// it the scenario fails instead of hanging until the timeout.
+// onlineWait bounds the wait for the world entry: past it the scenario fails
+// instead.
 const onlineWait = 90 * time.Second
 
 // The farm readiness condition ids.
@@ -42,19 +40,17 @@ const (
 // The village escape condition id.
 const checkEscape = "escape"
 
-// checkPocketEscape is the single check of the railing pocket
-// scenario: the character stands beyond the pocket radius from the
-// spawn cell (the walk out of the linkless deck cell happened).
+// checkPocketEscape is the single check of the railing pocket scenario: the
+// character stands beyond the pocket radius from the spawn cell, out of the
+// linkless deck.
 const checkPocketEscape = "pocket-escape"
 
-// checkStuckEscape is the single check of the stuck point scenarios:
-// the character stands beyond the escape radius from the reported
-// terrace spot (the walk out of the stranded link component
-// happened).
+// checkStuckEscape is the single check of the stuck point scenarios: the
+// character stands beyond the escape radius from the reported terrace spot, out
+// of the stranded component.
 const checkStuckEscape = "stuck-escape"
 
-// The tracker readiness detail strings the scenario evaluators
-// repeat (the goconst honest names).
+// The tracker readiness detail strings the evaluators repeat.
 const (
     detailOffline    = "offline"
     detailNoPosition = "the position is unknown"
@@ -66,10 +62,9 @@ const (
     checkFast  = "fast"
 )
 
-// The teacher hall geometry of the building entry scenario: the class
-// master Ellenia of the elven fighters stands inside the trainer hall
-// (ElvenVillageNPCs.xml), the interaction ring the scenario accepts
-// matches the server INTERACTION_DISTANCE.
+// The teacher hall geometry: Ellenia stands inside the trainer hall
+// (ElvenVillageNPCs.xml) and the accepted ring matches the server
+// INTERACTION_DISTANCE.
 const (
     elleniaSpawnX = 45725
     elleniaSpawnY = 52105
@@ -79,9 +74,7 @@ const (
     elleniaInteractionDist = 250.0
 )
 
-// evaluateTeacher reports whether the character stands within the
-// interaction distance of the teacher Ellenia - the walk crossed the
-// building entrance and reached the class master inside the hall.
+// evaluateTeacher reports whether the walk reached Ellenia inside the hall.
 func evaluateTeacher(tracker *state.Bot) (detail string, done bool) {
     x, y, z, ok := tracker.SelfPosition()
     if !ok {
@@ -98,10 +91,9 @@ func evaluateTeacher(tracker *state.Bot) (detail string, done bool) {
     return fmt.Sprintf("at %.0f units from Ellenia", dist), true
 }
 
-// evaluateLesson reports whether the teach stop already taught: the
-// SP of the character dropped below the injected start value (only
-// the lesson requests consume SP). A zero SP means the UserInfo of
-// the world entry has not landed yet - no lesson answer before it.
+// evaluateLesson reports whether the teach stop taught: the SP dropped below
+// the injected start value, the lessons being the only consumer. A zero SP
+// means the world entry UserInfo has not landed yet.
 func evaluateLesson(tracker *state.Bot) (detail string, done bool) {
     sp := tracker.SelfSp()
     if sp <= 0 {
@@ -114,8 +106,7 @@ func evaluateLesson(tracker *state.Bot) (detail string, done bool) {
     return fmt.Sprintf("%d sp, the lessons began", sp), true
 }
 
-// farmChecks is the initial check list of the farm readiness
-// scenario: the narrative order of the user story.
+// farmChecks is the initial check list of the farm readiness scenario.
 func farmChecks() []Check {
     return []Check{
         {
@@ -163,8 +154,8 @@ func lifetimeChecks() []Check {
     }
 }
 
-// zoneReturnChecks is the check list of the stuck cell scenario: the
-// world entry plus the walk home to the selected hunting zone.
+// zoneReturnChecks is the check list of the stuck cell scenario: the world
+// entry and the walk home to the selected hunting zone.
 func zoneReturnChecks() []Check {
     return []Check{
         {
@@ -178,13 +169,11 @@ func zoneReturnChecks() []Check {
     }
 }
 
-// fullDressWindow bounds the world entry dress of the burst scenario:
-// the burst lands the whole bag within the first ticks of the world
-// entry (the honest runs dress inside the two second monitor period),
-// while the retired fixed pause between the use item requests needed
-// over twenty seconds for the same eleven pieces - the window fails
-// that pacing and passes every honest burst with room for the monitor
-// poll granularity and a slow server flush.
+// fullDressWindow bounds the world entry dress of the burst scenario: a burst
+// lands the whole bag within the first ticks (the two second monitor period),
+// while a fixed pause between the use item requests needed over twenty seconds
+// for the same eleven pieces. The ten second window passes every burst with
+// room for the poll granularity and a slow server flush.
 const fullDressWindow = 10 * time.Second
 
 // fullDressSlots are the eleven paperdoll slots the injected outfit
@@ -196,9 +185,7 @@ var fullDressSlots = [...]int{
     state.PaperdollLFinger, state.PaperdollRFinger,
 }
 
-// fullDressChecks is the check list of the world entry burst
-// scenario: the world entry, the whole outfit worn and the burst
-// window held.
+// fullDressChecks is the check list of the world entry burst scenario.
 func fullDressChecks() []Check {
     return []Check{
         {
@@ -230,20 +217,17 @@ func evaluateFullDress(tracker *state.Bot) (filled int, total int) {
     return filled, total
 }
 
-// fullDressWatch tracks the world entry moment and the first fully
-// dressed observation of the burst scenario: the watch holds the
-// timing state between the monitor polls (the online moment anchors
-// the window, the first full paperdoll observation latches the dress
-// and the fast checks together).
+// fullDressWatch holds the timing state between the monitor polls: the online
+// moment anchors the window, the first full paperdoll observation latches the
+// dress and the fast checks together.
 type fullDressWatch struct {
     onlineAt  time.Time
     dressedAt time.Time
 }
 
-// evaluate rewrites the check list of the burst scenario from the
-// live tracker state: the dress check holds once every slot is
-// filled, the fast check latches with it and compares the elapsed
-// time against the world entry window.
+// evaluate rewrites the check list from the live tracker: the fast check
+// latches with the dress check and compares the elapsed time against the world
+// entry window.
 func (w *fullDressWatch) evaluate(tracker *state.Bot, test *Test) {
     if tracker.Status() != state.StatusOnline {
         return
@@ -265,8 +249,8 @@ func (w *fullDressWatch) evaluate(tracker *state.Bot, test *Test) {
         "the bag dressed in "+elapsed.Round(time.Millisecond).String())
 }
 
-// gearGapChecks is the check list of the pantsless dump scenario: the
-// world entry plus the dressed legs slot of the gear gap refill.
+// gearGapChecks is the check list of the pantsless dump scenario: the world
+// entry and the dressed legs slot of the gear gap refill.
 func gearGapChecks() []Check {
     return []Check{
         {
@@ -280,9 +264,9 @@ func gearGapChecks() []Check {
     }
 }
 
-// buildingEntryChecks is the check list of the trainer hall entry
-// scenario: the world entry at the building entrance, the walk right
-// up to the teacher npc inside the hall and the first learned lesson.
+// buildingEntryChecks is the check list of the trainer hall entry scenario: the
+// world entry at the entrance, the walk up to the teacher and the first learned
+// lesson.
 func buildingEntryChecks() []Check {
     return []Check{
         {
@@ -300,11 +284,10 @@ func buildingEntryChecks() []Check {
     }
 }
 
-// evaluateGearGapConditions rewrites the check list of the pantsless
-// dump scenario from the live tracker state: the segments check holds
-// once the character wears any piece in the paperdoll legs slot the
-// town trip bought back (the auto equipment wears the filler within
-// seconds of its arrival).
+// evaluateGearGapConditions rewrites the check list of the pantsless dump
+// scenario: the legs check holds once any piece sits in the paperdoll legs slot
+// the town trip bought back, and the auto equipment wears the filler within
+// seconds of its arrival.
 func evaluateGearGapConditions(tracker *state.Bot, test *Test) {
     if tracker.Status() != state.StatusOnline {
         return
@@ -315,8 +298,8 @@ func evaluateGearGapConditions(tracker *state.Bot, test *Test) {
 }
 
 // legsWord renders the legs slot state of the gear gap detail.
-func legsWord(segments int) string {
-    if segments == 1 {
+func legsWord(legs int) string {
+    if legs == 1 {
         return "the legs slot is dressed"
     }
 
@@ -362,16 +345,15 @@ type equipCounts struct {
     shield int
 }
 
-// total sums the filled slots.
+// armor sums the six armor slots.
 func (c equipCounts) armor() int {
     return c.chest + c.legs + c.head + c.gloves + c.feet + c.back
 }
 
-// evaluateEquipment reads the paperdoll and reports whether the
-// character wears a proper gear set: a weapon in the right hand, the
-// chest covered and at least four of the six armor slots plus one
-// jewel filled - the outcome the shop strategy of a 100k adena wallet
-// reaches in the elven village shops.
+// evaluateEquipment reports whether the character wears a proper set: a weapon
+// in the right hand, the chest covered, four of the six armor slots and one
+// jewel filled - what the shop strategy of a 100k adena wallet reaches in the
+// elven village shops.
 func evaluateEquipment(tracker *state.Bot) (equipCounts, bool) {
     doll := tracker.PaperdollSlotObjectIDs()
     counts := equipCounts{
@@ -404,9 +386,9 @@ func filled(objectID int32) int {
     return 0
 }
 
-// evaluateSkills reports whether the character learned its key
-// skills and has no affordable lesson left: the auras of the final
-// state plus the emptied affordable prefix of the class tree.
+// evaluateSkills reports whether the character learned its key skills and has
+// no affordable lesson left: the auras plus the emptied affordable prefix of
+// the class tree.
 func evaluateSkills(tracker *state.Bot) (detail string, done bool) {
     level := tracker.SelfLevel()
     plan := tracker.SkillPlan()
@@ -444,9 +426,9 @@ func evaluateSkills(tracker *state.Bot) (detail string, done bool) {
     return fmt.Sprintf("%d skills, %d sp left", total, plan.Sp), true
 }
 
-// evaluateZone reports whether the character stands inside its
-// current hunting zone (the spot square the hunt loop leashes itself
-// to) and returns the zone bounds for the kill placement check.
+// evaluateZone reports whether the character stands inside its hunting zone,
+// the square the hunt loop leashes itself to, and returns the zone for the kill
+// placement check.
 func evaluateZone(tracker *state.Bot) (detail string, inside bool,
     zone *state.Zone,
 ) {
@@ -482,16 +464,16 @@ func abs32(value int32) int32 {
     return value
 }
 
-// evaluateKill reports whether one kill mark of this run landed
-// inside the hunting zone.
+// evaluateKill reports whether one kill mark of this run landed inside the
+// hunting zone.
 func evaluateKill(
     tracker *state.Bot, zone *state.Zone, runStartMs int64,
 ) (detail string, done bool) {
     marks := tracker.KillMarks()
     for i := range marks {
         if marks[i].AtMs < runStartMs {
-            // A kill of a previous run of the same character: the
-            // kill ring survives the session resets.
+            // A kill of a previous run: the kill ring survives the session
+            // resets.
             continue
         }
         if zone != nil && !insideZone(zone, marks[i].X, marks[i].Y) {
@@ -506,8 +488,8 @@ func evaluateKill(
     return "no kills yet", false
 }
 
-// waitOnline blocks until the tracker reports the session online (or
-// the context ends): the precondition of every check evaluation.
+// waitOnline blocks until the tracker reports the session online, the
+// precondition of every check evaluation.
 func waitOnline(
     ctx context.Context, tracker *state.Bot, test *Test,
 ) error {

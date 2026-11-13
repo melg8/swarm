@@ -1912,6 +1912,25 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the cmd/swarm suite,
   `golangci-lint run ./cmd/swarm/...` 0 issues.
 
+### 2026-11-13 - acceptance/monitor.go keeps the check semantics
+
+- 25 blocks compress: the monitor keeps the two second poll period, the
+  90 second world entry bound, the teacher hall geometry (Ellenia in
+  `ElvenVillageNPCs.xml`, the accepted ring matching the server
+  `INTERACTION_DISTANCE` 250), the lesson detector (the SP below the
+  injected start value, a zero SP meaning no world entry UserInfo yet),
+  the ten second `fullDressWindow` against the fixed pause that needed
+  over twenty seconds, the eleven `fullDressSlots`, the gear gap legs
+  refill, the proper set rule (a weapon, the chest, four of the six
+  armor slots and one jewel - the 100k adena wallet outcome), the kill
+  ring surviving the session resets, and the check lists of the seven
+  scenarios. The `legsWord` parameter renamed from `segments` to `legs`
+  (the glossary word), the stale `total sums the filled slots` corrected
+  to `armor sums the six armor slots`. 96 comment lines of 539 become
+  78 of 521.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
