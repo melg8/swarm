@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Scratch analysis of the navmesh tile pack sizes (issue #11): walks
-// a tile directory, decodes every tile and breaks the wire bytes down
+// Scratch analysis of the navmesh tile pack sizes: walks a tile
+// directory, decodes every tile and breaks the wire bytes down
 // by section (the polygon planes, the area plane, the link CSR, the
 // span words, the target deltas, the external links, the grid index),
 // then re-encodes the raw tile at several zstd levels to measure the

@@ -130,8 +130,8 @@ func writeAbstractSidecar(outDir string, key navmesh.RegionKey,
     // The sidecar rides the same zstd wrapping as its tile: the abstract edge
     // records (64 wire bytes each) are mostly zero and repeated fields, the
     // plain sidecars of the 164 region pack carried 405.9 MB where the frame
-    // needs 72.6 MB (issue #11). The loader unwraps the frame on the magic
-    // word, the plain sidecars of the older packs keep loading.
+    // needs 72.6 MB. The loader unwraps the frame on the magic word, the plain
+    // sidecars of the older packs keep loading.
     compressed, err := encodeZstd(encoded)
     if err != nil {
         return 0, fmt.Errorf("compress the abstract: %w", err)

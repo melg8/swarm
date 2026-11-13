@@ -158,7 +158,7 @@ func navmeshViewerInitial(mesh *navmesh.Mesh, dir string,
 }
 
 // navmeshComparePack loads the -navmesh-compare tile pack of the
-// dual pack view (issue #59): the second directory renders in pane B
+// dual pack view: the second directory renders in pane B
 // beside the primary one. An explicitly passed directory that holds
 // no tiles answers ok=false and the mode stops - a silent single
 // pack fallback would read as a typo'd pane B with no explanation.
@@ -208,7 +208,7 @@ func runNavmeshViewer(cfg config) {
 
         return
     }
-    // The compare pack of the dual pack view (issue #59): the second
+    // The compare pack of the dual pack view: the second
     // directory renders in pane B. An explicitly passed directory
     // that holds no tiles stops the mode - a silent single pack
     // fallback would read as a typo'd pane B with no explanation.

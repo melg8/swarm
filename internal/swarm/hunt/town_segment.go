@@ -214,8 +214,8 @@ func (l *Loop) planNpcSegment(dest pathfind.Vec3) bool {
         if dz := math.Abs(last.Z - dest.Z); dz > exactSegmentDeckTolerance {
             // The plan resolved onto a foreign deck: the roof over the shop.
             // Walking it would click the roof the server resolves onto the
-            // character (the 2026-09-11 teleport geometry) - the npc rung
-            // refuses, the wide rung stops on the surrounding deck instead.
+            // character - the npc rung refuses, the wide rung stops on the
+            // surrounding deck instead.
             l.logf("Hunt: npc route to %d %d lands %.0f units off "+
                 "the npc deck, refusing the plan",
                 int(dest.X), int(dest.Y), dz)

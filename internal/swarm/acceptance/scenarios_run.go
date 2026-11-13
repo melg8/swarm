@@ -264,10 +264,9 @@ func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
 }
 
 // gearGapScenario runs the pantsless dump round: the temp character wakes at
-// the reported farm spot of the 2026-09-12 04:58 dump with the reported
-// pantsless paperdoll and wallet, and must buy its legs armor back through the
-// ordinary shop strategy (the report's bot farmed on without it - the gear debt
-// machinery of the round 60 fix and its reproduction live in the hunt package).
+// the recorded farm spot with the recorded pantsless paperdoll and wallet, and
+// must buy its legs armor back through the ordinary shop strategy (the reported
+// bot farmed on without it; the gear debt machinery lives in the hunt package).
 func gearGapScenario(ctx context.Context, m *Manager, t *Test) error {
     t.setChecks(gearGapChecks())
 

@@ -2657,6 +2657,21 @@ corner probe is a length, not a leg at all.
   (8.8 s) and gear (0.3 s) suites, `golangci-lint run` on the five
   paths 0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the dated and numbered comments
+
+- The rule forbids a date, a round number and an issue id in a comment;
+  the sweep left 12 such references in the acceptance, hunt, navbuild,
+  web and cmd docs. Each one now states the fact it carried (the
+  foreign deck click, the refusal pocket, the zstd headroom) without
+  the round that found it.
+- 9 files, 5 comment lines fewer; the history markers read 901 (the
+  SPDX headers and the live "legacy" pack and zone mode make up the
+  rest).
+- Verified: `task fmt`, `go build ./...`, the acceptance (8.9 s),
+  botlog (0.7 s), hunt (28.2 s), navbuild (30.6 s), webserver (8.7 s)
+  and cmd/swarm (0.1 s) suites, `golangci-lint run` on the six paths 0
+  issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

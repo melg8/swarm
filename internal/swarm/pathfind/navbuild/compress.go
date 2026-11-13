@@ -57,9 +57,9 @@ func decodeZstd(raw []byte) ([]byte, error) {
 // the decode cost the cold queries pay does not move with the encode level (a
 // zstd property), so the ratio is free at runtime and only the pack build time
 // pays it - the measured headroom over the old default level was 12.6% of the
-// tile pack and 82% of the plain abstract sidecars (issue #11: the default
-// level left 111 MB on the tiles, the unwrapped sidecars carried 333 MB of
-// compressible zero fields).
+// tile pack and 82% of the plain abstract sidecars (the default level left
+// 111 MB on the tiles, the unwrapped sidecars carried 333 MB of compressible
+// zero fields).
 var zstdEncoder, zstdEncoderErr = zstd.NewWriter(nil,
     zstd.WithEncoderConcurrency(1),
     zstd.WithEncoderLevel(zstd.SpeedBestCompression))

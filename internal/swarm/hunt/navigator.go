@@ -19,10 +19,8 @@ type Navigator interface {
     )
     // FindPathApproachAvoiding plans the walk around the given avoid areas: the
     // composition layer's avoid seam (the mesh ban walls with the escape ring
-    // of the own ban). The hunt loop's frozen corridor bans were its historical
-    // consumer - the plaza round of 2026-09-20 removed them (the rectangle
-    // granularity sealed whole mesh sheets), the mesh level capability stays
-    // for the library contract.
+    // of the own ban). The hunt loop no longer uses it (the rectangle
+    // granularity sealed whole mesh sheets), the capability stays on contract.
     FindPathApproachAvoiding(
         start, end pathfind.Vec3, approachRadius float64,
         avoid []pathfind.AvoidArea,

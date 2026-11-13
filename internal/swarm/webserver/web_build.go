@@ -12,12 +12,12 @@ import (
     "strings"
 )
 
-// The build identity of the embedded web interface (issue #48): the server
-// hashes the embedded web content and the page carries the same id through a
-// meta tag the server injects into index.html. The /api/bots poll reports the
-// id of the RUNNING binary through the X-Swarm-Build header, so a tab that
-// outlived a deployment notices the mismatch and reloads itself into the new
-// version instead of silently driving the map with the old assets.
+// The build identity of the embedded web interface: the server hashes the
+// embedded web content and the page carries the same id through a meta tag the
+// server injects into index.html. The /api/bots poll reports the id of the
+// RUNNING binary through the X-Swarm-Build header, so a tab that outlived a
+// deployment notices the mismatch and reloads itself into the new version
+// instead of silently driving the map with the old assets.
 
 // webBuildID hashes the whole file tree of the embedded web content: the hex
 // sha256 over the sorted file paths and the file bytes. The id changes exactly

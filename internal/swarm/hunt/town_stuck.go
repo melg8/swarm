@@ -255,10 +255,9 @@ func (l *Loop) stuckDestinationDistance(selfX int32, selfY int32) float64 {
         l.segmentDest.Y-float64(selfY))
 }
 
-// pocketRefused reports whether the current refusal verdict stands on
-// the very cell where the segment's first refusal latched: the ground the
-// character stands on refuses every click (the refusing pocket of
-// the 2026-09-14 15:10 report), not one specific click line.
+// pocketRefused reports whether the current refusal verdict stands on the very
+// cell where the segment's first refusal latched: the ground the character
+// stands on refuses every click, not one specific click line.
 func (l *Loop) pocketRefused(selfX int32, selfY int32) bool {
     return l.segmentRefused &&
         selfX == l.segmentRefusedX && selfY == l.segmentRefusedY
@@ -289,10 +288,9 @@ func (l *Loop) stuckTownWalk(now time.Time, selfX int32, selfY int32) bool {
             l.logf("Hunt: the server refused the walk click " +
                 "(ActionFailed), varying the aim")
         }
-        // The varied aims run first: the refusal is target specific
-        // far more often than it is a pocket (the round 82 evidence),
-        // one variant per stuck verdict - a variant the server
-        // accepts walks the character where the plain aim bounced.
+        // The varied aims run first: the refusal is target specific far more
+        // often than it is a pocket, one variant per stuck verdict that walks
+        // the character where the plain aim bounced.
         if l.sendVariedAim(selfX, selfY, l.stuckSelfZ(), now) {
             l.stuckAt, l.stuckX, l.stuckY = now, selfX, selfY
             l.stuckWP = l.wpIndex
