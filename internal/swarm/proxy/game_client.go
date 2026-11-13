@@ -107,13 +107,9 @@ func (gc *gameConn) handleAuthLogin(payload []byte) error {
 }
 
 // handleCharacterSelect answers a client character select with the
-// recorded CharSelected packet of the bot session patched to the live
-// tracker state (see serveCharSelectedLive). The slot index itself is
-// irrelevant (the client asked for the only offered slot), but the
-// answer must carry the live place of the character: a client picking
-// the char after a restart dance lands where the bot actually stands.
-// A user click cancels the pending auto select of a dance (the user
-// wins the race against the proxy's own double click).
+// recorded CharSelected packet of the bot session, patched to the live
+// tracker state; a user click cancels the pending auto select of a
+// dance (see serveCharSelectedLive).
 func (gc *gameConn) handleCharacterSelect(payload []byte) error {
     slot := int32(0)
     if len(payload) >= 5 {
@@ -136,14 +132,9 @@ func (gc *gameConn) handleCharacterSelect(payload []byte) error {
 }
 
 // serveCharSelectedLive serves the char selected answer of the current
-// bot session: the newest WebUI selection wins (a selection change that
-// fired while the client was loading or sitting on the char select
-// screen redirects the entry onto the newly selected bot), then the
-// recorded CharSelected packet of the resolved session is rewritten with
-// the live snapshot (the position, vitals and progression fields, see
-// patchCharSelectedLive) and queued to the client. Idempotent: the read
-// loop (the user's double click), the auto select timer of a restart
-// dance and a re-click after a lost answer all ride this one path.
+// bot session, rewritten with the live snapshot (the newest WebUI
+// selection wins). It is idempotent: the read loop, the auto select
+// timer and a re-click after a lost answer all ride this path.
 func (gc *gameConn) serveCharSelectedLive() error {
     if next := gc.server.tryResolveSelectedSession(); next != nil {
         gc.setSession(next)

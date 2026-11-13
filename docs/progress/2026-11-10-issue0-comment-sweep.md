@@ -1019,6 +1019,20 @@ corner probe is a length, not a leg at all.
   packages, `task lint:new`. `diagnostics.go` fell from 42.1 to 19.2
   percent (56 comment lines of 291), no block above 8 lines.
 
+### 2026-11-13 - the proxy split files keep the contracts only
+
+- The five files of the proxy game split (`game.go`,
+  `game_client.go`, `game_relay.go`, `game_switch.go`, `game_view.go`)
+  and `handoff.go` drop 14 blocks: the connection overview, the transit
+  and relogin narratives, the restart dance history, the position
+  report story and the veto handler chain. The static-key handshake,
+  the one-char emulation, the keepalive feedback loop, the position
+  band and the restart safety stay as one to eight line contracts,
+  each pointing at the matching `docs/proxy.md` section.
+- Verified: `task fmt`, `go build ./...`, the proxy tests,
+  `golangci-lint run ./internal/swarm/proxy/...` 0 issues; no block
+  above 8 lines in the six files.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

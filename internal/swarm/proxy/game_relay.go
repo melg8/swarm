@@ -10,22 +10,11 @@ import (
 )
 
 // transitToServer forwards one decrypted client packet to the real game
-// server through the bot session, applying the transformer seam. The
-// keepalive (RequestNetPing) is the one exception: it is answered by the
-// proxy itself and never transits (see answerNetPingLocally) - a held
-// client gets its answer too, the keepalive must survive the freeze.
-// Every other packet of a held client (its bot session ended, the
-// relogin pending) is swallowed: the character is offline, and the
-// frozen world state behind the client makes every action meaningless
-// anyway - except the logout: a user that wants out of the frozen world
-// gets the login screen (the synthesized LeaveWorld), not a swallowed
-// intent.
-//
-// A send failure never kills the client connection: it means the bot
-// session link died under the transit (the narrow window before the
-// relay noticed the recorder close and engaged the hold). The recorder
-// close is the authority on the session end - it triggers the hold of
-// the relogin handoff, and killing the client here would break it.
+// server through the bot session. The keepalive is answered locally and
+// never transits; a held client keeps the keepalive and the logout
+// (the synthesized LeaveWorld) and swallows the rest. A send failure
+// means the session link died: the recorder close owns the hold, so
+// the client connection survives (docs/proxy.md).
 func (gc *gameConn) transitToServer(payload []byte) error {
     if payload[0] == clientOpLogout {
         gc.markUserLogout()
@@ -174,14 +163,10 @@ func (gc *gameConn) writeOutbound(buf []byte, payload []byte) bool {
 }
 
 // runRelay streams the sessions of the client's bot until the
-// connection ends. Each cycle replays the recorded history of one bot
-// session and follows it with the live feed; when that session ends and
-// the client did not ask for the logout itself, the cycle performs the
-// relogin handoff (hold, restart dance) and the loop continues with the
-// replacement session. A WebUI selection change mid cycle swaps the
-// client onto the newly selected bot through the same dance, so the
-// relay goroutine stays the single owner of the stream for the whole
-// life of the connection.
+// connection ends: each cycle replays one session history and follows
+// it with the live feed, then performs the relogin handoff or the WebUI
+// switch through the same restart dance. The relay goroutine stays the
+// single owner of the stream for the life of the connection.
 func (gc *gameConn) runRelay() {
     defer gc.setRelayLive(false)
     fromSeq := gc.charSelectedSeq
@@ -195,16 +180,12 @@ func (gc *gameConn) runRelay() {
 }
 
 // streamSession serves one bot session cycle: the replay of everything
-// recorded after the given sequence (the enter world burst and the
-// history, live-patched for the played character) followed by the live
-// feed. It returns the replay start sequence of the next cycle (the
-// CharSelected the client was served after a restart dance) when the
-// session switched, ok=false when the connection is done.
+// recorded after the given sequence, followed by the live feed. It
+// returns the replay start sequence of the next cycle, or ok=false
+// when the connection is done.
 //
-// The LeaveWorld answer of a bot initiated logout is suppressed in both
-// the replay and the live feed (see handoff.go): a client that processes
-// it drops itself to the login screen, which breaks the hold. A client
-// that asked for the logout itself still receives it.
+// The LeaveWorld of a bot logout is suppressed in both phases (see
+// handoff.go); a client that asked for the logout itself receives it.
 func (gc *gameConn) streamSession(fromSeq int64) (int64, bool) {
     session := gc.currentSession()
     recorder := session.recorder

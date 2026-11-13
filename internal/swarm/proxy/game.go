@@ -18,33 +18,9 @@ import (
     togameserver "github.com/melg8/swarm/internal/swarm/packets/to_game_server"
 )
 
-// gameConn drives one client connection of the emulated game server.
-//
-// The handshake mirrors the real server (ProtocolVersion, KeyPacket
-// with the static Mobius session key, then the stateful XOR cipher). The pre
-// world packets
-// are fully emulated: any AuthLogin session keys are accepted, the char
-// list shows exactly the played character of the selected bot and the
-// CharSelected answer is the recorded packet of the bot session. After
-// EnterWorld the client receives the recorded server packet stream of
-// the bot (the replay) followed by the live feed, and every client
-// packet transits to the real game server through the bot connection -
-// except the keepalive: the RequestNetPing of the client is answered by
-// the proxy itself and never reaches the server (the NetPing answers of
-// the bot session are filtered out of the relay, see
-// isNetPingAnswerPayload - transit plus relay would close a ping
-// feedback loop that accelerates without bound).
-//
-// A mid-session switch onto another bot (the WebUI selection) or onto
-// the replacement session of the same bot (the relogin handoff) rides
-// the restart flow: the proxy plays the server side of the in-game
-// Restart button - RestartResponse moves the client to its char select
-// screen (the client tears its own world down there, so no ghost
-// objects and no stale self pawn survive), the char list of the target
-// bot is offered, and the unsolicited CharSelected answer follows
-// shortly after, exactly as the user's own double click of the only
-// listed character. The client then loads and sends its EnterWorld, and
-// the relay continues with the replay and the live feed of the target.
+// gameConn drives one client connection of the emulated game server:
+// the static-key handshake, the emulated pre-world packets, then the
+// replay and live feed of the selected bot (docs/proxy.md).
 type gameConn struct {
     server  *Server
     conn    net.Conn
@@ -53,14 +29,9 @@ type gameConn struct {
     state   gameState
     readBuf []byte
 
-    // mu guards the session handoff fields: the relay goroutine
-    // swaps the session when the held client is resynced onto the
-    // replacement bot session, while the read loop keeps reading
-    // the client packets and transiting them through the current
-    // session (or swallowing them while the client is held). It also
-    // guards netPingTime, the game time harvested from the suppressed
-    // NetPing answers of the bot session and carried by the locally
-    // synthesized client answers.
+    // mu guards the session handoff fields (the session swap, the hold
+    // and the logout flags) and netPingTime, the game time harvested
+    // from the suppressed NetPing answers for the local client answers.
     mu          sync.Mutex
     session     *botSession
     holding     bool
@@ -123,11 +94,9 @@ const (
     gameOpCharCreateFail = 0x26
 )
 
-// Client game packet opcodes of the periodic position report
-// (ValidatePosition, 0x48 of the Mobius ClientPackets enum) and the
-// local walk veto (CannotMoveAnymore, 0x36), and the server packet
-// opcode of the position correction answer (ValidateLocation, 0x76 of
-// the Mobius ServerPackets enum).
+// The periodic client position report (ValidatePosition, 0x48), the
+// client walk veto (CannotMoveAnymore, 0x36) and the server position
+// correction answer (ValidateLocation, 0x76), all Mobius C1 values.
 const (
     clientOpValidatePosition  = 0x48
     clientOpCannotMoveAnymore = 0x36
@@ -135,13 +104,11 @@ const (
 )
 
 // validateDivergenceSlack widens the server out of sync rule for the
-// projection error: the continuous self projection runs ahead of the
-// server's 100 ms movement tick by up to one tick of travel, and the
-// client report describes a view one network hop old. The rule itself
-// is the live move speed: a report farther than that from the server
-// side place snaps the character, and the server corrects the client
-// only above 500 units (or a >200 z gap), so the band under 500 is the
-// silent snap window this check closes.
+// projection error: the self projection runs up to one 100 ms tick
+// ahead and the client report is one network hop old. The rule is the
+// live move speed; the server corrects only above 500 units (or a
+// >200 z gap), so the band under 500 is the silent snap window this
+// check closes.
 const validateDivergenceSlack = 25.0
 
 // validateLogPeriod bounds the divergence logging: a client whose

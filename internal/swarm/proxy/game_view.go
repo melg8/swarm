@@ -29,18 +29,12 @@ func (gc *gameConn) answerNetPingLocally() {
 }
 
 // clientViewDiverged reports whether one client position report
-// contradicts the place the server holds the played character at. The
-// Mobius ValidatePosition handler snaps the character to the reported
-// place whenever the 3D distance exceeds one move speed, and it only
-// answers a correction to a report 500 or more units away - so a stale
-// spectator view in the band between the two drags the character back
-// with no correction at all, and a view stuck on client side geometry
-// keeps reporting the same stale place even when the correction
-// arrives (the railing case: the frozen pawn of the stair railing held
-// the character off the gatekeeper and the teleport bypass failed the
-// interaction range silently). The compared place is the projected
-// live position, not the last broadcast origin, because the origin
-// sits a whole walk segment behind a moving character.
+// contradicts the projected live place by more than one move speed
+// plus validateDivergenceSlack. The band under the server's 500 unit
+// correction threshold is the silent snap window this check closes;
+// the projected place is compared, not the last broadcast origin,
+// which sits a walk segment behind a moving character
+// (docs/proxy.md, "The client position reports").
 func (gc *gameConn) clientViewDiverged(payload []byte) bool {
     if len(payload) < 13 {
         return false
@@ -68,16 +62,11 @@ func (gc *gameConn) clientViewDiverged(payload []byte) bool {
     return math.Sqrt(dx*dx+dy*dy+dz*dz) > limit
 }
 
-// correctClientView drops one diverged position report and answers it
-// the way the Mobius server answers an out of sync client: a
-// ValidateLocation carrying the live place of the played character.
-// The answer heals the client's stale pawn view (the next reports come
-// back in sync and transit again), and the diverged report itself
-// never reaches the server, severing the position feedback loop that
-// snapped the character between the bot's walk requests and the
-// client's stale view. The correction may repeat with every stale
-// report (the client heals after one, a stubborn view keeps getting
-// corrected once per report), the log line is rate limited instead.
+// correctClientView drops one diverged report and answers it with the
+// ValidateLocation the Mobius server sends an out of sync client: the
+// correction heals the stale pawn view and the report never reaches
+// the server, severing the position feedback loop. The answer may
+// repeat per report; the log line is rate limited.
 func (gc *gameConn) correctClientView(payload []byte) {
     reportX := int32(binary.LittleEndian.Uint32(payload[1:5]))
     reportY := int32(binary.LittleEndian.Uint32(payload[5:9]))
@@ -96,16 +85,11 @@ func (gc *gameConn) correctClientView(payload []byte) {
 }
 
 // discardClientVeto drops one client CannotMoveAnymore (0x36) and
-// answers it with the same correction the server sends an out of sync
-// client. The Mobius handler throws the reported place away and
-// cancels the player's move intention (CannotMoveAnymore.runImpl ->
-// notifyActionArrivedBlocked -> setIntentionIdle), which stops the
-// bot's server side walk at the server place - the frozen pawn of an
-// attached client vetoed every click the bot sent and the character
-// never walked. The veto never transits: the local collision of a
-// spectator client has no authority over the bot session, and the
-// correction ends the client's local walk too, so the following
-// reports ride the bot again.
+// answers it with the same correction: the Mobius handler throws the
+// reported place away and cancels the move intention, which would stop
+// the bot's server side walk. The local collision of a spectator
+// client has no authority over the bot session, and the correction
+// ends the client's local walk (docs/proxy.md, "The client move veto").
 func (gc *gameConn) discardClientVeto(payload []byte) {
     if len(payload) < 13 {
         return

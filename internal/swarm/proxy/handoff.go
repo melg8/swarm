@@ -12,29 +12,12 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The bot relogin handoff: a client sitting in the world must survive the
-// session cycle of its bot. The hunt loop logs the character out when the
-// situation turns hopeless (the emergency logout) and the supervisor logs
-// it back in a few seconds later; the client user did nothing and must not
-// be kicked to the login screen for that. The pieces:
-//
-//   - the relay suppresses the LeaveWorld the real server answers to the
-//     bot's logout (a client that processes it drops to the login screen
-//     by itself), unless the client asked for the logout itself;
-//   - when the session's recorder closes, the relay holds the connection
-//     open and swallows the client packets (the character is offline, the
-//     world behind the client is frozen);
-//   - once the replacement session of the same bot enters the world, the
-//     held client is taken through the restart dance (see
-//     beginRestartSwitch): the proxy answers the restart the user never
-//     clicked, offers the character list of the replacement and serves
-//     the char selected answer on its own, so the client re-enters the
-//     world of the same character without anyone clicking anything.
-//
-// A user initiated logout keeps the classic flow: the client's own Logout
-// packet transits to the real server, the LeaveWorld answer is relayed so
-//     the client returns to the login screen itself, and the session end
-// then closes the client connection.
+// The bot relogin handoff: a client in the world must survive the
+// session cycle of its bot. The relay suppresses the bot's LeaveWorld,
+// holds the client while the character is offline, and resyncs it onto
+// the replacement session through the restart dance once that session
+// enters the world. A user logout keeps the classic relay path
+// (docs/proxy.md, "The bot relogin handoff").
 
 // Server packet opcodes the handoff synthesizes or suppresses (the C1
 // values of the Mobius ServerPackets enum).
@@ -55,15 +38,11 @@ const (
 )
 
 // isNetPingAnswerPayload reports whether the payload is the NetPing
-// answer of the bot session's own keepalive. Those answers are per
-// connection round trips between the bot and the real server: they
-// describe no world state, so the relay never forwards them to a
-// client (the client keepalive is answered locally instead, see
-// transitToServer - relaying them arms the ping feedback loop where an
-// answer driven client re-pings per delivered answer, the transit
-// reaches the server through the bot session, the new answer is
-// recorded and relayed again, and the loop accelerates to tens of
-// thousands of packets per second on the attached bot).
+// answer of the bot session's own keepalive. Those answers describe no
+// world state and are never relayed: the client keepalive is answered
+// locally, and relaying the bot answers arms the ping feedback loop
+// that accelerates without bound (docs/proxy.md, "The client
+// keepalive").
 func isNetPingAnswerPayload(payload []byte) bool {
     return len(payload) > 0 && payload[0] == serverOpNetPing
 }
@@ -174,14 +153,10 @@ func buildLeaveWorldPacket() []byte {
     return []byte{handoffOpLeaveWorld}
 }
 
-// buildRestartResponsePacket builds the C1 RestartResponse packet the
-// real server answers the in-game Restart button with (see
-// RequestRestart.handlePacket and RestartResponse.writeImpl of the
-// Mobius C1 server): [opcode 0x74][result: 1]. The client that processes
-// it tears its world down and returns to the character select screen on
-// its own - the one mid-session state transition the C1 client is
-// designed to make, and the carrier of every character switch the proxy
-// performs.
+// buildRestartResponsePacket builds the C1 RestartResponse answer of
+// the in-game Restart button (RequestRestart.handlePacket and
+// RestartResponse.writeImpl): [opcode 0x74][result: 1]. The client
+// tears its world down and returns to the char select screen.
 func buildRestartResponsePacket() []byte {
     return []byte{handoffOpRestartResponse, 0x01, 0x00, 0x00, 0x00}
 }

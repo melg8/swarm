@@ -9,18 +9,12 @@ import (
 )
 
 // serveBotSwitch handles a WebUI selection change while a client is
-// connected: it resolves the newly selected bot session and, when it
-// differs from the current one and is ready (online with its char
-// selected answer recorded), starts the restart dance onto it. The
-// client returns to its char select screen, is auto selected onto the
-// new character and re-enters the world on it: the position, the
-// appearance, the race, the class and the equipment all arrive through
-// the enter world packets of the new bot - no reconnect needed. Returns
-// the target id together with the new session when the dance started;
-// the target id with a nil session when the target is not ready yet
-// (the caller arms the pending switch and keeps serving the current
-// live feed); "" with a nil session when the selection resolves to the
-// current bot or nothing at all.
+// connected: a different ready bot (online with its CharSelected
+// recorded) starts the restart dance onto it. It returns the target id
+// with the new session when the dance started, the target id with a
+// nil session while the target is not ready (the caller arms the
+// pending switch), and "" with a nil session when the selection names
+// the current bot or nothing (docs/proxy.md, "Switching bots").
 func (gc *gameConn) serveBotSwitch(current *botSession) (string, *botSession) {
     target := gc.server.SelectedBot()
     if target == "" || target == current.id {
@@ -74,23 +68,12 @@ func (gc *gameConn) retryPendingSwitch(
 }
 
 // beginRestartSwitch starts the restart dance for a live in-world
-// client: the exact packet pair the real server answers the in-game
-// Restart button with (RestartResponse followed by the char list - see
-// RequestRestart.handlePacket of the Mobius C1 server) moves the client
-// to its own char select screen, and the session of the connection
-// swaps to the target bot so the char list, the char selected answer
-// and the following replay all serve the new character. The dance
-// cannot fail on a live connection: the synthesized packets are fixed
-// layout and the char list builder degrades gracefully.
-//
-// The C1 client tears its whole world down when it processes the
-// RestartResponse - that is what makes the dance the only correct
-// switch: the teleport + DeleteObject sweep approach crashes the client
-// (a UserInfo of an object id the client never spawned dereferences a
-// missing pawn in the UserInfoPacket handler - the reported General
-// protection fault), and a UserInfo of a nearby known object leaves the
-// client controlling its old pawn. A restart is the one mid-session
-// identity change the client is designed to process.
+// client: RestartResponse plus the char list move it to its char select
+// screen (the exact Mobius RequestRestart.handlePacket answer), the
+// session swaps to the target and the auto select follows. The C1
+// client tears its world down on the RestartResponse, which is what
+// makes the restart the only safe identity change: the teleport +
+// DeleteObject sweep crashes it (docs/proxy.md, "Switching bots").
 func (gc *gameConn) beginRestartSwitch(next *botSession) bool {
     gc.setSession(next)
     gc.setState(gameStateChars)
