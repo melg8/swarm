@@ -1497,6 +1497,21 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - hunt/loop_safety.go keeps the escape guards
+
+- 32 blocks compress: the flee layer keeps the lane fan order (the
+  straight away ray, then 45 and 90 degrees each side), the hunting
+  square clamp with the inner margin, the two dead escape guards (no
+  open lane, less than `escapeNoProgressDistance` in the window), the
+  H-006 dead escape, the 15 s logout combat window, the 85 logouts on
+  one ground measurement, the ~19 units held through 21 s by a level 10
+  Kaboo Orc Fighter, the 100 to 59 percent race of a level 7 archer in
+  sixteen seconds against the same mob, the `panicRunDistance` pile up
+  run and the dynamic `pileUpWinnable` verdict. 152 comment lines of 589
+  become 118 of 555.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
