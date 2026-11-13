@@ -2047,6 +2047,25 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the gear suite (0.4 s),
   `golangci-lint run ./internal/swarm/gear/...` 0 issues.
 
+### 2026-11-13 - state/bot_walkplan.go keeps the timing view
+
+- 19 blocks compress: the file keeps the two second `walkPlanTTL` (the
+  loop republishes every tick, so an expired plan means it moved on), the
+  published plan contract (origin, points, cursor, destination - the
+  dump and the map read it), the `WalkSearch` repro contract (a viewer
+  that rebuilt the walk with the exact destination and no bans drew a
+  route with nothing in common with the followed walk), the water priced
+  at the swim rate, the 200 approach radius of the trip searches against
+  the zero exact destination contract, the `Avoid` ban circles, the per
+  tick republish of an equal plan refreshing only its lifetime, the
+  timing view rule of `publishWalkPlanLocked` (the same route with the
+  cursor ahead keeps the zero point and records the arrivals, a replan
+  or a backward cursor starts anew and pre-fills the passed prefix), and
+  the deep copy of `rememberWalkPlanLocked`. 83 comment lines of 244
+  become 67 of 228.
+- Verified: `task fmt`, `go build ./...`, the state suite (1.2 s),
+  `golangci-lint run ./internal/swarm/state/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
