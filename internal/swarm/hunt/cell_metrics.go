@@ -10,91 +10,78 @@ import (
     "time"
 )
 
-// The empirical measurement layer of the cell hunting: per cell
-// rolling statistics of the session replace the gear points of the
-// old zone gates. The metrics measure what the gates tried to
-// predict: the loot income of the ground for THIS character (adena
-// per active minute, rest included - hard fights internalize their
-// own cost) and the danger of the ground (a decayed death heat). An
-// undergeared bot automatically scores worse where it takes damage
-// and drifts to easier cells without any MinGear numbers.
+// The empirical measurement layer of the cell hunting: per cell rolling
+// statistics replace the gear points of the old zone gates. They measure what
+// the gates tried to predict - the loot income of the ground for this character
+// (adena per active minute, rest included, so hard fights internalize their
+// cost) and the danger (a decayed death heat) - so an undergeared bot scores
+// worse where it takes damage and drifts to easier cells without any MinGear
+// numbers.
 
-// The scoring constants of the cell economy (the spot economy values
-// carried over: the elven respawn turnover and the C1 drop curve the
-// live sessions measured).
+// The scoring constants of the cell economy, measured on live sessions.
 const (
-    // cellMetricsTrustMin is the active hunting time a ground needs
-    // before the measured rate replaces the bootstrap prior.
+    // cellMetricsTrustMin is the hunt time a ground needs before the measured
+    // rate wins.
     cellMetricsTrustMin = 5.0
-    // cellKillCapacity is the kill rate a solo farmer sustains on
-    // white-green mobs (a kill every five seconds incl. the pull
-    // walk); the supply turnover bounds it below on sparse grounds.
+    // cellKillCapacity is the kill rate a solo farmer sustains on white-green
+    // mobs: a kill every five seconds including the pull walk; sparse grounds
+    // stay below.
     cellKillCapacity = 12.0
-    // cellAdenaBase and cellAdenaPerLevel price one kill of the
-    // bootstrap prior: the C1 elven drop curve rises with the mob
-    // level, the measured rate replaces the curve as soon as the
-    // real loot flows.
+    // cellAdenaBase and cellAdenaPerLevel price one kill of the prior: the C1
+    // elven drop curve rises with the mob level, the measured rate replaces it
+    // once loot flows.
     cellAdenaBase     = 18.0
     cellAdenaPerLevel = 6.5
-    // cellAggroPenalty is the static discount of an aggressive
-    // heavy ground (the aggressive share of the mass pays this
-    // fraction of the score).
+    // cellAggroPenalty discounts a heavy aggressive ground (the aggressive
+    // share of the mass pays this fraction).
     cellAggroPenalty = 0.35
-    // cellDeathHeatWeight scales the decayed death heat inside the
-    // safety multiplier: one death per hour costs a third of the
-    // score.
+    // cellDeathHeatWeight scales the decayed death heat inside the safety
+    // multiplier.
     cellDeathHeatWeight = 2.0
-    // cellDeathHalfLifeMin is the half-life of the death heat: an
-    // hour old death weighs half.
+    // cellDeathHalfLifeMin is the half-life of the death heat: an hour old
+    // death weighs a quarter.
     cellDeathHalfLifeMin = 30.0
-    // cellProximityScale is the distance at which a cell pays half
-    // its score: the walk to the ground is dead time. The neighbor
-    // rotation keeps the real walks short; the discount only guards
-    // the rare far relocation.
+    // cellProximityScale is the distance at which a cell pays half its score:
+    // the walk is dead time. The neighbor rotation keeps the walks short, the
+    // discount guards the rare far relocation.
     cellProximityScale = 8000.0
-    // cellUnripeDiscount is the score fraction a cell pays while its
-    // respawn window has not passed since the hunter cleared it: the
-    // ground holds nothing pickable until it ripens.
+    // cellUnripeDiscount is the score fraction of a cell whose respawn window
+    // has not passed since the hunter cleared it.
     cellUnripeDiscount = 0.25
 )
 
 // cellMetric accumulates the session experience of one cell.
 type cellMetric struct {
-    // activeMin is the total hunting time spent at the cell
-    // (minutes, rest included, town trips excluded).
+    // activeMin is the hunting time at the cell (rest included, town trips
+    // excluded).
     activeMin float64
     // kills counts the kills of the cell ground.
     kills int
     // adena is the looted adena attributed to the cell.
     adena int64
-    // deaths is the decayed death heat of the cell: every death adds
-    // one, the heat halves every half-life - a cell that killed the
-    // character recently reads hot, an old grudge fades.
+    // deaths is the decayed death heat: every death adds one, the heat halves
+    // every half-life, so a recent kill reads hot and an old grudge fades.
     deaths float64
-    // deathCount is the raw session death count of the cell (the
-    // map view label).
+    // deathCount is the raw session death count (the map view label).
     deathCount int32
     // lastDeathAt paces the decay of the heat.
     lastDeathAt time.Time
-    // killX and killY track the EMA of the kill positions: the live
-    // mass centroid of the ground as the character experiences it
-    // (the walk-to-cell destination and the map view label).
+    // killX and killY track the EMA of the kill positions, the live mass
+    // centroid: the walk-to-cell destination and the map view label.
     killX float64
     killY float64
-    // killPosKnown reports whether at least one kill anchored the
-    // EMA yet.
+    // killPosKnown reports whether a kill anchored the EMA yet.
     killPosKnown bool
-    // visitActiveMin, visitAdena and visitKills carry the running
-    // stay at the cell: the live rate of the current visit folds
-    // into the totals when the stay ends.
+    // visitActiveMin, visitAdena and visitKills carry the running stay; it
+    // folds into the totals when the stay ends.
     visitActiveMin float64
     visitAdena     int64
     visitKills     int
 }
 
-// adenaPerMin returns the measured income rate of the cell: the
-// current visit's live rate when the visit runs, the historical
-// average otherwise. Zero before the first minute of experience.
+// adenaPerMin returns the measured income rate: the live rate of the running
+// visit, the historical average otherwise; zero before the first minute of
+// experience.
 func (m *cellMetric) adenaPerMin() float64 {
     if m.visitActiveMin > 0.5 {
         return float64(m.visitAdena) / m.visitActiveMin
@@ -106,34 +93,29 @@ func (m *cellMetric) adenaPerMin() float64 {
     return 0
 }
 
-// trusted reports whether the measured rate has enough experience to
-// replace the bootstrap prior: the trust horizon of active minutes at
-// the ground.
+// trusted reports whether the measured rate earned the trust horizon.
 func (m *cellMetric) trusted() bool {
     return m.activeMin+m.visitActiveMin >= cellMetricsTrustMin
 }
 
-// cellHub shares the cell occupancy of the fleet: every loop of the
-// process publishes the cell it hunts, the picker divides the score
-// of a cell by its occupancy so the swarm spreads over the grounds
-// of one quality instead of stacking on the nearest one. The
-// neighbor rotation plus the occupancy division keeps the bots of a
-// fleet on DIFFERENT neighborhoods of the mesh: two bots never clear
-// the same cells in lockstep, so the ripeness clock of a cell is the
-// clock of its owning bot, not a race.
+// cellHub shares the cell occupancy of the fleet: every loop publishes the cell
+// it hunts and the picker divides the score by the occupancy, so the swarm
+// spreads over the grounds of one quality instead of stacking on the nearest.
+// The neighbor rotation plus the division keeps the bots on different
+// neighborhoods: two bots never clear the same cells in lockstep, so a cell
+// ripeness clock belongs to its owning bot, not a race.
 type cellHub struct {
     mu      sync.Mutex
     hunters map[string]int
 }
 
-// globalCellHub is the process wide cell occupancy registry: all bot
-// sessions of the swarm share it.
+// globalCellHub is the process wide cell occupancy registry of the swarm.
 var globalCellHub = &cellHub{ //nolint:exhaustruct_v5 // mu is zero
     hunters: make(map[string]int),
 }
 
-// enter claims the cell for a hunter: the occupancy of the cell grows
-// by one. Returns the leave function that releases the claim.
+// enter claims the cell for a hunter and returns the function releasing the
+// claim.
 func (h *cellHub) enter(cellID string) func() {
     h.mu.Lock()
     h.hunters[cellID]++
@@ -157,14 +139,10 @@ func (h *cellHub) occupancy(cellID string) int {
     return count
 }
 
-// cellScore returns the economic score of a cell for the character:
-// the income value (the measured adena per minute once trusted, the
-// bootstrap prior from the window mass and the respawn turnover
-// otherwise) times the safety multiplier (the static aggressive share
-// and the measured death heat) times the proximity discount (the walk
-// to the ground is dead time) times the ripeness discount (a cell the
-// hunter just cleared holds nothing until its respawn lands) divided
-// by the fleet occupancy (the shared cells feed several mouths).
+// cellScore returns the economic score of a cell: the income value times the
+// safety multiplier (the aggressive share and the death heat) times the
+// proximity discount times the ripeness discount, divided by the fleet
+// occupancy.
 func (h *cellHunter) cellScore(index int, now time.Time) float64 {
     cell := &h.cells[index]
     metric := &h.metrics[index]
@@ -177,16 +155,12 @@ func (h *cellHunter) cellScore(index int, now time.Time) float64 {
     return value * safety * proximity * ripeness / occupancy
 }
 
-// cellValue returns the income value of the cell: the measured rate
-// of the session once the ground earned the trust horizon, the
-// bootstrap prior before that. The prior models the expected kills
-// per minute as the smaller of the window supply turnover (window
-// mass / respawn window) and the kill capacity of a solo farmer, and
-// prices each kill by the mob level (the C1 elven drop curve rises
-// with the level; the measured rate replaces the curve as soon as
-// the real loot starts flowing). A trusted rate is the honest income
-// of THIS character on THIS ground - including the zero: a starved
-// ground must not promise its prior forever.
+// cellValue returns the income value: the measured rate once the ground earned
+// the trust horizon, the prior before that. The prior models the kills per
+// minute as the smaller of the window supply turnover (window mass / respawn
+// window) and the solo kill capacity, priced by the mob level. A trusted rate
+// is the honest income of this character on this ground, the zero included: a
+// starved ground must not promise its prior forever.
 func (h *cellHunter) cellValue(cell *Cell, metric *cellMetric) float64 {
     if metric.trusted() {
         return metric.adenaPerMin()
@@ -224,13 +198,11 @@ func (h *cellHunter) cellValue(cell *Cell, metric *cellMetric) float64 {
     return killsPerMin * adenaPerKill
 }
 
-// cellSafety returns the safety multiplier of the cell: the static
-// aggressive share of the ground discounts it a little (an aggressive
-// mob answers the pull before the character is prepared), the
-// measured death heat dominates once the ground drew blood - one
-// death per hour already costs a third of the score. This replaces
-// the MinGear gate: an undergeared character dies, the deaths heat
-// the cell, the picker moves it away.
+// cellSafety returns the safety multiplier: the static aggressive share
+// discounts it a little (an aggressive mob answers the pull before the
+// character is prepared) and the measured death heat dominates once the ground
+// drew blood. This replaces the MinGear gate: an undergeared character dies,
+// the deaths heat the cell, the picker moves away.
 func (h *cellHunter) cellSafety(
     cell *Cell, metric *cellMetric, now time.Time,
 ) float64 {
@@ -246,11 +218,9 @@ func (h *cellHunter) cellSafety(
     return static * dynamic
 }
 
-// cellProximity returns the distance discount of the cell: the walk
-// to the ground is dead time, a cell 8000 units away pays half. The
-// discount anchors at the live character position when known, the
-// current cell focus otherwise (a re-score between the fights never
-// sees a stale far position).
+// cellProximity returns the distance discount: a cell 8000 units away pays
+// half. It anchors at the live character position, the current cell focus
+// otherwise.
 func (h *cellHunter) cellProximity(cell *Cell) float64 {
     x, y := int32(0), int32(0)
     if h.selfKnown {
@@ -263,9 +233,8 @@ func (h *cellHunter) cellProximity(cell *Cell) float64 {
     return 1.0 / (1.0 + dist/cellProximityScale)
 }
 
-// deathHeat decays the death heat of a metric to the given time: the
-// heat halves every half-life since the last death, so an hour old
-// death weighs half. The rate feeds the safety multiplier.
+// deathHeat decays the heat to the given time, halving it every half-life (an
+// hour old death weighs a quarter); the safety multiplier reads it.
 func (h *cellHunter) deathHeat(metric *cellMetric, now time.Time) float64 {
     if metric.deaths <= 0 || metric.lastDeathAt.IsZero() {
         return 0

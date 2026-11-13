@@ -1661,6 +1661,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the webserver suite,
   `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
 
+### 2026-11-13 - hunt/cell_metrics.go keeps the economy numbers
+
+- 26 blocks compress: the measurement layer keeps the trust horizon of
+  5 active minutes, the 12 kills/min solo capacity (a kill every five
+  seconds including the pull walk), the prior `18 + 6.5*level` adena
+  per kill, the 0.35 aggressive share discount, the death heat weight
+  `1/(1 + 2*heat)`, the 30 minute half-life (an hour old death weighs a
+  quarter, the stale "weighs half" line corrected), the 8000 unit
+  proximity scale (half score there), the 0.25 unripe discount, the
+  running visit folding into the totals, the kill position EMA, the
+  shared occupancy hub (the division keeps the fleet off one ground)
+  and the measured rate replacing the prior once trusted. 110 comment
+  lines of 279 become 79 of 248.
+- Verified: `task fmt`, `go build ./...`, the hunt suite,
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
