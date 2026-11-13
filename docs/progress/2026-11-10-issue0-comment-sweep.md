@@ -1350,6 +1350,18 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, `go vet ./cmd/...`, the cmd
   suite (every binary package), `golangci-lint run ./cmd/...` 0 issues.
 
+### 2026-11-13 - acceptance/soak_metrics.go drops the doubles count story
+
+- 8 blocks compress: the trail keeps the O_APPEND line atomicity, the
+  SWARM_RUNS_DIR override, the byte identical local copy of the
+  experience table, the single running exp number of PlayableStat with
+  the UserInfo broadcast and the level below 1 raw exp rule. The 19 line
+  block of `cumulativeSoakXP` and the double count narrative (the dated
+  milestone run, the 1266 against 24238 delta) drop; the remaining block
+  is 5 lines. 53 comment lines of 183 become 29 of 159.
+- Verified: `task fmt`, `go build ./...`, the acceptance suite (8.9 s),
+  `golangci-lint run ./internal/swarm/acceptance/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
