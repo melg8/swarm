@@ -1644,6 +1644,23 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the webserver suite,
   `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
 
+### 2026-11-13 - webserver/stats_api.go keeps the history rules
+
+- 25 blocks compress: the endpoints keep the `?window=<seconds>`
+  contract (default the last day, 0 walks everything, the
+  `rateFloorSeconds` 60 floor against a young-process spike), the
+  tracker reads before the collector lock so the two lock families
+  never cycle, the reconnect gap hold (a zeroed tracker character
+  never flashes zeros through the KPI cards while the badge stays
+  true), the epoch aligned bucket rule (the picks are a pure function
+  of the sample timestamps, so two polls of one window serve the same
+  points and the charts never flicker), the 256 point cap, the
+  `rateFloor`/`perMinute` rates, the `rejoinsOf` first-session rule,
+  the deathless `kdOf` and the baseline gain views. 112 comment lines
+  of 805 become 80 of 773.
+- Verified: `task fmt`, `go build ./...`, the webserver suite,
+  `golangci-lint run ./internal/swarm/webserver/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

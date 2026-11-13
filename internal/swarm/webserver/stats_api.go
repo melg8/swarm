@@ -13,22 +13,18 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The statistics endpoints of the web layer: the fleet wide view
-// (GET /api/stats) and the per bot view (GET /api/stats/{id}). Both
-// answer the current counters plus the downsampled history of the
-// requested window (?window=<seconds>, the default is the last day, 0
-// walks everything the rings hold).
-//
-// Locking: the tracker reads (Info, Metrics, SelfSnapshot) happen
-// before the collector lock is taken and never inside it, mirroring
-// the sampler order - no goroutine ever holds a bot lock while
-// waiting for the collector, so the two lock families never cycle.
+// The statistics endpoints: the fleet view (GET /api/stats) and the per bot
+// view (GET /api/stats/{id}), both answering the current counters plus the
+// downsampled history of the requested window (?window=<seconds>, default the
+// last day, 0 walks everything the rings hold). The tracker reads (Info,
+// Metrics, SelfSnapshot) happen before the collector lock is taken and never
+// inside it, mirroring the sampler order, so the two lock families never cycle.
 
 // statsWindowDefault is the default history window of the endpoints.
 const statsWindowDefault = 24 * time.Hour
 
-// rateFloorSeconds bounds the rate denominators: a bot or a process
-// younger than a minute reports no hourly rate instead of a spike.
+// rateFloorSeconds bounds the rate denominators: a younger subject reports no
+// spike.
 const rateFloorSeconds = 60.0
 
 // parseStatsWindow resolves the window query parameter.
@@ -45,8 +41,8 @@ func parseStatsWindow(r *http.Request) time.Duration {
     return time.Duration(seconds) * time.Second
 }
 
-// botNow is one tracker read outside the collector lock: the live
-// values the "now" views render next to the collected history.
+// botNow is one tracker read outside the collector lock, the live values of the
+// view.
 type botNow struct {
     info      state.BotInfo
     metrics   state.MetricsView
@@ -101,8 +97,7 @@ type fleetStats struct {
     HitRate      float64 `json:"hitRate"`
 }
 
-// botStatsView is one bot row of the fleet view and the head of the
-// per bot view.
+// botStatsView is one bot row of the fleet view and the head of the bot view.
 type botStatsView struct {
     ID              string  `json:"id"`
     Name            string  `json:"name"`
@@ -220,9 +215,9 @@ func (s *Server) handleBotStats(w http.ResponseWriter, r *http.Request) {
     read := readBotNow(bot)
     response, ok := s.stats.botView(read, now, parseStatsWindow(r))
     if !ok {
-        // The sampler has not observed the bot yet (the first sample
-        // lands within one period): answer the current counters with
-        // an empty history instead of a 404.
+        // The sampler has not observed the bot yet (the first sample lands
+        // within one period): answer the current counters with an empty history
+        // instead of a 404.
         response = botStatsResponse{
             botStatsView: botViewFrom(read, nil, now),
             Phases:       []phaseShare{},
@@ -259,9 +254,8 @@ func (c *statsCollector) processStats(now time.Time) processStats {
     }
 }
 
-// fleetView builds the fleet response of a window: the live counters
-// of every registry bot (with the series baselines of the collected
-// history) and the downsampled fleet ring.
+// fleetView builds the fleet response: the live counters of every registry bot
+// (with the series baselines) and the downsampled fleet ring.
 func (c *statsCollector) fleetView(
     now time.Time, window time.Duration,
 ) statsResponse {
@@ -348,12 +342,10 @@ func (c *statsCollector) botView(
     return response, true
 }
 
-// botViewFrom builds the live counter view of one bot: the tracker
-// reads of the caller plus the baselines and the last sample of the
-// series (nil while the collector has none yet). A live read that
-// lands inside the reconnect gap (the zeroed tracker character) holds
-// the last known character facts of the series instead of flashing
-// level 0, experience 0 and adena 0 through the KPI cards.
+// botViewFrom builds the live counter view: the caller reads plus the baselines
+// and the last sample of the series (nil while the collector has none). A read
+// inside the reconnect gap holds the last known character facts instead of
+// flashing zeros through the KPI cards.
 func botViewFrom(read botNow, series *botSeries, now time.Time) botStatsView {
     uptimeSec := int64(0)
     if !read.startedAt.IsZero() {
@@ -413,10 +405,9 @@ func botViewFrom(read botNow, series *botSeries, now time.Time) botStatsView {
     return view
 }
 
-// holdGapView replaces the character facts of a live view that landed
-// inside the reconnect gap with the last known sample of the series:
-// the KPI cards must not flash zeros while the bot relogs (the status
-// badge keeps telling the truth - connecting or offline).
+// holdGapView replaces the character facts of a gap read with the last known
+// sample, so the KPI cards do not flash zeros while the bot relogs (the status
+// badge stays true).
 func holdGapView(view *botStatsView, series *botSeries) {
     last, ok := series.ring.last()
     if !ok || last.level <= 0 {
@@ -433,10 +424,8 @@ func holdGapView(view *botStatsView, series *botSeries) {
     }
 }
 
-// fleetHistoryLocked downsamples the fleet ring of a window: the
-// last sample of every epoch aligned time bucket (see bucketPicks -
-// the picks stay identical across the polls of one window, so the
-// charts never flicker). The caller must hold the collector lock.
+// fleetHistoryLocked downsamples the fleet ring: the last sample of every epoch
+// aligned bucket (bucketPicks), so the charts never flicker across polls.
 func (c *statsCollector) fleetHistoryLocked(
     now time.Time, window time.Duration,
 ) fleetHistory {
@@ -479,8 +468,7 @@ func (c *statsCollector) fleetHistoryLocked(
     return history
 }
 
-// windowedFleetLocked collects the fleet samples of the window. The
-// caller must hold the collector lock.
+// windowedFleetLocked collects the fleet samples of the window.
 func (c *statsCollector) windowedFleetLocked(
     now time.Time, window time.Duration,
 ) []fleetSample {
@@ -498,10 +486,8 @@ func (c *statsCollector) windowedFleetLocked(
     return windowed
 }
 
-// botHistoryLocked downsamples the per bot ring of a window: the last
-// sample of every epoch aligned time bucket (see bucketPicks - the
-// picks stay identical across the polls of one window, so the charts
-// never flicker). The caller must hold the collector lock.
+// botHistoryLocked downsamples the per bot ring: the last sample of every epoch
+// aligned bucket (bucketPicks), so the charts never flicker across polls.
 func (c *statsCollector) botHistoryLocked(
     series *botSeries, now time.Time, window time.Duration,
 ) botHistory {
@@ -549,10 +535,8 @@ func (c *statsCollector) botHistoryLocked(
     return history
 }
 
-// phaseSharesLocked measures how long the bot spent in every hunt
-// phase over the window (the share of each sample gap attributes to
-// the phase of the earlier sample). The caller must hold the
-// collector lock.
+// phaseSharesLocked measures the time spent in every hunt phase over the window
+// (each sample gap attributes to the phase of the earlier sample).
 func (c *statsCollector) phaseSharesLocked(
     series *botSeries, now time.Time, window time.Duration,
 ) []phaseShare {
@@ -591,16 +575,12 @@ func (c *statsCollector) phaseSharesLocked(
     return visible
 }
 
-// historyBucketSec returns the fixed bucket width of a history window:
-// the downsampling serves the last sample of every epoch aligned
-// bucket, so the served points are a pure function of the sample
-// timestamps - two polls of the same window derive the very same
-// points however far apart they run (the old index stride re-aligned
-// its picks on every appended sample and every window slide, and the
-// charts visibly jumped between the polls). A window request fixes
-// the bucket from its own seconds alone; the unbounded walk (window 0)
-// derives it from the observed span rounded up to the sample period
-// so it only grows in rare, coarse steps.
+// historyBucketSec returns the bucket width of a history window. The epoch
+// aligned buckets make the served points a pure function of the sample
+// timestamps, so two polls of the same window derive the same points however
+// far apart they run. A window request fixes the bucket from its own seconds;
+// the unbounded walk (window 0) derives it from the observed span, so it only
+// grows in rare, coarse steps.
 func historyBucketSec(window time.Duration, spanSec int64) int64 {
     if window > 0 {
         return roundUpSampleSec(
@@ -616,8 +596,7 @@ func historyBucketSec(window time.Duration, spanSec int64) int64 {
         (spanSec + statsHistoryMaxPoints - 1) / statsHistoryMaxPoints)
 }
 
-// roundUpSampleSec rounds a bucket width up to a whole multiple of the
-// sample period (never below one sample period).
+// roundUpSampleSec rounds a bucket width up to a multiple of the sample period.
 func roundUpSampleSec(sec int64) int64 {
     sample := int64(statsSamplePeriod / time.Second)
     if sec < sample {
@@ -637,8 +616,7 @@ func sampleTimes(samples []botSample) []int64 {
     return times
 }
 
-// fleetSampleTimes collects the timestamps of the windowed fleet
-// samples.
+// fleetSampleTimes collects the timestamps of the windowed fleet samples.
 func fleetSampleTimes(samples []fleetSample) []int64 {
     times := make([]int64, len(samples))
     for i := range samples {
@@ -657,14 +635,10 @@ func spanSeconds(times []int64) int64 {
     return times[len(times)-1] - times[0]
 }
 
-// bucketPicks returns the indices of the windowed samples the history
-// serves: the LAST sample of every epoch aligned bucket (bucket
-// boundaries at the whole multiples of bucketSec) plus the newest
-// sample. Because the buckets align to absolute time, the picks are a
-// pure function of the sample timestamps: consecutive polls derive
-// the same points, and a new sample only refreshes the value of its
-// still open trailing bucket or opens the next one - no reshuffling
-// of the picked set (the old index stride flickered that way).
+// bucketPicks returns the sample indices the history serves: the last sample of
+// every epoch aligned bucket plus the newest one. The picks are a pure function
+// of the sample timestamps, so a new sample only refreshes its open trailing
+// bucket or opens the next.
 func bucketPicks(times []int64, bucketSec int64) []int {
     if len(times) == 0 {
         return nil
@@ -682,8 +656,8 @@ func bucketPicks(times []int64, bucketSec int64) []int {
     return append(picks, len(times)-1)
 }
 
-// rateFloor returns the rate denominator between two picked samples
-// (the floor keeps a tight pair from spiking the per minute view).
+// rateFloor returns the rate denominator between two picks, floored against
+// spikes.
 func rateFloor(prevAt, at int64) float64 {
     dt := rateFloorSeconds
     if elapsed := float64(at - prevAt); elapsed > dt {
@@ -693,9 +667,7 @@ func rateFloor(prevAt, at int64) float64 {
     return dt
 }
 
-// rejoinsOf derives the rejoin count of the session count: the first
-// session of a tracker opens the deployment, every later one is a
-// rejoin.
+// rejoinsOf derives the rejoin count: the first session opens the deployment.
 func rejoinsOf(sessions int32) int32 {
     if sessions <= 1 {
         return 0
@@ -704,8 +676,8 @@ func rejoinsOf(sessions int32) int32 {
     return sessions - 1
 }
 
-// kdOf computes the kill to death ratio: a deathless bot reports its
-// kill count.
+// kdOf computes the kill to death ratio; a deathless bot reports its kill
+// count.
 func kdOf(kills, deaths int32) float64 {
     if deaths <= 0 {
         return float64(kills)
@@ -714,8 +686,7 @@ func kdOf(kills, deaths int32) float64 {
     return float64(kills) / float64(deaths)
 }
 
-// ratePerHour converts a counter into an hourly rate over the given
-// observation seconds (floored).
+// ratePerHour converts a counter into an hourly rate over the floored seconds.
 func ratePerHour(value int64, seconds int64) float64 {
     if seconds < 1 {
         return 0
@@ -728,8 +699,7 @@ func ratePerHour(value int64, seconds int64) float64 {
     return float64(value) * 3600.0 / denominator
 }
 
-// perMinute converts a delta into a per minute rate over the floored
-// seconds.
+// perMinute converts a delta into a per minute rate over the floored seconds.
 func perMinute(delta int64, seconds float64) float64 {
     if seconds <= 0 {
         return 0
@@ -738,10 +708,9 @@ func perMinute(delta int64, seconds float64) float64 {
     return float64(delta) * 60.0 / seconds
 }
 
-// expGainedOf computes the net experience gain of a bot against its
-// series baseline (a deleveling drop reads as a real loss). A series
-// without a valid baseline yet (opened inside a reconnect gap) reports
-// no gain.
+// expGainedOf computes the net experience gain against the series baseline (a
+// deleveling drop reads as a real loss); a series without a valid baseline
+// reports no gain.
 func expGainedOf(read botNow, series *botSeries) int64 {
     if series == nil || series.ring.count == 0 || !series.based {
         return 0
@@ -750,8 +719,7 @@ func expGainedOf(read botNow, series *botSeries) int64 {
     return int64(read.character.Exp) - series.expBase
 }
 
-// adenaGainedOf computes the net adena gain of a bot against its series
-// baseline (a gear purchase reads as a real spend).
+// adenaGainedOf computes the net adena gain against the series baseline.
 func adenaGainedOf(read botNow, series *botSeries) int64 {
     if series == nil || series.ring.count == 0 || !series.based {
         return 0
@@ -772,8 +740,8 @@ func lastPacketRate(series *botSeries) float64 {
     return 0
 }
 
-// hpPercentOf computes the health percentage of the live view, -1
-// while the vitals are unknown.
+// hpPercentOf computes the health percentage of the live view, -1 while
+// unknown.
 func hpPercentOf(info state.BotInfo) float64 {
     if info.MaxHP <= 0 {
         return -1
@@ -794,8 +762,8 @@ func hpOfSample(sample botSample) float64 {
     return float64(sample.hpPct)
 }
 
-// agoSec returns the age of a timestamp in whole seconds (0 when it
-// never happened).
+// agoSec returns the age of a timestamp in whole seconds (0 when it never
+// happened).
 func agoSec(at time.Time, now time.Time) int64 {
     if at.IsZero() {
         return 0
