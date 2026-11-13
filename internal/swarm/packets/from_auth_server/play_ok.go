@@ -19,7 +19,6 @@ type PlayOkPacket struct {
     PlayOkID2 int32
 }
 
-// NewPlayOkPacket creates a zero valued play ok packet ready for parsing.
 func NewPlayOkPacket() *PlayOkPacket {
     return &PlayOkPacket{PlayOkID1: 0, PlayOkID2: 0}
 }
@@ -36,7 +35,6 @@ func (p *PlayOkPacket) ToBytes(writer *packet.Writer) error {
     return writer.WriteInt32(p.PlayOkID2)
 }
 
-// ParsePlayOkPacket reads the packet from decrypted content bytes.
 func ParsePlayOkPacket(p *PlayOkPacket, data []byte) error {
     reader := packet.NewReader(data)
 

@@ -28,12 +28,10 @@ type RequestRestartPointPacket struct {
     PointType int32
 }
 
-// NewRequestRestartPointPacket creates a zero valued restart request.
 func NewRequestRestartPointPacket() *RequestRestartPointPacket {
     return &RequestRestartPointPacket{PointType: RestartTypeVillage}
 }
 
-// ToBytes serializes the packet.
 func (p *RequestRestartPointPacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(requestRestartPointPacketID); err != nil {
         return fmt.Errorf("failed to write restart point id: %w", err)

@@ -42,7 +42,6 @@ type MoveToLocationRequestPacket struct {
     Mode    int32
 }
 
-// NewMoveToLocationRequestPacket creates a zero valued move request.
 func NewMoveToLocationRequestPacket() *MoveToLocationRequestPacket {
     return &MoveToLocationRequestPacket{
         TargetX: 0,
@@ -55,7 +54,6 @@ func NewMoveToLocationRequestPacket() *MoveToLocationRequestPacket {
     }
 }
 
-// ToBytes serializes the packet.
 func (p *MoveToLocationRequestPacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(MoveToLocationPacketID); err != nil {
         return fmt.Errorf("failed to write move to location id: %w", err)

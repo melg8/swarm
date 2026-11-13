@@ -2611,6 +2611,20 @@ corner probe is a length, not a leg at all.
   cached from the same tree state), `golangci-lint run` on the seven
   paths 0 issues, `task fmt:check` clean.
 
+### 2026-11-13 - the packet boilerplate docs
+
+- The packet packages carried 99 doc lines that restate their own
+  signature and nothing else: "NewX creates a zero valued packet ready
+  for parsing", "ParseX reads the packet from payload bytes" and
+  "ToBytes serializes the packet". The wire layouts and the server
+  semantics stay on the struct doc; the constructor and parser docs go
+  (the rule: a comment states a fact the code cannot say).
+- 41 files, 99 comment lines fewer; the audit reads 17 236 of 170 771
+  (10.1 percent).
+- Verified: `task fmt`, `go build ./...`, the five packet suites
+  (0.4 s, 0.4 s, cached, cached, 0.2 s), `golangci-lint run` on the
+  package 0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

@@ -30,12 +30,10 @@ type SetupGaugePacket struct {
     Max     int32
 }
 
-// NewSetupGaugePacket creates a zero valued packet ready for parsing.
 func NewSetupGaugePacket() *SetupGaugePacket {
     return &SetupGaugePacket{Color: 0, Current: 0, Max: 0}
 }
 
-// ParseSetupGaugePacket reads the packet from payload bytes.
 func ParseSetupGaugePacket(p *SetupGaugePacket, data []byte) error {
     reader := packet.NewReader(data)
 

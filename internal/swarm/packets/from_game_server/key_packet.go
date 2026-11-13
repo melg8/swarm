@@ -27,12 +27,10 @@ type KeyPacket struct {
     ServerID int32
 }
 
-// NewKeyPacket creates a zero valued key packet ready for parsing.
 func NewKeyPacket() *KeyPacket {
     return &KeyPacket{Result: 0, Key: [keyPacketKeySize]byte{}, ServerID: 0}
 }
 
-// ParseKeyPacket reads the packet from payload bytes.
 func ParseKeyPacket(p *KeyPacket, data []byte) error {
     reader := packet.NewReader(data)
 

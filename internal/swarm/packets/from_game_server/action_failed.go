@@ -17,7 +17,6 @@ const ActionFailedPacketID = 0x35
 // own retry logic. Wire format (see ActionFailed.writeImpl): [opcode 0x35].
 type ActionFailedPacket struct{}
 
-// NewActionFailedPacket creates a zero valued packet ready for parsing.
 func NewActionFailedPacket() *ActionFailedPacket {
     return &ActionFailedPacket{}
 }

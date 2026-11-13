@@ -32,7 +32,6 @@ type ValidatePositionPacket struct {
     Vehicle int32
 }
 
-// NewValidatePositionPacket creates a zero valued validation request.
 func NewValidatePositionPacket() *ValidatePositionPacket {
     return &ValidatePositionPacket{
         X:       0,
@@ -43,7 +42,6 @@ func NewValidatePositionPacket() *ValidatePositionPacket {
     }
 }
 
-// ToBytes serializes the packet.
 func (p *ValidatePositionPacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(validatePositionPacketID); err != nil {
         return fmt.Errorf("failed to write validate position id: %w", err)

@@ -56,7 +56,6 @@ type UserInfoPacket struct {
     Z                  int32
 }
 
-// NewUserInfoPacket creates a zero valued packet ready for parsing.
 func NewUserInfoPacket() *UserInfoPacket {
     return &UserInfoPacket{
         ObjectID:           0,

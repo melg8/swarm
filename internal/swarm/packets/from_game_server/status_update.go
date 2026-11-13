@@ -35,7 +35,6 @@ type StatusAttr struct {
     Value int32
 }
 
-// NewStatusUpdatePacket creates a zero valued packet ready for parsing.
 func NewStatusUpdatePacket() *StatusUpdatePacket {
     var packet StatusUpdatePacket
     packet.ObjectID = 0
@@ -44,7 +43,6 @@ func NewStatusUpdatePacket() *StatusUpdatePacket {
     return &packet
 }
 
-// ParseStatusUpdatePacket reads the packet from payload bytes.
 func ParseStatusUpdatePacket(p *StatusUpdatePacket, data []byte) error {
     reader := packet.NewReader(data)
 

@@ -47,7 +47,6 @@ type AttackPacket struct {
     HitCount   int
 }
 
-// NewAttackPacket creates a zero valued packet ready for parsing.
 func NewAttackPacket() *AttackPacket {
     return &AttackPacket{
         AttackerID: 0,
@@ -137,12 +136,10 @@ type AutoAttackStartPacket struct {
     ObjectID int32
 }
 
-// NewAutoAttackStartPacket creates a zero valued packet ready for parsing.
 func NewAutoAttackStartPacket() *AutoAttackStartPacket {
     return &AutoAttackStartPacket{ObjectID: 0}
 }
 
-// ParseAutoAttackStartPacket reads the packet from payload bytes.
 func ParseAutoAttackStartPacket(p *AutoAttackStartPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -162,12 +159,10 @@ type AutoAttackStopPacket struct {
     ObjectID int32
 }
 
-// NewAutoAttackStopPacket creates a zero valued packet ready for parsing.
 func NewAutoAttackStopPacket() *AutoAttackStopPacket {
     return &AutoAttackStopPacket{ObjectID: 0}
 }
 
-// ParseAutoAttackStopPacket reads the packet from payload bytes.
 func ParseAutoAttackStopPacket(p *AutoAttackStopPacket, data []byte) error {
     reader := packet.NewReader(data)
 

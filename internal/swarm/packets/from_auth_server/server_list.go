@@ -43,7 +43,6 @@ func NewServerListPacket() *ServerListPacket {
     return &ServerListPacket{Count: 0, LastServer: 0, Servers: nil}
 }
 
-// ParseServerListPacket reads the packet from decrypted content bytes.
 func ParseServerListPacket(p *ServerListPacket, data []byte) error {
     reader := packet.NewReader(data)
 

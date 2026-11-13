@@ -24,7 +24,6 @@ func NewCharCreateOkPacket() *CharCreateOkPacket {
     return &CharCreateOkPacket{}
 }
 
-// ParseCharCreateOkPacket reads the packet from payload bytes.
 func ParseCharCreateOkPacket(data []byte) error {
     reader := packet.NewReader(data)
 
@@ -55,7 +54,6 @@ func NewCharCreateFailPacket() *CharCreateFailPacket {
     return &CharCreateFailPacket{Reason: 0}
 }
 
-// ParseCharCreateFailPacket reads the packet from payload bytes.
 func ParseCharCreateFailPacket(p *CharCreateFailPacket, data []byte) error {
     reader := packet.NewReader(data)
 

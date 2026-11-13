@@ -25,7 +25,6 @@ type AttackRequestPacket struct {
     Shift    int8
 }
 
-// NewAttackRequestPacket creates a zero valued attack request.
 func NewAttackRequestPacket() *AttackRequestPacket {
     return &AttackRequestPacket{
         TargetID: 0,

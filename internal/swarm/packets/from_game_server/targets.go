@@ -26,12 +26,10 @@ type MyTargetSelectedPacket struct {
     ObjectID int32
 }
 
-// NewMyTargetSelectedPacket creates a zero valued packet ready for parsing.
 func NewMyTargetSelectedPacket() *MyTargetSelectedPacket {
     return &MyTargetSelectedPacket{ObjectID: 0}
 }
 
-// ParseMyTargetSelectedPacket reads the packet from payload bytes.
 func ParseMyTargetSelectedPacket(p *MyTargetSelectedPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -60,7 +58,6 @@ type TargetSelectedPacket struct {
     Z        int32
 }
 
-// NewTargetSelectedPacket creates a zero valued packet ready for parsing.
 func NewTargetSelectedPacket() *TargetSelectedPacket {
     return &TargetSelectedPacket{
         ObjectID: 0,
@@ -71,7 +68,6 @@ func NewTargetSelectedPacket() *TargetSelectedPacket {
     }
 }
 
-// ParseTargetSelectedPacket reads the packet from payload bytes.
 func ParseTargetSelectedPacket(p *TargetSelectedPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -97,12 +93,10 @@ type TargetUnselectedPacket struct {
     ObjectID int32
 }
 
-// NewTargetUnselectedPacket creates a zero valued packet ready for parsing.
 func NewTargetUnselectedPacket() *TargetUnselectedPacket {
     return &TargetUnselectedPacket{ObjectID: 0}
 }
 
-// ParseTargetUnselectedPacket reads the packet from payload bytes.
 func ParseTargetUnselectedPacket(p *TargetUnselectedPacket, data []byte) error {
     reader := packet.NewReader(data)
 

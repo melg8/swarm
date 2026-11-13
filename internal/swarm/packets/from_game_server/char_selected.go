@@ -29,7 +29,6 @@ type CharSelectedPacket struct {
     CurrentMP float64
 }
 
-// NewCharSelectedPacket creates a zero valued packet ready for parsing.
 func NewCharSelectedPacket() *CharSelectedPacket {
     return &CharSelectedPacket{
         Name:      "",

@@ -45,7 +45,6 @@ func NewRequestSellItemPacket() *RequestSellItemPacket {
     }
 }
 
-// ToBytes serializes the packet.
 func (p *RequestSellItemPacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(requestSellItemPacketID); err != nil {
         return fmt.Errorf("failed to write sell item id: %w", err)

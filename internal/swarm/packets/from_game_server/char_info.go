@@ -36,7 +36,6 @@ type CharInfoPacket struct {
     Z        int32
 }
 
-// NewCharInfoPacket creates a zero valued packet ready for parsing.
 func NewCharInfoPacket() *CharInfoPacket {
     return &CharInfoPacket{
         ObjectID:        0,
@@ -58,7 +57,6 @@ func NewCharInfoPacket() *CharInfoPacket {
     }
 }
 
-// ParseCharInfoPacket reads the packet from payload bytes.
 func ParseCharInfoPacket(p *CharInfoPacket, data []byte) error {
     reader := packet.NewReader(data)
 

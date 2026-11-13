@@ -26,12 +26,10 @@ type SocialActionPacket struct {
     ActionID int32
 }
 
-// NewSocialActionPacket creates a zero valued packet ready for parsing.
 func NewSocialActionPacket() *SocialActionPacket {
     return &SocialActionPacket{ObjectID: 0, ActionID: 0}
 }
 
-// ParseSocialActionPacket reads the packet from payload bytes.
 func ParseSocialActionPacket(p *SocialActionPacket, data []byte) error {
     reader := packet.NewReader(data)
 

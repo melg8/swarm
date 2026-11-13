@@ -26,7 +26,6 @@ type CreatureSayPacket struct {
     Text     string
 }
 
-// NewCreatureSayPacket creates a packet ready for parsing.
 func NewCreatureSayPacket() *CreatureSayPacket {
     return &CreatureSayPacket{
         ObjectID: 0,
@@ -36,7 +35,6 @@ func NewCreatureSayPacket() *CreatureSayPacket {
     }
 }
 
-// ParseCreatureSayPacket reads the packet from payload bytes.
 func ParseCreatureSayPacket(
     p *CreatureSayPacket, data []byte,
 ) error {

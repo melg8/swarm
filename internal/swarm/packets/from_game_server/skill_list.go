@@ -42,7 +42,6 @@ func NewSkillListPacket() *SkillListPacket {
     }
 }
 
-// ParseSkillListPacket reads the packet from payload bytes.
 func ParseSkillListPacket(p *SkillListPacket, data []byte) error {
     reader := packet.NewReader(data)
 

@@ -46,7 +46,6 @@ func NewAbnormalStatusUpdatePacket() *AbnormalStatusUpdatePacket {
     }
 }
 
-// ParseAbnormalStatusUpdatePacket reads the packet from payload bytes.
 func ParseAbnormalStatusUpdatePacket(
     p *AbnormalStatusUpdatePacket, data []byte,
 ) error {

@@ -25,7 +25,6 @@ type RequestMagicSkillUsePacket struct {
     Shift   bool
 }
 
-// NewRequestMagicSkillUsePacket creates a zero valued cast request.
 func NewRequestMagicSkillUsePacket() *RequestMagicSkillUsePacket {
     return &RequestMagicSkillUsePacket{
         SkillID: 0,
@@ -34,7 +33,6 @@ func NewRequestMagicSkillUsePacket() *RequestMagicSkillUsePacket {
     }
 }
 
-// ToBytes serializes the packet.
 func (p *RequestMagicSkillUsePacket) ToBytes(
     writer *packet.Writer,
 ) error {

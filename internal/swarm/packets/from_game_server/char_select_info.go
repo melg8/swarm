@@ -231,7 +231,6 @@ func parseCharacterResources(reader *packet.Reader, info *CharacterInfo) error {
     return nil
 }
 
-// ParseCharSelectInfoPacket reads the packet from payload bytes.
 func ParseCharSelectInfoPacket(p *CharSelectInfoPacket, data []byte) error {
     reader := packet.NewReader(data)
 

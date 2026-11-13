@@ -102,7 +102,6 @@ func readSystemMessageParam(
     return nil
 }
 
-// ParseSystemMessagePacket reads the packet from payload bytes.
 func ParseSystemMessagePacket(p *SystemMessagePacket, data []byte) error {
     reader := packet.NewReader(data)
 

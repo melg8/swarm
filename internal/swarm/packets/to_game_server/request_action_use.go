@@ -31,7 +31,6 @@ type RequestActionUsePacket struct {
     Shift    bool
 }
 
-// NewRequestActionUsePacket creates a zero valued action use request.
 func NewRequestActionUsePacket() *RequestActionUsePacket {
     return &RequestActionUsePacket{
         ActionID: 0,
@@ -40,7 +39,6 @@ func NewRequestActionUsePacket() *RequestActionUsePacket {
     }
 }
 
-// ToBytes serializes the packet.
 func (p *RequestActionUsePacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(requestActionUsePacketID); err != nil {
         return fmt.Errorf("failed to write action use id: %w", err)

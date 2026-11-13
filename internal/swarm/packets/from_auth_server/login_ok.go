@@ -31,7 +31,6 @@ type LoginOkPacket struct {
     LoginOkID2 int32
 }
 
-// NewLoginOkPacket creates a zero valued login ok packet ready for parsing.
 func NewLoginOkPacket() *LoginOkPacket {
     return &LoginOkPacket{LoginOkID1: 0, LoginOkID2: 0}
 }
@@ -64,7 +63,6 @@ func (p *LoginOkPacket) ToBytes(writer *packet.Writer) error {
     return writer.WriteInt32(loginOkUnknown5)
 }
 
-// ParseLoginOkPacket reads the packet from decrypted content bytes.
 func ParseLoginOkPacket(p *LoginOkPacket, data []byte) error {
     reader := packet.NewReader(data)
 

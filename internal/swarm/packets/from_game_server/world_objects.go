@@ -38,7 +38,6 @@ type MoveToLocationPacket struct {
     Z        int32
 }
 
-// NewMoveToLocationPacket creates a zero valued packet ready for parsing.
 func NewMoveToLocationPacket() *MoveToLocationPacket {
     return &MoveToLocationPacket{
         ObjectID: 0,
@@ -51,7 +50,6 @@ func NewMoveToLocationPacket() *MoveToLocationPacket {
     }
 }
 
-// ParseMoveToLocationPacket reads the packet from payload bytes.
 func ParseMoveToLocationPacket(p *MoveToLocationPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -83,7 +81,6 @@ type MoveToPawnPacket struct {
     TargetZ  int32
 }
 
-// NewMoveToPawnPacket creates a zero valued packet ready for parsing.
 func NewMoveToPawnPacket() *MoveToPawnPacket {
     return &MoveToPawnPacket{
         ObjectID: 0,
@@ -98,7 +95,6 @@ func NewMoveToPawnPacket() *MoveToPawnPacket {
     }
 }
 
-// ParseMoveToPawnPacket reads the packet from payload bytes.
 func ParseMoveToPawnPacket(p *MoveToPawnPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -125,7 +121,6 @@ type StopMovePacket struct {
     Heading  int32
 }
 
-// NewStopMovePacket creates a zero valued packet ready for parsing.
 func NewStopMovePacket() *StopMovePacket {
     return &StopMovePacket{
         ObjectID: 0,
@@ -136,7 +131,6 @@ func NewStopMovePacket() *StopMovePacket {
     }
 }
 
-// ParseStopMovePacket reads the packet from payload bytes.
 func ParseStopMovePacket(p *StopMovePacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -162,7 +156,6 @@ type ValidateLocationPacket struct {
     Heading  int32
 }
 
-// NewValidateLocationPacket creates a zero valued packet ready for parsing.
 func NewValidateLocationPacket() *ValidateLocationPacket {
     return &ValidateLocationPacket{
         ObjectID: 0,
@@ -173,7 +166,6 @@ func NewValidateLocationPacket() *ValidateLocationPacket {
     }
 }
 
-// ParseValidateLocationPacket reads the packet from payload bytes.
 func ParseValidateLocationPacket(p *ValidateLocationPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -194,12 +186,10 @@ type DeleteObjectPacket struct {
     ObjectID int32
 }
 
-// NewDeleteObjectPacket creates a zero valued packet ready for parsing.
 func NewDeleteObjectPacket() *DeleteObjectPacket {
     return &DeleteObjectPacket{ObjectID: 0}
 }
 
-// ParseDeleteObjectPacket reads the packet from payload bytes.
 func ParseDeleteObjectPacket(p *DeleteObjectPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -226,7 +216,6 @@ type DropItemPacket struct {
     Z          int32
 }
 
-// NewDropItemPacket creates a zero valued packet ready for parsing.
 func NewDropItemPacket() *DropItemPacket {
     return &DropItemPacket{
         ObjectID:   0,
@@ -239,7 +228,6 @@ func NewDropItemPacket() *DropItemPacket {
     }
 }
 
-// ParseDropItemPacket reads the packet from payload bytes.
 func ParseDropItemPacket(p *DropItemPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -281,7 +269,6 @@ type SpawnItemPacket struct {
     Z          int32
 }
 
-// NewSpawnItemPacket creates a zero valued packet ready for parsing.
 func NewSpawnItemPacket() *SpawnItemPacket {
     return &SpawnItemPacket{
         ObjectID:   0,
@@ -294,7 +281,6 @@ func NewSpawnItemPacket() *SpawnItemPacket {
     }
 }
 
-// ParseSpawnItemPacket reads the packet from payload bytes.
 func ParseSpawnItemPacket(p *SpawnItemPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -329,7 +315,6 @@ type GetItemPacket struct {
     Z        int32
 }
 
-// NewGetItemPacket creates a zero valued packet ready for parsing.
 func NewGetItemPacket() *GetItemPacket {
     return &GetItemPacket{
         PlayerID: 0,
@@ -340,7 +325,6 @@ func NewGetItemPacket() *GetItemPacket {
     }
 }
 
-// ParseGetItemPacket reads the packet from payload bytes.
 func ParseGetItemPacket(p *GetItemPacket, data []byte) error {
     reader := packet.NewReader(data)
 

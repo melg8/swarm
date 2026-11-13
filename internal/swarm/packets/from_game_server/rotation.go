@@ -33,12 +33,10 @@ type BeginRotationPacket struct {
     Heading  int32
 }
 
-// NewBeginRotationPacket creates a zero valued packet ready for parsing.
 func NewBeginRotationPacket() *BeginRotationPacket {
     return &BeginRotationPacket{ObjectID: 0, Heading: 0}
 }
 
-// ParseBeginRotationPacket reads the packet from payload bytes.
 func ParseBeginRotationPacket(p *BeginRotationPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -64,12 +62,10 @@ type StopRotationPacket struct {
     Heading  int32
 }
 
-// NewStopRotationPacket creates a zero valued packet ready for parsing.
 func NewStopRotationPacket() *StopRotationPacket {
     return &StopRotationPacket{ObjectID: 0, Heading: 0}
 }
 
-// ParseStopRotationPacket reads the packet from payload bytes.
 func ParseStopRotationPacket(p *StopRotationPacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -96,12 +92,10 @@ type ChangeMoveTypePacket struct {
     Running  bool
 }
 
-// NewChangeMoveTypePacket creates a zero valued packet ready for parsing.
 func NewChangeMoveTypePacket() *ChangeMoveTypePacket {
     return &ChangeMoveTypePacket{ObjectID: 0, Running: false}
 }
 
-// ParseChangeMoveTypePacket reads the packet from payload bytes.
 func ParseChangeMoveTypePacket(p *ChangeMoveTypePacket, data []byte) error {
     reader := packet.NewReader(data)
 
@@ -131,7 +125,6 @@ type TeleportToLocationPacket struct {
     Heading  int32
 }
 
-// NewTeleportToLocationPacket creates a zero valued packet ready for parsing.
 func NewTeleportToLocationPacket() *TeleportToLocationPacket {
     return &TeleportToLocationPacket{
         ObjectID: 0,
@@ -142,7 +135,6 @@ func NewTeleportToLocationPacket() *TeleportToLocationPacket {
     }
 }
 
-// ParseTeleportToLocationPacket reads the packet from payload bytes.
 func ParseTeleportToLocationPacket(
     p *TeleportToLocationPacket, data []byte,
 ) error {

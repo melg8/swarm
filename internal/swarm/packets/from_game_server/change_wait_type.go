@@ -29,12 +29,10 @@ type ChangeWaitTypePacket struct {
     Sitting  bool
 }
 
-// NewChangeWaitTypePacket creates a zero valued packet ready for parsing.
 func NewChangeWaitTypePacket() *ChangeWaitTypePacket {
     return &ChangeWaitTypePacket{ObjectID: 0, Sitting: false}
 }
 
-// ParseChangeWaitTypePacket reads the packet from payload bytes.
 func ParseChangeWaitTypePacket(p *ChangeWaitTypePacket, data []byte) error {
     reader := packet.NewReader(data)
 

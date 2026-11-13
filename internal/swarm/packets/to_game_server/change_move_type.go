@@ -22,12 +22,10 @@ type ChangeMoveTypePacket struct {
     TypeRun int32
 }
 
-// NewChangeMoveTypePacket creates a zero valued (walk) move type request.
 func NewChangeMoveTypePacket() *ChangeMoveTypePacket {
     return &ChangeMoveTypePacket{TypeRun: 0}
 }
 
-// ToBytes serializes the packet.
 func (p *ChangeMoveTypePacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(changeMoveTypePacketID); err != nil {
         return fmt.Errorf("failed to write change move type id: %w", err)

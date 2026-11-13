@@ -63,7 +63,6 @@ func NewQuestListPacket() *QuestListPacket {
     }
 }
 
-// ParseQuestListPacket reads the packet from payload bytes.
 func ParseQuestListPacket(p *QuestListPacket, data []byte) error {
     reader := packet.NewReader(data)
 

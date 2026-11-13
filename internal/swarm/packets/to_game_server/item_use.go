@@ -24,12 +24,10 @@ type RequestUseItem struct {
     ObjectID int32
 }
 
-// NewRequestUseItem creates a zero valued use item request.
 func NewRequestUseItem() *RequestUseItem {
     return &RequestUseItem{ObjectID: 0}
 }
 
-// ToBytes serializes the packet.
 func (p *RequestUseItem) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(requestUseItemPacketID); err != nil {
         return fmt.Errorf("failed to write use item id: %w", err)
@@ -55,7 +53,6 @@ type RequestDropItem struct {
     Z        int32
 }
 
-// NewRequestDropItem creates a zero valued drop item request.
 func NewRequestDropItem() *RequestDropItem {
     return &RequestDropItem{
         ObjectID: 0,
@@ -66,7 +63,6 @@ func NewRequestDropItem() *RequestDropItem {
     }
 }
 
-// ToBytes serializes the packet.
 func (p *RequestDropItem) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(requestDropItemPacketID); err != nil {
         return fmt.Errorf("failed to write drop item id: %w", err)

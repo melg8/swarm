@@ -61,7 +61,6 @@ type NpcInfoPacket struct {
     Title         string
 }
 
-// NewNpcInfoPacket creates a zero valued packet ready for parsing.
 func NewNpcInfoPacket() *NpcInfoPacket {
     return &NpcInfoPacket{
         ObjectID:        0,

@@ -30,7 +30,6 @@ type ActionRequestPacket struct {
     Shift    int8
 }
 
-// NewActionRequestPacket creates a zero valued action request.
 func NewActionRequestPacket() *ActionRequestPacket {
     return &ActionRequestPacket{
         ObjectID: 0,
@@ -41,7 +40,6 @@ func NewActionRequestPacket() *ActionRequestPacket {
     }
 }
 
-// ToBytes serializes the packet.
 func (p *ActionRequestPacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(actionPacketID); err != nil {
         return fmt.Errorf("failed to write action request id: %w", err)
@@ -73,12 +71,10 @@ type RequestDestroyItem struct {
     Count    int32
 }
 
-// NewRequestDestroyItem creates a zero valued destroy request.
 func NewRequestDestroyItem() *RequestDestroyItem {
     return &RequestDestroyItem{ObjectID: 0, Count: 0}
 }
 
-// ToBytes serializes the packet.
 func (p *RequestDestroyItem) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(requestDestroyItemPacketID); err != nil {
         return fmt.Errorf("failed to write destroy item id: %w", err)
@@ -97,7 +93,6 @@ func (p *RequestDestroyItem) ToBytes(writer *packet.Writer) error {
 // Wire format (see RequestItemList.readImpl): [opcode 0x0F].
 type RequestItemList struct{}
 
-// ToBytes serializes the packet.
 func (p *RequestItemList) ToBytes(writer *packet.Writer) error {
     return writer.WriteInt8(requestItemListPacketID)
 }

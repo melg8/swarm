@@ -16,12 +16,10 @@ type NetPingPacket struct {
     GameTime int32
 }
 
-// NewNetPingPacket creates a zero valued net ping packet ready for parsing.
 func NewNetPingPacket() *NetPingPacket {
     return &NetPingPacket{GameTime: 0}
 }
 
-// ParseNetPingPacket reads the packet from payload bytes.
 func ParseNetPingPacket(p *NetPingPacket, data []byte) error {
     reader := packet.NewReader(data)
 

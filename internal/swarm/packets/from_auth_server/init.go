@@ -29,7 +29,6 @@ type InitPacket struct {
     BlowfishKey     []byte
 }
 
-// NewInitPacket creates a zero valued init packet ready for parsing.
 func NewInitPacket() *InitPacket {
     return &InitPacket{
         SessionID:       0,

@@ -25,7 +25,6 @@ func NewAppearingPacket() *AppearingPacket {
     return &AppearingPacket{}
 }
 
-// ToBytes serializes the packet.
 func (p *AppearingPacket) ToBytes(writer *packet.Writer) error {
     if err := writer.WriteInt8(appearingPacketID); err != nil {
         return fmt.Errorf("failed to write appearing id: %w", err)

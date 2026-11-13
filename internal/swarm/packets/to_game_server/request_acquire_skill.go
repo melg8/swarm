@@ -25,7 +25,6 @@ type RequestAcquireSkillPacket struct {
     Level   int32
 }
 
-// NewRequestAcquireSkillPacket creates a zero valued acquire request.
 func NewRequestAcquireSkillPacket() *RequestAcquireSkillPacket {
     return &RequestAcquireSkillPacket{
         SkillID: 0,
@@ -33,7 +32,6 @@ func NewRequestAcquireSkillPacket() *RequestAcquireSkillPacket {
     }
 }
 
-// ToBytes serializes the packet.
 func (p *RequestAcquireSkillPacket) ToBytes(
     writer *packet.Writer,
 ) error {
