@@ -1466,6 +1466,22 @@ corner probe is a length, not a leg at all.
 - Verified: `task fmt`, `go build ./...`, the hunt suite (27.8 s),
   `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
 
+### 2026-11-13 - hunt/delevel.go keeps the guard death rules
+
+- 34 blocks compress. The file keeps the archer only melee provocation
+  (a melee guard only follows and the chase dies in the checkTarget
+  karma gate), the level 10 penalty floor with the Lucky skill 194 /
+  Player.isLucky below it, the 9 aim floor, the Life Cubic 16 floor
+  (skill 67, the 16..19 window), the gremlin 6..8 median, the +5 full
+  drop gap, the 60 unit melee range, the three free deaths with the
+  30 min cooldown, the 20 s fight timeout, the abort backoff 5 min times
+  five capped at 30 min, the 60 min timeout, the archer guard spawns
+  (7218, 7220), the level 70 guard hit floor of 20 percent, the
+  `PlayerStat.removeExpAndSp` UserInfo refresh and the 9900 unit move
+  limit of the return walk. 151 comment lines of 495 become 126 of 470.
+- Verified: `task fmt`, `go build ./...`, the hunt suite (27.9 s),
+  `golangci-lint run ./internal/swarm/hunt/...` 0 issues.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are
