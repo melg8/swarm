@@ -2,12 +2,11 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The server-to-client packet decoder of the run log: one readable
-// line (plus continuation lines for the list packets) per packet the
-// session receives. The decode reuses the tested parsers of the
-// from_game_server package; a parse failure or an unknown opcode
-// falls back to the size and the hex tail instead of panicking on
-// the session reader goroutine.
+// The server-to-client packet decoder of the run log: one readable line (plus
+// continuation lines for the list packets) per packet the session receives. The
+// decode reuses the tested parsers of the from_game_server package; a parse
+// failure or an unknown opcode falls back to the size and the hex tail instead
+// of panicking on the session reader goroutine.
 
 package botlog
 

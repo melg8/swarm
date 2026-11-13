@@ -41,8 +41,7 @@ type Header struct {
     Title      string
     Account    string
     Generation uint64
-    // Timeout bounds the whole run (the scenario bound of the web
-    // UI card).
+    // Timeout bounds the whole run (the scenario bound of the web UI card).
     Timeout time.Duration
     // Description is the hover text of the web UI card: the Start,
     // Flow and Pass story of the scenario.

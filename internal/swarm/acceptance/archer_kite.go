@@ -75,11 +75,10 @@ const (
     archerKiteQuiver = 600
 )
 
-// archerKiteItems is the injected start kit: the wooden armor set
-// and the starter jewels of the zone return dump (the proven
-// wearable ids), the short bow instead of the melee weapon and the
-// full quiver. No shield: the left hand belongs to the arrows (the
-// archer profile lets nothing else stay there).
+// archerKiteItems is the injected start kit: the wooden armor set and the
+// starter jewels of the zone return dump (the proven wearable ids), the short
+// bow instead of the melee weapon and the full quiver. No shield: the left hand
+// belongs to the arrows (the archer profile lets nothing else stay there).
 var archerKiteItems = []ResetItem{
     {ItemID: 13, Count: 1},   // Short Bow
     {ItemID: 17, Count: 600}, // Wooden Arrow (the quiver)
@@ -134,8 +133,7 @@ const (
     checkArcherKiteQuiver   = "quiver"
 )
 
-// archerKiteChecks is the initial check list of the archer
-// scenario.
+// archerKiteChecks is the initial check list of the archer scenario.
 func archerKiteChecks() []Check {
     return []Check{
         {
@@ -210,9 +208,8 @@ const (
     // archerKiteMinKiteSteps is the retreat evidence floor: a
     // repeated pattern, not a single blip.
     archerKiteMinKiteSteps = 2
-    // archerKiteHPFloor is the "bottomed" boundary of the survival
-    // check: below it the kiting failed to keep the character out
-    // of the killing range.
+    // archerKiteHPFloor is the "bottomed" boundary of the survival check: below
+    // it the kiting failed to keep the character out of the killing range.
     archerKiteHPFloor = 10.0
 )
 
@@ -250,8 +247,7 @@ type archerKiteLog struct {
     kills  int
 }
 
-// newArcherKiteLog arms the wrapper around the base log line
-// callback.
+// newArcherKiteLog arms the wrapper around the base log line callback.
 func newArcherKiteLog(next func(string)) *archerKiteLog {
     return &archerKiteLog{next: next}
 }
@@ -298,9 +294,8 @@ type archerKiteSample struct {
     online bool
     // dead is the death flag of the character.
     dead bool
-    // bowWorn and quiverWorn are the paperdoll state: the right
-    // hand holds the bow (the weapon kind answer) and the left
-    // hand holds the arrow stack.
+    // bowWorn and quiverWorn are the paperdoll state: the right hand holds the
+    // bow (the weapon kind answer) and the left hand holds the arrow stack.
     bowWorn    bool
     quiverWorn bool
     // fighting is true when the auto attack runs against a live
@@ -313,12 +308,10 @@ type archerKiteSample struct {
     // fightDist is the distance to the fight target, -1 when the
     // sample carries no fight.
     fightDist float64
-    // hpPercent is the health percentage, -1 before the first
-    // vitals answer.
+    // hpPercent is the health percentage, -1 before the first vitals answer.
     hpPercent float64
-    // arrows is the total arrow count of the inventory (the worn
-    // quiver stack plus the bagged spare piles), -1 before the
-    // first inventory answer.
+    // arrows is the total arrow count of the inventory (the worn quiver stack
+    // plus the bagged spare piles), -1 before the first inventory answer.
     arrows int32
     // shotAt is the timestamp of the last self Attack broadcast,
     // zero before the first shot of the session.

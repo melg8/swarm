@@ -185,10 +185,9 @@ func (gc *GameClient) ActionSitStand() error {
     return nil
 }
 
-// ClickObject selects an object through the plain client click (Action
-// 0x04): the NpcClick handler selects the npc and remembers it as the
-// last folk talked to, which the RequestAcquireSkill trainer resolves
-// through.
+// ClickObject selects an object through the plain client click (Action 0x04):
+// the NpcClick handler selects the npc and remembers it as the last folk talked
+// to, which the RequestAcquireSkill trainer resolves through.
 func (gc *GameClient) ClickObject(objectID int32) error {
     if objectID == 0 {
         return nil
@@ -270,10 +269,9 @@ func (gc *GameClient) ClearTarget() error {
     return nil
 }
 
-// AcquireSkill learns one lesson of the class skill tree at the teacher
-// the character last talked to (see ClickObject): the server charges the
-// SP, consumes the required skill book and answers with a fresh
-// SkillList.
+// AcquireSkill learns one lesson of the class skill tree at the teacher the
+// character last talked to (see ClickObject): the server charges the SP,
+// consumes the required skill book and answers with a fresh SkillList.
 func (gc *GameClient) AcquireSkill(skillID int32, level int32) error {
     request := togameserver.NewRequestAcquireSkillPacket()
     request.SkillID = skillID
@@ -300,10 +298,9 @@ func (gc *GameClient) UseMagicSkill(skillID int32) error {
     return nil
 }
 
-// RestartAtVillage revives a dead character at the nearest village
-// restart point (RequestRestartPoint 0x6D type 0), like the death dialog
-// of the official client; the server refuses it while the character is
-// alive.
+// RestartAtVillage revives a dead character at the nearest village restart
+// point (RequestRestartPoint 0x6D type 0), like the death dialog of the
+// official client; the server refuses it while the character is alive.
 func (gc *GameClient) RestartAtVillage() error {
     request := togameserver.NewRequestRestartPointPacket()
     request.PointType = togameserver.RestartTypeVillage

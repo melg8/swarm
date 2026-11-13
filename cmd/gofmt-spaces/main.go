@@ -2,16 +2,14 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Command gofmt-spaces formats Go source files exactly like gofmt
-// except that it uses spaces instead of tabs: every tab of the
-// canonical gofmt output is replaced by four spaces outside string
-// and character literals. The repository-wide whitespace policy is
-// "spaces only" (see AGENTS.md), so this tool - not the stock
-// gofmt/gofumpt, both of which re-tab the tree - is the formatter of
-// record. Run it through `task fmt` or directly:
+// Command gofmt-spaces formats Go source files exactly like gofmt except that
+// it uses spaces instead of tabs: every tab of the canonical gofmt output is
+// replaced by four spaces outside string and character literals. The
+// repository-wide whitespace policy is "spaces only" (see AGENTS.md), so this
+// tool - not the stock gofmt/gofumpt, both of which re-tab the tree - is the
+// formatter of record. Run it through `task fmt` or directly:
 //
-//    gofmt-spaces -w . .agents/skills
-//    gofmt-spaces -l cmd internal
+// gofmt-spaces -w . .agents/skills gofmt-spaces -l cmd internal
 package main
 
 import (
@@ -117,11 +115,10 @@ func collectGoFiles(paths []string) ([]string, error) {
     return files, nil
 }
 
-// processFiles formats every file and reports the result the way the
-// switches ask: -l prints the paths that differ, -w rewrites the
-// files that differ, otherwise the formatted source of every file
-// goes to out. Files that fail to parse are reported to errOut and
-// fail the run without stopping the others.
+// processFiles formats every file and reports the result the way the switches
+// ask: -l prints the paths that differ, -w rewrites the files that differ,
+// otherwise the formatted source of every file goes to out. Files that fail to
+// parse are reported to errOut and fail the run without stopping the others.
 func processFiles(
     files []string,
     opts options,
@@ -240,9 +237,8 @@ func literalSpans(src []byte) ([][2]int, error) {
     return spans, nil
 }
 
-// expandTabs replaces every tab outside the given literal spans with
-// spaces. The spans must be sorted and non-overlapping, which the
-// scanner guarantees.
+// expandTabs replaces every tab outside the given literal spans with spaces.
+// The spans must be sorted and non-overlapping, which the scanner guarantees.
 func expandTabs(src []byte, spans [][2]int) []byte {
     tabCount := bytes.Count(src, []byte{'\t'})
     out := make([]byte, 0, len(src)+(spaceWidth-1)*tabCount)

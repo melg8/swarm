@@ -2,13 +2,12 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Command benchdiff compares two `go test -bench` output files and
-// prints the per benchmark delta of every shared metric (ns/op, B/op,
-// allocs/op, MB/s). It is the plumbing of the benchmark baseline
-// workflow: `task bench:save` commits the output into
-// runs/bench-<name>.txt and `task bench:diff` wraps this tool, so the
-// comparison reads the committed baseline instead of the agent's
-// memory. The offline twin of benchstat: no network, one parse walk.
+// Command benchdiff compares two `go test -bench` output files and prints the
+// per benchmark delta of every shared metric (ns/op, B/op, allocs/op, MB/s). It
+// is the plumbing of the benchmark baseline workflow: `task bench:save` commits
+// the output into runs/bench-<name>.txt and `task bench:diff` wraps this tool,
+// so the comparison reads the committed baseline instead of the agent's memory.
+// The offline twin of benchstat: no network, one parse walk.
 package main
 
 import (
@@ -94,11 +93,10 @@ type row struct {
     delta float64
 }
 
-// diff joins the two result sets on the benchmark names and returns
-// the comparison rows of every shared metric, sorted by name and the
-// metric order. Benchmarks or metrics missing on one side are
-// reported separately (the caller prints them as the no-baseline
-// list).
+// diff joins the two result sets on the benchmark names and returns the
+// comparison rows of every shared metric, sorted by name and the metric order.
+// Benchmarks or metrics missing on one side are reported separately (the caller
+// prints them as the no-baseline list).
 func diff(base, fresh map[string]*result) []row {
     names := make([]string, 0, len(base))
     for name := range base {

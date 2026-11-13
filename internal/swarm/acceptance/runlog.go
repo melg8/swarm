@@ -21,10 +21,9 @@ import (
     "github.com/melg8/swarm/internal/version"
 )
 
-// samplePeriod paces the state samples of the run log: ten seconds
-// of resolution keeps a twenty minute run at ~120 sample lines while
-// the position and phase drift stays visible between the packet
-// lines.
+// samplePeriod paces the state samples of the run log: ten seconds of
+// resolution keeps a twenty minute run at ~120 sample lines while the position
+// and phase drift stays visible between the packet lines.
 const samplePeriod = 10 * time.Second
 
 // openRunLog opens the botlog file of one scenario run (nil when the
@@ -59,8 +58,7 @@ func (m *Manager) openRunLog(test *Test, generation uint64) *botlog.RunLog {
     return log
 }
 
-// checkDescs snapshots the check list of a test into the botlog
-// shape.
+// checkDescs snapshots the check list of a test into the botlog shape.
 func checkDescs(test *Test) []botlog.CheckDesc {
     test.mu.Lock()
     defer test.mu.Unlock()
@@ -114,10 +112,9 @@ func (m *Manager) environment() []botlog.EnvLine {
     return env
 }
 
-// runLogFor resolves the live run log of the test that owns the
-// account (every scenario owns one temp account, the sessions of the
-// account belong to its current run). The nil answer keeps the
-// session wiring tapless.
+// runLogFor resolves the live run log of the test that owns the account (every
+// scenario owns one temp account, the sessions of the account belong to its
+// current run). The nil answer keeps the session wiring tapless.
 func (m *Manager) runLogFor(account string) *botlog.RunLog {
     for _, test := range m.tests {
         if test.def.Account != account {

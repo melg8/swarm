@@ -2597,6 +2597,20 @@ corner probe is a length, not a leg at all.
   `golangci-lint run` on the six paths 0 issues, `task fmt:check`
   clean.
 
+### 2026-11-13 - the comment wrapping reflow of the acceptance and tool layers
+
+- The same packing over the acceptance, connection, huntaudit,
+  memwatch, version, logfmt and cmd packages: 36 files, 115 comment
+  lines fewer by the audit count.
+- `acceptance/city_shopping.go` (11), `archer_kite.go` (7),
+  `scenarios_run.go` (7), `soak.go` (6) and `version/version.go` (6)
+  carry the largest single savings.
+- The audit reads 17 335 of 170 870 (10.1 percent) after this commit.
+- Verified: `task fmt`, `go build ./...`, the acceptance, botlog,
+  connection, huntaudit, memwatch, version, logfmt and cmd suites (all
+  cached from the same tree state), `golangci-lint run` on the seven
+  paths 0 issues, `task fmt:check` clean.
+
 ## Status
 
 The tool, the rule and the renames are in. The worst files are

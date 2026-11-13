@@ -8,13 +8,12 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// deathEdgeTracker counts the character deaths over the soak window by
-// watching the SelfDead flag for rising edges (false -> true). A death is a
-// known maximum HP with a zero current HP (see Bot.SelfDead); the flag
-// oscillates, since the server resurrects the character at the village, so the
-// count is the number of transitions into the dead state. The tracker is a
-// single-goroutine read of the public tracker API, so it stays inside the
-// acceptance scope.
+// deathEdgeTracker counts the character deaths over the soak window by watching
+// the SelfDead flag for rising edges (false -> true). A death is a known
+// maximum HP with a zero current HP (see Bot.SelfDead); the flag oscillates,
+// since the server resurrects the character at the village, so the count is the
+// number of transitions into the dead state. The tracker is a single-goroutine
+// read of the public tracker API, so it stays inside the acceptance scope.
 type deathEdgeTracker struct {
     previous bool
     seen     bool

@@ -25,29 +25,26 @@ import (
 // cityShoppingScenarioID is the scenario registry id.
 const cityShoppingScenarioID = "city-shopping"
 
-// cityShoppingAccount is the temp account of the scenario: the next
-// free slot after the archer fleet spread (temp20 through temp24).
-// The password equals the account (the Mobius login auto-creates
-// missing accounts).
+// cityShoppingAccount is the temp account of the scenario: the next free slot
+// after the archer fleet spread (temp20 through temp24). The password equals
+// the account (the Mobius login auto-creates missing accounts).
 const (
     cityShoppingAccount  = "temp25"
     cityShoppingPassword = "temp25"
 )
 
-// cityShoppingTimeout bounds the whole run: the errand stages (the
-// walk to Mirabel, the outbound ride, both merchant stops, the dress,
-// the ride home and the walk back) complete in under four minutes on
-// the deployed stack, the standard restock trip that follows spends
-// about five, and the resumed farm adds one kill. The watch fails
-// fast on a stopped errand or a silent return ground, so the budget
-// only catches a session that never reaches either gate.
+// cityShoppingTimeout bounds the whole run: the errand stages (the walk to
+// Mirabel, the outbound ride, both merchant stops, the dress, the ride home and
+// the walk back) complete in under four minutes on the deployed stack, the
+// standard restock trip that follows spends about five, and the resumed farm
+// adds one kill. The watch fails fast on a stopped errand or a silent return
+// ground, so the budget only catches a session that never reaches either gate.
 const cityShoppingTimeout = 20 * time.Minute
 
-// cityShoppingErrandWall bounds the errand runtime the watch accepts:
-// the fixture's ground sits 11 000 units from Mirabel and the errand
-// completes in about three minutes on the deployed stack, so the wall
-// catches a hung errand long before the 30 minute driver budget of a
-// far cell would.
+// cityShoppingErrandWall bounds the errand runtime the watch accepts: the
+// fixture's ground sits 11 000 units from Mirabel and the errand completes in
+// about three minutes on the deployed stack, so the wall catches a hung errand
+// long before the 30 minute driver budget of a far cell would.
 const cityShoppingErrandWall = 12 * time.Minute
 
 // cityShoppingFarmWindow bounds the resumed farm wait after the
@@ -58,11 +55,10 @@ const cityShoppingErrandWall = 12 * time.Minute
 // bot that never comes back to the ground stays silent past it.
 const cityShoppingFarmWindow = 10 * time.Minute
 
-// The start state of the errand: the level 15 vitals on the Kaboo
-// Orc Grunt SW-5 cell (elven-hex-104), where the cell median of 9
-// stays under the delevel trigger and the hunt resumes on the
-// return. The 800 000 adena cover the 748 560 Gludio counter price of
-// the top no-grade kit and the bow behind it.
+// The start state of the errand: the level 15 vitals on the Kaboo Orc Grunt
+// SW-5 cell (elven-hex-104), where the cell median of 9 stays under the delevel
+// trigger and the hunt resumes on the return. The 800 000 adena cover the 748
+// 560 Gludio counter price of the top no-grade kit and the bow behind it.
 const (
     cityShoppingSpawnX = 36000
     cityShoppingSpawnY = 50229
@@ -87,8 +83,7 @@ const (
     checkCityShopGludio = "gludio"
     // checkCityShopWeapon holds once the Falchion is in the bag.
     checkCityShopWeapon = "weapon"
-    // checkCityShopArmor holds once every armor piece of the kit is
-    // in the bag.
+    // checkCityShopArmor holds once every armor piece of the kit is in the bag.
     checkCityShopArmor = "armor"
     // checkCityShopBow holds once the top no-grade bow is in the bag
     // beside the melee kit.
@@ -96,8 +91,7 @@ const (
     // checkCityShopSold holds once the replaced village gear and the
     // old bow left the bag during the errand.
     checkCityShopSold = "sold"
-    // checkCityShopWorn holds once the whole kit fills its paperdoll
-    // slots.
+    // checkCityShopWorn holds once the whole kit fills its paperdoll slots.
     checkCityShopWorn = "worn"
     // checkCityShopHome holds once the character walked back to the
     // start ground after the purchases.
@@ -107,11 +101,10 @@ const (
     checkCityShopFarm = "farming"
 )
 
-// cityShoppingVillageKit is the village dress in the bag: the level
-// 15 no-grade set the auto equipment puts on, the weapon the errand
-// upgrades, the Forest Bow the Composition Bow replaces and the
-// starter jewels. The two rings ride separate rows so both fingers
-// receive their own object id.
+// cityShoppingVillageKit is the village dress in the bag: the level 15 no-grade
+// set the auto equipment puts on, the weapon the errand upgrades, the Forest
+// Bow the Composition Bow replaces and the starter jewels. The two rings ride
+// separate rows so both fingers receive their own object id.
 var cityShoppingVillageKit = []ResetItem{
     {ItemID: 2, Count: 1},   // Long Sword
     {ItemID: 24, Count: 1},  // Bone Breastplate
@@ -128,11 +121,10 @@ var cityShoppingVillageKit = []ResetItem{
     {ItemID: 907, Count: 1}, // Necklace of Anguish
 }
 
-// cityShoppingOldGear is the village weapon, armor set, shield and
-// Forest Bow the errand replaces and must sell at the Gludio
-// merchants (the starter jewels are kept). The bow is the luring tool
-// of the melee dress: the Composition Bow replaces it and the bow
-// stop sells it before the new tool lands.
+// cityShoppingOldGear is the village weapon, armor set, shield and Forest Bow
+// the errand replaces and must sell at the Gludio merchants (the starter jewels
+// are kept). The bow is the luring tool of the melee dress: the Composition Bow
+// replaces it and the bow stop sells it before the new tool lands.
 var cityShoppingOldGear = []int32{2, 24, 31, 44, 50, 38, 102, 272}
 
 // cityShoppingSlot is one piece of the top kit and the paperdoll
@@ -143,9 +135,8 @@ type cityShoppingSlot struct {
     slot   int
 }
 
-// cityShoppingSlots is the paperdoll layout of the top no-grade kit
-// in purchase order (the weapon first, the same order the hunt
-// driver buys in).
+// cityShoppingSlots is the paperdoll layout of the top no-grade kit in purchase
+// order (the weapon first, the same order the hunt driver buys in).
 var cityShoppingSlots = []cityShoppingSlot{
     {itemID: 68, slot: state.PaperdollRHand},  // Falchion
     {itemID: 26, slot: state.PaperdollChest},  // Bronze Breastplate
@@ -315,12 +306,11 @@ func cityShoppingScenario(ctx context.Context, m *Manager, t *Test) error {
     }
 }
 
-// cityShoppingWatch accumulates the latches of the scenario: the
-// purchase flags gate the return watch, the home stamp gates the
-// resumed farm check, the visit, dress and farm flags retire their
-// checks once the story reached them - the bot leaves Gludio and
-// swaps gear on the later town trips, so a live position or paperdoll
-// predicate would reopen a fact the run already proved.
+// cityShoppingWatch accumulates the latches of the scenario: the purchase flags
+// gate the return watch, the home stamp gates the resumed farm check, the
+// visit, dress and farm flags retire their checks once the story reached them -
+// the bot leaves Gludio and swaps gear on the later town trips, so a live
+// position or paperdoll predicate would reopen a fact the run already proved.
 type cityShoppingWatch struct {
     weaponBought bool
     armorBought  bool
@@ -399,10 +389,9 @@ func (w *cityShoppingWatch) evaluate(tracker *state.Bot, test *Test) {
     w.evaluateFarming(tracker, test)
 }
 
-// evaluateBow latches the bow purchase: the tool rides the last
-// Gludio stop, behind the melee kit. The latch retires the live bag
-// predicate - the junk flows may sell a duplicate later and would
-// reopen the proven fact.
+// evaluateBow latches the bow purchase: the tool rides the last Gludio stop,
+// behind the melee kit. The latch retires the live bag predicate - the junk
+// flows may sell a duplicate later and would reopen the proven fact.
 func (w *cityShoppingWatch) evaluateBow(
     tracker *state.Bot, test *Test,
 ) {

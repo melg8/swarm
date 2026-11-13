@@ -220,11 +220,10 @@ func (t *Test) updateCheck(id string, done bool, detail string) {
     }
 }
 
-// appendLog adds one line to the rolling log and mirrors it into
-// the run log file of the current run. The hunt loop decision lines
-// (they all start with "Hunt:", the logger convention of the loop)
-// ride their own tag so the file separates the bot decisions from
-// the scenario narration.
+// appendLog adds one line to the rolling log and mirrors it into the run log
+// file of the current run. The hunt loop decision lines (they all start with
+// "Hunt:", the logger convention of the loop) ride their own tag so the file
+// separates the bot decisions from the scenario narration.
 func (t *Test) appendLog(line string) {
     t.mu.Lock()
     runLog := t.runLog

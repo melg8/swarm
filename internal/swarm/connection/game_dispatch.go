@@ -110,9 +110,8 @@ var packetRoutes = []struct {
 // per packet.
 var packetHandlers = buildPacketHandlers()
 
-// buildPacketHandlers indexes packetRoutes and rejects a duplicate
-// opcode: the second registration would be unreachable and the
-// compiler cannot see it.
+// buildPacketHandlers indexes packetRoutes and rejects a duplicate opcode: the
+// second registration would be unreachable and the compiler cannot see it.
 func buildPacketHandlers() [256]packetHandler {
     var table [256]packetHandler
     for _, route := range packetRoutes {
@@ -137,14 +136,13 @@ func (gc *GameClient) handleServerClose([]byte) {
     gc.logger.Println("Server is closing the connection")
 }
 
-// applyActionFailed validates the refusal answer of the server and
-// hands its arrival time to the state tracker: the hunt walk
-// machinery reads it as the online refusal evidence - a walk click
-// that got the answer while the character stood still is a server
-// side refusal the offline click validation cannot see (see
-// hunt.Loop.refusalEvidence). The packet itself carries no details
-// about which request failed, so the loop keeps driving its own
-// retry logic around the timestamp.
+// applyActionFailed validates the refusal answer of the server and hands its
+// arrival time to the state tracker: the hunt walk machinery reads it as the
+// online refusal evidence - a walk click that got the answer while the
+// character stood still is a server side refusal the offline click validation
+// cannot see (see hunt.Loop.refusalEvidence). The packet itself carries no
+// details about which request failed, so the loop keeps driving its own retry
+// logic around the timestamp.
 func (gc *GameClient) applyActionFailed(payload []byte) {
     if err := fromgameserver.ParseActionFailedPacket(
         &gc.actionFailed, payload); err != nil {
@@ -252,13 +250,12 @@ func (gc *GameClient) logUnknownPacket(payload []byte) {
     }
 }
 
-// handleNetPing validates the server net ping response and stays
-// silent on the happy path: the reply only proves the connection is
-// alive (the game time it carries is used nowhere), and a C1 client
-// behind the proxy pings continuously (its RequestNetPing 0xA8 packets
-// relay through this session, several replies per second live), so one
-// line per answer flooded the log. A malformed packet still logs: it
-// flags a cipher or protocol desync.
+// handleNetPing validates the server net ping response and stays silent on the
+// happy path: the reply only proves the connection is alive (the game time it
+// carries is used nowhere), and a C1 client behind the proxy pings continuously
+// (its RequestNetPing 0xA8 packets relay through this session, several replies
+// per second live), so one line per answer flooded the log. A malformed packet
+// still logs: it flags a cipher or protocol desync.
 func (gc *GameClient) handleNetPing(payload []byte) {
     ping := fromgameserver.NewNetPingPacket()
     if err := fromgameserver.ParseNetPingPacket(ping, payload); err != nil {

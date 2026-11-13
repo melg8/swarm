@@ -443,8 +443,7 @@ func runGenerate(args []string) error {
     return nil
 }
 
-// countVerdict counts the queries of one verdict class (the summary
-// line).
+// countVerdict counts the queries of one verdict class (the summary line).
 func countVerdict(queries []corpusQuery, verdict string) int {
     n := 0
     for _, q := range queries {

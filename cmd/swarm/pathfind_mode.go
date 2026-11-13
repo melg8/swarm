@@ -132,9 +132,8 @@ func (f *navmeshShowFlag) IsBoolFlag() bool {
     return true
 }
 
-// navmeshViewerInitial resolves and logs the initial tile selection
-// of the viewer: the flag named tiles that exist, every tile when the
-// flag named none.
+// navmeshViewerInitial resolves and logs the initial tile selection of the
+// viewer: the flag named tiles that exist, every tile when the flag named none.
 func navmeshViewerInitial(mesh *navmesh.Mesh, dir string,
     requested []navmesh.RegionKey, tileFiles int, tileDir string,
 ) []navmesh.RegionKey {
@@ -282,11 +281,10 @@ func detectGeodataDir() string {
     return defaultGeodataCandidates[0]
 }
 
-// detectNavmeshDir picks the first candidate directory that holds at
-// least one tile file, "" when none does: the mesh is an accelerator
-// over the geodata engine, not a dependency - an absent tile set
-// keeps the navigator on the pure grid engine without a word of
-// noise.
+// detectNavmeshDir picks the first candidate directory that holds at least one
+// tile file, "" when none does: the mesh is an accelerator over the geodata
+// engine, not a dependency - an absent tile set keeps the navigator on the pure
+// grid engine without a word of noise.
 func detectNavmeshDir() string {
     for _, candidate := range defaultNavmeshCandidates {
         entries, err := os.ReadDir(candidate)

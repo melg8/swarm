@@ -14,25 +14,23 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The railing pocket scenario: the character wakes at 43736 47048
-// -2992, the elven village deck cell just off the railings, and
-// cannot build a route anywhere from it. The cell is honest ground -
-// the server walks clicks in and out, the grid engine plans out - but
-// every axis neighbour carries a railing wall bit, so the mesh link
-// graph makes it a linkless one polygon island whose only way out is
-// the diagonal squeeze the anti corner cut rule allows. The pocket
-// escape walks out and the plan routes from the connected ground.
+// The railing pocket scenario: the character wakes at 43736 47048 -2992, the
+// elven village deck cell just off the railings, and cannot build a route
+// anywhere from it. The cell is honest ground - the server walks clicks in and
+// out, the grid engine plans out - but every axis neighbour carries a railing
+// wall bit, so the mesh link graph makes it a linkless one polygon island whose
+// only way out is the diagonal squeeze the anti corner cut rule allows. The
+// pocket escape walks out and the plan routes from the connected ground.
 const (
     // railingPocketSpawnX/Y/Z is the reported pocket cell (the deck
     // cell off the village railings the report named).
     railingPocketSpawnX = 43736
     railingPocketSpawnY = 47048
     railingPocketSpawnZ = -2992
-    // The escape radius: the pocket cell plus its railing ring
-    // measure under 100 units across, the mesh escape aim lands 200+
-    // units out, the followup plans route from there - a character
-    // 256 units from the spawn stands on the connected deck ground
-    // the planner routes from.
+    // The escape radius: the pocket cell plus its railing ring measure under
+    // 100 units across, the mesh escape aim lands 200+ units out, the followup
+    // plans route from there - a character 256 units from the spawn stands on
+    // the connected deck ground the planner routes from.
     railingPocketRadius = 256.0
     railingPocketWindow = 2 * time.Minute
 )
@@ -56,12 +54,11 @@ func railingPocketReset(account string) characterReset {
     return reset
 }
 
-// railingPocketScenario runs the railing pocket round: the temp
-// character wakes inside the linkless deck cell and must walk out of
-// it on its own within the two minute window - the report held the
-// character there forever (every plan attempt answered the bare not
-// found before the pocket escape, the return held without a single
-// walk request).
+// railingPocketScenario runs the railing pocket round: the temp character wakes
+// inside the linkless deck cell and must walk out of it on its own within the
+// two minute window - the report held the character there forever (every plan
+// attempt answered the bare not found before the pocket escape, the return held
+// without a single walk request).
 func railingPocketScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(railingPocketChecks())
@@ -147,8 +144,7 @@ func evaluateRailingPocket(
     return dist >= railingPocketRadius, detail
 }
 
-// railingPocketChecks builds the initial check list of the pocket
-// scenario.
+// railingPocketChecks builds the initial check list of the pocket scenario.
 func railingPocketChecks() []Check {
     return []Check{{
         ID:     checkPocketEscape,

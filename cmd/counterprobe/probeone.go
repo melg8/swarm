@@ -11,10 +11,9 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind"
 )
 
-// probeOne is the debugging helper of the counterprobe world pass
-// (-mode one -scan <template id>): it dumps the spawn cell
-// classification, the close cell map and one verification route of
-// the named merchant.
+// probeOne is the debugging helper of the counterprobe world pass (-mode one
+// -scan <template id>): it dumps the spawn cell classification, the close cell
+// map and one verification route of the named merchant.
 func probeOne(geodata string, id int32) {
     worldGeodata = geodata
     spawn, ok := npcdata.MerchantSpawnOf(id)

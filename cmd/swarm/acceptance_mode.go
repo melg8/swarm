@@ -41,9 +41,8 @@ func attachAcceptance(
 }
 
 // newAcceptanceManager builds the acceptance manager from the shared
-// dependencies. The headless CLI path and the live web UI path share
-// the same construction so the scenarios see the same wiring either
-// way.
+// dependencies. The headless CLI path and the live web UI path share the same
+// construction so the scenarios see the same wiring either way.
 func newAcceptanceManager(
     registry *state.Registry, cfg config,
     engine *pathfind.Engine, mesh *navmesh.Mesh, proxyServer *proxy.Server,
@@ -60,12 +59,11 @@ func newAcceptanceManager(
     }, acceptance.Definitions())
 }
 
-// acceptanceLogDir resolves the directory of the per-run acceptance
-// bot logs: an explicit -acceptance-log-dir wins ("off" disables the
-// run logs), the empty default derives "<session-dir>/acceptance"
-// from the journal directory and falls back to "logs/acceptance"
-// when the journal itself is off (the run logs stay on - they are
-// the feedback loop of the acceptance suite).
+// acceptanceLogDir resolves the directory of the per-run acceptance bot logs:
+// an explicit -acceptance-log-dir wins ("off" disables the run logs), the empty
+// default derives "<session-dir>/acceptance" from the journal directory and
+// falls back to "logs/acceptance" when the journal itself is off (the run logs
+// stay on - they are the feedback loop of the acceptance suite).
 func acceptanceLogDir(cfg config) string {
     switch {
     case cfg.acceptanceLogDir == "off":
@@ -79,23 +77,21 @@ func acceptanceLogDir(cfg config) string {
     }
 }
 
-// runHuntAuditCLI measures the live hunting ground geometry: the probe
-// account visits every cell focus through the database position
-// injection, and the evidence file collects the attackable npc
-// population of every ground with the polygon leash verdicts. The
-// stack must be up (login 2106, game 7777, MariaDB 3306); the run
-// resumes from the evidence file (-audit-fresh starts over) and exits
-// 0 once every spot of the filter measured. The registry regeneration
+// runHuntAuditCLI measures the live hunting ground geometry: the probe account
+// visits every cell focus through the database position injection, and the
+// evidence file collects the attackable npc population of every ground with the
+// polygon leash verdicts. The stack must be up (login 2106, game 7777, MariaDB
+// 3306); the run resumes from the evidence file (-audit-fresh starts over) and
+// exits 0 once every spot of the filter measured. The registry regeneration
 // builds on this measurement (tools/generate_hunt_cells.py).
 func runHuntAuditCLI(cfg config) {
     log.Println("Starting swarm hunt audit CLI")
     log.Printf("Build: %s", version.Identity())
 
     account := cfg.auditAccount
-    // The signal context stops the audit on SIGINT/SIGTERM. The stop
-    // call lands on the explicit cleanup path below (no defer) because
-    // os.Exit skips the deferred calls - the same shape the acceptance
-    // CLI uses.
+    // The signal context stops the audit on SIGINT/SIGTERM. The stop call lands
+    // on the explicit cleanup path below (no defer) because os.Exit skips the
+    // deferred calls - the same shape the acceptance CLI uses.
     ctx, stop := signal.NotifyContext(context.Background(),
         syscall.SIGINT, syscall.SIGTERM)
     err := huntaudit.Run(ctx, huntaudit.Config{
@@ -120,13 +116,12 @@ func runHuntAuditCLI(cfg config) {
 }
 
 // runAcceptanceCLI drives the acceptance scenarios headless: no fleet
-// supervisor, only the acceptance manager. "list" prints the ids and
-// exits, "all" runs every scenario in definition order, "all-parallel"
-// launches them at once and collects every failure, and an id runs
-// just that one; the exit code is 0 on a pass and 1 on a fail, so an
-// agent or a CI gate drives the suite without the web UI. `-web
-// address` watches the run from the UI (`-web ""` keeps it silent);
-// the proxy relay scenario arms its own ephemeral proxy.
+// supervisor, only the acceptance manager. "list" prints the ids and exits,
+// "all" runs every scenario in definition order, "all-parallel" launches them
+// at once and collects every failure, and an id runs just that one; the exit
+// code is 0 on a pass and 1 on a fail, so an agent or a CI gate drives the
+// suite without the web UI. `-web address` watches the run from the UI (`-web
+// ""` keeps it silent); the proxy relay scenario arms its own ephemeral proxy.
 func runAcceptanceCLI(cfg config) {
     log.Println("Starting swarm acceptance CLI")
     log.Printf("Build: %s", version.Identity())

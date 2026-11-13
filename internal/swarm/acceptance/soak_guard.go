@@ -11,26 +11,24 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The stagnation thresholds of the soak scenario: the guard fails the
-// run when the character gains no experience for stagnationNoXpMinutes
-// or holds the same position for stagnationNoMoveMinutes. The elven
-// lands hunt loop kills a mob every 10-30 seconds at level 1, so ten
-// minutes with no XP is a real livelock, not a slow patch; the
-// position window is tighter because a healthy bot walks between
-// kills and a stuck cell freezes the coordinates first.
+// The stagnation thresholds of the soak scenario: the guard fails the run when
+// the character gains no experience for stagnationNoXpMinutes or holds the same
+// position for stagnationNoMoveMinutes. The elven lands hunt loop kills a mob
+// every 10-30 seconds at level 1, so ten minutes with no XP is a real livelock,
+// not a slow patch; the position window is tighter because a healthy bot walks
+// between kills and a stuck cell freezes the coordinates first.
 const (
     stagnationNoXpMinutes   = 10
     stagnationNoMoveMinutes = 5
     stagnationStartupGrace  = 90 * time.Second
 )
 
-// stagnationGuard watches the tracker for the two soak livelock
-// signatures: no experience gain for stagnationNoXpMinutes and no
-// position change for stagnationNoMoveMinutes. The guard reads the
-// tracker public API only; the hunt loop later surfaces the same
-// events for the scenario to consume. The now seam lets the unit tests
-// drive the clock (production uses time.Now), and the soak monitor
-// loop owns the guard and calls update on every tick.
+// stagnationGuard watches the tracker for the two soak livelock signatures: no
+// experience gain for stagnationNoXpMinutes and no position change for
+// stagnationNoMoveMinutes. The guard reads the tracker public API only; the
+// hunt loop later surfaces the same events for the scenario to consume. The now
+// seam lets the unit tests drive the clock (production uses time.Now), and the
+// soak monitor loop owns the guard and calls update on every tick.
 type stagnationGuard struct {
     now         func() time.Time
     bootTime    time.Time
@@ -71,14 +69,13 @@ func newStagnationGuard(now func() time.Time) *stagnationGuard {
     }
 }
 
-// update reads the tracker and advances the guard. A change of the
-// cumulative experience (level plus the within-level exp) refreshes
-// lastXpAt; a change of the floored position refreshes lastPosAt. The
-// guard fires (and records the reason) once the startup grace has
-// elapsed and either threshold is crossed. The character being
-// offline pauses the position check (no position is known) but the
-// experience check still runs - a long offline stretch with no XP is
-// a reconnect livelock.
+// update reads the tracker and advances the guard. A change of the cumulative
+// experience (level plus the within-level exp) refreshes lastXpAt; a change of
+// the floored position refreshes lastPosAt. The guard fires (and records the
+// reason) once the startup grace has elapsed and either threshold is crossed.
+// The character being offline pauses the position check (no position is known)
+// but the experience check still runs - a long offline stretch with no XP is a
+// reconnect livelock.
 func (g *stagnationGuard) update(tracker *state.Bot) {
     now := g.now()
     xp := cumulativeSoakXP(tracker.SelfLevel(), tracker.SelfExp())
@@ -128,8 +125,7 @@ func (g *stagnationGuard) fired() bool {
     return g.firedReason != ""
 }
 
-// reason returns the recorded trip reason (empty when the guard
-// never fired).
+// reason returns the recorded trip reason (empty when the guard never fired).
 func (g *stagnationGuard) reason() string {
     return g.firedReason
 }

@@ -37,9 +37,8 @@ var relayDialer = &net.Dialer{Timeout: relayTimeout}
 // transit to the bot session.
 const relayPingBurst = 5
 
-// relayProxy is the dedicated client proxy of the relay scenario: it
-// owns its ephemeral listeners so the main -proxy of the process is
-// never touched.
+// relayProxy is the dedicated client proxy of the relay scenario: it owns its
+// ephemeral listeners so the main -proxy of the process is never touched.
 type relayProxy struct {
     server  *proxy.Server
     logFile *os.File
@@ -244,9 +243,8 @@ func driveRelayReplay(game *relayGameClient, test *Test) error {
     return nil
 }
 
-// driveRelayTransit walks the live part of the game side: the
-// movement echo through the bot session and the locally answered net
-// pings of the keepalive.
+// driveRelayTransit walks the live part of the game side: the movement echo
+// through the bot session and the locally answered net pings of the keepalive.
 func driveRelayTransit(
     game *relayGameClient, tracker *state.Bot, test *Test,
 ) error {

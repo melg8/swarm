@@ -12,12 +12,11 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// farmReadinessScenario runs the user round: a reset level 15
-// character with the injected wallet shops, learns, walks to its farm
-// zone and kills a mob there under the auras. The hunt loop does the
-// autonomous part (it is the same -hunt wiring the fleet sessions
-// use); the monitor reads the tracker state until every condition of
-// the story holds at once.
+// farmReadinessScenario runs the user round: a reset level 15 character with
+// the injected wallet shops, learns, walks to its farm zone and kills a mob
+// there under the auras. The hunt loop does the autonomous part (it is the same
+// -hunt wiring the fleet sessions use); the monitor reads the tracker state
+// until every condition of the story holds at once.
 func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(farmChecks())
@@ -82,13 +81,12 @@ func farmReadinessScenario(ctx context.Context, m *Manager, t *Test) error {
     }
 }
 
-// buildingEntryScenario runs the trainer hall round: the temp
-// character wakes at the west aisle entrance of the trainer hall with
-// the dump inventory and the learning trip armed - the sell stop walks
-// first, then the teacher segment must cross the building entrance and
-// reach the class master Ellenia inside the hall, and the lessons
-// begin. The frozen corridor ban, the detour re-plan and the direct
-// server routed walk own the recovery (the repro:
+// buildingEntryScenario runs the trainer hall round: the temp character wakes
+// at the west aisle entrance of the trainer hall with the dump inventory and
+// the learning trip armed - the sell stop walks first, then the teacher segment
+// must cross the building entrance and reach the class master Ellenia inside
+// the hall, and the lessons begin. The frozen corridor ban, the detour re-plan
+// and the direct server routed walk own the recovery (the repro:
 // hunt/building_entry_test.go).
 func buildingEntryScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
@@ -167,12 +165,11 @@ func evaluateBuildingEntryConditions(tracker *state.Bot, test *Test) {
     test.updateCheck(checkLesson, learned, lessonDetail)
 }
 
-// runSupervisedScenario drives the common skeleton of the supervised
-// temp bot scenarios: ensure the temp character exists, inject the
-// start state, run the supervised hunt session behind it and watch
-// the check list until every condition holds (the context cancel
-// unwinds the session either way). The scenarios differ only in the
-// start state and the conditions.
+// runSupervisedScenario drives the common skeleton of the supervised temp bot
+// scenarios: ensure the temp character exists, inject the start state, run the
+// supervised hunt session behind it and watch the check list until every
+// condition holds (the context cancel unwinds the session either way). The
+// scenarios differ only in the start state and the conditions.
 func runSupervisedScenario(
     ctx context.Context, m *Manager, t *Test, reset characterReset,
     evaluate func(*state.Bot, *Test), watchLog, doneLog string,
@@ -235,14 +232,13 @@ func runSupervisedScenario(
     }
 }
 
-// fullDressScenario runs the world entry burst round: the temp
-// character wakes at the creation spawn point with the complete outfit
-// in the bag and nothing worn, and the auto equipment must dress the
-// whole set within the world entry window - the burst planner sends
-// every independent use item request in one tick, the confirmation
-// gate holds back only the steps that share server state. The fixed
-// pause pacing needed over twenty seconds for the same bag; the fast
-// check window fails it.
+// fullDressScenario runs the world entry burst round: the temp character wakes
+// at the creation spawn point with the complete outfit in the bag and nothing
+// worn, and the auto equipment must dress the whole set within the world entry
+// window - the burst planner sends every independent use item request in one
+// tick, the confirmation gate holds back only the steps that share server
+// state. The fixed pause pacing needed over twenty seconds for the same bag;
+// the fast check window fails it.
 func fullDressScenario(ctx context.Context, m *Manager, t *Test) error {
     t.setChecks(fullDressChecks())
     watch := &fullDressWatch{}
@@ -267,12 +263,11 @@ func zoneReturnScenario(ctx context.Context, m *Manager, t *Test) error {
         "acceptance: the bot reached its hunting zone, stopping the bot")
 }
 
-// gearGapScenario runs the pantsless dump round: the temp character
-// wakes at the reported farm spot of the 2026-09-12 04:58 dump with
-// the reported pantsless paperdoll and wallet, and must buy its legs
-// armor back through the ordinary shop strategy (the report's bot
-// farmed on without it - the gear debt machinery of the round 60 fix
-// and its reproduction live in the hunt package).
+// gearGapScenario runs the pantsless dump round: the temp character wakes at
+// the reported farm spot of the 2026-09-12 04:58 dump with the reported
+// pantsless paperdoll and wallet, and must buy its legs armor back through the
+// ordinary shop strategy (the report's bot farmed on without it - the gear debt
+// machinery of the round 60 fix and its reproduction live in the hunt package).
 func gearGapScenario(ctx context.Context, m *Manager, t *Test) error {
     t.setChecks(gearGapChecks())
 
@@ -282,10 +277,9 @@ func gearGapScenario(ctx context.Context, m *Manager, t *Test) error {
         "acceptance: the legs slot is dressed, stopping the bot")
 }
 
-// evaluateZoneReturnConditions rewrites the check list of the stuck
-// cell scenario from the live tracker state: the zone check holds
-// once the character stands inside the hunting zone its own spot
-// economy selected.
+// evaluateZoneReturnConditions rewrites the check list of the stuck cell
+// scenario from the live tracker state: the zone check holds once the character
+// stands inside the hunting zone its own spot economy selected.
 func evaluateZoneReturnConditions(tracker *state.Bot, test *Test) {
     if tracker.Status() != state.StatusOnline {
         return
@@ -417,11 +411,10 @@ func botLifetimeScenario(ctx context.Context, m *Manager, t *Test) error {
     return nil
 }
 
-// proxyRelayScenario mirrors tools/proxy_e2e.sh in process: the temp
-// bot enters the world behind a dedicated proxy and a fake C1 client
-// walks the whole client path - the emulated login, the char list,
-// the world entry replay, the live movement relay and the locally
-// answered net pings.
+// proxyRelayScenario mirrors tools/proxy_e2e.sh in process: the temp bot enters
+// the world behind a dedicated proxy and a fake C1 client walks the whole
+// client path - the emulated login, the char list, the world entry replay, the
+// live movement relay and the locally answered net pings.
 func proxyRelayScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(relayChecks())

@@ -9,10 +9,9 @@ import (
     "time"
 )
 
-// The temp accounts of the scenarios: temp1 through temp6 with the
-// matching passwords and character names. They never collide with the
-// -bots fleet (which derives test1, test2, ... from the base
-// account).
+// The temp accounts of the scenarios: temp1 through temp6 with the matching
+// passwords and character names. They never collide with the -bots fleet (which
+// derives test1, test2, ... from the base account).
 const (
     farmAccount    = "temp1"
     farmPassword   = "temp1"
@@ -62,18 +61,16 @@ const zoneReturnTimeout = 15 * time.Minute
 // an hour keeps the slowest honest run inside the bound.
 const gearGapTimeout = 15 * time.Minute
 
-// buildingEntryTimeout bounds the trainer hall entry scenario: the
-// weapon run town round - the weapon, the armor, the jewels, the
-// spellbooks and the teacher segment into the hall - measured ~2.2
-// minutes on the live stack run (the dump's own town visit), the
-// bound leaves room for the walk retries and the aggressive road
-// mobs of the village surroundings.
+// buildingEntryTimeout bounds the trainer hall entry scenario: the weapon run
+// town round - the weapon, the armor, the jewels, the spellbooks and the
+// teacher segment into the hall - measured ~2.2 minutes on the live stack run
+// (the dump's own town visit), the bound leaves room for the walk retries and
+// the aggressive road mobs of the village surroundings.
 const buildingEntryTimeout = 9 * time.Minute
 
-// lifeOnlineTime is how long the lifetime scenario keeps the bot in
-// the world: enough to observe a stable session (the mirrors of
-// tools/mobius_e2e.sh stay 45 seconds), short enough to keep the
-// sequential run of all tests snappy.
+// lifeOnlineTime is how long the lifetime scenario keeps the bot in the world:
+// enough to observe a stable session (the mirrors of tools/mobius_e2e.sh stay
+// 45 seconds), short enough to keep the sequential run of all tests snappy.
 const lifeOnlineTime = 30 * time.Second
 
 // The buff skills of the elven fighter: the auras the final state of
@@ -83,18 +80,16 @@ const (
     defenseAuraSkillID = 91
 )
 
-// villageEscapeTimeout bounds the refused-click escape scenario:
-// the escape window itself is the two minutes of the user contract
-// (villageEscapeWindow, measured from the world entry), the scenario
-// budget adds the character injection, the login handshake and the
-// graceful shutdown around it.
+// villageEscapeTimeout bounds the refused-click escape scenario: the escape
+// window itself is the two minutes of the user contract (villageEscapeWindow,
+// measured from the world entry), the scenario budget adds the character
+// injection, the login handshake and the graceful shutdown around it.
 const villageEscapeTimeout = 5 * time.Minute
 
-// fullDressTimeout bounds the world entry burst scenario: the run is
-// the character injection, the login handshake, one burst of the auto
-// equipment and the graceful shutdown - the dress itself lands within
-// the ten second window of the world entry, the budget keeps the
-// session prologue comfortable.
+// fullDressTimeout bounds the world entry burst scenario: the run is the
+// character injection, the login handshake, one burst of the auto equipment and
+// the graceful shutdown - the dress itself lands within the ten second window
+// of the world entry, the budget keeps the session prologue comfortable.
 const fullDressTimeout = 5 * time.Minute
 
 // Definitions returns the acceptance scenario list the web UI serves: the

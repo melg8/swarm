@@ -123,13 +123,12 @@ func auditSegments(engine *pathfind.Engine, route *navmesh.Route) {
     }
 }
 
-// auditTurns validates every intermediate turn of the plan the way
-// the follower's click guard does: from arrival samples around the
-// turn waypoint (the pass radius ring, biased to the incoming leg)
-// toward the next waypoint. The sample z rides the leg interpolation
-// (the surface the character walks), not a layer resolution. Any
-// refused sample is a stick the walker hits when the server stops it
-// short of the turn.
+// auditTurns validates every intermediate turn of the plan the way the
+// follower's click guard does: from arrival samples around the turn waypoint
+// (the pass radius ring, biased to the incoming leg) toward the next waypoint.
+// The sample z rides the leg interpolation (the surface the character walks),
+// not a layer resolution. Any refused sample is a stick the walker hits when
+// the server stops it short of the turn.
 func auditTurns(engine *pathfind.Engine, route *navmesh.Route) {
     wps := route.Waypoints
     for i := 1; i+1 < len(wps); i++ {
@@ -174,11 +173,10 @@ func auditTurns(engine *pathfind.Engine, route *navmesh.Route) {
                 badAt, firstBad.X, firstBad.Y)
         }
     }
-    // The near pivot detail of every refused turn: which arrival
-    // distances refuse and does the pivot itself click through; and
-    // does the FORWARD overshoot click (past the turn along the
-    // outgoing leg) validate from the refused positions - the corner
-    // recovery candidate.
+    // The near pivot detail of every refused turn: which arrival distances
+    // refuse and does the pivot itself click through; and does the FORWARD
+    // overshoot click (past the turn along the outgoing leg) validate from the
+    // refused positions - the corner recovery candidate.
     for i := 1; i+1 < len(wps); i++ {
         wp, next := wps[i], wps[i+1]
         prev := wps[i-1]
@@ -351,9 +349,8 @@ func meshPos(v pathfind.Vec3) navmesh.Pos {
     return navmesh.Pos{X: v.X, Y: v.Y, Z: v.Z}
 }
 
-// clearedFilter mirrors the hunt navigator filter: the funnel pivot
-// clearance of the fighter capsule, the shortcut pass, the C1 water
-// pricing.
+// clearedFilter mirrors the hunt navigator filter: the funnel pivot clearance
+// of the fighter capsule, the shortcut pass, the C1 water pricing.
 func clearedFilter() navmesh.Filter {
     filter := navmesh.DefaultFilter()
     filter.WaypointClearance = pathfind.DefaultCollisionRadius

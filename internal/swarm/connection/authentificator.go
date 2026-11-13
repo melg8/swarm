@@ -71,10 +71,9 @@ func NewLoginClient(conn net.Conn) *LoginClient {
     }
 }
 
-// armReadDeadline bounds the next blocking socket read (see
-// loginReadTimeout). A buffered remainder of a previous packet
-// short circuits before the socket and the deadline simply rides
-// along.
+// armReadDeadline bounds the next blocking socket read (see loginReadTimeout).
+// A buffered remainder of a previous packet short circuits before the socket
+// and the deadline simply rides along.
 func (lc *LoginClient) armReadDeadline() error {
     return lc.conn.SetReadDeadline(time.Now().Add(loginReadTimeout))
 }

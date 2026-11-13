@@ -2,14 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package version pins the build identity of the running binary: the
-// git branch, the commit, the tree state and the build time. The
-// build scripts bake the values in with -ldflags -X; a plain go build
-// or go run falls back to the VCS stamp of a package path form build
-// (`go run ./cmd/swarm`; a file path build like `go run
-// ./cmd/swarm/main.go` gets no stamp) and to the .git directory. The
-// state dump and the startup log render Identity, so a report always
-// names the exact code that produced it.
+// Package version pins the build identity of the running binary: the git
+// branch, the commit, the tree state and the build time. The build scripts bake
+// the values in with -ldflags -X; a plain go build or go run falls back to the
+// VCS stamp of a package path form build (`go run ./cmd/swarm`; a file path
+// build like `go run ./cmd/swarm/main.go` gets no stamp) and to the .git
+// directory. The state dump and the startup log render Identity, so a report
+// always names the exact code that produced it.
 package version
 
 import (
@@ -37,11 +36,10 @@ var (
     BuildTime string
 )
 
-// Identity renders the build identity line of the running binary:
-// the branch, the commit with the tree state and the build time. The
-// link-time fields win, the VCS stamp of the binary and the .git
-// directory of the working directory fill the gaps, unknown fields
-// drop out.
+// Identity renders the build identity line of the running binary: the branch,
+// the commit with the tree state and the build time. The link-time fields win,
+// the VCS stamp of the binary and the .git directory of the working directory
+// fill the gaps, unknown fields drop out.
 func Identity() string {
     branch, commit, dirty, built := Branch, Commit, Dirty, BuildTime
     if stamp, ok := readVCSStamp(); ok {
@@ -99,18 +97,16 @@ func readVCSStamp() (vcsStamp, bool) {
     return stamp, stamp.revision != ""
 }
 
-// worktree carries the branch and the commit resolved straight out
-// of the .git directory of a worktree - the last resort of a binary
-// with no VCS stamp.
+// worktree carries the branch and the commit resolved straight out of the .git
+// directory of a worktree - the last resort of a binary with no VCS stamp.
 type worktree struct {
     branch string
     commit string
 }
 
-// readWorktree resolves the branch and the commit of the worktree
-// rooted at dir out of .git: HEAD points either at a ref (resolved
-// through the loose ref file or packed-refs) or carries the hash of
-// a detached HEAD.
+// readWorktree resolves the branch and the commit of the worktree rooted at dir
+// out of .git: HEAD points either at a ref (resolved through the loose ref file
+// or packed-refs) or carries the hash of a detached HEAD.
 func readWorktree(dir string) worktree {
     var tree worktree
     gitdir, head, ok := readHead(dir)
@@ -135,10 +131,9 @@ func readWorktree(dir string) worktree {
     return tree
 }
 
-// readHead reads the HEAD file of the worktree rooted at dir and
-// returns the git directory it lives in: .git is a directory in a
-// plain checkout and a "gitdir: <path>" pointer file in a linked
-// worktree or a submodule.
+// readHead reads the HEAD file of the worktree rooted at dir and returns the
+// git directory it lives in: .git is a directory in a plain checkout and a
+// "gitdir: <path>" pointer file in a linked worktree or a submodule.
 func readHead(dir string) (string, string, bool) {
     dotGit := filepath.Join(dir, ".git")
     head, err := readGitEntry(filepath.Join(dotGit, "HEAD"))
@@ -214,9 +209,8 @@ func packedRef(gitdir, ref string) string {
 }
 
 // readGitEntry reads a file of the local git layout - HEAD, the
-// gitdir/commondir pointers, refs. Every path here resolves inside
-// the .git directory of the worktree being inspected, never through
-// user input.
+// gitdir/commondir pointers, refs. Every path here resolves inside the .git
+// directory of the worktree being inspected, never through user input.
 func readGitEntry(path string) ([]byte, error) {
     return os.ReadFile(path)
 }

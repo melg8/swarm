@@ -18,12 +18,11 @@ import (
     "github.com/melg8/swarm/internal/version"
 )
 
-// runFleet launches multiple bot sessions in one process: each gets
-// its own account (the base name plus the 1-based index), its own
-// tracker in a shared registry and its own runBotForever goroutine.
-// All bots share one web interface, one proxy (the UI selects which
-// bot a C1 client attaches to) and one geodata engine. The process
-// lives until every supervisor returns.
+// runFleet launches multiple bot sessions in one process: each gets its own
+// account (the base name plus the 1-based index), its own tracker in a shared
+// registry and its own runBotForever goroutine. All bots share one web
+// interface, one proxy (the UI selects which bot a C1 client attaches to) and
+// one geodata engine. The process lives until every supervisor returns.
 //
 //nolint:funlen // the fleet start walks the phases in order
 func runFleet(cfg config) {
@@ -82,10 +81,9 @@ func runFleet(cfg config) {
         wireSessionBot(ctx, journal, tracker, journalWG)
     }
 
-    // Launch every bot supervisor in its own goroutine. A per-bot
-    // config carries the plan slot (the derived account and the bot
-    // type); the rest of the flags (login, hunt, geodata, navmesh,
-    // proxy) stay shared.
+    // Launch every bot supervisor in its own goroutine. A per-bot config
+    // carries the plan slot (the derived account and the bot type); the rest of
+    // the flags (login, hunt, geodata, navmesh, proxy) stay shared.
     var wg sync.WaitGroup
     for i, tracker := range trackers {
         botCfg := cfg

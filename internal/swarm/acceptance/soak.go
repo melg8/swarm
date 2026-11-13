@@ -41,11 +41,10 @@ const (
 // action; the scenario itself is duration-agnostic.
 const soakDefaultMinutes = 10
 
-// soakShutdownGrace is the budget the scenario gives the supervised
-// session to unwind after the soak window: the logout announcement,
-// the combat stance delay and the socket flush. The manager's own
-// restartWait already covers the worst case; this grace is the local
-// bound the pass criteria read against.
+// soakShutdownGrace is the budget the scenario gives the supervised session to
+// unwind after the soak window: the logout announcement, the combat stance
+// delay and the socket flush. The manager's own restartWait already covers the
+// worst case; this grace is the local bound the pass criteria read against.
 const soakShutdownGrace = 90 * time.Second
 
 // soakDuration reads the SWARM_SOAK_MINUTES env and returns the soak
@@ -63,11 +62,10 @@ func soakDuration() time.Duration {
     return time.Duration(minutes) * time.Minute
 }
 
-// soakTimeout computes the test timeout from the soak window: the
-// window itself plus the startup (the character ensure, the login
-// dial and the world entry) and the shutdown grace. The manager adds
-// its own restartWait on top, so this bound only needs to cover the
-// honest run.
+// soakTimeout computes the test timeout from the soak window: the window itself
+// plus the startup (the character ensure, the login dial and the world entry)
+// and the shutdown grace. The manager adds its own restartWait on top, so this
+// bound only needs to cover the honest run.
 func soakTimeout() time.Duration {
     return soakDuration() + onlineWait + ensurePause +
         soakShutdownGrace
@@ -105,13 +103,12 @@ func soakChecks() []Check {
     }
 }
 
-// soakScenario runs the M1 acceptance vehicle: a fresh level 1
-// character enters the world under the autonomous hunt loop and farms
-// for the configured soak window (SWARM_SOAK_MINUTES, default the 10
-// minute smoke; the real M1 run is 8h). The monitor watches the
-// stagnation guard every tick; a trip (no XP for M minutes, no move
-// for K minutes) fails the run. On every terminal path the scenario
-// appends one JSON line to runs/metrics.jsonl with the M1 fields.
+// soakScenario runs the M1 acceptance vehicle: a fresh level 1 character enters
+// the world under the autonomous hunt loop and farms for the configured soak
+// window (SWARM_SOAK_MINUTES, default the 10 minute smoke; the real M1 run is
+// 8h). The monitor watches the stagnation guard every tick; a trip (no XP for M
+// minutes, no move for K minutes) fails the run. On every terminal path the
+// scenario appends one JSON line to runs/metrics.jsonl with the M1 fields.
 func soakScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(soakChecks())
@@ -141,12 +138,11 @@ func soakScenario(ctx context.Context, m *Manager, t *Test) error {
         sessionDone, cancelMonitor, monitorDone, deaths)
 }
 
-// soakSetup ensures the temp character, launches the supervised
-// session and waits for the world entry. It returns the captured
-// run-start state (the level, the cumulative XP, the re-path count),
-// the tracker, the session done channel, the session cancel function
-// and any setup error. The caller owns the session teardown on every
-// exit path.
+// soakSetup ensures the temp character, launches the supervised session and
+// waits for the world entry. It returns the captured run-start state (the
+// level, the cumulative XP, the re-path count), the tracker, the session done
+// channel, the session cancel function and any setup error. The caller owns the
+// session teardown on every exit path.
 func soakSetup(
     ctx context.Context, m *Manager, test *Test,
 ) (soakRunStart, *state.Bot, chan error, context.CancelFunc, error) {
@@ -276,18 +272,16 @@ type soakRunStart struct {
     rePaths    int
 }
 
-// soakOutcome is the terminal verdict of the monitor loop: failed
-// carries the stagnation reason, the elapsed time is read off the
-// start by the caller.
+// soakOutcome is the terminal verdict of the monitor loop: failed carries the
+// stagnation reason, the elapsed time is read off the start by the caller.
 type soakOutcome struct {
     failed bool
     reason string
 }
 
-// soakMonitor runs the stagnation guard and the check evaluation until
-// the deadline or the context end. The monitor owns the guard and the
-// death edge tracker (single goroutine); the outcome channel receives
-// one value on exit.
+// soakMonitor runs the stagnation guard and the check evaluation until the
+// deadline or the context end. The monitor owns the guard and the death edge
+// tracker (single goroutine); the outcome channel receives one value on exit.
 func soakMonitor(
     ctx context.Context, tracker *state.Bot, test *Test,
     guard *stagnationGuard, deaths *deathEdgeTracker,

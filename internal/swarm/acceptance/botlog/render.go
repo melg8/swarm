@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The shared render helpers and the opcode name tables of the run
-// log decoders.
+// The shared render helpers and the opcode name tables of the run log decoders.
 
 package botlog
 
@@ -57,8 +56,7 @@ func skillName(skillID int32) string {
     return info.Name
 }
 
-// recvOpcodeNames maps the server-to-client opcodes the session
-// observes.
+// recvOpcodeNames maps the server-to-client opcodes the session observes.
 var recvOpcodeNames = map[byte]string{
     0x01: "MoveToLocation", 0x03: "CharInfo", 0x04: "UserInfo",
     0x06: "Attack", 0x0B: "Die", 0x15: "SpawnItem",
@@ -79,8 +77,7 @@ var recvOpcodeNames = map[byte]string{
     0xEC: "NetPing", 0xBF: "MyTargetSelected",
 }
 
-// sendOpcodeNames maps the client-to-server opcodes the session
-// sends.
+// sendOpcodeNames maps the client-to-server opcodes the session sends.
 var sendOpcodeNames = map[byte]string{
     0x00: "ProtocolVersion", 0x01: "MoveToLocation",
     0x03: "EnterWorld", 0x04: "Action", 0x08: "AuthLogin",

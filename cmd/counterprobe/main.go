@@ -21,10 +21,9 @@ import (
     "github.com/melg8/swarm/internal/swarm/pathfind/navmesh"
 )
 
-// merchant is one shop npc of the probe (the townMerchants rows plus
-// the spawn heading of the Mobius data). The id field carries the
-// npcdata template id of the world pass rows; the legacy list rows
-// leave it zero.
+// merchant is one shop npc of the probe (the townMerchants rows plus the spawn
+// heading of the Mobius data). The id field carries the npcdata template id of
+// the world pass rows; the legacy list rows leave it zero.
 type merchant struct {
     id      int32
     name    string

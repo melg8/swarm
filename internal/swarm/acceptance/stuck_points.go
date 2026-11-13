@@ -31,11 +31,10 @@ const (
     stuckPointBX = 41920
     stuckPointBY = 52128
     stuckPointBZ = -3000
-    // stuckEscapeRadius is the escape ring both scenarios accept: the
-    // mesh escape aims measure 276 and 311 units out (the march past
-    // the arrival slack), a character 256+ units from the spawn has
-    // walked the escape ray onto the connected ground the followup
-    // plans route from.
+    // stuckEscapeRadius is the escape ring both scenarios accept: the mesh
+    // escape aims measure 276 and 311 units out (the march past the arrival
+    // slack), a character 256+ units from the spawn has walked the escape ray
+    // onto the connected ground the followup plans route from.
     stuckEscapeRadius = 256.0
     stuckPointWindow  = 2 * time.Minute
     // stuckPointTimeout bounds one stuck point scenario: the escape
@@ -136,10 +135,9 @@ func runStuckPointScenario(
     }
 }
 
-// evaluateStuckPoint rewrites the check list of the stuck point
-// scenario from the live tracker state: the escape check holds once
-// the character stands beyond the escape radius from the reported
-// spot.
+// evaluateStuckPoint rewrites the check list of the stuck point scenario from
+// the live tracker state: the escape check holds once the character stands
+// beyond the escape radius from the reported spot.
 func evaluateStuckPoint(
     tracker *state.Bot, test *Test, x, y int32,
 ) (bool, string) {
@@ -158,8 +156,7 @@ func evaluateStuckPoint(
     return dist >= stuckEscapeRadius, detail
 }
 
-// stuckPointChecks builds the initial check list of the stuck point
-// scenarios.
+// stuckPointChecks builds the initial check list of the stuck point scenarios.
 func stuckPointChecks() []Check {
     return []Check{{
         ID:     checkStuckEscape,

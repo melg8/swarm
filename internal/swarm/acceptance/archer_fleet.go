@@ -80,9 +80,8 @@ const (
     fleetTurnAngle       = 40.0
     fleetMinTurns        = 2
     fleetSamplePeriod    = 250 * time.Millisecond
-    // fleetWindupWindow mirrors the accepted-move boundary (the measured
-    // windup end plus the lead, ~1.65 s at pAtkSpd 337): the one allowed
-    // standing.
+    // fleetWindupWindow mirrors the accepted-move boundary (the measured windup
+    // end plus the lead, ~1.65 s at pAtkSpd 337): the one allowed standing.
     fleetWindupWindow = 1650 * time.Millisecond
     // fleetStandShareCeil bounds the avoidable standing share of a fight: the
     // healthy rhythm books near zero, a standing fight reads above it.
@@ -441,8 +440,7 @@ func (w fleetWatch) foldRetreat(dx, dy float64) fleetWatch {
 
 // foldFight tracks the per-fight drift: the first fighting sample of a target
 // anchors on the mob's stand (the farm point, not the spawn), and a fight
-// switch closes the track. Fights without a retreat carry no curve
-// evidence.
+// switch closes the track. Fights without a retreat carry no curve evidence.
 func (w fleetWatch) foldFight(s fleetSample) fleetWatch {
     if w.fightTarget == 0 || s.targetID != w.fightTarget {
         w = w.closeFight()
@@ -742,8 +740,7 @@ func archerFleetScenario(ctx context.Context, m *Manager, t *Test) error {
     return fleetVerdict(test, bots, window, ran)
 }
 
-// launchFleet starts the five supervised archer sessions with staggered
-// logins.
+// launchFleet starts the five supervised archer sessions with staggered logins.
 func launchFleet(
     ctx context.Context, m *Manager, test *Test,
 ) []*fleetBotRun {
@@ -773,8 +770,7 @@ func launchFleet(
 }
 
 // ensureFleetTracker registers the slot's tracker before the session launches:
-// without it every resolution mints a fresh offline twin the audit cannot
-// see.
+// without it every resolution mints a fresh offline twin the audit cannot see.
 func (m *Manager) ensureFleetTracker(account string) *state.Bot {
     if bot, ok := m.registry.Get(account); ok {
         return bot

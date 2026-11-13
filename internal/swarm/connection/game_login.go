@@ -51,9 +51,8 @@ func (gc *GameClient) Authenticate(
     }
     gc.logger.Println("Sent game auth login for account " + params.Account)
 
-    // The char list answer bounds like every pre-world read (see
-    // charListWait): the silence watchdog of the live session does
-    // not exist yet.
+    // The char list answer bounds like every pre-world read (see charListWait):
+    // the silence watchdog of the live session does not exist yet.
     if err := gc.conn.SetReadDeadline(
         time.Now().Add(charListWait)); err != nil {
         return nil, fmt.Errorf(
@@ -296,10 +295,9 @@ func (gc *GameClient) EnterWorld(slot int32) error {
     }
     gc.logger.Println("Sent enter world request")
 
-    // The movement toggle of the official client entry: the server starts
-    // every session walking (Creature._isRunning defaults to false), so a bot
-    // that never flips it crosses the world at 97 instead of ~170 units per
-    // second.
+    // The movement toggle of the official client entry: the server starts every
+    // session walking (Creature._isRunning defaults to false), so a bot that
+    // never flips it crosses the world at 97 instead of ~170 units per second.
     run := togameserver.NewChangeMoveTypePacket()
     run.TypeRun = 1
     if err := gc.sendPacket(run); err != nil {

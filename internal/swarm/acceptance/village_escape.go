@@ -14,13 +14,12 @@ import (
     "github.com/melg8/swarm/internal/swarm/state"
 )
 
-// The dump start state of the village escape scenario: a level 15
-// fighter stood at the elven village center cell (the Mother Tree
-// plaza where the village streets converge) through a whole day of
-// refused walks - the corridor bans, the detour re-plans and the
-// server routed hops all failed. The scenario pins the recovery
-// contract: from this position the bot finds a path out of the city
-// within two minutes.
+// The dump start state of the village escape scenario: a level 15 fighter stood
+// at the elven village center cell (the Mother Tree plaza where the village
+// streets converge) through a whole day of refused walks - the corridor bans,
+// the detour re-plans and the server routed hops all failed. The scenario pins
+// the recovery contract: from this position the bot finds a path out of the
+// city within two minutes.
 const (
     // villageEscapeSpawnX/Y/Z is the reported stuck position, the
     // village plaza cell.
@@ -37,12 +36,11 @@ const (
     villageEscapeCP    = 178
 )
 
-// villageEscapeItems is the exact item set of the dump: the equipped
-// paperdoll (the Brandish two hander, the bone armor set, the leather
-// helmet and gloves, the starter jewels) and the bag of the report
-// (the arrows, the hunting bow and the two crafting leftovers). The
-// injection lands every stack in the bag - the auto equipment of the
-// hunt loop dresses the character from it.
+// villageEscapeItems is the exact item set of the dump: the equipped paperdoll
+// (the Brandish two hander, the bone armor set, the leather helmet and gloves,
+// the starter jewels) and the bag of the report (the arrows, the hunting bow
+// and the two crafting leftovers). The injection lands every stack in the bag -
+// the auto equipment of the hunt loop dresses the character from it.
 var villageEscapeItems = []ResetItem{
     {ItemID: 24, Count: 1},   // Bone Breastplate
     {ItemID: 31, Count: 1},   // Bone Gaiters
@@ -82,25 +80,23 @@ func villageEscapeReset(account string) characterReset {
     }
 }
 
-// The escape contract: the character is out of the city once its
-// distance from the village center passes the escape radius, and the
-// whole escape (from the world entry at the dump cell to the open
-// ground) fits the escape window. The radius covers every village
-// structure of the geodata: the farthest npc stands 2734 units from
-// the plaza (Cobendell), the southwest gate corridor sits 2348 out,
-// the village streets reach 2760 - at 3000 units the character stands
-// on the open road past every wall, gate and deck of the city.
+// The escape contract: the character is out of the city once its distance from
+// the village center passes the escape radius, and the whole escape (from the
+// world entry at the dump cell to the open ground) fits the escape window. The
+// radius covers every village structure of the geodata: the farthest npc stands
+// 2734 units from the plaza (Cobendell), the southwest gate corridor sits 2348
+// out, the village streets reach 2760 - at 3000 units the character stands on
+// the open road past every wall, gate and deck of the city.
 const (
     villageEscapeRadius = 3000.0
     villageEscapeWindow = 2 * time.Minute
     villageEscapeBudget = 5 * time.Minute
 )
 
-// villageEscapeScenario runs the refused-click round: the temp
-// character wakes at the village plaza cell with the dump state and
-// must reach the open ground on its own within the escape window. The
-// corridor bans, the detour re-plans and the server routed hops all
-// failed to move the stuck characters.
+// villageEscapeScenario runs the refused-click round: the temp character wakes
+// at the village plaza cell with the dump state and must reach the open ground
+// on its own within the escape window. The corridor bans, the detour re-plans
+// and the server routed hops all failed to move the stuck characters.
 func villageEscapeScenario(ctx context.Context, m *Manager, t *Test) error {
     test := t
     test.setChecks(villageEscapeChecks())
@@ -217,8 +213,7 @@ func evaluateVillageEscape(
     return dist >= villageEscapeRadius, detail
 }
 
-// villageEscapeChecks builds the initial check list of the escape
-// scenario.
+// villageEscapeChecks builds the initial check list of the escape scenario.
 func villageEscapeChecks() []Check {
     return []Check{{
         ID:     checkEscape,

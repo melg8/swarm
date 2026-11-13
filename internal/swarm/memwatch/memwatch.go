@@ -19,10 +19,9 @@ import (
 // evidence trail readable without drowning the bot log.
 const DefaultPeriod = time.Minute
 
-// Watch logs the memory footprint line every period until the context
-// ends. The first line lands at once (the baseline of the run), then
-// the ticker owns the rhythm. A nil logger or a non positive period
-// disables the watch.
+// Watch logs the memory footprint line every period until the context ends. The
+// first line lands at once (the baseline of the run), then the ticker owns the
+// rhythm. A nil logger or a non positive period disables the watch.
 func Watch(ctx context.Context, logger *log.Logger, period time.Duration) {
     if logger == nil || period <= 0 {
         return

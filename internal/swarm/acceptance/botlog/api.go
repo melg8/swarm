@@ -2,10 +2,9 @@
 //
 // SPDX-License-Identifier: MIT
 
-// The public emit surface of the run log: the scenario events, the
-// packet taps, the monitor check transitions, the state samples and
-// the verdict. Every method is nil-safe and non-blocking (see
-// RunLog.emit).
+// The public emit surface of the run log: the scenario events, the packet taps,
+// the monitor check transitions, the state samples and the verdict. Every
+// method is nil-safe and non-blocking (see RunLog.emit).
 
 package botlog
 
@@ -108,11 +107,10 @@ func hexByte(value byte) string {
     return string([]byte{digits[value>>4], digits[value&0x0f]})
 }
 
-// Checks writes the pass/fail contract block of the run: the
-// scenario publishes its check list at the start (the setChecks
-// call of the scenario function), and the block lands as the first
-// [check] event - the list the monitor watches for the rest of the
-// run.
+// Checks writes the pass/fail contract block of the run: the scenario publishes
+// its check list at the start (the setChecks call of the scenario function),
+// and the block lands as the first [check] event - the list the monitor watches
+// for the rest of the run.
 func (l *RunLog) Checks(timeout time.Duration, checks []CheckDesc) {
     if l == nil || len(checks) == 0 {
         return
@@ -130,11 +128,10 @@ func (l *RunLog) Checks(timeout time.Duration, checks []CheckDesc) {
     l.emit(tagCheck, lines)
 }
 
-// CheckTransition writes one check state flip the monitor decided
-// (done or reopened), with the label for the readers who grep by
-// name instead of id. Only the state changes land as lines (a
-// steady check rewrites every monitor period - the transitions are
-// the story the file needs).
+// CheckTransition writes one check state flip the monitor decided (done or
+// reopened), with the label for the readers who grep by name instead of id.
+// Only the state changes land as lines (a steady check rewrites every monitor
+// period - the transitions are the story the file needs).
 func (l *RunLog) CheckTransition(
     id string, label string, done bool, detail string,
 ) {

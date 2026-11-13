@@ -2,14 +2,13 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Package huntaudit measures the real hunting ground geometry on the
-// live Mobius C1 stack: for every registry cell it injects the probe
-// character at the anchor through the database position rewrite, waits
-// out the knownlist broadcast and dumps every attackable npc it sees.
-// The registry anchors are clustered from the spawn polygon squares,
-// never measured live, so a leash square can fence out the whole mob
-// mass; the JSON output is the evidence file the run reloads to skip
-// the measured spots across several runs.
+// Package huntaudit measures the real hunting ground geometry on the live
+// Mobius C1 stack: for every registry cell it injects the probe character at
+// the anchor through the database position rewrite, waits out the knownlist
+// broadcast and dumps every attackable npc it sees. The registry anchors are
+// clustered from the spawn polygon squares, never measured live, so a leash
+// square can fence out the whole mob mass; the JSON output is the evidence file
+// the run reloads to skip the measured spots across several runs.
 package huntaudit
 
 import (
@@ -67,9 +66,8 @@ type Config struct {
     // Anchors optionally overrides the audited positions per spot id
     // (the verification pass audits the re-generated geometry).
     Anchors string
-    // Filter audits only the spots whose id contains one of the
-    // comma separated substrings (empty audits everything not yet
-    // measured).
+    // Filter audits only the spots whose id contains one of the comma separated
+    // substrings (empty audits everything not yet measured).
     Filter string
     // Stride audits every Nth spot of the registry (0 or 1 audits
     // every spot): the stratified sampling of the verification pass.
@@ -357,10 +355,9 @@ func openSession(
     return game, nil
 }
 
-// ensureCharacter creates the probe character through the game
-// protocol when it is missing (the same creation recipe of the
-// acceptance scenarios) and drops the connection without entering
-// the world.
+// ensureCharacter creates the probe character through the game protocol when it
+// is missing (the same creation recipe of the acceptance scenarios) and drops
+// the connection without entering the world.
 func ensureCharacter(cfg Config) error {
     loginConn, err := auditDialer.Dial("tcp", cfg.Login)
     if err != nil {

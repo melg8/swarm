@@ -41,13 +41,12 @@ func (gc *GameClient) applyNpcHTMLMessage(payload []byte) {
     }
 }
 
-// dialogLinks extracts the bypass links of the current html through
-// the shared ParseHTMLLinks parser (T-012) and maps them to the
-// state.DialogLinkView the open dialog section of the tracker (T-013)
-// stores. The gatekeeper step reads the raw html through LastHTMLDialog
-// for the teleport-specific classification (the list name and the
-// destination index); the tracker path serves the web UI and the M2
-// quest dialog walker.
+// dialogLinks extracts the bypass links of the current html through the shared
+// ParseHTMLLinks parser (T-012) and maps them to the state.DialogLinkView the
+// open dialog section of the tracker (T-013) stores. The gatekeeper step reads
+// the raw html through LastHTMLDialog for the teleport-specific classification
+// (the list name and the destination index); the tracker path serves the web UI
+// and the M2 quest dialog walker.
 func (gc *GameClient) dialogLinks() []state.DialogLinkView {
     parsed := fromgameserver.ParseHTMLLinks(gc.npcHTML.HTML)
     if len(parsed) == 0 {
@@ -101,13 +100,12 @@ func (gc *GameClient) LastHTMLDialogArrival() (
     return gc.lastHTML.NpcObjID, gc.lastHTML.HTML, gc.htmlGen
 }
 
-// SendBypass sends a RequestBypassToServer command to the server
-// (the gatekeeper teleport flow, the H-002 verification). The command
-// is the raw bypass string the NpcHtmlMessage button carried, WITHOUT
-// the "bypass -h " prefix the client strips (the server receives
-// "npc_<objId>_teleport <list> <index>" or "npc_<objId>_Chat"
-// directly). An empty command is refused (the server disconnects on
-// an empty bypass).
+// SendBypass sends a RequestBypassToServer command to the server (the
+// gatekeeper teleport flow, the H-002 verification). The command is the raw
+// bypass string the NpcHtmlMessage button carried, WITHOUT the "bypass -h "
+// prefix the client strips (the server receives "npc_<objId>_teleport <list>
+// <index>" or "npc_<objId>_Chat" directly). An empty command is refused (the
+// server disconnects on an empty bypass).
 func (gc *GameClient) SendBypass(command string) error {
     return gc.sendPacket(
         &togameserver.RequestBypassToServer{Command: command})

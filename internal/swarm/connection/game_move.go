@@ -129,14 +129,13 @@ func (gc *GameClient) CursorKeyWalkTo(
     return nil
 }
 
-// ClaimValidatePosition reports a claimed client position
-// (ValidatePosition 0x48): while the cursor key movement is armed the server
-// syncs the claimed placement straight into the world and broadcasts it, so
-// the claims walk the character without any click validation
-// (ValidatePosition.runImpl, the cursor key branch). The claims gate the
-// echo ticker: the echo of the broadcast position would lag them by one
-// broadcast and snap the character back a step each tick. The first
-// mouse-mode walk clears the gate (see WalkTo).
+// ClaimValidatePosition reports a claimed client position (ValidatePosition
+// 0x48): while the cursor key movement is armed the server syncs the claimed
+// placement straight into the world and broadcasts it, so the claims walk the
+// character without any click validation (ValidatePosition.runImpl, the cursor
+// key branch). The claims gate the echo ticker: the echo of the broadcast
+// position would lag them by one broadcast and snap the character back a step
+// each tick. The first mouse-mode walk clears the gate (see WalkTo).
 func (gc *GameClient) ClaimValidatePosition(
     x int32, y int32, z int32, heading int32,
 ) error {
