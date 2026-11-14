@@ -1,4 +1,4 @@
-# The fighter bow lure timing and range (status: in progress)
+# The fighter bow lure timing and range (status: done)
 
 Started 2026-11-14, branch main, issue0 (owner report: three defects of
 the melee fighter's bow lure - the standoff sits too close, the attack
@@ -129,8 +129,40 @@ section, and the new "lure gate" paragraph in the archer-kite section.
 `go build ./...`, `go test ./internal/swarm/hunt/`, `task fmt` and
 `task lint:new` pass.
 
+### 2026-11-14 - the code and the first live measurement
+
+`acef3042` carries the rework and the tests, `f45f8433` the two
+operator log lines (the range entry and the melee handoff). The live
+probe ran the built binary as `test1` (level 18 fighter) on the
+deployed C1 stack at `127.0.0.3:2106` with the web state probe at
+5 Hz (`runs/live-lure.log`).
+
+First episode (03:10:04, one covered pick in the first five
+minutes): the range entry at 483 units, the character stopped at 455
+units on the attack commit, the first damage 1.47 s after the entry
+(the bow windup, so the shot went out on the entry tick), the sword
+confirmed 0.25 s after the swap request.
+
+### 2026-11-14 - the second live measurement
+
+The character came back from its town trip and hunted for ten
+minutes; 2997 state samples and nine covered picks:
+
+- eight lures reached the range entry at 479-480 units (the 480 ring,
+  20 units inside the 500 unit range) against the old 420 standoff;
+- the last moving sample preceded the range entry by 0.08-0.36 s, so
+  the character never stood at the target waiting the shot;
+- the first damage landed 1.31-1.97 s after the entry - the shot
+  fired on the entry tick and the gap is the bow windup;
+- every measured handoff (six) confirmed the sword 0.25 s after the
+  swap request, one loop tick, and the first melee request followed
+  in the same tick;
+- one episode ended before the standoff because an add aggroed on the
+  approach (the ordinary engage answered it).
+
 ## Status
 
-Next: `task prepush`, the commit, then the live probe on the running
-stack (standoff distance, arrival -> shot, swap -> attack) and the
-devlog record of the round.
+Done. The lure stops at the 480 ring, fires the pull the tick the
+target enters the range, arms on the walk and hands the melee over in
+one tick; the live numbers are recorded in
+`docs/devlog/2026-11-14-issue0-fighter-bow-lure.md`.
