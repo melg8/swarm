@@ -65,10 +65,17 @@ type combatState struct {
     combatAvoidHoldAt time.Time
     // castAt/buffAt/skillReuse hold the combat casting pacing
     // (combat_skills.go): the server clock starts at the cast start,
-    // the local reuse keeps a jitter margin.
+    // the local reuse keeps a jitter margin. swingFor/swingDamage/
+    // swingSeenAt hold the smallest non-critical swing observed on
+    // the current target, castLandsAt the landing time of the own
+    // in-flight strike (the overhit finishing window samples them).
     castAt        time.Time
     buffAt        time.Time
     skillReuse    map[int32]time.Time
+    swingFor      int32
+    swingDamage   float64
+    swingSeenAt   time.Time
+    castLandsAt   time.Time
     profilePicked bool
     // healFlightUntil bounds the in-flight recovery heal: the sit
     // request waits it out (recovery_heal.go).

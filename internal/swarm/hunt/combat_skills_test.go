@@ -57,6 +57,19 @@ func equipSword(bot *state.Bot) {
     bot.ApplyPaperdoll(slots)
 }
 
+// setSelfPAtk applies a UserInfo refresh carrying the given physical
+// attack: C1 never sends P_ATK over StatusUpdate, so the overhit
+// strike estimate reads the value from here. The class of the bot is
+// preserved, the vitals stay the fixture defaults.
+func setSelfPAtk(bot *state.Bot, pAtk int32) {
+    bot.ApplyUserInfo(state.UserInfo{
+        Name: "unittest1", Level: 10,
+        ClassID: bot.SelfClassID(), Race: 1,
+        X: 45000, Y: 50000, Z: -3500,
+        MaxHP: 100, CurHP: 90, MaxMP: 100, CurMP: 90, PAtk: pAtk,
+    })
+}
+
 // setMobHP sets the vitals of the spawned mob (object 7): the
 // server refreshes the bar of the attacked mob over StatusUpdate.
 // The bar maximum is the 100 of every fight fixture, so the curHP
@@ -71,20 +84,27 @@ func setMobHP(bot *state.Bot, curHP int32) {
 // TestLoopCastsStrikeOfEquippedWeapon pins the warrior path: the
 // learned Power Strike (a SWORD and BLUNT strike) fires at the
 // selected target while the fight runs and a sword is worn. The
-// target bar sits inside the overhit finish window (see
+// target bar sits under the estimated strike damage (see
 // overhit_test.go) - a healthy bar holds the strike back.
 func TestLoopCastsStrikeOfEquippedWeapon(t *testing.T) {
     bot := newTestBot()
+    setSelfPAtk(bot, 50)
     bot.SetSkills([]state.LearnedSkill{
         {SkillID: 3, Level: 1, Passive: false},
     })
     equipSword(bot)
     spawnMob(bot)
-    setMobHP(bot, 15)
+    setMobHP(bot, 100)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
 
     startFight(loop, bot)
+    // The landed swing of 80 (100 -> 20) sets the strike estimate
+    // above the remaining bar; the next paced tick releases it.
+    setMobHP(bot, 20)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.castAt = time.Time{}
+    loop.tick()
 
     require.Equal(t, []int32{3}, game.casts,
         "the sword strike fires in the fight")
@@ -175,18 +195,22 @@ func TestLoopPassiveSkillsNeverCast(t *testing.T) {
 // ticks hold it until the window closes.
 func TestSkillReuseBlocksTheSecondCast(t *testing.T) {
     bot := newTestBot()
+    setSelfPAtk(bot, 50)
     bot.SetSkills([]state.LearnedSkill{
         {SkillID: 3, Level: 1, Passive: false},
     })
     equipSword(bot)
     spawnMob(bot)
-    setMobHP(bot, 15)
+    setMobHP(bot, 100)
     game := &fakeGame{}
     loop := NewLoop(game, bot)
 
     startFight(loop, bot)
-    // The cast retry period is 2s, the reuse of Power Strike is 13s
-    // plus the margin: the ticks inside the window cast nothing.
+    // The landed swing of 80 (100 -> 20) sets the estimate above the
+    // bar, so the first paced tick fires the strike. The cast retry
+    // period is 2s, the reuse of Power Strike is 13s plus the margin:
+    // the ticks inside the window cast nothing.
+    setMobHP(bot, 20)
     for range 5 {
         bot.ApplyPawnMovement(state.PawnMovement{
             ObjectID: 100, TargetID: 7, Distance: 40,

@@ -40,15 +40,26 @@ const (
     // manaStandPercent is the mana fill the resting mystic waits for
     // before it stands up and re-engages.
     manaStandPercent = 60.0
-    // overhitFinishPercent is the target health below which the overhit-capable
-    // strike fires as the finishing blow. The server (Mobius C1,
+    // The overhit finishing window. The server (Mobius C1,
     // Attackable.calculateOverhitExp L1480) pays exp * min(overkill/maxHp,
     // 0.25) on a killing blow of an overhit-flagged skill, and any non lethal
     // hit clears the armed flag (AttackableStatus.reduceHp L40), so an early
-    // cast only burns the reuse window. One melee swing takes 25-45 percent of
-    // the mob bar in the low level band, so a bar inside the window usually
-    // holds about a strike's worth of damage.
-    overhitFinishPercent = 40.0
+    // cast only burns the reuse window. The window is the estimated strike
+    // damage, never a fixed bar percentage: a percentage of the mob maximum
+    // loses to the absolute strike.
+    //
+    // overhitSafetyFactor scales the estimate down: the swing sample is the
+    // smallest roll of the fight and the strike rolls its own weapon
+    // multiplier, so the window stays under the expected damage.
+    overhitSafetyFactor = 0.85
+    // overhitSwingFresh bounds the age of the swing sample: an older hit may
+    // belong to another attacker (a fleet mate) with a different P.Atk.
+    overhitSwingFresh = 8 * time.Second
+    // overhitCastLead/overhitCastLag bound the landing window of the own
+    // strike: the HP drop it causes must never enter the swing sample. The
+    // margins cover the server and client clock jitter.
+    overhitCastLead = 300 * time.Millisecond
+    overhitCastLag  = 1200 * time.Millisecond
 )
 
 // maybeCastCombatSkill fires the combat skill of the running fight: the warrior
@@ -57,6 +68,7 @@ const (
 // mystic cast is the primary damage. One request per retry period, gated by the
 // local reuse windows.
 func (l *Loop) maybeCastCombatSkill(now time.Time) {
+    l.trackSwingDamage(now)
     if !l.castAt.IsZero() && now.Sub(l.castAt) < castRetryPeriod {
         return
     }
@@ -75,6 +87,8 @@ func (l *Loop) maybeCastCombatSkill(now time.Time) {
             return
         }
         l.castAt = now
+        l.castLandsAt = now.Add(
+            time.Duration(cast.HitTime) * time.Millisecond)
         l.skillReuse[skill.SkillID] = now.Add(
             time.Duration(cast.ReuseDelay)*time.Millisecond +
                 castReuseMargin)
@@ -119,23 +133,91 @@ func (l *Loop) combatSkillCandidate(
         return false
     }
     if npcdata.OverhitSkill(skill.SkillID) &&
-        l.targetAboveOverhitWindow() {
+        l.targetAboveOverhitWindow(cast, skill.Level) {
         return false
     }
 
     return true
 }
 
-// targetAboveOverhitWindow reports whether the target still stands above the
-// finishing window. An unknown health means the fight just opened (the server
-// refreshes the vitals of the attacked mob), so the strike holds.
-func (l *Loop) targetAboveOverhitWindow() bool {
-    hp := l.tracker.ObjectHealthPercent(l.target)
-    if hp < 0 {
+// targetAboveOverhitWindow reports whether the target stands above the
+// estimated strike damage. An unknown health means the fight just opened (the
+// server refreshes the vitals of the attacked mob), so the strike holds; an
+// unknown estimate (no swing sample or no P.Atk yet) holds it too, because a
+// blind cast spends the reuse window without the overhit bonus.
+func (l *Loop) targetAboveOverhitWindow(
+    cast npcdata.SkillCast, level int32,
+) bool {
+    curHP, _, ok := l.tracker.ObjectVitals(l.target)
+    if !ok {
+        return true
+    }
+    damage, ok := l.overhitStrikeDamage(cast, level)
+    if !ok {
         return true
     }
 
-    return hp > overhitFinishPercent
+    return curHP > damage
+}
+
+// overhitStrikeDamage estimates the non-critical damage of one strike from the
+// server formula (Formulas.calcPhysDam): the skill adds its power to the P.Atk
+// before the shared defence, proximity and weapon rolls, so the ratio to an
+// auto attack is (PAtk + power) / PAtk. ok is false without a swing sample, a
+// known P.Atk or the power data of the skill.
+func (l *Loop) overhitStrikeDamage(
+    cast npcdata.SkillCast, level int32,
+) (float64, bool) {
+    power := cast.PowerOf(level)
+    pAtk := l.tracker.SelfPAtk()
+    if l.swingDamage <= 0 || power <= 0 || pAtk <= 0 {
+        return 0, false
+    }
+    ratio := float64(pAtk+power) / float64(pAtk)
+
+    return l.swingDamage * ratio * overhitSafetyFactor, true
+}
+
+// trackSwingDamage samples the auto attack hits of the current target: the
+// smallest non-critical hit is the base of the strike estimate. A target
+// switch resets the sample, and the HP drop of the own in-flight strike around
+// its landing time never enters it.
+func (l *Loop) trackSwingDamage(now time.Time) {
+    if l.target == 0 {
+        return
+    }
+    if l.swingFor != l.target {
+        l.swingFor = l.target
+        l.swingDamage = 0
+        l.swingSeenAt = time.Time{}
+    }
+    amount, crit, at, ok := l.tracker.ObjectLastDamage(l.target)
+    if !ok || crit || at.After(now) ||
+        now.Sub(at) > overhitSwingFresh {
+        return
+    }
+    if !l.swingSeenAt.IsZero() && !at.After(l.swingSeenAt) {
+        return
+    }
+    l.swingSeenAt = at
+    if l.insideCastLanding(at) {
+        return
+    }
+    if amount <= 0 || (l.swingDamage > 0 && amount >= l.swingDamage) {
+        return
+    }
+    l.swingDamage = amount
+}
+
+// insideCastLanding reports whether a hit landed inside the window of the own
+// in-flight strike.
+func (l *Loop) insideCastLanding(at time.Time) bool {
+    if l.castLandsAt.IsZero() {
+        return false
+    }
+
+    return !at.Before(l.castLandsAt.Add(-overhitCastLead)) &&
+        !at.After(l.castLandsAt.Add(overhitCastLag))
 }
 
 // maybeSelfBuff casts the missing self buffs between the fights: the learned
