@@ -161,6 +161,30 @@ for path in sorted(glob.glob(os.path.join(skill_stats, '*.xml'))):
                     costs = [int(x) for x in tab.group(1).split()]
             else:
                 costs = [int(ref)] * max(1, min(max_level, 100))
+        # The <power> number of a physical strike per level: the
+        # damage formula adds it to the attacker P.Atk (Formulas
+        # .calcPhysDam), so the hunt loop sizes the finishing blow
+        # from it. A float table (the dot and heal rates) carries no
+        # strike power and stays out.
+        pw = re.search(r'<power>([^<]+)</power>', body)
+        powers = []
+        if pw:
+            ref = pw.group(1).strip()
+            if ref.startswith('#'):
+                tab = re.search(
+                    r'<table name="%s">([^<]+)</table>' % re.escape(ref),
+                    body)
+                if tab:
+                    try:
+                        powers = [int(x) for x in
+                                  tab.group(1).split()]
+                    except ValueError:
+                        powers = []
+            else:
+                try:
+                    powers = [int(ref)] * max(1, min(max_level, 100))
+                except ValueError:
+                    powers = []
         kinds = re.findall(r'<using kind="([^"]+)"', body)
         weapons = []
         if kinds:
@@ -170,6 +194,7 @@ for path in sorted(glob.glob(os.path.join(skill_stats, '*.xml'))):
             'operate': op.group(1) if op else '',
             'target': tg.group(1) if tg else '',
             'mp': costs,
+            'power': powers,
             'range': int(cr.group(1)) if cr else 0,
             'reuse': int(rd.group(1)) if rd else 0,
             'hit': int(ht.group(1)) if ht else 0,
@@ -376,11 +401,11 @@ lines.append('')
 lines.append('// skillCasts maps the skill id to the cast data of the skill:')
 lines.append('// the operate type (A1 active damage, A2 timed buff, P passive),')
 lines.append('// the target type (ONE attacks the selected target, SELF lands')
-lines.append('// on the caster), the per level mana cost, the cast range, the')
-lines.append('// reuse delay and the hit time in milliseconds, the magic flag')
-lines.append('// of the spells, the abnormal time of the timed buffs in')
-lines.append('// seconds and the weapon kinds the <using> condition demands')
-lines.append('// (empty - any weapon). See SkillCast in skills.go.')
+lines.append('// on the caster), the per level mana cost and strike power, the')
+lines.append('// cast range, the reuse delay and the hit time in milliseconds,')
+lines.append('// the magic flag of the spells, the abnormal time of the timed')
+lines.append('// buffs in seconds and the weapon kinds the <using> condition')
+lines.append('// demands (empty - any weapon). See SkillCast in skills.go.')
 lines.append('var skillCasts = map[int32]SkillCast{')
 for skill_id in sorted(skill_casts):
     cast = skill_casts[skill_id]
@@ -388,12 +413,15 @@ for skill_id in sorted(skill_casts):
         continue
     mp = cast['mp']
     mp_list = ', '.join(str(x) for x in mp)
+    powers = ', '.join(str(x) for x in cast['power'])
     weapons = ', '.join(go_str(k) for k in cast['weapons'])
     lines.append('\t%d: {Operate: %s, Target: %s, MPCost: []int32{%s}, '
+                 'Power: []int32{%s}, '
                  'CastRange: %d, ReuseDelay: %d, HitTime: %d, '
                  'Magic: %s, BuffTime: %d, Weapons: []string{%s}},'
                  % (skill_id, go_str(cast['operate']),
-                    go_str(cast['target']), mp_list, cast['range'],
+                    go_str(cast['target']), mp_list, powers,
+                    cast['range'],
                     cast['reuse'], cast['hit'],
                     'true' if cast['magic'] else 'false', cast['buff'],
                     weapons))

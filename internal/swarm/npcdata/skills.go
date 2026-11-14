@@ -73,6 +73,11 @@ type SkillCast struct {
     // MPCost is the mana cost per skill level (the list indexes
     // level minus one; shorter lists clamp to the last entry).
     MPCost []int32
+    // Power is the strike power per skill level (the <power> number of
+    // the Mobius stats, the same clamping as MPCost). The physical
+    // damage formula adds it to the attacker P.Atk, so the strike to
+    // swing damage ratio is (PAtk + Power) / PAtk.
+    Power []int32
     // CastRange is the cast range in world units (40 - melee).
     CastRange int32
     // ReuseDelay is the reuse cooldown in milliseconds.
@@ -214,6 +219,24 @@ func (c SkillCast) MPCostOf(level int32) int32 {
     }
 
     return c.MPCost[index]
+}
+
+// PowerOf returns the strike power of one level of the skill with the same
+// clamping as MPCostOf: a shorter list clamps to its last entry, an empty list
+// answers 0 (no power data, the hunt loop holds the overhit strike).
+func (c SkillCast) PowerOf(level int32) int32 {
+    if len(c.Power) == 0 {
+        return 0
+    }
+    index := int(level) - 1
+    if index < 0 {
+        index = 0
+    }
+    if index >= len(c.Power) {
+        index = len(c.Power) - 1
+    }
+
+    return c.Power[index]
 }
 
 // UsableWithWeapon reports whether the skill accepts the given
