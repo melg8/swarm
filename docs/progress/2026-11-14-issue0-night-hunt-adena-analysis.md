@@ -1,0 +1,152 @@
+# The night hunt adena analysis (status: in progress)
+
+Started 2026-11-14, branch main, issue #0 (no board issue yet).
+
+## Goal
+
+Raise the fleet adena per hour from the evidence of the live night run,
+without stopping the stack and without touching the game server. The
+deliverable of this round is a measured, prioritized loss list with the
+concrete fix each loss needs; the fixes land in their own rounds.
+
+Acceptance of the analysis: every loss is quantified in wall-clock
+hours and adena for the 18.7 hour run, and the source record is named
+so a fresh session can recompute it.
+
+## Context
+
+- The run: `-hunt -proxy -login 127.0.0.3:2106
+  -web 127.0.0.1:8081 -bots 3 -navmesh ./data/navmesh`, started
+  2026-11-14 03:31 from `main` @ 16b3f6fc, still alive at 22:00.
+- Sources (read only, the process keeps writing): the session journal
+  `logs/session-20261114-033100-33468.jsonl` (structured kills, deaths,
+  trip starts and ends, logouts, levels, 10 s state samples), the
+  combined bot log `runs/night-run.log`, `proxy.log`, the live state
+  API `http://127.0.0.1:8081/api/bots/<id>/state`, and the character
+  rows of the stack database.
+- The journal duplicates every Hunt line in the plain log, so a log
+  grep counts each event twice; the journal counts below are unique.
+- Phase shares are interval weighted over the 10-13 s state samples
+  (gaps over 120 s dropped, so a bot that died mid gap loses nothing).
+
+## Progress
+
+### 2026-11-14 22:30 UTC - measure the night run
+
+The 18.7 hour totals (net is the adena delta of the state samples,
+gross excludes the matched junk sale):
+
+| bot   | kills | deaths | net adena | net/h  | adena/kill |
+| ----- | ----- | ------ | --------- | ------ | ---------- |
+| test1 | 2919  | 118    | 240902    | 12905  | 82.5       |
+| test2 | 2766  | 117    | 328160    | 17580  | 118.6      |
+| test3 | 2679  | 88     | 235442    | 12613  | 87.9       |
+
+The phase budget per bot: engage 59.9 / 61.2 / 60.5 percent, townReturn
+14.1-16.3, townWalk 11.4-15.1, delevel 5.3-7.3, loot 3.6-4.2,
+townSell 0.4-0.9. The town block is therefore 27.7-30.2 percent of the
+wall clock, and the engage rate inside it is 217-238 kills/h.
+
+### Finding 1: the guide trip after a delevel finish (the largest)
+
+All 37 delevel finishes were followed by a Newbie Guide trip start
+within 300 s, median 167 s. The 167 s is the walk home (the finish sets
+the return walk) plus the 45 s `weaponRunCooldown`, and the guide trip
+then walks the same 170-204 s back to the village. The character stood
+next to the guide when it finished the delevel.
+
+Cost: about 315 s of duplicated walking per finish, 3.2 h across the
+fleet, 1.08 h per bot, 5.9 percent of the wall clock, 20-30k adena per
+bot.
+
+Fix: after `finishDelevel` and `abortDelevel` in the village, run the
+guide stop (and the sell when the bag is full) before the return walk,
+the way `recoverFromDeath` already clears `tripEndedAt` so a revived
+character sells right away.
+
+### Finding 2: the 16 to 17 delevel loop on a level 9-10 cell
+
+test1 ran 12 extra delevel episodes between 17:13 and 19:25 (plus three
+after 21:31), test3 three: 60-90 s each with 0-2 deaths. A death from
+17 lands at 16 with the experience at the top of the 16 window (the
+window is 417203..426222, 9k wide), so one or two kills restore 17 and
+the trigger fires again. The fleet logged 45 "delevel death 1 removed
+no experience" deaths.
+
+Cost: about 1.1 h for test1 and 0.35 h for test3 without a single kill.
+
+Fix: the delevel cooldown after a finish is one minute
+(`delevelCooldown`), so the next trigger is always armed; a finished
+delevel needs a longer settle, at least until a level up beyond the
+trigger, and the trigger should read the ground the character could
+hunt at its level rather than the ground it stands on.
+
+### Finding 3: the emergency logout at a 55-60 percent bar
+
+93 logouts (test1 13, test2 38, test3 42): 45 pile ups (23 of them
+exactly two mobs) and 48 "HP 55-60 percent under attack". The label is
+the health at the logout, not the trigger: the flee runs
+`fleeLogoutAfter` (20 s) and ends the session when the chaser keeps
+pace, which a 125 speed character cannot avoid against the same speed
+mobs.
+
+`losingFight` flees when the target leads the character by 25 percent
+of the bar and the character is under 60 percent, a relative measure
+that treats 59 percent of a level 18 pool against a level 12 mob as a
+lost fight.
+
+Cost: median 85 s to the next kill, test2 mean 327 s and p90 953 s,
+about 2.2 h at the median across the fleet, 4 percent of the clock.
+
+Fix: gate the pile up run on the effective threat (the mob level
+against the character level and the absolute health pool), not the raw
+count of two, and let a single same-or-lower-level mob be traded at
+59 percent instead of abandoned.
+
+### Finding 4: the interrupted town trip loses the whole plan
+
+127 "town trip interrupted" lines, 107 of them a mob on the outbound
+walk. `interruptTripForAttacker` calls `resetTownTrip`, so the frozen
+sell and guide stops die with the walk and the next tick starts the
+trip from scratch. The log shows the pattern: start at 04:22:54,
+interruption at 04:23:20, a fresh start at 04:23:31, and the trip
+finally ends at 04:28:29 (297 s measured from the restart).
+
+Cost: about 40 s of lost walk per interruption, 1.4 h across the fleet.
+
+Fix: keep `tripStops` across the interruption and re-path from the
+current position, the way the trip already re-paths on a stuck
+waypoint.
+
+### Finding 5: the cell distance and the town cost
+
+The median hunting distance to the guide is 21.2k / 24.4k / 25.5k
+units (a 169-204 s straight line return walk at speed 125). The coarse
+2k grid shows 311-366 adena/min at 17-27k and 162-253 at 30-35k, so the
+far edge of the registry is already a loss. `cellProximity` is
+1/(1+d/8000) anchored at the live character position, so a cell looks
+closest exactly when the character stands in the village, and no term
+models the recurring 250 s trip every 22 minutes.
+
+Fix: score the travel against the village anchor and charge the trip
+cost inside the cell value, so a cell that pays 100 adena/min more but
+costs 100 s more per trip loses.
+
+### Open measurement: the ActionFailed volume
+
+40352 "Action failed" lines in 18.7 h, 4.8 per kill, clustered around
+Power Strike and the attack spam. The cause is unidentified; the packet
+is the server refusal of a client action, not a bot error. A debug line
+naming the last sent opcode before each refusal answers it in one
+round.
+
+## Status
+
+The analysis round is complete; the five fixes are ordered by yield
+(finding 1 is worth about 6 percent of the clock, finding 5 is the
+structural one). The night process stays up for the owner's evaluation;
+none of the numbers above came from a control command.
+
+Next step: open the board issues for findings 1-3 and land them as
+separate small rounds, each verified on the live stack against this
+baseline (12905 / 17580 / 12613 adena per hour).
