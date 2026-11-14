@@ -596,6 +596,24 @@ func (h *cellHunter) ringCells(ring int) []int32 {
     return outer
 }
 
+// highestEligibleMedian returns the highest static median mob level among the
+// grounds the picker may commit the character to right now (0 when none): the
+// delevel guard asks it whether a relocation can replace the guard deaths.
+func (h *cellHunter) highestEligibleMedian(level int32, now time.Time) int32 {
+    best := int32(0)
+    for index := range h.cells {
+        cell := &h.cells[index]
+        if !cellEligible(*cell, level) || h.starveCoolingDown(cell.ID, now) {
+            continue
+        }
+        if median := cellMedianLevel(*cell); median > best {
+            best = median
+        }
+    }
+
+    return best
+}
+
 // ringEligible reports whether the neighbor ring holds any level eligible
 // ground at all: an eligible but unripe ring refills on its own clock, so the
 // hunter waits instead of relocating far.

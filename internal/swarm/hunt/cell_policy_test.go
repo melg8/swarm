@@ -593,11 +593,12 @@ func TestCellWindowHelpers(t *testing.T) {
     // adena floor (level - 8) sits above every mob.
     require.False(t, cellEligible(cells[0], 20))
     // The median of the home mix (4 keltirs of 2, 2 elders of 4)
-    // reads 2, the delevel safety holds while the gap stays under
-    // the trigger.
+    // reads 2, the delevel safety holds while the gap stays inside
+    // the full adena gap (8) and breaks past it.
     require.Equal(t, int32(2), cellMedianLevel(cells[0]))
     require.True(t, cellDelevelSafe(cells[0], 6))
-    require.False(t, cellDelevelSafe(cells[0], 10))
+    require.True(t, cellDelevelSafe(cells[0], 10))
+    require.False(t, cellDelevelSafe(cells[0], 11))
     require.Equal(t, int32(2), cellLevelDistance(cells[0], 6))
 }
 

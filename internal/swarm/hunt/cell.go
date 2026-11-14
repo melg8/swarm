@@ -58,13 +58,22 @@ func cellWindowMass(cell Cell, level int32) float64 {
     return mass
 }
 
+// adenaFullLevelGap is the largest character-level gap over a mob that still
+// pays the whole adena drop: the Mobius DropAdenaMinLevelDifference starts the
+// scale down at 8 and the DropAdenaMaxLevelDifference reaches 10 percent at 15
+// (Rates.ini, NpcTemplate.dropItems). The item chance collapses earlier
+// (DropItemMinLevelDifference, 5) but pays junk only, and the experience has
+// no gap scale at all (Attackable.calculateExpAndSp cuts off at
+// MonsterExpMaxLevelDifference, 11).
+const adenaFullLevelGap = int32(8)
+
 // cellEligible reports whether the character can productively hunt the cell at
 // the given level: the ground holds at least one species inside the wide window
-// [max(1, level-8), level+2] (mob level + 8 is the full adena edge, level + 2
-// the hard engage ceiling). A cell outside the window wastes the character's
+// [max(1, level-adenaFullLevelGap), level+2] (the full adena edge below, the
+// hard engage ceiling above). A cell outside the window wastes the character's
 // time - too low pays no adena, too high kills it.
 func cellEligible(cell Cell, level int32) bool {
-    low := level - 8
+    low := level - adenaFullLevelGap
     if low < 1 {
         low = 1
     }
@@ -119,11 +128,11 @@ func cellMedianLevel(cell Cell) int32 {
 }
 
 // cellDelevelSafe reports whether holding the cell at the given level keeps the
-// character under the delevel trigger: the cell window (level-8) admits grounds
-// whose median sits 7+ levels below the character, and the deleveling answers
-// such ground with the guard deaths - the picker must not commit the character
-// to ground it immediately delevels it for. A cell without a computable median
-// keeps the plain window judgement.
+// character inside the full adena gap: the cell window admits grounds whose
+// median sits adenaFullLevelGap levels below the character, and the deleveling
+// answers a wider ground with the guard deaths - the picker must not commit the
+// character to ground it immediately delevels it for. A cell without a
+// computable median keeps the plain window judgement.
 func cellDelevelSafe(cell Cell, level int32) bool {
     median := cellMedianLevel(cell)
     if median <= 0 {

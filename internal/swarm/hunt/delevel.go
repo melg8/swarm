@@ -2,14 +2,15 @@
 //
 // SPDX-License-Identifier: MIT
 
-// Deleveling of the hunt loop: when the hunting ground holds only mobs
-// far below the character level the drop chance collapses (the Mobius
-// level gap rules), so the bot provokes the town guards and dies until
-// the level returns to the rewarding range. Only archer guards are
-// provoked, always in melee: a provoked archer shoots at anything in
-// its bow range, while a melee guard only follows and the chase dies
-// in the checkTarget karma gate. The penalty applies from level 10 up
-// (Lucky newbie absorbs it below; Life Cubic aims no lower than 16).
+// Deleveling of the hunt loop: when the character outgrew the ground so far
+// that the adena drop shrinks (the Mobius level gap scale), the bot provokes
+// the town guards and dies until the level returns inside the full drop gap.
+// The experience carries no gap scale of its own, so a death inside the gap is
+// a pure loss. Only archer guards are provoked, always in melee: a provoked
+// archer shoots at anything in its bow range, while a melee guard only follows
+// and the chase dies in the checkTarget karma gate. The penalty applies from
+// level 10 up (Lucky newbie absorbs it below; Life Cubic aims no lower than
+// 16).
 package hunt
 
 import (
@@ -22,13 +23,14 @@ import (
 
 // Timing and threshold constants of the deleveling.
 const (
-    // delevelTriggerDiff starts the deleveling when the character level exceeds
-    // the median zone mob level by this much: the elven gremlins cycle between
-    // 8 and 6.
-    delevelTriggerDiff = int32(7)
-    // delevelTargetGap is the target above the median zone mob level: mob level
-    // plus 5 is the last level with the full item drop chance.
-    delevelTargetGap = int32(5)
+    // delevelTriggerDiff starts the deleveling one level past the full adena
+    // gap: inside the gap the guard deaths buy nothing, whatever the item
+    // chance does (adenaFullLevelGap carries the server rule).
+    delevelTriggerDiff = adenaFullLevelGap + 1
+    // delevelTargetGap is the target above the median zone mob level: the last
+    // level of the full adena drop, so a trigger at the edge buys the minimum
+    // drop and any deeper ground buys more.
+    delevelTargetGap = adenaFullLevelGap - 1
     // delevelDropMin is the smallest level drop a deleveling must buy: a single
     // level re-levels within the hour, and the guard walk only burns the guide
     // buffs the death takes with it.
@@ -126,7 +128,8 @@ func (l *Loop) delevelTriggerMedian() int32 {
 // live one flickers with the respawn windows). The static answer only stands
 // while the character holds the ground, and a target that does not drop the
 // level by delevelDropMin never starts the walk: a one-level delevel re-levels
-// before the next bag is full. The rules: docs/hunting.md.
+// before the next bag is full. A ground the picker can leave upwards never
+// triggers either. The rules: docs/hunting.md.
 func (l *Loop) delevelWanted() bool {
     if l.navigator == nil || !l.delevelCooldownOver() {
         return false
@@ -151,8 +154,28 @@ func (l *Loop) delevelWanted() bool {
     if level-median < delevelTriggerDiff {
         return false
     }
+    if l.delevelHasHigherGround(level) {
+        return false
+    }
 
     return delevelTargetFor(level, median) <= level-delevelDropMin
+}
+
+// delevelHasHigherGround reports whether the picker can move the character up
+// instead of dying down: an eligible cell whose median mob level beats the held
+// ground. Dying is the last resort of a character the registry has no higher
+// ground for; a relocation costs one walk, a delevel costs the walk plus the
+// death and the experience it removes.
+func (l *Loop) delevelHasHigherGround(level int32) bool {
+    if l.cell == nil {
+        return false
+    }
+    held := l.anchoredCellMedian()
+    if held <= 0 {
+        return false
+    }
+
+    return l.cell.highestEligibleMedian(level, l.now()) > held
 }
 
 // delevelTargetFor computes the target from the character level over the median
@@ -214,9 +237,9 @@ func (l *Loop) startDelevel() {
     l.waypoints = nil
     l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
     l.phase = phaseDelevel
-    l.logf("Hunt: level %d is too high for level %d mobs (the level "+
-        "gap collapsed the drops), deleveling to %d at the town "+
-        "guards", level, median, target)
+    l.logf("Hunt: level %d over the level %d mobs (the adena drop "+
+        "shrinks past a gap of %d), deleveling to %d at the town "+
+        "guards", level, median, adenaFullLevelGap, target)
 }
 
 // delevelAbortWait returns the pause of the next abort: the base scaled by the

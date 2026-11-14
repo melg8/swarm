@@ -44,8 +44,19 @@ func delevelCell(fx, fy int32) Cell {
 // farming compete here.
 func newDelevelCellLoop(t *testing.T) (*Loop, *fakeGame, *state.Bot) {
     t.Helper()
+
+    return newDelevelCellLoopAt(t, 15)
+}
+
+// newDelevelCellLoopAt prepares the same scene over a character of the given
+// level: the median 8 ground sits inside the full adena gap up to level 16 and
+// past the delevel trigger from level 18.
+func newDelevelCellLoopAt(
+    t *testing.T, level int32,
+) (*Loop, *fakeGame, *state.Bot) {
+    t.Helper()
     bot := newTestBot()
-    setZoneTestLevel(bot, 15)
+    setZoneTestLevel(bot, level)
     moveSelfTo(bot, 46112, 41500, -3500)
     giveTestWeapon(bot)
     game := &fakeGame{}
@@ -117,7 +128,7 @@ func delevelGuardWalkTarget() [3]int32 {
 // starts the deleveling - the living mobs of the ground never win one
 // attack request, the walk to the guard replaces the farming.
 func TestDelevelOutranksTheEngageOnTheSpawnSpot(t *testing.T) {
-    loop, game, bot := newDelevelCellLoop(t)
+    loop, game, bot := newDelevelCellLoopAt(t, 18)
     spawnSpotMobs(bot)
 
     loop.tick()
@@ -125,8 +136,8 @@ func TestDelevelOutranksTheEngageOnTheSpawnSpot(t *testing.T) {
         "the outleveled spot starts the deleveling on the first tick")
     require.Empty(t, game.forces,
         "the mobs of the spot never receive an attack request")
-    require.Equal(t, int32(13), loop.delevelTarget,
-        "the target is the median 8 plus the full drop gap 5")
+    require.Equal(t, int32(16), loop.delevelTarget,
+        "the median 8 plus the full drop gap 7 clamps at the guide floor")
     require.Equal(t, []([3]int32){delevelGuardWalkTarget()}, game.walks,
         "the first walk is the guard segment")
 
@@ -145,7 +156,7 @@ func TestDelevelOutranksTheEngageOnTheSpawnSpot(t *testing.T) {
 // empty. The old behavior farmed the respawn waves one kill at a time
 // and only de-leveled when a tick happened to land on a living mob.
 func TestDelevelTriggersOnStaticMedianWhileSpotEmpty(t *testing.T) {
-    loop, game, _ := newDelevelCellLoop(t)
+    loop, game, _ := newDelevelCellLoopAt(t, 18)
 
     loop.tick()
     require.Equal(t, phaseDelevel, loop.phase,
@@ -153,9 +164,8 @@ func TestDelevelTriggersOnStaticMedianWhileSpotEmpty(t *testing.T) {
     require.Empty(t, game.forces)
     require.Equal(t, []([3]int32){delevelGuardWalkTarget()}, game.walks,
         "the guard walk replaces the empty spot patrol")
-    require.Equal(t, int32(13), loop.delevelTarget,
-        "the static median 8 computes the target, the Lucky clamp "+
-            "never fires")
+    require.Equal(t, int32(16), loop.delevelTarget,
+        "the static median 8 computes the target up to the guide floor")
 }
 
 // TestDelevelOutranksTheTownTrip pins the shopping preemption: a full
@@ -163,7 +173,7 @@ func TestDelevelTriggersOnStaticMedianWhileSpotEmpty(t *testing.T) {
 // character to the shops - the deleveling starts instead, the sale
 // waits for the walk home after the deaths.
 func TestDelevelOutranksTheTownTrip(t *testing.T) {
-    loop, game, bot := newDelevelCellLoop(t)
+    loop, game, bot := newDelevelCellLoopAt(t, 18)
     spawnSpotMobs(bot)
     fillInventoryForTripTest(bot)
 
@@ -199,4 +209,66 @@ func TestDelevelSkipsAtTheGuideFloorOnTheCell(t *testing.T) {
     require.Zero(t, loop.delevelTarget, "no target was announced")
     require.NotEmpty(t, game.forces,
         "the engage keeps farming the spot")
+}
+
+// TestDelevelKeepsAFullAdenaGround pins the server rule against the night run
+// regression: the character outgrew the median 8 ground by 7 levels, which is
+// inside the full adena gap (DropAdenaMinLevelDifference 8), so the guard
+// deaths would buy nothing and must never start.
+func TestDelevelKeepsAFullAdenaGround(t *testing.T) {
+    loop, _, bot := newDelevelCellLoop(t)
+    spawnSpotMobs(bot)
+
+    loop.tick()
+    require.NotEqual(t, phaseDelevel, loop.phase,
+        "a gap inside the full adena drop never pays the guard walk")
+    require.Zero(t, loop.delevelTarget, "no target was announced")
+}
+
+// TestDelevelTriggerConstantsMatchTheServerGap pins the two constants to the
+// Mobius Rates.ini rule they encode, so a later tuning pass cannot walk the
+// trigger back inside the full adena gap.
+func TestDelevelTriggerConstantsMatchTheServerGap(t *testing.T) {
+    require.Equal(t, int32(8), adenaFullLevelGap,
+        "DropAdenaMinLevelDifference of Rates.ini")
+    require.Equal(t, adenaFullLevelGap+1, delevelTriggerDiff,
+        "the trigger starts one level past the full adena drop")
+    require.Equal(t, adenaFullLevelGap-1, delevelTargetGap,
+        "the target is the last full adena level")
+    require.GreaterOrEqual(t, delevelTriggerDiff-delevelTargetGap,
+        delevelDropMin, "a trigger at the edge still buys the minimum drop")
+}
+
+// TestDelevelLeavesAGroundWithAHigherOne pins the relocation guard: a character
+// out of the held ground climbs to a higher cell instead of dying down, because
+// one walk is cheaper than the walk plus the death and the experience.
+func TestDelevelLeavesAGroundWithAHigherOne(t *testing.T) {
+    bot := newTestBot()
+    setZoneTestLevel(bot, 18)
+    moveSelfTo(bot, 46112, 41500, -3500)
+    giveTestWeapon(bot)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    low := delevelCell(46112, 41500)
+    high := quadCell("delevel-high", "Lirein Ground", 52000, 62000, 800,
+        []int32{}, []CellMob{
+            {TemplateID: 20336, Name: "Lirein", Level: 18, Count: 3,
+                RespawnMin: 15, RespawnMax: 20},
+        })
+    high.Mass = 3
+    loop.SetHuntingCells([]Cell{low, high})
+    loop.SetNavigator(&fakeNavigator{found: true})
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+    t.Cleanup(func() {
+        if loop.cell != nil && loop.cell.leave != nil {
+            loop.cell.leave()
+        }
+    })
+    loop.cell.picked = 0
+    loop.zonePickedID = low.ID
+
+    loop.tick()
+    require.NotEqual(t, phaseDelevel, loop.phase,
+        "a higher eligible ground replaces the guard deaths")
+    require.Zero(t, loop.delevelTarget, "no target was announced")
 }

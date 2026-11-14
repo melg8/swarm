@@ -278,3 +278,83 @@ also leave a strike just short of its estimate). The strike rate is
 far below the night-run3 cadence: 12 casts in the first four minutes
 across three bots instead of one every ~15 seconds per bot, because
 the strike now waits for the bar to fit its own damage.
+
+### 2026-11-15 02:50 UTC - run4 diagnosis and the delevel trigger fix
+
+Run4 (`runs/night-run4.log`, journal
+`logs/session-20261114-234636-16708.jsonl`, 2.86 h, 3 bots) measured
+39503 adena per hour on the fleet (13.2k per bot) with 1430 kills and
+66 deaths, and the fleet **lost** 189342 experience (test3 dropped two
+levels). 62 of the 66 deaths were guard deaths of the deleveling: the
+phase owned 5/5/15 percent of the bot time, and the four runs
+(23:48, 00:25, 00:35, 00:47) burned 39 minutes.
+
+Root cause: the delevel trigger measured the **item** gap. Read from
+the Mobius sources - item drops scale from 100 percent at a gap of 5
+(`DropItemMinLevelDifference`) to 10 percent at 10, but that pays junk
+only; adena holds 100 percent to a gap of 8
+(`DropAdenaMinLevelDifference`) and reaches 10 percent at 15; and
+experience has **no** gap scale at all (`Attackable.calculateExpAndSp`
+awards the full template exp for every gap from -10 to +10 and cuts
+off at 11). A trigger at 7 therefore killed the character inside the
+full adena and full exp band - a pure loss of time, experience and the
+level-keyed power that comes with it.
+
+Fixed in this commit:
+
+- `adenaFullLevelGap` (8) is the single constant of the server rule:
+  `cellEligible` builds its lower window from it instead of a literal
+  8 and `delevelTriggerDiff` (9) / `delevelTargetGap` (7) derive from
+  it, so the picker window and the delevel trigger can never drift
+  apart again.
+- `delevelHasHigherGround` holds the guard deaths back while the cell
+  picker has an eligible ground whose median beats the held one: a
+  relocation costs one walk, a delevel costs the walk plus the death
+  and the experience.
+- The start log line stops claiming the drop collapsed: it names the
+  character level, the ground median and the gap the adena scale
+  starts at.
+
+Tests: `TestDelevelKeepsAFullAdenaGround` (the run4 field case, a gap
+of 7 over the median 8 Dryad ground, must not walk to a guard),
+`TestDelevelTriggerConstantsMatchTheServerGap` (pins the three
+constants to `Rates.ini`),
+`TestDelevelLeavesAGroundWithAHigherOne` (the relocation guard); the
+three priority tests moved to a genuinely outleveled level 18, and
+`TestCellWindowHelpers` now pins the adena-safe flag on both sides of
+the gap. Docs: `docs/hunting.md` (the trigger, the target and the
+verified gap rules).
+
+Measured time budget of run4 for the remaining work: engage 59
+percent, loot 5, town 27 (24 trips, 14.3 percent of fleet time in the
+journal), delevel 8.3.
+
+Ranked plan, each with its expected gain:
+
+- P0 (landed here) - the delevel loop: +8 percent time, +1.5 levels of
+  experience, 62 deaths removed.
+- P1 - the cell ranking: `cellWindowMass` reads `[level-5, level]`, so
+  the mobs above the character level never count although the engage
+  window admits `level+2`; `cellProximity` charges a one-time 20-26k
+  relocation as a permanent 0.25-0.33 multiplier, so Dryad SW-7 (531)
+  outscores the Lirein 16-19 ground (299) forever. Measured adena per
+  minute by mob level is 246 (10), 297 (13), 339 (15) - the climb is
+  +18-25 percent once the picker takes it.
+- P2 - 76 of 883 adena drops were never picked (949 requests, 807
+  confirmed): a pickup retry is worth 6-7 percent.
+- P3 - soulshots (item 1835, 7 adena, sold in the elven village via
+  buylist 0009938): 4.9 swings per kill puts the shot cost at half the
+  kill income, so the real gain is +10-15 percent, not the +25-30
+  estimated before.
+- P4 - the Dion 20-25 handover: `cmd/swarm/session.go` hardcodes the
+  elven region while `dionShopCatalog` and `zones_dion.go` are ready,
+  and 6.1M adena sits unspent because the elven village sells nothing
+  above no-grade.
+
+Rejected as levers after measurement: the guide buff trips (24 trips,
+1200 s buffs against a 280 s trip = 1200 * 1.24 = 1488 equivalent
+seconds versus 1480 without the trip, break-even), and the gear
+planner (correctly silent: no upgrade exists in the elven shops).
+
+Next step: P1, the two cell ranking bugs, then a fleet restart to
+compare against this baseline.

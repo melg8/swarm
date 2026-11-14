@@ -2320,7 +2320,7 @@ fences, the combat hold, the errand status hand-off) and the
 ## Deleveling (internal/swarm/hunt/delevel.go)
 
 When the character level exceeds the median level of the living
-attackable npcs inside the zone by 7 or more AND the level is at least
+attackable npcs inside the zone by 9 or more AND the level is at least
 10, the bot walks to the nearest archer guard (delevelGuards: the
 Elven village sentinels Kendell and Starden only - display ids 7218 and
 7220, Elven Bow, ARCHER ai type; the melee sentinels Veltress and
@@ -2338,6 +2338,18 @@ guard deaths pay the penalty from level 10 up (verified live: level
 safety net for servers where the deaths remove nothing: three
 consecutive penalty-free deaths abort the deleveling and arm a 30 min
 cooldown.
+
+The trigger sits one level past the full adena gap
+(`adenaFullLevelGap`, 8, the Mobius `DropAdenaMinLevelDifference`) and
+the target at the last full gap level (median + 7): a death inside the
+gap buys nothing, because the adena chance is still 100 percent there
+and the experience has no gap scale of its own. A ground the picker
+can leave upwards never triggers either - a relocation costs one walk,
+a delevel costs the walk plus the death and the experience it removes
+(`delevelHasHigherGround`). The measured night run paid this gap at
+trigger 7: 62 of its 66 deaths were guard deaths inside the full adena
+band, the fleet lost 189342 experience over 2.6 hours and one bot
+dropped two levels.
 
 The guide floor caps the descent for the characters that reached the
 support magic window: the Newbie Guide grants its buffs by level, and
@@ -2363,12 +2375,15 @@ The level gap rules of the drop calculation
 (`NpcTemplate.calculateGroupDrops`) set the farming window: item drops
 slide from 100 percent at mob level + 5 to 10 percent at + 10 and
 beyond, adena from 100 percent at + 8 to 10 percent at + 15, and
-experience and SP stop at + 11 (`MonsterExpMaxLevelDifference`). The
-elven fields mobs are levels 1-5, so a level 11 character gets 10
-percent item drops - the deleveling exists to fix that.
+experience and SP stop at + 11 (`MonsterExpMaxLevelDifference`) with no
+scale inside that cutoff at all - `Attackable.calculateExpAndSp` awards
+the full template exp for every gap from -10 to +10. The item collapse
+is the earliest of the three and pays junk only (Animal Skin, Coal,
+Stem and the like), so the adena gap is the one the deleveling follows
+and a character keeps the whole exp reward until the hard cutoff.
 
-The deleveling stops at the target level = median zone mob level + 5
-(the last level with the full item drop chance, floored at 9 and, once
+The deleveling stops at the target level = median zone mob level + 7
+(the last level with the full adena drop chance, floored at 9 and, once
 the character stands above the guide window, at 16) and re-triggers
 after hunting raised the level back above the trigger. The
 fight stage re-paths when the guard ignores landed damage within 20 s
@@ -2407,8 +2422,8 @@ its higher species are down), so the trigger also requires the static
 median of the anchored spot to agree with the live one (the 2026-09-12
 building entry acceptance round de-leveled a healthy level 15 on the
 Kaboo Orc Fighter SW respawn window whose static median is 9), and the
-spot picker itself skips eligible grounds whose static median sits at
-the delevel gap - the spot window (level-8) admits grounds the
+spot picker itself skips eligible grounds whose static median sits past
+the full adena gap - the spot window (level - 8) admits grounds the
 deleveling would immediately answer with guard deaths.
 
 ### The delevel acceptance scenario (acceptance/delevel.go)
