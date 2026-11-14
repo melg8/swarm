@@ -158,6 +158,42 @@ func TestLoopTanksAWinnablePileUp(t *testing.T) {
         "the run opens the escape distance")
 }
 
+// TestLoopTanksTheHurtPairOfOutleveledMobs pins the measured two-mob
+// trades: the night run armed the pile up run between 45 and 60
+// percent health on pairs of mobs far below the character, and every
+// run against same-speed mobs ended in the logout. The pair is tanked
+// down to the lower floor; below it the run keeps its answer.
+func TestLoopTanksTheHurtPairOfOutleveledMobs(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45600)
+    spawnMobAt(bot, 8, 45400)
+    attackerHits(bot, 7, 45600)
+    attackerHits(bot, 8, 45400)
+    bot.ApplyStatusUpdate(100, []state.Attribute{
+        {ID: state.AttrLevel, Value: 10},
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+
+    loop.tick()
+    require.NotZero(t, loop.target, "the healthy pair is engaged")
+
+    hurtTo(bot, 50)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.tick()
+    require.True(t, loop.panicAt.IsZero(),
+        "the pair above the hurt line is tanked")
+    require.NotZero(t, loop.target, "the fight keeps its pick")
+
+    hurtTo(bot, 40)
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+    loop.tick()
+    require.False(t, loop.panicAt.IsZero(),
+        "the pair below the hurt line arms the run")
+    require.Zero(t, loop.target, "the run drops the fight")
+}
+
 // TestFightPotionDrinksUnderHalf pins the fight potion: a running
 // fight below the drink threshold (above the re-engage line, so the
 // flee gates never pre-empt it) drinks a healing potion from the bag

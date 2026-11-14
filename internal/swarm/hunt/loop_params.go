@@ -120,6 +120,11 @@ const (
     // character before the fight counts as lost (the level gap, the adds of a
     // social pack).
     losingFightGap = 25.0
+    // fleeOutlevelSlack is the level lead of the character over a single
+    // target above which the gap rule stands down: the measured 55-60 percent
+    // flees ran from mobs five levels below, and a same-speed chase only turned
+    // the fight into the logout. The critical health above still flees.
+    fleeOutlevelSlack = int32(2)
     // escapeTargetBeatenPercent is the target health below which a hurt
     // character finishes the fight instead of fleeing: the kill is one swing
     // away.
@@ -204,6 +209,11 @@ const (
     // tanks (pileUpWinnable): two mobs are the reported softlock case, the
     // third is the headroom for a wandering add.
     pileUpFightMaxAttackers = 3
+    // pileUpTwoHealthPercent is the tank floor of a two-mob pair: the measured
+    // pile up runs armed between this line and reengageHealthPercent never
+    // opened the gap against same-speed mobs and every one of them ended in the
+    // logout, while the pair trades won. A third attacker keeps the upper line.
+    pileUpTwoHealthPercent = 45.0
     // pileUpKillWindowPercent is the target health under which the pile up gate
     // keeps the standing fight instead of the flight: one or two arrows finish
     // the kill the fight already paid for.

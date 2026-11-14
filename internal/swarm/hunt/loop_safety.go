@@ -520,10 +520,15 @@ func (l *Loop) attackerEngageable(objectID int32) bool {
 // panic run, a kill that thins the pack hands the answer to the ordinary aggro
 // flow, and a target inside the kill window is finished first.
 func (l *Loop) pileUpWinnable() bool {
-    if l.tracker.SelfHealthPercent() < reengageHealthPercent {
+    attackers := l.tracker.SelfAttackers()
+    floor := reengageHealthPercent
+    if len(attackers) <= panicLogoutAttackers {
+        // The two-mob pair trades down to the lower line: docs/hunting.md.
+        floor = pileUpTwoHealthPercent
+    }
+    if l.tracker.SelfHealthPercent() < floor {
         return false
     }
-    attackers := l.tracker.SelfAttackers()
     if len(attackers) > pileUpFightMaxAttackers {
         return false
     }

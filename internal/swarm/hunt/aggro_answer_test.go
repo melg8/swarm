@@ -108,6 +108,46 @@ func TestLosingFightKeepsTheGapRuleForTheRunningFight(t *testing.T) {
         "the running fight with a 50 point lead is lost")
 }
 
+// TestLosingFightKeepsTheOutleveledFight pins the measured gap-rule
+// flee: the mobs of the night run sat five levels below the character,
+// every flee at 55-60 percent health on a same-speed chase turned into
+// the emergency logout, and the trade was the cheaper answer. A target
+// two levels down no longer drops the fight above the critical health.
+func TestLosingFightKeepsTheOutleveledFight(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45600)
+    setMobHealth(bot, 100)
+    selfSwingsAt(bot, 45600)
+    hurtTo(bot, 50)
+    bot.ApplyStatusUpdate(100, []state.Attribute{
+        {ID: state.AttrLevel, Value: 10},
+    })
+    loop := NewLoop(&fakeGame{}, bot)
+    loop.target = 7
+
+    require.False(t, loop.losingFight(),
+        "a mob eight levels below cannot outtrade the character")
+}
+
+// TestLosingFightFleesTheEvenTarget pins the other side of the
+// outlevel rule: a target within the level lead still drops the fight
+// on the health gap.
+func TestLosingFightFleesTheEvenTarget(t *testing.T) {
+    bot := newTestBot()
+    spawnMobAt(bot, 7, 45600)
+    setMobHealth(bot, 100)
+    selfSwingsAt(bot, 45600)
+    hurtTo(bot, 50)
+    bot.ApplyStatusUpdate(100, []state.Attribute{
+        {ID: state.AttrLevel, Value: 2},
+    })
+    loop := NewLoop(&fakeGame{}, bot)
+    loop.target = 7
+
+    require.True(t, loop.losingFight(),
+        "a one-level lead does not buy the tank")
+}
+
 // TestLosingFightFleesTheBowAddBeforeTheNearlyDeadTarget pins the bow
 // add verdict of the 2026-11-10 live acceptance run: a level 8 Kaboo
 // Orc Archer joined the melee fight and the shot cycle kept firing at

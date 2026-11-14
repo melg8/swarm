@@ -512,6 +512,13 @@ func (l *Loop) losingFight() bool {
     if selfHP < escapeHealthPercent {
         return true
     }
+    if l.outlevelsTarget() {
+        // A target this far below the character cannot outtrade it at half
+        // health, and the flight from it only ends in the logout: the measured
+        // gap-rule flees ran from mobs five levels down. The critical health
+        // above keeps its escape.
+        return false
+    }
     if !l.tracker.SelfFighting(l.target) {
         // The fight has not started: only the critical health above flees, the
         // engaged mob gets its fight.
@@ -534,4 +541,19 @@ func (l *Loop) maxTargetLevel() int32 {
     }
 
     return level + targetMaxLevelSlack
+}
+
+// outlevelsTarget reports whether the character leads the selected target by
+// fleeOutlevelSlack levels: an unknown level of either side reads no.
+func (l *Loop) outlevelsTarget() bool {
+    level := l.tracker.SelfLevel()
+    if level <= 0 || l.target == 0 {
+        return false
+    }
+    target, ok := l.tracker.ObjectLevel(l.target)
+    if !ok || target <= 0 {
+        return false
+    }
+
+    return level-target >= fleeOutlevelSlack
 }
