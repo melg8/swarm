@@ -119,8 +119,8 @@ func TestDelevelFinishResetsAbortStreak(t *testing.T) {
         "a new start never resets the streak")
     bot.ApplyUserInfo(stateUserInfoLevel(9))
     loop.tick()
-    require.Equal(t, phaseTownReturn, loop.phase,
-        "the target level finishes the deleveling")
+    require.Equal(t, phaseEngage, loop.phase,
+        "the target level finishes the deleveling into the village errand")
     require.Equal(t, 0, loop.delevelAborts,
         "the finished deleveling resets the streak")
 
@@ -154,11 +154,11 @@ func TestDelevelDiagnosticsCarryTargetAndReason(t *testing.T) {
     require.Equal(t, int32(1), hunt.DelevelZoneMedian,
         "the median mob level of the held ground is the why")
 
-    // The finish clears the message: the banner falls back to the
-    // return walk text the same tick the phase leaves.
+    // The finish clears the message: the banner falls back to the phase
+    // text the same tick the phase leaves.
     bot.ApplyUserInfo(stateUserInfoLevel(9))
     loop.tick()
-    require.Equal(t, phaseTownReturn, loop.phase)
+    require.Equal(t, phaseEngage, loop.phase)
     hunt = bot.Snapshot().Diagnostics.Hunt
     require.False(t, hunt.DelevelActive)
     require.Zero(t, hunt.DelevelTarget)

@@ -434,23 +434,22 @@ func (l *Loop) noteDelevelDeath() {
         l.delevelFree)
 }
 
-// finishDelevel returns the character to the hunt through the town trip return
-// segment and resets the abort streak, so the next cycle starts from the short
-// pause.
+// finishDelevel returns the character to the hunt and resets the abort streak,
+// so the next cycle starts from the short pause.
 func (l *Loop) finishDelevel() {
     l.delevelEnd = l.now()
     l.delevelTarget = 0
     l.delevelGuard = 0
     l.delevelAborts = 0
-    l.logf("Hunt: delevel finished at level %d, walking back",
+    l.logf("Hunt: delevel finished at level %d, the way back starts",
         l.tracker.SelfLevel())
-    l.startDelevelReturnSegment()
+    l.endDelevelWalk()
 }
 
-// abortDelevel gives the deleveling up and returns through the town trip: a raw
-// engage walk to the zone center is refused from the far guard posts (the 9900
-// unit move limit). The abort streak arms the escalating pause; only a finished
-// run resets it.
+// abortDelevel gives the deleveling up and ends the phase: a raw engage walk to
+// the zone center is refused from the far guard posts (the 9900 unit move
+// limit). The abort streak arms the escalating pause; only a finished run
+// resets it.
 func (l *Loop) abortDelevel(reason string) {
     l.delevelEnd = l.now()
     l.delevelTarget = 0
@@ -460,6 +459,27 @@ func (l *Loop) abortDelevel(reason string) {
     l.delevelWait = l.now().Add(wait)
     l.logf("Hunt: delevel aborted: %s (the next attempt waits %s)",
         reason, wait)
+    l.endDelevelWalk()
+}
+
+// endDelevelWalk starts the way back after a deleveling. The guide refill runs
+// first when the phase left the character next to the Newbie Guide: the guard
+// deaths clear the support magic every time, and the refill trip returns to the
+// farm spot the deleveling started from, so the farm walk in between only
+// doubles the village walk. The plain farm walk otherwise.
+func (l *Loop) endDelevelWalk() {
+    if l.guideRunWanted() {
+        l.phase = phaseEngage
+        l.waypoints = nil
+        l.segmentDest = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.segmentStart = pathfind.Vec3{X: 0, Y: 0, Z: 0}
+        l.segmentFrameOffset = 0
+        l.tripEndedAt = time.Time{}
+        l.logf("Hunt: the support magic waits at the guide, refilling " +
+            "before the walk home")
+
+        return
+    }
     l.startDelevelReturnSegment()
 }
 
