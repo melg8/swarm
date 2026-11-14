@@ -182,3 +182,15 @@ lint are green on every commit.
 Next step: restart the same three-bot night run on the fixed build and
 compare against this baseline (12905 / 17580 / 12613 adena per hour,
 2919 / 2766 / 2679 kills, 118 / 117 / 88 deaths).
+
+### 2026-11-14 22:43 UTC - restart on the fixed build
+
+The old process was gone (its log ended 22:19:44, no listener on 8081).
+The stack ports were re-checked before the start: login 127.0.0.3:2106,
+game 7777 and MariaDB 3306 listening. The same command as the baseline
+run started from 9ff12415: `-hunt -proxy -login 127.0.0.3:2106 -web
+127.0.0.1:8081 -bots 3 -navmesh ./data/navmesh`; log
+`runs/night-run2.log`, journal `logs/session-20261114-224321-31012.jsonl`.
+All three bots reported online within 30 s (test1 level 17 engage,
+test2 level 17 townWalk, test3 level 19 engage), and `delevelTarget`
+stayed 0 on the level 17 pair - the drop floor holds.
