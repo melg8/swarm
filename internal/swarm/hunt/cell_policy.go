@@ -109,6 +109,11 @@ type cellHunter struct {
     selfX     int32
     selfY     int32
     selfKnown bool
+    // villageX/villageY anchor the recurring trip drag at the region guide,
+    // the village the shops and the revive share; unknown without a guide.
+    villageX     int32
+    villageY     int32
+    villageKnown bool
     // emptySince arms the wait-or-rotate economy: the last empty reading.
     emptySince time.Time
     // lastWaitWalkAt paces the drift toward the predicted respawns.
@@ -153,6 +158,11 @@ func (l *Loop) SetHuntingCells(cells []Cell) {
         return
     }
     l.cell = newCellHunter(cells, globalCellHub)
+    if guide, ok := guideForRegion(l.zoneRegion); ok {
+        l.cell.villageX = guide.X
+        l.cell.villageY = guide.Y
+        l.cell.villageKnown = true
+    }
     if l.cellPin != "" {
         // A pin installed before the registry (SetCellPin) is inherited.
         l.cell.pin = l.cellPin

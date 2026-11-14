@@ -45,6 +45,12 @@ const (
     // the walk is dead time. The neighbor rotation keeps the walks short, the
     // discount guards the rare far relocation.
     cellProximityScale = 8000.0
+    // cellTripDwell and cellTripSpeed price the recurring town trip of a cell:
+    // one filled bag buys about 1200 seconds of hunting, and the walk runs at
+    // the unbuffed elven fighter speed (125 units per second). The round trip
+    // repeats at every fill, so a far ground pays its distance every cycle.
+    cellTripDwell = 1200.0
+    cellTripSpeed = 125.0
     // cellUnripeDiscount is the score fraction of a cell whose respawn window
     // has not passed since the hunter cleared it.
     cellUnripeDiscount = 0.25
@@ -139,18 +145,19 @@ func (h *cellHub) occupancy(cellID string) int {
 
 // cellScore returns the economic score of a cell: the income value times the
 // safety multiplier (the aggressive share and the death heat) times the
-// proximity discount times the ripeness discount, divided by the fleet
-// occupancy.
+// proximity discount, the recurring village trip drag and the ripeness
+// discount, divided by the fleet occupancy.
 func (h *cellHunter) cellScore(index int, now time.Time) float64 {
     cell := &h.cells[index]
     metric := &h.metrics[index]
     value := h.cellValue(cell, metric)
     safety := h.cellSafety(cell, metric, now)
     proximity := h.cellProximity(cell)
+    village := h.cellVillageDrag(cell)
     ripeness := h.ripenessFactor(index, now)
     occupancy := float64(1 + h.hub.occupancy(cell.ID))
 
-    return value * safety * proximity * ripeness / occupancy
+    return value * safety * proximity * village * ripeness / occupancy
 }
 
 // cellValue returns the income value: the measured rate once the ground earned
@@ -229,6 +236,21 @@ func (h *cellHunter) cellProximity(cell *Cell) float64 {
     dist := cellDistance(*cell, x, y)
 
     return 1.0 / (1.0 + dist/cellProximityScale)
+}
+
+// cellVillageDrag discounts the recurring town trip: the walk to the
+// village and back repeats at every inventory fill, so a far ground
+// pays its distance on every cycle, not only on the relocation. The
+// drag is the hunting share of the cycle: the dwell over the dwell
+// plus the round trip. The live proximity above keeps pricing the
+// one-time move.
+func (h *cellHunter) cellVillageDrag(cell *Cell) float64 {
+    if !h.villageKnown {
+        return 1.0
+    }
+    dist := cellDistance(*cell, h.villageX, h.villageY)
+
+    return cellTripDwell / (cellTripDwell + 2*dist/cellTripSpeed)
 }
 
 // deathHeat decays the heat to the given time, halving it every half-life (an

@@ -380,6 +380,43 @@ func TestCellTrustedZeroIncomeScoresZero(t *testing.T) {
         &hunter.cells[hunter.picked], metric), 1e-9)
 }
 
+// TestCellVillageDragPricesTheRecurringTrip pins the trip drag of the
+// cell economy: the measured adena rate excludes the town time, so a
+// far ground must pay its village round trip inside the score - a cell
+// one half trip from the dwell point pays half its rate.
+func TestCellVillageDragPricesTheRecurringTrip(t *testing.T) {
+    _, _, hunter := pickedCellLoop(t)
+    hunter.villageX, hunter.villageY = guideStopNpc.X, guideStopNpc.Y
+    hunter.villageKnown = true
+
+    near := Cell{ID: "near", FocusX: guideStopNpc.X, FocusY: guideStopNpc.Y}
+    far := Cell{ID: "far", FocusX: guideStopNpc.X + 75000, FocusY: guideStopNpc.Y}
+    require.InDelta(t, 1.0, hunter.cellVillageDrag(&near), 1e-6,
+        "the village ground keeps its full rate")
+    require.InDelta(t, 0.5, hunter.cellVillageDrag(&far), 1e-6,
+        "two 75000 unit legs spend the dwell time")
+
+    hunter.villageKnown = false
+    require.InDelta(t, 1.0, hunter.cellVillageDrag(&far), 1e-9,
+        "no guide anchors no drag")
+}
+
+// TestCellScorePricesTheVillageTrip pins the wiring of the drag into
+// the pick score: the same ground scores lower while its village
+// round trip counts.
+func TestCellScorePricesTheVillageTrip(t *testing.T) {
+    _, _, hunter := pickedCellLoop(t)
+    hunter.villageX, hunter.villageY = guideStopNpc.X, guideStopNpc.Y
+    hunter.villageKnown = true
+    now := time.Now()
+    withTrip := hunter.cellScore(hunter.picked, now)
+    hunter.villageKnown = false
+    withoutTrip := hunter.cellScore(hunter.picked, now)
+    require.Positive(t, withTrip)
+    require.Less(t, withTrip, withoutTrip,
+        "the recurring village trip discounts the score")
+}
+
 func TestCellAccumulateAttributesAdena(t *testing.T) {
     loop, _, hunter := pickedCellLoop(t)
     now := time.Now()
