@@ -358,3 +358,40 @@ planner (correctly silent: no upgrade exists in the elven shops).
 
 Next step: P1, the two cell ranking bugs, then a fleet restart to
 compare against this baseline.
+
+### 2026-11-15 03:05 UTC - the cell income window and the relocation cost
+
+Two ranking bugs, both contradicted by the engage window the same policy
+already applies:
+
+- `cellWindowMass` and the inline price loop of `cellValue` read
+  `[level-5, level]`, so the mobs **above** the character level never
+  counted toward the income prior although `cellEligible` and
+  `cellMobPriorities` admit `level+2` and the engage happily kills
+  them. The server penalizes neither the adena nor the experience of a
+  mob above the character level, so the prior was pricing a ground by
+  the half of it the bot ignores. Both now read the shared
+  `cellWindowBounds` (`[max(1, level-5), level+cellMaxLevelSlack]`),
+  and `cellWindowLevel` replaces the duplicated loop in `cellValue`.
+- `cellProximity` charged `1/(1+dist/8000)` - the half-score distance
+  - for a walk that happens **once**. It now amortizes the relocation
+    over the dwell the ground buys (`cellTripDwell/(cellTripDwell +
+    dist/cellTripSpeed)`), the same shape `cellVillageDrag` uses for
+    the recurring trip; `cellProximityScale` is gone.
+
+Honest result of the re-ranking (offline model, `runs` scratch script):
+the pick moves from Dryad SW-7 (894) to Pincer Spider SW-5 (896) at
+level 17 - a tie. The measured adena per minute curve (246 at mob level
+10, 297 at 13, 339 at 15) is real but the village drag cancels it: the
+Lirein 16-19 ground sits 44000 units from the Newbie Guide against the
+23000 of the Dryad ground, and the round trip repeats at every buff
+cycle. So **ground level is not the lever**, the fixes are correctness
+wins (the prior now prices what the bot kills) with a small expected
+gain, and the remaining plan turns to the two certain losses: the
+pickup failures (P2) and the fight time itself (P3 soulshots, P4 the
+Dion handover for a weapon above no-grade).
+
+Tests: `TestCellProximityAmortizesTheRelocation`,
+`TestCellWindowCountsTheEngageCeiling`, and `TestCellWindowHelpers`
+now pins the above-level band and the window level. Docs:
+`docs/hunting_cells.md` (the economy formula and the window).

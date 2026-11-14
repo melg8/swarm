@@ -584,9 +584,12 @@ func TestCellMobRespawnLookup(t *testing.T) {
 func TestCellWindowHelpers(t *testing.T) {
     cells := testCells()
     // The level 6 window: the home ground holds the full mass, the
-    // rich ground holds the level 6 wolves only.
+    // rich ground holds the wolves plus the Elder Wolves of the
+    // engage ceiling above the character.
     require.InDelta(t, 6.0, cellWindowMass(cells[0], 6), 1e-9)
-    require.InDelta(t, 8.0, cellWindowMass(cells[1], 6), 1e-9)
+    require.InDelta(t, 12.0, cellWindowMass(cells[1], 6), 1e-9)
+    require.InDelta(t, 16.0/6.0, cellWindowLevel(cells[0], 6), 1e-9)
+    require.InDelta(t, 80.0/12.0, cellWindowLevel(cells[1], 6), 1e-9)
     require.True(t, cellEligible(cells[0], 6))
     require.True(t, cellEligible(cells[1], 6))
     // The level 20 character outgrew the home ground entirely: the
@@ -770,4 +773,40 @@ func TestCellRotationHoldsWhileEnemiesVisible(t *testing.T) {
         "a visible enemy keeps the economy quiet - no rotation")
     require.True(t, hunter.emptySince.IsZero(),
         "the emptiness reading resets while enemies are visible")
+}
+
+// TestCellProximityAmortizesTheRelocation pins the relocation model: the walk to
+// a new ground happens once and is paid against the dwell the ground buys, so a
+// ground 40000 units away still keeps most of its score - the old halving at
+// 8000 units made a one-time relocation a permanent penalty and pinned the
+// picker to the first ground it ever held.
+func TestCellProximityAmortizesTheRelocation(t *testing.T) {
+    _, _, hunter := pickedCellLoop(t)
+    hunter.selfKnown = true
+    hunter.selfX, hunter.selfY = 0, 0
+
+    near := Cell{ID: "near", FocusX: 0, FocusY: 0}
+    far := Cell{ID: "far", FocusX: 40000, FocusY: 0}
+    require.InDelta(t, 1.0, hunter.cellProximity(&near), 1e-6,
+        "the standing ground pays no relocation")
+    // 40000 units at the unbuffed speed are 320 seconds of a 1200
+    // second dwell, so the ground keeps 1200/1520 of its score.
+    require.InDelta(t, 1200.0/1520.0, hunter.cellProximity(&far), 1e-6,
+        "one relocation costs the walk, not the whole rate")
+}
+
+// TestCellWindowCountsTheEngageCeiling pins the income window against the
+// engage window: the server penalizes neither the adena nor the experience of a
+// mob above the character level, so a ground holding the next band up is not a
+// worse ground.
+func TestCellWindowCountsTheEngageCeiling(t *testing.T) {
+    cell := Cell{ID: "band", Mobs: []CellMob{
+        {TemplateID: 1, Name: "Below", Level: 10, Count: 2},
+        {TemplateID: 2, Name: "At", Level: 15, Count: 1},
+        {TemplateID: 3, Name: "Next", Level: 17, Count: 3},
+        {TemplateID: 4, Name: "TooHigh", Level: 18, Count: 5},
+    }}
+
+    require.InDelta(t, 6.0, cellWindowMass(cell, 15), 1e-9,
+        "levels 10, 15 and 17 count, level 18 sits above the ceiling")
 }

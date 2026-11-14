@@ -41,10 +41,6 @@ const (
     // cellDeathHalfLifeMin is the half-life of the death heat: an hour old
     // death weighs a quarter.
     cellDeathHalfLifeMin = 30.0
-    // cellProximityScale is the distance at which a cell pays half its score:
-    // the walk is dead time. The neighbor rotation keeps the walks short, the
-    // discount guards the rare far relocation.
-    cellProximityScale = 8000.0
     // cellTripDwell and cellTripSpeed price the recurring town trip of a cell:
     // one filled bag buys about 1200 seconds of hunting, and the walk runs at
     // the unbuffed elven fighter speed (125 units per second). The round trip
@@ -145,7 +141,7 @@ func (h *cellHub) occupancy(cellID string) int {
 
 // cellScore returns the economic score of a cell: the income value times the
 // safety multiplier (the aggressive share and the death heat) times the
-// proximity discount, the recurring village trip drag and the ripeness
+// relocation cost, the recurring village trip drag and the ripeness
 // discount, divided by the fleet occupancy.
 func (h *cellHunter) cellScore(index int, now time.Time) float64 {
     cell := &h.cells[index]
@@ -181,23 +177,10 @@ func (h *cellHunter) cellValue(cell *Cell, metric *cellMetric) float64 {
     supply := windowMass * 60.0 / respawnMid
     killsPerMin := math.Min(supply, cellKillCapacity)
     // The count weighted window level prices the kills.
-    levelMass := 0.0
-    levelWeight := 0.0
-    low := h.level - 5
-    if low < 1 {
-        low = 1
-    }
-    for index := range cell.Mobs {
-        mob := &cell.Mobs[index]
-        if mob.Level >= low && mob.Level <= h.level {
-            levelMass += float64(mob.Level) * float64(mob.Count)
-            levelWeight += float64(mob.Count)
-        }
-    }
-    if levelWeight <= 0 {
+    windowLevel := cellWindowLevel(*cell, h.level)
+    if windowLevel <= 0 {
         return 0
     }
-    windowLevel := levelMass / levelWeight
     adenaPerKill := cellAdenaBase + cellAdenaPerLevel*windowLevel
 
     return killsPerMin * adenaPerKill
@@ -223,9 +206,11 @@ func (h *cellHunter) cellSafety(
     return static * dynamic
 }
 
-// cellProximity returns the distance discount: a cell 8000 units away pays
-// half. It anchors at the live character position, the current cell focus
-// otherwise.
+// cellProximity returns the relocation discount: the one-time walk to the cell
+// amortized over the dwell the ground buys before the bag fills. A cell 20000
+// units away pays about 160 seconds of a 1200 second stay; the recurring town
+// trip repeats every cycle and belongs to cellVillageDrag. It anchors at the
+// live character position, the current cell focus otherwise.
 func (h *cellHunter) cellProximity(cell *Cell) float64 {
     x, y := int32(0), int32(0)
     if h.selfKnown {
@@ -235,7 +220,7 @@ func (h *cellHunter) cellProximity(cell *Cell) float64 {
     }
     dist := cellDistance(*cell, x, y)
 
-    return 1.0 / (1.0 + dist/cellProximityScale)
+    return cellTripDwell / (cellTripDwell + dist/cellTripSpeed)
 }
 
 // cellVillageDrag discounts the recurring town trip: the walk to the

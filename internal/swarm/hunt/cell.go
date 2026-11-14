@@ -38,24 +38,55 @@ func cellDistance(cell Cell, x int32, y int32) float64 {
     return math.Hypot(float64(cell.FocusX-x), float64(cell.FocusY-y))
 }
 
-// cellWindowMass returns the expected population of the cell inside the
-// white-green window [max(1, level-5), level]: the mobs a few levels below the
-// character drop full loot without any exp or adena penalty and die in a few
-// swings - the gold optimum the picker scores.
-func cellWindowMass(cell Cell, level int32) float64 {
+// cellWindowBounds returns the income window of a ground at the given level:
+// the mobs that pay the full adena drop below and that the engage accepts
+// above (cellMaxLevelSlack). The server penalizes neither the adena nor the
+// experience of a mob above the character level, so a ground that holds the
+// next band up is not a worse ground.
+func cellWindowBounds(level int32) (int32, int32) {
     low := level - 5
     if low < 1 {
         low = 1
     }
+
+    return low, level + cellMaxLevelSlack
+}
+
+// cellWindowMass returns the expected population of the cell inside the income
+// window: the mobs a few levels below the character drop full loot and die in
+// a few swings, and the ones up to the engage ceiling pay the full adena too -
+// the gold optimum the picker scores.
+func cellWindowMass(cell Cell, level int32) float64 {
+    low, high := cellWindowBounds(level)
     mass := 0.0
     for index := range cell.Mobs {
         mob := &cell.Mobs[index]
-        if mob.Level >= low && mob.Level <= level {
+        if mob.Level >= low && mob.Level <= high {
             mass += float64(mob.Count)
         }
     }
 
     return mass
+}
+
+// cellWindowLevel returns the count weighted mob level of the income window:
+// the price input of the value prior (zero when the window is empty).
+func cellWindowLevel(cell Cell, level int32) float64 {
+    low, high := cellWindowBounds(level)
+    levelMass := 0.0
+    levelWeight := 0.0
+    for index := range cell.Mobs {
+        mob := &cell.Mobs[index]
+        if mob.Level >= low && mob.Level <= high {
+            levelMass += float64(mob.Level) * float64(mob.Count)
+            levelWeight += float64(mob.Count)
+        }
+    }
+    if levelWeight <= 0 {
+        return 0
+    }
+
+    return levelMass / levelWeight
 }
 
 // adenaFullLevelGap is the largest character-level gap over a mob that still

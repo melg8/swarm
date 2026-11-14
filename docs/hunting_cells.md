@@ -120,28 +120,35 @@ port of the spot economy, the geometry replaced):
 - **The neighbor-first sweep**: the starved and the economic switches
   pick the best RIPE candidate of the 1-hop ring, then the 2-hop
   ring; the far relocation (the global contest with the proximity
-  discount) fires only when the level window emptied the whole
+  cost) fires only when the level window emptied the whole
   neighborhood - the bots travel the map freely but never run far
   for farm.
 - **The starvation net**: a ground that reads empty even when ripe
   (another hunter's farm, a wiped spawn) keeps a 5-minute starve
   cooldown - the sweep moves forward through the mesh, the two-ground
   ping-pong livelock of the 2026-09-13 session cannot return.
-- **The economy**: `cellScore = value x safety x proximity x
+- **The economy**: `cellScore = value x safety x proximity x village x
   ripeness / (1 + occupancy)`. The value is the bootstrap prior
   (window mass x respawn turnover x level-priced kills) until 5
   minutes of measured income replace it (a trusted zero stays zero);
   the safety folds the static aggressive share and the decayed death
-  heat (half-life 30 minutes, per cell); the proximity discounts the
-  walk (half score at 8000 units); the ripeness discounts an unripe
-  cell; the occupancy (the process-wide `cellHub`) divides the score
-  so the fleet spreads over different neighborhoods. A voluntary
-  switch needs the alternative 25 percent above after a 5-minute
-  fair trial; a death re-picks at once through the global contest
-  (the escape from the deadly neighborhood).
+  heat (half-life 30 minutes, per cell); the proximity amortizes the
+  one-time relocation over the 1200 second dwell the ground buys (a
+  40000 unit walk keeps 0.79 of the score); the village drag prices
+  the recurring round trip (the walk repeats at every bag fill, half
+  rate at 37500 units); the ripeness discounts an unripe cell; the
+  occupancy (the process-wide `cellHub`) divides the score so the
+  fleet spreads over different neighborhoods. A voluntary switch
+  needs the alternative 25 percent above after a 5-minute fair trial;
+  a death re-picks at once through the global contest (the escape
+  from the deadly neighborhood).
 - **The window**: the target search filters on `[max(1, L-8), L+2]`
   (the C1 full-adena edge, the hard engage ceiling), the priorities
-  bias the white-green subrange `[L-4, L-1]` strongest.
+  bias the white-green subrange `[L-4, L-1]` strongest. The income
+  prior reads `[max(1, L-5), L+2]`: the same engage ceiling, because
+  the server penalizes neither the adena nor the experience of a mob
+  above the character level, so a ground holding the next band up is
+  not a worse ground.
 - **The dynamic focus**: the kill centroid EMA per cell feeds the
   map label and the walk targets drift to the live mass (the
   wait-walk segments to the predicted corpse positions). The PARTITION
