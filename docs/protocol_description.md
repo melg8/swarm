@@ -603,13 +603,22 @@ across the map on every pickup.
 `[race: 4][female: 4][baseClass: 4][level: 4][exp: 4][STR: 4][DEX: 4]`
 `[CON: 4][INT: 4][WIT: 4][MEN: 4][maxHp: 4][curHp: 4][maxMp: 4][curMp: 4]`
 `[sp: 4][curLoad: 4][maxLoad: 4][weaponFlag: 4][15 paperdoll object ids]`
-`[15 paperdoll display ids][12 combat stat ints][runSpd: 4][walkSpd: 4]`
-`[swim and fly speeds: 24][moveMultiplier: 8]` followed by appearance
-fields, matching `UserInfo.writeImpl` of the Mobius C1 sources.
+`[15 paperdoll display ids][pAtk: 4][11 combat stat ints][runSpd: 4]`
+`[walkSpd: 4][swim and fly speeds: 24][moveMultiplier: 8]` followed by
+appearance fields, matching `UserInfo.writeImpl` of the Mobius C1
+sources.
 
 The transmitted `runSpd` and `walkSpd` are base values: the server
 divides the real speeds by the move multiplier before writing them,
 so the effective speed is `runSpd * moveMultiplier`.
+
+The combat stat block leads with `getPAtk(null)`; the tracker keeps it
+(the hunt loop sizes the overhit finishing window from the
+strike-to-swing damage ratio, docs/hunting.md). C1 never broadcasts
+`P_ATK` (0x11) over StatusUpdate (`broadcastStatusUpdate` has no such
+case), so this UserInfo field is the only refresh: the server sends
+UserInfo after every equip, unequip, buff and level change
+(`broadcastUserInfo`).
 
 ### UserInfo (0x04) paperdoll slots
 

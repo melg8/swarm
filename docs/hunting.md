@@ -263,21 +263,27 @@ already unwinding, and the relogin inherited none of the cleanup).
   itself (summon kills pay nothing). The overhit skill set lives in
   npcdata.OverhitSkill (21 verified C1 skills; the deployment
   classes meet Power Strike 3 and Power Shot 56). The combat cast
-  therefore holds the flagged strike while the target stands above
-  the 40 percent finish window (`overhitFinishPercent`) and fires
-  it once the bar drops into it: in the low level band one melee
-  swing takes 25-45 percent of the mob bar, so a bar inside the
-  window usually holds about a strike's worth of damage - the cast
-  lands the kill and the overkill pays the bonus. A strike weaker
-  than the remaining bar (the level +2 pulls, the early strike
-  levels) fires inside the window, misses the kill and loses this
-  cast's bonus; the total fight damage is unchanged, the cost is
-  the delay and the mana - the absolute damage estimate follow up
-  (observed swing damage vs ObjectVitals) closes the gap. The
-  trash that dies inside one swing never opens the window (the
-  strike stays sheathed, the mana is saved), and a missed cast
-  keeps the server flag armed - the auto attack kill that follows
-  still pays the bonus (only a landed non lethal hit clears it).
+  therefore holds the flagged strike until the target bar fits the
+  estimated strike damage and fires it into it. The estimate rides
+  the verified server formula (Formulas.calcPhysDam): the skill
+  adds its `<power>` to the P.Atk before the shared defence,
+  proximity and weapon rolls, so one strike lands about
+  `(PAtk + power) / PAtk` auto attacks. The loop samples the
+  smallest non-critical swing of the fight (a crit is a larger roll
+  of the same swing and stays out) and scales the ratio down by
+  0.85 for the independent weapon rolls (`overhitSafetyFactor`).
+  The P.Atk comes from the UserInfo packet - the only C1 source of
+  the stat, since the server never broadcasts StatusUpdate P_ATK
+  (0x11). No swing sample yet, no UserInfo P.Atk or unknown vitals
+  hold the strike: a blind cast spends the reuse window without the
+  bonus. The estimate is absolute damage, so a high HP mob sitting
+  at a low bar no longer invites the early cast the retired 40
+  percent window allowed (the level 17 mob of 292 HP left at 117
+  survived a 105 damage strike). The trash that dies inside one
+  swing never opens the window (the strike stays sheathed, the mana
+  is saved), and a missed cast keeps the server flag armed - the
+  auto attack kill that follows still pays the bonus (only a landed
+  non lethal hit clears it).
   An "Over-hit!" system message (id 361) confirms a
   landed overhit on the wire.
 - Two triggers end the session: critical health (12%) under attack, or

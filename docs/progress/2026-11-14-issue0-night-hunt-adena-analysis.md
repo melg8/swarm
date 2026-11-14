@@ -208,3 +208,51 @@ throughout. The same command restarted the fleet from 2a9a7ad6 into
 `runs/night-run3.log`, journal
 `logs/session-20261114-224715-19364.jsonl`; all three bots reported
 online (engage) within the same minute and the run stays up.
+
+### 2026-11-14 23:40 UTC - the overhit finishing blow reads damage, not percent
+
+Live measurement on `runs/night-run3.log`: the finished fights show
+Power Strike level 9 hits of 105-141 damage while the auto attacks of
+the same bots land 36-62, and test3's 105 strike into a mob of ~292
+max HP left it alive with about one auto attack worth of HP. The old
+rule fired the strike at 40 percent of the bar (116.8 HP for that
+mob), above the absolute strike damage, so the cast could not kill.
+
+Verified source: `Formulas.calcPhysDam` computes the non-critical
+physical skill hit as `76 * (pAtk + power) * proximity / defence` and
+the auto attack as `76 * pAtk * proximity / defence`, with the weapon
+random multiplier applied to both (`RandomizeAutoAttackDamage` and
+`RandomizePhysicalSkillDamage` are True; `getRandomDamageMultiplier`
+runs twice in the same function), so the strike-to-swing ratio is
+`(pAtk + power) / pAtk`. Power Strike level 9 carries `<power>70`;
+the C1 `UserInfo` packet is the only carrier of the live P.Atk (the
+server never broadcasts `StatusUpdate.P_ATK` 0x11).
+
+The fix:
+- the UserInfo parser reads the P.Atk leading the combat stat block
+  after the 15 paperdoll display ids and skips the 11 stats behind
+  it; `state.CharacterState.PAtk`, `state.UserInfo.PAtk` and
+  `Bot.SelfPAtk` carry it, `connection.applyUserInfo` fills it;
+- `state.objectCold` records the last landed hit (`LastDamage`,
+  `LastDamageCrit`, `LastDamageAt`) from the HP delta that already
+  feeds the combat feed, and `Bot.ObjectLastDamage` exposes it;
+- `npcdata.SkillCast.Power` (generated from `<power>` with the
+  `#power` table resolution; a float table like `#dot` carries no
+  strike power) with `PowerOf`;
+- `hunt/combat_skills.go` samples the smallest non-critical swing of
+  the current fight (per-target reset, 8 s freshness, the own strike
+  landing window excluded, crits skipped) and fires the overhit
+  strike only when the bar fits
+  `swing * (PAtk + power) / PAtk * 0.85`; no sample, no P.Atk or
+  unknown vitals hold the strike.
+
+Tests: `overhit_test.go` rewritten (hold above the estimate, unknown
+vitals, no P.Atk, the low bar of a high HP mob that the percent rule
+fooled, the release with the log line, the crit filter); the cast and
+reuse tests of `combat_skills_test.go` feed the P.Atk and a swing.
+Docs: `docs/hunting.md` (the damage-based window) and
+`docs/protocol_description.md` (the UserInfo P.Atk field).
+
+Next step: restart the three-bot fleet on the fixed build, confirm the
+finished fights report "Over-hit!" with the strike as the killing
+blow.
