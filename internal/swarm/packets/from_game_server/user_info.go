@@ -16,12 +16,13 @@ const UserInfoPacketID = 0x04
 // duplicate of the right hand).
 const userInfoPaperdollSlots = 15
 
-// UserInfo skipped field groups of the wire format, counted in bytes: the
-// weapon flag, the paperdoll display ids with the combat stats, and the swim
-// and fly speeds.
+// UserInfo field group sizes of the wire format, counted in bytes: the weapon
+// flag, the paperdoll display ids, the combat stats after the leading P.Atk and
+// the swim and fly speeds.
 const (
     userInfoWeaponFlagSkip = 4
-    userInfoStatsSkip      = 15*4 + 12*4
+    userInfoDisplaySkip    = 15 * 4
+    userInfoStatTrailSkip  = 11 * 4
     userInfoSpeedTrail     = 24
 )
 
@@ -48,12 +49,17 @@ type UserInfoPacket struct {
     CurrentLoad        int32
     MaxLoad            int32
     PaperdollObjectIDs [userInfoPaperdollSlots]int32
-    RunSpeed           int32
-    WalkSpeed          int32
-    MoveSpeedMult      float64
-    X                  int32
-    Y                  int32
-    Z                  int32
+    // PAtk is the physical attack the server computed at send time (the
+    // leading combat stat after the display ids). The hunt loop sizes the
+    // overhit finishing window from the strike-to-swing damage ratio
+    // (combat_skills.go); the stat block order: docs/protocol_description.md.
+    PAtk          int32
+    RunSpeed      int32
+    WalkSpeed     int32
+    MoveSpeedMult float64
+    X             int32
+    Y             int32
+    Z             int32
 }
 
 func NewUserInfoPacket() *UserInfoPacket {
@@ -78,6 +84,7 @@ func NewUserInfoPacket() *UserInfoPacket {
         CurrentLoad:        0,
         MaxLoad:            0,
         PaperdollObjectIDs: [userInfoPaperdollSlots]int32{},
+        PAtk:               0,
         RunSpeed:           0,
         WalkSpeed:          0,
         MoveSpeedMult:      0,
@@ -138,8 +145,16 @@ func ParseUserInfoPacket(p *UserInfoPacket, data []byte) error { //nolint:cyclop
             return fmt.Errorf("failed to read paperdoll slot: %w", err)
         }
     }
-    // Skip the 15 paperdoll display ids and the 12 combat stat ints.
-    if err := reader.Skip(userInfoStatsSkip); err != nil {
+    // Skip the 15 paperdoll display ids.
+    if err := reader.Skip(userInfoDisplaySkip); err != nil {
+        return fmt.Errorf("not enough bytes for user stats: %w", err)
+    }
+    // P.Atk leads the combat stat block.
+    if p.PAtk, err = reader.ReadInt32(); err != nil {
+        return fmt.Errorf("failed to read user p.atk: %w", err)
+    }
+    // Skip the 11 combat stats after P.Atk.
+    if err := reader.Skip(userInfoStatTrailSkip); err != nil {
         return fmt.Errorf("not enough bytes for user stats: %w", err)
     }
     if err := readInt32Fields(reader, &p.RunSpeed, &p.WalkSpeed); err != nil {

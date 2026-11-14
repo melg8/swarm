@@ -425,7 +425,9 @@ func buildUserInfoData() []byte {
     for index := range userInfoPaperdollSlots {
         data = putInt32(data, int32(268473900+index))
     }
-    data = append(data, make([]byte, userInfoStatsSkip)...)
+    data = append(data, make([]byte, userInfoDisplaySkip)...)
+    data = putInt32(data, 70) // P.Atk
+    data = append(data, make([]byte, userInfoStatTrailSkip)...)
     data = putInt32(data, 170) // run speed
     data = putInt32(data, 85)  // walk speed
     data = append(data, make([]byte, userInfoSpeedTrail)...)

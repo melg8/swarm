@@ -213,14 +213,16 @@ func TestParseUserInfoPacket(t *testing.T) {
         data = putInt32(data, 640) // cur load
         data = putInt32(data, 6400000)
         // Weapon flag, 15 paperdoll object ids, 15 paperdoll display
-        // ids and 12 combat stat ints.
+        // ids, the leading P.Atk and 11 combat stat ints.
         data = append(data, make([]byte, userInfoWeaponFlagSkip)...)
         paperdoll := [userInfoPaperdollSlots]int32{}
         for index := range paperdoll {
             paperdoll[index] = int32(268473900 + index)
             data = putInt32(data, paperdoll[index])
         }
-        data = append(data, make([]byte, userInfoStatsSkip)...)
+        data = append(data, make([]byte, userInfoDisplaySkip)...)
+        data = putInt32(data, 70) // P.Atk
+        data = append(data, make([]byte, userInfoStatTrailSkip)...)
         data = putInt32(data, 165) // run speed
         data = putInt32(data, 80)  // walk speed
         // swim and fly speeds.
@@ -247,6 +249,7 @@ func TestParseUserInfoPacket(t *testing.T) {
         require.Equal(t, int32(640), p.CurrentLoad)
         require.Equal(t, int32(6400000), p.MaxLoad)
         require.Equal(t, paperdoll, p.PaperdollObjectIDs)
+        require.Equal(t, int32(70), p.PAtk)
         require.Equal(t, int32(165), p.RunSpeed)
         require.Equal(t, int32(80), p.WalkSpeed)
         require.InDelta(t, 1.1, p.MoveSpeedMult, 0.0001)

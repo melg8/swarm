@@ -133,13 +133,15 @@ func buildUserInfoPayload() []byte {
     } {
         data = putInt32(data, value)
     }
-    // Weapon flag, 15 paperdoll display ids and 12 combat stat ints
-    // are skipped by the parser.
+    // Weapon flag, 15 paperdoll object ids and 15 paperdoll display ids;
+    // P.Atk leads the combat stat block the parser reads first.
     data = append(data, make([]byte, userInfoWeaponFlagSkip)...)
     for index := range userInfoPaperdollSlots {
         data = putInt32(data, int32(268473900+index))
     }
-    data = append(data, make([]byte, userInfoStatsSkip)...)
+    data = append(data, make([]byte, userInfoDisplaySkip)...)
+    data = putInt32(data, 70) // P.Atk
+    data = append(data, make([]byte, userInfoStatTrailSkip)...)
     data = putInt32(data, 165) // run speed
     data = putInt32(data, 80)  // walk speed
     // Swim and fly speeds trail.
