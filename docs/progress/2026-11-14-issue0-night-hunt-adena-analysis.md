@@ -256,3 +256,25 @@ Docs: `docs/hunting.md` (the damage-based window) and
 Next step: restart the three-bot fleet on the fixed build, confirm the
 finished fights report "Over-hit!" with the strike as the killing
 blow.
+
+### 2026-11-14 23:52 UTC - live acceptance on the damage window
+
+The three-bot fleet was restarted on aae8fe55 (`go run` child PID
+16708, log `runs/night-run4.log`, journal
+`logs/session-20261114-234636-16708.jsonl`, web 127.0.0.1:8081, the
+same flags as the baseline run). The stack ports stayed up the whole
+time (login 127.0.0.3:2106, game 7777, MariaDB 3306). All three bots
+reported online and engaged within the first minute; `delevelTarget`
+stayed 0 on both level 17 bots.
+
+The damage window accepted six strikes that landed in the first six
+minutes and every one killed with "Over-hit!": test1 118 and 150,
+test2 106 and 322, test3 110 and 97, each followed by the +25 percent
+experience share (294 -> 368 and similar). One further cast at
+23:50:08 did not pay the bonus - the mob died to a separate 148 hit
+(the log cannot tell a refused cast from a critical auto attack at
+that resolution, and the tail of the independent weapon rolls can
+also leave a strike just short of its estimate). The strike rate is
+far below the night-run3 cadence: 12 casts in the first four minutes
+across three bots instead of one every ~15 seconds per bot, because
+the strike now waits for the bar to fit its own damage.
