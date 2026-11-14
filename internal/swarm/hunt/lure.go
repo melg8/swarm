@@ -218,6 +218,8 @@ func (l *Loop) lureApproachTick(lure *lureState, now time.Time) bool {
     }
     if toolReady && targetDist <= lureShotRange {
         lure.phase = lureShoot
+        l.logf("Hunt: luring %s: inside the bow range at %d units",
+            l.targetName(lure.target), int(targetDist))
 
         return false
     }
@@ -403,7 +405,16 @@ func (l *Loop) lureShootTick(lure *lureState, now time.Time) bool {
 // the sword: the equip and the attack would race on the server executor.
 func (l *Loop) lureMeleeTick(lure *lureState, now time.Time) bool {
     kind, ok := l.tracker.SelfWeaponKind()
-    if (ok && kind != weaponTypeBow) || now.Sub(lure.swapAt) >= lureSwapHold {
+    if ok && kind != weaponTypeBow {
+        l.logf("Hunt: the sword is back, closing into melee on %s",
+            l.targetName(lure.target))
+        l.clearLure()
+
+        return false
+    }
+    if now.Sub(lure.swapAt) >= lureSwapHold {
+        l.logf("Hunt: the melee swap did not confirm within %s",
+            lureSwapHold)
         l.clearLure()
 
         return false
