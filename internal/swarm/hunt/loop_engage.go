@@ -469,15 +469,17 @@ func (l *Loop) walkStalledChase(now time.Time) {
 // it goes out the moment the bow is ready whatever range the chaser reached.
 // Waiting for a safe distance is a treadmill the mob out-regenerates.
 func (l *Loop) requestAttack(now time.Time) {
+    if l.lureArmed() && l.lureTick(now) {
+        // The lure paces its own walk and equips; the movement hold and the
+        // retry gate below only own what it hands over to.
+        return
+    }
     if now.Before(l.combatAvoidUntil) {
         // The impending-add step owns the movement: a forced attack request
         // interrupts a running walk server-side.
         return
     }
     if now.Sub(l.lastActionAt) < engageRetryPeriod {
-        return
-    }
-    if l.lureArmed() && l.lureTick(now) {
         return
     }
     if err := l.game.AttackTarget(l.target); err != nil {

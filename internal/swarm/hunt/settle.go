@@ -211,27 +211,14 @@ func (l *Loop) maybeBeginFirstStrike(now time.Time) bool {
         if paperdoll[state.PaperdollRHand] != 0 {
             kind, weaponOK := l.tracker.SelfWeaponKind()
             if weaponOK && kind == weaponTypeBow {
-                // The bow is already worn (an interrupted lure): the
-                // arm phase skips its own equip.
+                // The bow is already worn (an interrupted lure): the arm step
+                // skips its own equip.
                 meleeObjID = 0
             } else {
                 meleeObjID = paperdoll[state.PaperdollRHand]
             }
         }
-        l.lure = &lureState{
-            phase:      lureArm,
-            target:     l.target,
-            meleeObjID: meleeObjID,
-            bowObjID:   bowID,
-            arrowObjID: arrowID,
-            standX:     selfX,
-            standY:     selfY,
-            startedAt:  now,
-            segmentAt:  time.Time{},
-            armAt:      time.Time{},
-            armedBow:   false,
-            armedArrow: false,
-        }
+        l.startLure(now, bowID, arrowID, meleeObjID, selfX, selfY, true)
         l.logf("Hunt: first strike on %s with the bow from the "+
             "protected spot", strike.Name)
 

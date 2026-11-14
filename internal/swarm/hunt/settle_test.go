@@ -106,7 +106,7 @@ func TestSettleArmsTheBowFirstStrike(t *testing.T) {
 
     loop.tick()
     require.NotNil(t, loop.lure, "the first strike arms the bow lure")
-    require.Equal(t, lureArm, loop.lure.phase)
+    require.Equal(t, lureApproach, loop.lure.phase)
     require.Equal(t, int32(9001), loop.lure.target)
     require.Equal(t, int32(501), loop.lure.meleeObjID,
         "the melee weapon is remembered for the swap back")

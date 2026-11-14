@@ -185,6 +185,11 @@ func (l *Loop) kiteLayerGates(now time.Time) bool {
     if !l.kite.Enabled || !l.bowEquipped() || l.target == 0 {
         return false
     }
+    if l.lureArmed() {
+        // The lure holds the standoff and brings the pulled mob to the melee
+        // swap; a retreat would drag the character out of its range (lure.go).
+        return false
+    }
     // Against an archer the retreat is off: a ranged enemy cannot be
     // outrun (docs/hunting.md).
     if l.tracker.ObjectUsesBow(l.target) {
@@ -931,6 +936,22 @@ func (l *Loop) kiteWalkClear() {
     l.kiteWalkIssuedAt = time.Time{}
     l.kiteReclicks = 0
     l.kiteWalkDead = false
+}
+
+// kiteStandDown drops the whole kite motion: the deferred click, the re-click
+// ladder, the movement hold and the cornered hold. The lure calls it on the
+// arming and on the melee handoff, so the next forced request owns the tick
+// (lure.go).
+func (l *Loop) kiteStandDown() {
+    held := !l.kiteClickAt.IsZero() || !l.kiteWalkUntil.IsZero() ||
+        !l.kiteHeldAt.IsZero()
+    l.kiteClickDrop()
+    l.kiteWalkClear()
+    l.kiteHeldAt = time.Time{}
+    l.kiteHeldFor = 0
+    if held {
+        l.logf("Hunt: the kite motion stands down on target %d", l.target)
+    }
 }
 
 // kiteHoldGround arms the hold: the archer stops retreating and keeps

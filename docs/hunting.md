@@ -400,10 +400,11 @@ absorbs damage.
 The recovered character opens with the first strike instead of
 walking: the nearest aggressive mob inside the firstStrikeRange (the
 700 unit Power Shot cast range) is attacked FROM THE SPOT - the bow
-owner arms the ranged tool through the lure machinery (the
-lureArm/lureShoot phases run the ranged fight and swap the melee
-weapon back when the mob closes to lureArriveRange), everyone else
-answers in melee at the chosen spot with a full bar. The strike
+owner arms the ranged tool through the lure machinery (the on spot
+lure approach arms on the spot and the shoot phase runs the ranged
+fight, swapping the melee weapon back when the mob closes to
+lureArriveRange), everyone else answers in melee at the chosen spot
+with a full bar. The strike
 keeps the engage discipline (the level ceiling, the mystic mana
 gate); without an aggressive mob in range the ordinary pick flow
 resumes. Breaking the protection exposes the character to every
@@ -508,22 +509,36 @@ trips):
 - the cover detection (`targetCovered`): an idle aggressive mob whose
   on-sight circle plus the 200 unit slack reaches the pick or the
   straight approach segment;
-- the approach stops at the 420 unit standoff, a hair inside the 500
-  unit bow range and outside every threat circle. The standoff
+- the approach stops on the 480 unit standoff ring, 20 units inside the
+  500 unit bow range and outside every threat circle. The standoff
   direction is the one from the target toward the character, rotated
   through the eight compass directions until a candidate is clean; the
   fallback keeps the character side;
-- the arm phase equips the bow and the quiver through the ordinary use
-  item requests, paced at the 2 s flood protector window and held by
-  the paperdoll confirmation gate;
+- the bow and the quiver arm on the walk, through the ordinary use item
+  requests: the use item flood protector is disabled, so each request
+  waits only the paperdoll confirmation of the previous one and the
+  arrival finds the tool ready;
+- the pull pre-selects the target on the first walk tick (the first
+  Mobius `AttackRequest` only selects, the repeated one forces), so the
+  forced attack fires the moment the live target enters the 500 unit
+  weapon range instead of spending its pacing window after the arrival;
 - the pull is the ordinary forced attack request: with the bow in hand
   the server starts the ranged auto attack and the learned Power Shot
   casts through the combat skill flow. The hunter holds the position,
   so the attacked mob runs to the shooter and the cover does not (the
   character never entered its aggro radius);
-- the arrival at 200 units swaps the melee weapon back and the fight
-  continues as an ordinary one. A pull that never engages releases the
-  target within 30 s to the ordinary skip machinery.
+- the kite layers never arm under the lure, and the arming stands a
+  motion that was already running down: the standoff holds the range,
+  a retreat would drag the character out of it;
+- the arrival at 200 units stands the kite motion down, swaps the melee
+  weapon back (the server defers the swap to the bow attack end) and
+  fires the first melee request the moment the paperdoll confirms the
+  sword, so the character stops retreating and closes into melee. A
+  pull that never engages releases the target within 30 s to the
+  ordinary skip machinery.
+
+The spawn-settle first strike reuses the same state machine on the spot
+(`onSpot`): no standoff walk, the mob comes to the character.
 
 Pinned by `hunt/lure_test.go`.
 
@@ -579,6 +594,14 @@ reads the fight target alone: a melee-target fight keeps the
 established behavior, and an archer add in a mixed fight does not
 switch the layer off. A natural-weapon mob (right hand 0) is not an
 archer.
+
+The lure gate: while the covered pick lure holds the standoff
+(docs/hunting.md, `hunt/lure.go`) no kite layer arms, and the arming
+stands a running motion down. The standoff exists to hold the bow
+range while the pulled mob crosses it, so a retreat would drag the
+shooter out of its own range; after the melee swap the same gate keeps
+the character from retreating with the sword in hand - the melee
+handoff closes into melee instead.
 
 The same owner rule fences the archers out of the INITIATION
 (`avoidBowTargets`, threaded into the constrained target search as
