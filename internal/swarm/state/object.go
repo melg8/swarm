@@ -144,6 +144,12 @@ type objectCold struct {
     MaxHP     float64
     CurMP     float64
     MaxMP     float64
+    // LastDamage is the amount of the last landed hit on the object and
+    // LastDamageAt its arrival in nanoseconds; the overhit finishing window
+    // samples the own non-critical swings from it (combat_skills.go).
+    LastDamage     float64
+    LastDamageCrit bool
+    LastDamageAt   int64
 }
 
 // inCombat reports whether the object was seen fighting recently: the auto

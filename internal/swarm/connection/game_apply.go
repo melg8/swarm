@@ -48,6 +48,7 @@ func (gc *GameClient) applyUserInfo(payload []byte) {
             CurMP:              info.CurMP,
             CurrentLoad:        info.CurrentLoad,
             MaxLoad:            info.MaxLoad,
+            PAtk:               info.PAtk,
             RunSpeed:           info.RunSpeed,
             WalkSpeed:          info.WalkSpeed,
             MoveSpeedMult:      info.MoveSpeedMult,

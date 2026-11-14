@@ -229,3 +229,22 @@ func (b *Bot) ObjectVitals(
 
     return cold.CurHP, cold.MaxHP, true
 }
+
+// ObjectLastDamage returns the last landed hit on an observed object: the
+// amount, the crit hint and the arrival time. ok is false when the object is
+// unknown or no hit landed yet. The server sends no damage number, so the
+// tracker derives the amount from the HP delta; the hunt loop samples the own
+// swings from it.
+func (b *Bot) ObjectLastDamage(
+    objectID int32,
+) (amount float64, crit bool, at time.Time, ok bool) {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+    _, cold := b.objectLocked(objectID)
+    if cold == nil || cold.LastDamageAt == 0 {
+        return 0, false, time.Time{}, false
+    }
+
+    return cold.LastDamage, cold.LastDamageCrit,
+        time.Unix(0, cold.LastDamageAt), true
+}

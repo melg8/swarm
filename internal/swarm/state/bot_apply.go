@@ -53,6 +53,7 @@ type UserInfo struct {
     CurMP              int32
     CurrentLoad        int32
     MaxLoad            int32
+    PAtk               int32
     RunSpeed           int32
     WalkSpeed          int32
     MoveSpeedMult      float64
@@ -81,6 +82,7 @@ func (b *Bot) ApplyUserInfo(info UserInfo) {
     b.char.CurMP = float64(info.CurMP)
     b.char.CurrentLoad = info.CurrentLoad
     b.char.MaxLoad = info.MaxLoad
+    b.char.PAtk = info.PAtk
     b.char.RunSpeed = effectiveSpeed(
         info.RunSpeed, info.WalkSpeed, info.MoveSpeedMult)
     b.char.WalkSpeed = effectiveSpeed(

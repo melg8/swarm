@@ -104,6 +104,10 @@ type CharacterState struct {
     // 500000/pAtkSpd + reuseDelay*333/pAtkSpd (the C1
     // calculateTimeBetweenAttacks and calculateReuseTime).
     PAtkSpd int32
+    // PAtk is the physical attack of the last UserInfo packet. C1 never
+    // broadcasts StatusUpdate P_ATK (0x11), so the gear change UserInfo is
+    // the only refresh; the overhit finishing window divides by it.
+    PAtk int32
     // BowCycleAt and BowCycle record the RED SetupGauge of the committed bow
     // shot (the packet names no object, it goes to the affected client only):
     // the max field is the exact disable window, windup plus reuse tail. The
@@ -159,6 +163,7 @@ func newCharacterState() CharacterState {
         LastLandedHitTarget: 0,
         LastSelfShotAt:      time.Time{},
         PAtkSpd:             0,
+        PAtk:                0,
         BowCycleAt:          time.Time{},
         BowCycle:            0,
         CurrentLoad:         0,

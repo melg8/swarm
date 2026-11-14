@@ -115,12 +115,17 @@ func (b *Bot) recordObjectDamageLocked(
         if attr.ID != AttrCurHP || float64(attr.Value) >= cold.CurHP {
             continue
         }
+        amount := cold.CurHP - float64(attr.Value)
+        crit := b.critHintLocked(objectID, now)
+        cold.LastDamage = amount
+        cold.LastDamageCrit = crit
+        cold.LastDamageAt = now.UnixNano()
         b.recordCombatEventLocked(CombatEvent{
             Kind:       CombatEventDamage,
             TargetID:   objectID,
             AttackerID: 0,
-            Amount:     cold.CurHP - float64(attr.Value),
-            Crit:       b.critHintLocked(objectID, now),
+            Amount:     amount,
+            Crit:       crit,
             X:          hot.X,
             Y:          hot.Y,
             TargetX:    0,

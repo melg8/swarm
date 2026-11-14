@@ -126,6 +126,16 @@ func (b *Bot) SelfPAtkSpd() int32 {
     return b.char.PAtkSpd
 }
 
+// SelfPAtk returns the physical attack of the last UserInfo packet, zero when
+// none arrived (see CharacterState.PAtk). The overhit finishing window sizes
+// the strike-to-swing damage ratio from it.
+func (b *Bot) SelfPAtk() int32 {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.char.PAtk
+}
+
 // SelfBowCycle returns when the last RED SetupGauge arrived and the bow disable
 // window it announced (zero values before the first): the kite retreat reads
 // the server's own windup and reuse timing instead of the pAtkSpd formula (see
