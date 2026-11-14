@@ -194,3 +194,17 @@ run started from 9ff12415: `-hunt -proxy -login 127.0.0.3:2106 -web
 All three bots reported online within 30 s (test1 level 17 engage,
 test2 level 17 townWalk, test3 level 19 engage), and `delevelTarget`
 stayed 0 on the level 17 pair - the drop floor holds.
+
+### 2026-11-14 22:47 UTC - controlled stop and restart (the harness check)
+
+The owner asked to stop the running bot shell and start it again
+without touching the stack. The fleet process was `swarm.exe` (the
+`go run` child); a second shell cannot deliver SIGINT to it on this
+host, and `taskkill` without /F refuses a console process, so the stop
+was the forced kill of the child. `go run` exited with code 1, port
+8081 freed and no swarm or go process stayed behind; the stack ports
+(login 127.0.0.3:2106, game 7777, MariaDB 3306) kept listening
+throughout. The same command restarted the fleet from 2a9a7ad6 into
+`runs/night-run3.log`, journal
+`logs/session-20261114-224715-19364.jsonl`; all three bots reported
+online (engage) within the same minute and the run stays up.
