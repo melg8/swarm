@@ -29,6 +29,10 @@ const (
     // delevelTargetGap is the target above the median zone mob level: mob level
     // plus 5 is the last level with the full item drop chance.
     delevelTargetGap = int32(5)
+    // delevelDropMin is the smallest level drop a deleveling must buy: a single
+    // level re-levels within the hour, and the guard walk only burns the guide
+    // buffs the death takes with it.
+    delevelDropMin = int32(2)
     // luckyProtectLevel is the level at or under which the Lucky newbie skill
     // (id 194, Player.isLucky) absorbs the death penalty: a guard death at 9
     // removes nothing, at 10 it pays.
@@ -120,8 +124,9 @@ func (l *Loop) delevelTriggerMedian() int32 {
 // the live median below the trigger difference, the static median of the
 // anchored cell as the stable fallback and a hysteresis when both read (the
 // live one flickers with the respawn windows). The static answer only stands
-// while the character holds the ground, and a target that cannot sit below the
-// current level never starts the walk. The rules: docs/hunting.md.
+// while the character holds the ground, and a target that does not drop the
+// level by delevelDropMin never starts the walk: a one-level delevel re-levels
+// before the next bag is full. The rules: docs/hunting.md.
 func (l *Loop) delevelWanted() bool {
     if l.navigator == nil || !l.delevelCooldownOver() {
         return false
@@ -147,7 +152,7 @@ func (l *Loop) delevelWanted() bool {
         return false
     }
 
-    return delevelTargetFor(level, median) < level
+    return delevelTargetFor(level, median) <= level-delevelDropMin
 }
 
 // delevelTargetFor computes the target from the character level over the median

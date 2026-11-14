@@ -138,6 +138,20 @@ func TestDelevelTargetClampsAtTheGuideFloor(t *testing.T) {
     require.Len(t, game.walks, 1, "the walk to the guard starts")
 }
 
+// TestDelevelSkipsTheSingleLevelDrop pins the floor of the drop: a level
+// 17 character over level 1 gremlins targets 16 and would re-level there
+// within the hour, so the guard walk never starts - the repeated 17 to 16
+// cycle spent a third of the measured death count.
+func TestDelevelSkipsTheSingleLevelDrop(t *testing.T) {
+    loop, _, _, _ := newDelevelLoop(delevelGuideFloorLevel + 1)
+    spawnZoneMobs(loop.tracker)
+
+    loop.tick()
+    require.NotEqual(t, phaseDelevel, loop.phase,
+        "a one-level drop does not buy the guard walk")
+    require.Zero(t, loop.delevelTarget, "no target was announced")
+}
+
 // TestDelevelFightsTheGuard verifies the fight stage: the walk ends at
 // the guard, the guard npc is picked and attacked once per second.
 func TestDelevelFightsTheGuard(t *testing.T) {
