@@ -233,7 +233,12 @@ already unwinding, and the relogin inherited none of the cleanup).
   (`SelfFighting`): before the first swing the target bar is simply
   full, and the old pre-fight rule fled a winnable aggroed mob seconds
   after the answer (the 2026-11-09 live round: the adopted spider sat
-  at 100% against a 56% character and the bot ran). A hurt character
+  at 100% against a 56% character and the bot ran). The gap rule
+  stands down while the character leads the target by
+  `fleeOutlevelSlack` (2) levels: the measured 55-60% flees ran from
+  mobs five levels down and every same-speed chase ended in the
+  emergency logout, so the trade is the cheaper answer - the critical
+  health line still flees. A hurt character
   under attack keeps fleeing instead of standing in the blows.
 - The escape runs an ordered lane fan (`escapeWalkDestination`): the
   straight away ray first, then the 45 and 90 degree lanes each side
@@ -413,13 +418,18 @@ the pack arrives at a chosen spot, full health, into a ranged opener.
 
 The pile up policy answers the reported two mob softlock: a pack of
 at most pileUpFightMaxAttackers (3) attackers inside the engage
-level ceiling with the health above the re-engage threshold is
+level ceiling with the health above the tank floor is
 TANKED (pileUpWinnable in loop_safety.go) - the tick gate skips the
 panic run, the aggro answer fights the nearest attacker, the fight
 potion (fightPotionHealthPercent = 70, above the re-engage line so
 the flee gates never pre-empt it; the loot phase serves it too)
-keeps the bar under the swings. The kill that thins the pack to one
-attacker hands the answer back to the ordinary flow; the health
+keeps the bar under the swings. The floor is the re-engage threshold
+(60%) for a pack of three and `pileUpTwoHealthPercent` (45%) for a
+pair: the measured night run armed the run on 23 exact two-mob pairs
+between 45 and 60 percent against same-speed mobs and every one
+ended in the logout, while the pair trades won. The kill that thins
+the pack to one attacker hands the answer back to the ordinary flow;
+the health
 drop re-arms the panic run mid fight. The unwinnable pile up keeps
 the old run, relogin and regenerate cycle - which now lands into
 the settle instead of an immediate walk back into the pack.
@@ -1283,7 +1293,12 @@ shot are looted at the corpse - the bot approaches and picks up the
 drops and the adena, never leaves them on the ground. The economy of
 the spot era carries over (the measured income, the death heat, the
 occupancy division of the fleet, the white-green window, the respawn
-overlay with the corpse camping); the manual ground selection is
+overlay with the corpse camping); the recurring village trip enters
+the score as `cellVillageDrag` (the dwell of one filled bag over the
+dwell plus the village round trip, anchored at the region guide), so
+a far ground pays its distance at every fill while the live
+proximity factor keeps pricing the one-time relocation; the manual
+ground selection is
 gone (the registry of a full project grows past a thousand cells -
 the economy owns the rotation, the map hover shows the cell info
 read-only). The web map draws EXACTLY TWO hexagons: the one the bot
@@ -2325,10 +2340,18 @@ the Life Cubic (skill 67) rides the narrow 16..19 band of the gate
 `AbnormalStatusUpdate`). The owner rule keeps that level-keyed reward
 over the drop chance the deaths would restore below the window, so a
 level 16 character never starts a deleveling at all (the target would
-be the level itself) and the guard deaths of a level 17+ character stop
-at 16 - the target is the level floor, never the raw drop boundary
+be the level itself), a level 17 character skips it for the same
+reason under the drop floor below, and the guard deaths of a level 18+
+character stop at 16 - the target is the level floor, never the raw
+drop boundary
 that sits under it. A character under the window still delevels to the
 Lucky floor: it never held the cubic.
+
+The drop floor (`delevelDropMin`, 2 levels) keeps the walk worth its
+deaths: the target must sit at least two levels under the character,
+or the farm climbs back over the trigger within the hour and the next
+cycle repeats. The measured night run cycled one bot between 17 and 16
+twelve times (a third of its death count) before the floor.
 
 The level gap rules of the drop calculation
 (`NpcTemplate.calculateGroupDrops`) set the farming window: item drops
@@ -2352,7 +2375,13 @@ whole timeout window of misses is the normal variance of the gap and
 the stage extends instead of blacklisting a guard that had no damage
 to retaliate against (internal/swarm/state SelfLandedHit feeds the
 distinction). The whole deleveling is bounded by a 60 min timeout and
-a 1 min cooldown after it ends. The
+a 1 min cooldown after it ends. The phase end starts in the village:
+the finish and the abort both hand the walk back to the trip engine
+(`endDelevelWalk`), and when the support magic is wanted the refill
+trip starts first - the guard deaths cleared the buffs and the revive
+landed next to the guide, so the plain walk home only added the
+village round trip (all 37 measured finishes paid it). The refill
+trip keeps the preserved farm spot as its return target. The
 walk segments are split into at most 1000 unit steps because the server
 refuses move requests with a target farther than 9900 units
 (MoveToLocation readImpl); the smoothed geodata routes happily exceed

@@ -142,11 +142,43 @@ round.
 
 ## Status
 
-The analysis round is complete; the five fixes are ordered by yield
-(finding 1 is worth about 6 percent of the clock, finding 5 is the
-structural one). The night process stays up for the owner's evaluation;
-none of the numbers above came from a control command.
+### 2026-11-14 23:05 UTC - land the fixes and re-measure finding 4
 
-Next step: open the board issues for findings 1-3 and land them as
-separate small rounds, each verified on the live stack against this
-baseline (12905 / 17580 / 12613 adena per hour).
+Four of the five findings landed as separate commits, each with its
+tests; finding 4 was re-measured and dropped.
+
+- Finding 1 (`b0b1442b`): `endDelevelWalk` hands the phase end back to
+  the trip engine. The finish and the abort clear the walk state, and
+  when `guideRunWanted` the refill trip starts on the next tick and
+  returns to the preserved farm spot; the plain return segment stays
+  for the regions without a guide. `TestDelevelFinishRefillsTheGuideFirst`
+  and four updated phase assertions.
+- Finding 2 (`1c4724ab`): `delevelDropMin` (2) in `delevelWanted` - a
+  target that buys fewer than two levels never starts the guard walk.
+  A level 17 character over the guide floor now farms instead of
+  cycling 17 to 16. `TestDelevelSkipsTheSingleLevelDrop`.
+- Finding 3 (`6f83ac22`): the gap rule stands down when the character
+  leads the target by `fleeOutlevelSlack` (2) levels, the critical
+  health still flees; `pileUpTwoHealthPercent` (45) tanks an exact
+  two-mob pair between 45 and 60 percent. Three new tests in
+  `aggro_answer_test.go` and `combat_policy_test.go`.
+- Finding 4: DROPPED. The re-measurement shows the interruption costs
+  the covered walking and the restart only, about 15 s each: 127
+  interruptions are roughly 0.5 h fleet-wide, under 1 percent of the
+  clock - the 1.4 h estimate priced the whole plan loss, which the
+  restart does not pay.
+- Finding 5 (`a374fc50`): `cellVillageDrag` multiplies the score by
+  the dwell share of the trip cycle (1200 s dwell over dwell plus the
+  round trip at speed 125, anchored at `guideForRegion`), while the
+  live `cellProximity` keeps pricing the one-time relocation.
+  `TestCellVillageDragPricesTheRecurringTrip` and
+  `TestCellScorePricesTheVillageTrip`.
+
+Docs: `docs/hunting.md` carries the four rules (the drop floor, the
+phase-end refill, the outlevel flee and the pair floor, the village
+drag). The hunt package tests, `go build ./...` and the changed-code
+lint are green on every commit.
+
+Next step: restart the same three-bot night run on the fixed build and
+compare against this baseline (12905 / 17580 / 12613 adena per hour,
+2919 / 2766 / 2679 kills, 118 / 117 / 88 deaths).
