@@ -520,3 +520,34 @@ deaths and pile ups apart.
 
 Next step: let the run collect its window and compare kills per hour,
 adena per hour, deaths, trips and refusals against the run5 baseline.
+
+### 2026-11-15 12:48 UTC - the journal baseline of run5 and the A/B tool
+
+`tools/journal_stats.py` (new) prints the comparison table of a
+measurement round from the journals alone, so both sides of an A/B are
+counted the same way:
+
+```
+python tools/journal_stats.py logs/session-20261115-030925-33068.jsonl \
+    logs/session-20261115-122750-10868.jsonl --phases
+```
+
+The run5 journal (`session-20261115-030925-33068`, build `7e5e65e9`,
+window 03:09 to 12:02, 8.88 h) reads: 4500 kills, 4 deaths, 4 stalls,
+22 logouts, 102 town trips, 65 sell batches, 7784 adena of buys, a net
+purse gain of 398740 (44971 adena per hour on the fleet, 14990 per
+bot-hour), 1474249 experience (55423 per bot-hour) and 9 level ups;
+the phase share is engage 70.0 percent, townWalk 12.4, townReturn
+12.7, townSell 0.5 and loot 4.4, so the town block is 25.6 percent of
+the bot time. The figure differs from the 359781 of the earlier
+analysis on purpose: that one summed the adena pickups the live stats
+API reports, this one is the net purse (pickups plus sales minus the
+buys) - the run comparison uses the net figure for both sides.
+
+The run6 window at 12:36 (the first nine minutes, the restart ramp
+with a boundary death) reads 48 kills, 1 death, 4468 net purse, 31539
+adena per hour on the fleet and 339 kills per hour - not comparable
+yet, the run needs its hours.
+
+Next step: read both journals with the tool once the run6 window is
+long enough to compare.

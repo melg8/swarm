@@ -123,6 +123,26 @@ before NewJournal finished).
   record trail: attach it to the report and the agent greps the
   timeline directly.
 
+### The A/B table of a measurement round
+
+`tools/journal_stats.py` reads one or more journals and prints the
+per-bot and fleet kills, deaths, stalls, logouts, town trips, sales,
+buy cost, net purse gain, experience gain and level ups, with the
+phase time share of the samples behind `--phases`. The figures are
+comparable across runs by construction (the same journal, the same
+counters), so a round compares the builds by pointing the tool at
+their two journals:
+
+```
+python tools/journal_stats.py logs/session-<run5>.jsonl \
+    logs/session-<run6>.jsonl --phases
+```
+
+The money figure is the net purse gain (the pickups and the sales
+minus the buys), not the raw pickup sum the live stats API reports:
+the two answer different questions, and the run comparison uses the
+net figure for both sides.
+
 ## The report shape
 
 ```
