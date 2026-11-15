@@ -486,3 +486,37 @@ pickup refusal, the stagnation dump, the delevel phase end) and
 Next step: restart the 3-bot fleet on this build and compare against
 the run5 baseline (359781 adena, 3 deaths, 92 trips, 45.5k adena per
 hour).
+
+### 2026-11-15 12:40 UTC - run6 restarted on the final build
+
+The fleet runs the fixed build (`414234f5`, three bots, `-hunt -proxy
+-login 127.0.0.3:2106 -web 127.0.0.1:8081 -bots 3 -navmesh
+./data/navmesh`):
+
+- `runs/night-run6.log`, journal
+  `logs/session-20261115-122750-10868.jsonl` - the run of record.
+- `runs/night-run6-pre.log`, journal
+  `logs/session-20261115-120439-31560.jsonl` - the 20 minute ramp of
+  the same build before the label fix (`c2518615`), kept as evidence.
+
+First minutes of the record run: three bots online, twelve kills in
+the first three minutes, no guide trip line at all (run5 started 81 of
+them), no death and no stagnation fire.
+
+The refusal attribution (`Action failed: the request 0x.. was .. ms
+ago`) names the candidates the bare server packet never did, over the
+first 167 seconds: 29 action clicks (0x04), 25 attack requests (0x0a),
+22 move clicks (0x01), 10 skill casts (0x2f), 3 enter world (0x03) and
+1 potion drink (0x14). The server sources explain the two leaders: an
+`Action` on an object that already left the world and an
+`AttackRequest` on a target the server holds dead or gone (both answer
+`ActionFailed` at once), while a `MoveToLocation` is refused at once
+when the destination is its own origin or the geodata blocks it.
+
+`414234f5` - the pile up that forced an emergency logout logged
+"death at the cell", the shared cell regression accounting reused the
+death wording. The message now names the cause, so the run log counts
+deaths and pile ups apart.
+
+Next step: let the run collect its window and compare kills per hour,
+adena per hour, deaths, trips and refusals against the run5 baseline.
