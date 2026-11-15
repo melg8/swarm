@@ -810,3 +810,67 @@ func TestCellWindowCountsTheEngageCeiling(t *testing.T) {
     require.InDelta(t, 6.0, cellWindowMass(cell, 15), 1e-9,
         "levels 10, 15 and 17 count, level 18 sits above the ceiling")
 }
+
+// TestCellDangerSpotDemotesTheScore pins the danger ring of the cell score: an
+// emergency logout spot demotes its ground for the danger window, so the
+// economy prefers any alternative first (the observed storms repeated the same
+// ground within a minute).
+func TestCellDangerSpotDemotesTheScore(t *testing.T) {
+    _, _, hunter := pickedCellLoop(t)
+    now := time.Now()
+    before := hunter.cellScore(0, now)
+
+    require.True(t, hunter.noteDangerAt(46112, 41500, now),
+        "the home spot belongs to the home cell")
+    require.True(t, hunter.cellDangerHeld(&hunter.metrics[0], now))
+    after := hunter.cellScore(0, now)
+    require.InDelta(t, before*cellDangerPenalty, after, 1e-9,
+        "the demoted ground keeps a fifth of its score")
+
+    expired := now.Add(cellDangerWindow + time.Second)
+    require.False(t, hunter.cellDangerHeld(&hunter.metrics[0], expired))
+    require.InDelta(t, 1.0,
+        hunter.cellDangerFactor(&hunter.metrics[0], expired), 1e-9,
+        "the demotion lapses with the danger window")
+}
+
+// TestCellDangerLogoutMarksTheRing pins the emergency logout accounting: the
+// spot lands in the tracker danger ring (the next session seeds it back) and
+// demotes the ground the character stood on.
+func TestCellDangerLogoutMarksTheRing(t *testing.T) {
+    loop, _, hunter := pickedCellLoop(t)
+
+    loop.noteZoneDanger()
+
+    require.NotEmpty(t, loop.tracker.DangerSpots(zoneDangerWindow),
+        "the logout spot survives the session in the tracker ring")
+    require.True(t, hunter.cellDangerHeld(&hunter.metrics[0], loop.now()),
+        "the ground of the logout is demoted")
+}
+
+// TestCellResumeRefusesTheDangerSpot pins the relogin handoff gate: the fresh
+// loop of the next session stands on the ground the emergency logout left and
+// takes the alternative instead of walking back into the pack that forced the
+// logout.
+func TestCellResumeRefusesTheDangerSpot(t *testing.T) {
+    bot := cellTestBot(t)
+    bot.ApplyPlacement(state.Placement{
+        ObjectID: 100, X: 46112, Y: 41500, Z: -3400,
+    })
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.SetHuntingCells(testCells())
+    t.Cleanup(func() {
+        if loop.cell != nil && loop.cell.leave != nil {
+            loop.cell.leave()
+        }
+    })
+    bot.NoteDangerSpot(46112, 41500)
+    loop.seedZoneDanger()
+    require.True(t, loop.cell.cellDangerHeld(
+        &loop.cell.metrics[0], time.Now()),
+        "the seeded spot demotes the home ground")
+    loop.tick()
+    require.Equal(t, "test-rich", loop.zonePickedID,
+        "the danger ground is not resumed")
+}

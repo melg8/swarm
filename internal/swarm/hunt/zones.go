@@ -460,10 +460,13 @@ func (l *Loop) noteZoneDeath() {
 // noteZoneDanger counts one emergency logout against its zone: a ground that
 // keeps piling mobs is as hostile as one that keeps killing. The spot also
 // lands in the tracker danger ring, which the next session seeds back
-// (seedZoneDanger).
+// (seedZoneDanger), and demotes its hunting cell for the danger window.
 func (l *Loop) noteZoneDanger() {
     if x, y, _, ok := l.tracker.SelfPosition(); ok {
         l.tracker.NoteDangerSpot(x, y)
+        if l.cell != nil {
+            l.cell.noteDangerAt(x, y, l.now())
+        }
     }
     l.noteZoneRegression("pile up", "pile ups")
 }
@@ -511,9 +514,16 @@ const zoneDangerWindow = time.Hour
 // seedZoneDanger folds the emergency logout spots carried over from the
 // previous sessions into the fresh loop: the counters live in the loop instance
 // and an emergency logout ends its own loop, so without the seeding a too-hot
-// ground never reaches the limit.
+// ground never reaches the limit. In cell mode the spot demotes its cell for the
+// danger window instead (see cellDangerHeld).
 func (l *Loop) seedZoneDanger() {
     for _, spot := range l.tracker.DangerSpots(zoneDangerWindow) {
+        if l.cell != nil && l.cell.noteDangerAt(spot.X, spot.Y, spot.At) {
+            l.logf("Hunt: carrying over an emergency logout at %d %d "+
+                "into the cell challenge", spot.X, spot.Y)
+
+            continue
+        }
         for index := range l.zones {
             if !l.zones[index].ContainsPoint(spot.X, spot.Y) {
                 continue

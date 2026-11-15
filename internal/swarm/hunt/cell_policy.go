@@ -237,6 +237,14 @@ func (l *Loop) cellEvaluate(now time.Time) {
                         "(%.0fs ago)", level, cell.Name,
                         age.Seconds())
                     skip = ground
+                } else if hunter.cellDangerHeld(
+                    &hunter.metrics[ground], now) {
+                    // The pack that forced the emergency logout still holds
+                    // the spot: the fresh session farms elsewhere first.
+                    l.logger.Printf("Hunt: level %d: not resuming "+
+                        "the cell %s - the emergency logout still "+
+                        "stands", level, cell.Name)
+                    skip = ground
                 } else {
                     hunter.apply(l, ground, now)
                     l.logger.Printf("Hunt: level %d: resuming the "+
@@ -359,6 +367,15 @@ func (h *cellHunter) followGround(l *Loop, now time.Time) {
         h.followAt = now
         l.logger.Printf("Hunt: not following the standing ground "+
             "%s - the death regression stands", h.cells[ground].Name)
+
+        return
+    }
+    if h.cellDangerHeld(&h.metrics[ground], now) {
+        // The pack that forced the emergency logout still holds the spot:
+        // following the standing ground would walk straight back into it.
+        h.followAt = now
+        l.logger.Printf("Hunt: not following the standing ground "+
+            "%s - the emergency logout still stands", h.cells[ground].Name)
 
         return
     }

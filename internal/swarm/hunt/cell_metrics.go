@@ -50,6 +50,14 @@ const (
     // cellUnripeDiscount is the score fraction of a cell whose respawn window
     // has not passed since the hunter cleared it.
     cellUnripeDiscount = 0.25
+    // cellDangerPenalty discounts a ground an emergency logout fired on: the
+    // pack that drove the session out still holds the spot, so any alternative
+    // outranks it. The window matches the death regression.
+    cellDangerPenalty = 0.2
+    // cellDangerWindow is how long an emergency logout keeps its ground
+    // demoted: fifteen minutes reopen the spot, matching the death
+    // regression.
+    cellDangerWindow = cellDeathRegressionWindow
 )
 
 // cellMetric accumulates the session experience of one cell.
@@ -68,6 +76,9 @@ type cellMetric struct {
     deathCount int32
     // lastDeathAt paces the decay of the heat.
     lastDeathAt time.Time
+    // dangerAt is the last emergency logout on this ground: the picker demotes
+    // the cell for cellDangerWindow (see cellDangerHeld).
+    dangerAt time.Time
     // killX and killY track the EMA of the kill positions, the live mass
     // centroid: the walk-to-cell destination and the map view label.
     killX float64
@@ -151,9 +162,46 @@ func (h *cellHunter) cellScore(index int, now time.Time) float64 {
     proximity := h.cellProximity(cell)
     village := h.cellVillageDrag(cell)
     ripeness := h.ripenessFactor(index, now)
+    danger := h.cellDangerFactor(metric, now)
     occupancy := float64(1 + h.hub.occupancy(cell.ID))
 
-    return value * safety * proximity * village * ripeness / occupancy
+    return value * safety * proximity * village * ripeness * danger / occupancy
+}
+
+// cellDangerFactor discounts a ground an emergency logout fired on: the pack
+// that drove the session out still holds the spot, so the next session farms
+// anywhere else first (the observed storms repeated the same ground within a
+// minute). The factor lapses after cellDangerWindow.
+func (h *cellHunter) cellDangerFactor(
+    metric *cellMetric, now time.Time,
+) float64 {
+    if h.cellDangerHeld(metric, now) {
+        return cellDangerPenalty
+    }
+
+    return 1.0
+}
+
+// cellDangerHeld reports whether the ground carries a fresh emergency logout.
+func (h *cellHunter) cellDangerHeld(
+    metric *cellMetric, now time.Time,
+) bool {
+    return !metric.dangerAt.IsZero() && now.Sub(metric.dangerAt) < cellDangerWindow
+}
+
+// noteDangerAt marks the ground holding the spot as dangerous and reports
+// whether a cell owns it; the picker demotes and the resume refuses it.
+func (h *cellHunter) noteDangerAt(x int32, y int32, at time.Time) bool {
+    for index := range h.leashes {
+        if !h.leashes[index].Contains(x, y) {
+            continue
+        }
+        h.metrics[index].dangerAt = at
+
+        return true
+    }
+
+    return false
 }
 
 // cellValue returns the income value: the measured rate once the ground earned
