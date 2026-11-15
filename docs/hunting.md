@@ -73,7 +73,13 @@ would have paid for.
   stretch and executes the pickup (StopMove to self, GetItem broadcast,
   InventoryUpdate), the walk keeps the approach smooth on the map.
   Failed pickups (protected or unreachable items) are skipped for 30
-  seconds after a 20 second attempt. The click is re-sent once per
+  seconds after a 20 second attempt, and a drop whose pickup the server
+  answers with `ActionFailed` is skipped at once: the answer that lands
+  within 2 seconds of the request (`pickupRefusalWindow`) belongs to
+  the pickup (the drop left the ground to a fleet mate or its
+  protection refuses the character), so retrying it only herds the
+  refusal storm - 57 percent of the observed refusals answered a
+  request sent right after a kill. The click is re-sent once per
   second until the `GetItem` confirms, so the request count runs above
   the confirmation count without a loss: run4 sent 1123 requests for
   the 1053 drops it saw, 953 were confirmed and 25 were removed by the
@@ -146,7 +152,11 @@ would have paid for.
   `stagnationPositionWindow` (10 min) logs one explicit event per
   window (`Hunt: stagnation: no experience change ...` / `Hunt:
   stagnation: position held ... at X Y Z`), carrying the loop phase so
-  the log explains what the state machine was doing while frozen. The
+  the log explains what the state machine was doing while frozen, and
+  follows it with `Hunt: stagnation dump: ...` - the phase, the target
+  and its age, the empty search, the pending loot, the trip and the
+  waypoints left, the last decision line, the vitals, the attackers and
+  the purse - so a stuck bot report needs no live repro. The
   lines route through `Loop.logf` (console, tracker event log, the
   web UI log tab) and the stall ages ride the state dump diagnostics
   (`xpStallForMs`, `positionStallForMs`). The windows re-arm after
@@ -175,9 +185,15 @@ An event logs one line per window with the current loop phase (the console,
 the web UI event feed and the state dump all mirror the loop logger), lands
 in the tracker action note and in the session journal (`Stall`), and
 re-arms only its own window, so a frozen character logs its stall every
-window instead of every 250 ms tick. The baselines reset on the offline
-gaps (a supervisor relogin is not a livelock) and on the manual only
-sessions (an interactive character may stand still).
+window instead of every 250 ms tick. The event carries a second line,
+`Hunt: stagnation dump: ...`: the phase, the held target and its age, the
+empty search and the pending loot, the running trip and the waypoints
+left, the last decision line and its age, the HP/MP, the attacker count,
+the adena and the experience - the state a stuck bot report needs, so the
+fix never depends on reproducing the live session (the dump-state-repro
+skill). The baselines reset on the offline gaps (a supervisor relogin is
+not a livelock) and on the manual only sessions (an interactive character
+may stand still).
 
 The escalation rides the same watch: the first position stall clears the
 frozen loop state in place (the soft reset - the target skip for the frozen
@@ -1304,7 +1320,12 @@ shot are looted at the corpse - the bot approaches and picks up the
 drops and the adena, never leaves them on the ground. The economy of
 the spot era carries over (the measured income, the death heat, the
 occupancy division of the fleet, the white-green window, the respawn
-overlay with the corpse camping); the recurring village trip enters
+overlay with the corpse camping); an emergency logout demotes its ground
+for the 15 minute danger window (`cellDangerPenalty`, the same window as
+the death regression), so the fresh session farms an alternative instead
+of walking back into the pack that forced the logout - the observed
+storms logged three logouts within a minute on the same ground; the
+recurring village trip enters
 the score as `cellVillageDrag` (the dwell of one filled bag over the
 dwell plus the village round trip, anchored at the region guide), so
 a far ground pays its distance at every fill while the live
@@ -1523,9 +1544,13 @@ The short form:
   the walk, the sell and the recovery files of the same package hold
   the rest) trigger when the
   inventory passes 50% of the slots or 50% of the maximum weight. A
-  trip start never interrupts a fight: `fightBusy` (a living target, a
-  pending loot pickup or an incoming hit) holds it until the
-  between-fights window, and a resting character is stood up first
+  trip start waits a fight out: `maybeStartTownTrip` refuses while a
+  living target is held or the character is under attack, and
+  `fightBusy` (the same live target, a pending loot pickup or an
+  incoming hit) holds the start until the between-fights window - the
+  observed night run lost two of its three deaths on a trip start under
+  a mob, so the walk never drops a live target on the character's tail
+  any more. A resting character is stood up first
   (the server refuses move requests while sitting; the stand toggle
   shares the pending transition gate with the rest logic).
 - **The weapon leads every trip that buys one** (the 2026-09-11
@@ -1580,35 +1605,32 @@ The short form:
   sets follow the region (`merchantsForRegion`): the elven default
   and the Dion set for the 20-25 band, the same set the region shop
   catalog builds from.
-- **The Newbie Guide buff run** (the 2026-09-21 guide priority
-  round): the support magic of the village guide (template 7599, the
+- **The Newbie Guide support magic rides an ordinary trip** (the
+  2026-11-15 measured round): the village guide (template 7599, the
   8-24 level band, the two dialog links - see `hunt/guide_buffs.go`)
-  is a trip reason of its own (`guideRunWanted`: the region carries a
-  guide AND `guideWanted` - the level band, no refusal cooldown, an
-  eligible buff missing). The run joins the weapon run as the second
-  trip start that may fire OUTSIDE the hunting zone: the village
-  revive of a death wipes every buff and lands next to the guide, so
-  the recovered character takes the support magic first and the trip
-  return segment walks the preserved farm spot second (`resetTownTrip`
-  keeps `farmX/Y/Z`; the guide run skips the out-of-zone
-  `rememberFarmSpot` zone-center overwrite). In zone, the expired
-  support magic starts the refill trip at the next between-fights
-  window - the bot never keeps farming unbuffed while the guide is
-  reachable. The trip machinery is shared: the ordinary sell stop
-  leads (the junk sells), the guide stop plans behind the learning
-  stops (`planGuideStop`), the refusal cooldown of a refused gate
-  keeps the later trips away for 10 minutes. The support magic is
-  keyed by the character level: the buff windows widen and narrow
-  across the 8-24 band and the 16..19 band also carries the Life
-  Cubic (skill 67), so the deleveling never aims below 16 once the
-  character reached it (see the deleveling section). The keep-one
-  scroll line of the shopping plan stays out of the trip justification
-  total (`shoppingWanted` skips the scroll): a scroll-only plan
-  never clears the trip minimum, the stock rides the natural trip
-  cadence and restores itself on the same trip that spends it.
-  Regions without a mapped guide (Dion today) neither start the run
-  nor plan the stop (`guideForRegion`) - a wrong guide would walk
-  the Dion trips to the elven village across the whole map.
+  grants the level 1 support magic, and the server pushes it away after
+  a while, but a dedicated walk for it costs the farm more than it
+  returns: 76 of 81 trips of the observed run started from the farm at
+  a median 289 seconds dead time (6.4 of 23.8 bot-hours), and a paired
+  44 cycle comparison read 225 kills per hour with and without the
+  buffs. No trigger starts a trip for the guide any more; the sell trip
+  the full inventory already started appends the guide stop behind the
+  learning stops (`planGuideStop`) when `guideWanted` holds (the level
+  band, no refusal cooldown, an eligible buff missing), so one town
+  visit sells, buys, learns and picks up the buffs. The stop walks the
+  same npc segment as the teacher, the refusal cooldown of a refused
+  gate keeps the later trips away for 10 minutes, and regions without a
+  mapped guide (Dion today) never plan the stop (`guideForRegion`) - a
+  wrong guide would walk the Dion trips to the elven village across the
+  whole map. The support magic is keyed by the character level: the
+  buff windows widen and narrow across the 8-24 band and the 16..19
+  band also carries the Life Cubic (skill 67), so the deleveling never
+  aims below 16 once the character reached it (see the deleveling
+  section). The keep-one scroll line of the shopping plan stays out of
+  the trip justification total (`shoppingWanted` skips the scroll): a
+  scroll-only plan never clears the trip minimum, the stock rides the
+  natural trip cadence and restores itself on the same trip that spends
+  it.
 - **One town visit buys everything** (the 2026-09-12 acceptance
   round): the gear stops distribute first (`planShoppingStops`), the
   learn stops close the trip behind them (`planLearnStops` at the
@@ -2403,11 +2425,12 @@ to retaliate against (internal/swarm/state SelfLandedHit feeds the
 distinction). The whole deleveling is bounded by a 60 min timeout and
 a 1 min cooldown after it ends. The phase end starts in the village:
 the finish and the abort both hand the walk back to the trip engine
-(`endDelevelWalk`), and when the support magic is wanted the refill
-trip starts first - the guard deaths cleared the buffs and the revive
-landed next to the guide, so the plain walk home only added the
-village round trip (all 37 measured finishes paid it). The refill
-trip keeps the preserved farm spot as its return target. The
+(`startDelevelReturnSegment`) - a plain segment route home from the
+guard post, which the 9900 unit move limit accepts while a raw engage
+walk does not. The dedicated guide refill at the finish is gone with
+the rest of the dedicated guide trips (the support magic rides the next
+sell trip instead, see the shop strategy section), so the character
+farms unbuffed for at most one bag fill. The
 walk segments are split into at most 1000 unit steps because the server
 refuses move requests with a target farther than 9900 units
 (MoveToLocation readImpl); the smoothed geodata routes happily exceed

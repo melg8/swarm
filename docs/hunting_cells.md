@@ -128,11 +128,15 @@ port of the spot economy, the geometry replaced):
   cooldown - the sweep moves forward through the mesh, the two-ground
   ping-pong livelock of the 2026-09-13 session cannot return.
 - **The economy**: `cellScore = value x safety x proximity x village x
-  ripeness / (1 + occupancy)`. The value is the bootstrap prior
+  ripeness x danger / (1 + occupancy)`. The value is the bootstrap prior
   (window mass x respawn turnover x level-priced kills) until 5
   minutes of measured income replace it (a trusted zero stays zero);
   the safety folds the static aggressive share and the decayed death
-  heat (half-life 30 minutes, per cell); the proximity amortizes the
+  heat (half-life 30 minutes, per cell); the danger factor discounts a
+  ground an emergency logout fired on to a fifth for the 15 minute
+  danger window, so the fresh session - and the follow switch - farms
+  an alternative instead of walking back into the pack; the
+  proximity amortizes the
   one-time relocation over the 1200 second dwell the ground buys (a
   40000 unit walk keeps 0.79 of the score); the village drag prices
   the recurring round trip (the walk repeats at every bag fill, half

@@ -432,3 +432,57 @@ Dion 20-25 handover for a weapon above no-grade).
 
 Next step: restart the 3-bot fleet on the P0+P1 build and compare
 against this baseline (129566 adena, 110 deaths, -539959 experience).
+
+### 2026-11-15 12:00 UTC - run5: the town time is the lever, five fixes landed
+
+Run5 closed on the P0+P1 build (`runs/night-run5.log`, journal
+`logs/session-20261115-030925-33068.jsonl`, build `7e5e65e9`): 3978
+kills, 3 deaths, 359781 adena (45.5k per hour on the fleet, 15.2k per
+bot-hour), +1319926 experience, levels 17 to 19/20/20, 92 town trips
+(81 guide, 8 shop), 22 logouts and 16741 "Action failed" lines. The
+delevel loop and the deaths were gone (P0 worked); the town block took
+30 percent of the clock and the guide trips alone 6.4 of 23.8
+bot-hours.
+
+The four measurements behind the landed fixes:
+
+- A dedicated guide trip costs a median 289 seconds and 76 of the 81
+  trips started from the farm. The paired 44 cycle comparison on the
+  same bots read 225 kills per hour buffed and 225 unbuffed, so the
+  level 1 support magic buys no kill rate at this DPS (the guide band
+  ends at 24; the bots are 17 hours of farming away from it).
+- Two of the three deaths landed on a trip start under a mob.
+- 9506 of the 16741 refusals (57 percent) arrived right after a kill's
+  death broadcast: the corpse clicks and pickup retries were the
+  candidates, and the pickup side is now answered within 2 seconds.
+- Four emergency logout storms repeated the same ground within a
+  minute.
+
+Landed this round, each with its tests and its doc:
+
+- `23db197a` - the town trip start waits a live target and an attack
+  out, no trigger starts a dedicated guide trip (`planGuideStop` rides
+  the sell trip), the delevel finish and abort walk straight home.
+- `58b1e150` - the send path records the last request (opcode and
+  time), the ActionFailed log names it, a refused pickup skips its drop
+  at once, a dead target takes no strike and no attack request.
+- `01f0ebd9` - an emergency logout demotes its cell to a fifth for the
+  15 minute danger window; the picker, the resume handoff and the
+  follow switch all refuse it, and the tracker ring seeds it across the
+  session rebuild.
+- `0450f632` - every stagnation fire logs the whole frozen loop state
+  (target, loot, trip, waypoints, last action, vitals, purse), so the
+  next stuck report needs no live repro.
+
+Rejected after measurement: the ground tier at the current DPS (adena
+per minute nearly flat 5.6/4.8/5.1 across the tiers - the Dion
+handover only pays with a D-grade weapon), and any adena gap fix (the
+target window already floors at `level - 8`).
+
+Docs: `docs/hunting.md` (the trip start rule, the guide policy, the
+pickup refusal, the stagnation dump, the delevel phase end) and
+`docs/hunting_cells.md` (the danger factor of the score).
+
+Next step: restart the 3-bot fleet on this build and compare against
+the run5 baseline (359781 adena, 3 deaths, 92 trips, 45.5k adena per
+hour).
