@@ -73,7 +73,12 @@ would have paid for.
   stretch and executes the pickup (StopMove to self, GetItem broadcast,
   InventoryUpdate), the walk keeps the approach smooth on the map.
   Failed pickups (protected or unreachable items) are skipped for 30
-  seconds after a 20 second attempt.
+  seconds after a 20 second attempt. The click is re-sent once per
+  second until the `GetItem` confirms, so the request count runs above
+  the confirmation count without a loss: run4 sent 1123 requests for
+  the 1053 drops it saw, 953 were confirmed and 25 were removed by the
+  server after the bot left them (the rest are foreign drops and the
+  ones still lying at the last kill), and no pickup timed out.
 - **Cadence and rest**: the loop decides on a 250 ms cadence, chains
   the next target immediately while the character HP is at or above 60
   percent (rate limited to one player action per second for the flood
@@ -2347,9 +2352,9 @@ and the experience has no gap scale of its own. A ground the picker
 can leave upwards never triggers either - a relocation costs one walk,
 a delevel costs the walk plus the death and the experience it removes
 (`delevelHasHigherGround`). The measured night run paid this gap at
-trigger 7: 62 of its 66 deaths were guard deaths inside the full adena
-band, the fleet lost 189342 experience over 2.6 hours and one bot
-dropped two levels.
+trigger 7: 110 deaths in 3.4 hours, 109 of them in the delevel phase,
+**-539959 experience** (one bot fell 19 -> 17) against 38560 adena an
+hour on the fleet.
 
 The guide floor caps the descent for the characters that reached the
 support magic window: the Newbie Guide grants its buffs by level, and
@@ -2369,7 +2374,7 @@ The drop floor (`delevelDropMin`, 2 levels) keeps the walk worth its
 deaths: the target must sit at least two levels under the character,
 or the farm climbs back over the trigger within the hour and the next
 cycle repeats. The measured night run cycled one bot between 17 and 16
-twelve times (a third of its death count) before the floor.
+twelve times before the floor.
 
 The level gap rules of the drop calculation
 (`NpcTemplate.calculateGroupDrops`) set the farming window: item drops

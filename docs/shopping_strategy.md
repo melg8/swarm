@@ -31,6 +31,12 @@ source):
   - **Creamees** (7149, list 3014900): jewels - the mDef ladder from
     Magic Ring 7 / 33 up to Necklace of Wisdom 25 / 11.9k - and the
     spellbooks of the class lessons (list 3014901).
+- **No soulshots**: the datapack carries item 1835
+  (`SoulShots.java` exists) but no merchant sells it - buylist
+  `0009938.xml` has no `<npcs>` block, the priced
+  `custom/00099380.xml` is referenced by no spawn, and no mob drop
+  table lists 1835 - so the hunt runs shotless and a shot cost never
+  enters the income.
 - The income of the elven lands: a level 1-4 keltir drops 7-11 adena
   and the occasional item; the level 5-7 goblins and kaboo orcs drop
   roughly double. The bot also sells every gear drop at reference/2,

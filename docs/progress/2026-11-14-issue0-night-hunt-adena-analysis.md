@@ -282,7 +282,8 @@ the strike now waits for the bar to fit its own damage.
 ### 2026-11-15 02:50 UTC - run4 diagnosis and the delevel trigger fix
 
 Run4 (`runs/night-run4.log`, journal
-`logs/session-20261114-234636-16708.jsonl`, 2.86 h, 3 bots) measured
+`logs/session-20261114-234636-16708.jsonl`; the figures below are the
+2.86 h mid-run snapshot, the closed run is in the 03:15 entry) measured
 39503 adena per hour on the fleet (13.2k per bot) with 1430 kills and
 66 deaths, and the fleet **lost** 189342 experience (test3 dropped two
 levels). 62 of the 66 deaths were guard deaths of the deleveling: the
@@ -395,3 +396,39 @@ Tests: `TestCellProximityAmortizesTheRelocation`,
 `TestCellWindowCountsTheEngageCeiling`, and `TestCellWindowHelpers`
 now pins the above-level band and the window level. Docs:
 `docs/hunting_cells.md` (the economy formula and the window).
+
+### 2026-11-15 03:15 UTC - run4 closed: the loot loss is small, the shot lever is dead
+
+Run4 was stopped (force kill of the bot tree, the journal tail parsed)
+so the baseline is a closed dataset. Final figures over 3.36 h: 1585
+kills, **110 deaths of which 109 fired in the delevel phase**, adena
+income 129566 (38560 per hour on the fleet, 12.9k per bot), and
+**-539959 experience** with test3 falling 19 -> 17. Fleet time shares
+from the 402 samples per bot: engage 57 percent, town
+walk/return/sell 28 percent, delevel 11 percent, loot 5 percent.
+
+P2 corrected by measurement - the earlier "76 of 883 drops never
+picked, 6-7 percent" was a counting artifact. The loot loop re-sends
+the pickup click once per `selectPeriod` (1 s) until the `GetItem`
+confirms, so a request count above the confirmation count is the retry
+window, not a loss. Per bot: test1 381 drops / 433 requests / 361
+confirmed / 7 server removals, test2 341/362/314/8, test3
+331/328/278/10. The only real loss is the server removal of a ground
+item (`object removed: Adena`): 25 events fleet-wide, 2.4 percent of
+the 1053 drop events, about 2.5 percent of the income. The bounded
+retry path already exists (`pickupTimeout` 20 s, `pickupRetryDelay`
+30 s, `itemSkip`) and never fired in 3.4 h - zero "timed out,
+skipping" lines - so the abandoned drops are items the bot walked away
+from, not failed pickups. No loot code changes this round.
+
+P3 closed - **C1 sells no soulshots in this datapack**. Item 1835
+exists (`dist/game/data/stats/items/1835.xml`, `SoulShots.java`), but:
+buylist `0009938.xml` (the one the generated catalog carries at price
+0) has no `<npcs>` block, `custom/00099380.xml` (price 7) is referenced
+by no npc spawn, no `stats/npcs/*.xml` template sells 1835, and no mob
+drop table lists it. The shot lever needs a source the server does not
+provide, so the hunt stays shotless; the ranked plan turns to P4 (the
+Dion 20-25 handover for a weapon above no-grade).
+
+Next step: restart the 3-bot fleet on the P0+P1 build and compare
+against this baseline (129566 adena, 110 deaths, -539959 experience).
