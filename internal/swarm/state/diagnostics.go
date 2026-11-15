@@ -176,6 +176,15 @@ func (b *Bot) NoteLastAction(message string) {
     b.huntLastActionAt = b.now()
 }
 
+// HuntLastAction returns the last decision line of the loop with its age: the
+// stagnation dump names what the frozen loop did before it stopped.
+func (b *Bot) HuntLastAction() (string, time.Time) {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.huntLastAction, b.huntLastActionAt
+}
+
 func (b *Bot) SetHuntErrand(errand HuntErrand) {
     b.mu.Lock()
     defer b.mu.Unlock()

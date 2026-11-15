@@ -65,6 +65,7 @@ func (l *Loop) observeStagnationXP(now time.Time) {
     l.stagXPFires++
     l.logf("Hunt: stagnation: no experience change for %s, "+
         "exp %d held, phase %s", held.Round(time.Minute), xp, l.phase)
+    l.stagnationDump(now)
     if l.journal != nil {
         l.journal.Stall(l.tracker.ID(), "xp", held, 0, 0, string(l.phase))
     }
@@ -100,6 +101,7 @@ func (l *Loop) observeStagnationPosition(now time.Time) {
     l.stagPosFires++
     l.logf("Hunt: stagnation: position held %s at %d %d %d, phase %s",
         held.Round(time.Minute), x, y, z, l.phase)
+    l.stagnationDump(now)
     if l.journal != nil {
         l.journal.Stall(l.tracker.ID(), "pos", held, x, y, string(l.phase))
     }
@@ -113,6 +115,45 @@ func (l *Loop) observeStagnationPosition(now time.Time) {
     }
     l.stagnationHardRecover("position held "+held.Round(time.Minute).String()+
         " at "+strconv.Itoa(int(x))+" "+strconv.Itoa(int(y)), now)
+}
+
+// stagnationDump logs the frozen loop state at a stagnation fire: the phase,
+// the held target and its age, the empty search and the pending loot, the trip
+// and the walk progress, the last decision line, the vitals and the purse. The
+// report must carry the whole picture, so the fix needs no live repro (the
+// dump-state-repro skill).
+func (l *Loop) stagnationDump(now time.Time) {
+    targetAge := "no clock"
+    if !l.engageAt.IsZero() {
+        targetAge = now.Sub(l.engageAt).Round(time.Second).String()
+    }
+    noTargetAge := "not waiting"
+    if !l.noTargetSince.IsZero() {
+        noTargetAge = now.Sub(l.noTargetSince).Round(time.Second).String()
+    }
+    loot := "none"
+    if l.lootID != 0 {
+        loot = strconv.Itoa(int(l.lootID)) + " for " +
+            now.Sub(l.lootAt).Round(time.Second).String()
+    }
+    trip := "no trip"
+    if l.tripActive() && !l.tripStart.IsZero() {
+        trip = now.Sub(l.tripStart).Round(time.Second).String()
+    }
+    action, actionAt := l.tracker.HuntLastAction()
+    actionAge := "never"
+    if !actionAt.IsZero() {
+        actionAge = now.Sub(actionAt).Round(time.Second).String()
+    }
+    stats := l.tracker.InventoryStats()
+    l.logf("Hunt: stagnation dump: phase %s, target %d for %s, "+
+        "no target for %s, loot %s, trip %s, waypoints %d, "+
+        "last action %q %s ago, hp %.0f%%, mp %.0f%%, attackers %d, "+
+        "adena %d, exp %d",
+        l.phase, l.target, targetAge, noTargetAge, loot, trip,
+        l.remainingWaypoints(), action, actionAge,
+        l.tracker.SelfHealthPercent(), l.tracker.SelfManaPercent(),
+        l.tracker.SelfAttackerCount(), stats.Adena, l.tracker.SelfExp())
 }
 
 // stagnationSoftReset clears the frozen loop state of the first position stall

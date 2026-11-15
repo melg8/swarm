@@ -74,6 +74,8 @@ func TestStagnationXPFiresAfterWindow(t *testing.T) {
     require.Contains(t, lines, "stagnation: no experience change")
     require.Contains(t, lines, "21m0s")
     require.Contains(t, lines, "phase engage")
+    require.Contains(t, lines, "stagnation dump",
+        "the xp fire carries the loop dump too")
 
     // The window re-armed: an immediate repeat observation logs
     // nothing until the next full window passes.
@@ -323,6 +325,35 @@ func TestStagnationPositionSecondFireRebuildsSession(t *testing.T) {
     loop.observeStagnation(time.Now())
     require.Equal(t, 1, game.logouts, "the surviving freeze rebuilds")
     require.True(t, loop.logoutDone)
+}
+
+// TestStagnationDumpNamesTheFrozenState: every stagnation fire carries the whole
+// loop picture - the phase, the target and its age, the pending loot, the trip,
+// the waypoints, the last decision line, the vitals and the purse - so a stuck
+// bot report needs no live repro (the dump-state-repro skill).
+func TestStagnationDumpNamesTheFrozenState(t *testing.T) {
+    bot := stagnationBot()
+    loop, sink := newStagnationLoop(bot, &fakeGame{})
+    loop.phase = phaseLoot
+    loop.target = 7
+    loop.engageAt = time.Now().Add(-2 * time.Minute)
+    loop.lootID = 77
+    loop.lootAt = time.Now()
+    armStagnationPosition(loop, bot)
+
+    loop.observeStagnation(time.Now())
+
+    dump := sink.String()
+    require.Contains(t, dump, "stagnation dump: phase loot")
+    require.Contains(t, dump, "target 7 for 2m")
+    require.Contains(t, dump, "loot 77 for")
+    require.Contains(t, dump, "waypoints 0")
+    require.Contains(t, dump, "hp 90%")
+    require.Contains(t, dump, "mp 50%")
+    require.Contains(t, dump, "attackers 0")
+    require.Contains(t, dump, "adena 0")
+    require.Contains(t, dump, "exp 1000")
+    require.Contains(t, dump, "last action")
 }
 
 // TestStagnationMovementResetsEscalation: a character that moves
