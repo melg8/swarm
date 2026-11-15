@@ -27,11 +27,6 @@ const (
     // mobs: a kill every five seconds including the pull walk; sparse grounds
     // stay below.
     cellKillCapacity = 12.0
-    // cellAdenaBase and cellAdenaPerLevel price one kill of the prior: the C1
-    // elven drop curve rises with the mob level, the measured rate replaces it
-    // once loot flows.
-    cellAdenaBase     = 18.0
-    cellAdenaPerLevel = 6.5
     // cellAggroPenalty discounts a heavy aggressive ground (the aggressive
     // share of the mass pays this fraction).
     cellAggroPenalty = 0.35
@@ -205,33 +200,28 @@ func (h *cellHunter) noteDangerAt(x int32, y int32, at time.Time) bool {
 }
 
 // cellValue returns the income value: the measured rate once the ground earned
-// the trust horizon, the prior before that. The prior models the kills per
-// minute as the smaller of the window supply turnover (window mass / respawn
-// window) and the solo kill capacity, priced by the mob level. A trusted rate
-// is the honest income of this character on this ground, the zero included: a
+// the trust horizon, the prior before that. The prior prices one kill by the
+// ground economy - the mean adena of the window after the level gap scale and
+// the kill rate the fight plus the loot and risk overhead sustain at the
+// measured damage rate - so a higher band pays only for its longer fight. The
+// flat capacity bounds a ground before the meter warmed up. A trusted rate is
+// the honest income of this character on this ground, the zero included: a
 // starved ground must not promise its prior forever.
 func (h *cellHunter) cellValue(cell *Cell, metric *cellMetric) float64 {
     if metric.trusted() {
         return metric.adenaPerMin()
     }
-    windowMass := cellWindowMass(*cell, h.level)
-    if windowMass <= 0 {
+    economy, ok := cellWindowEconomy(*cell, h.level)
+    if !ok {
         return 0
     }
     respawnMid := float64(cell.RespawnMin+cell.RespawnMax) / 2.0
     if respawnMid < 1 {
         respawnMid = 1
     }
-    supply := windowMass * 60.0 / respawnMid
-    killsPerMin := math.Min(supply, cellKillCapacity)
-    // The count weighted window level prices the kills.
-    windowLevel := cellWindowLevel(*cell, h.level)
-    if windowLevel <= 0 {
-        return 0
-    }
-    adenaPerKill := cellAdenaBase + cellAdenaPerLevel*windowLevel
+    supply := economy.mass * 60.0 / respawnMid
 
-    return killsPerMin * adenaPerKill
+    return math.Min(supply, groundKillCapacity(economy)) * economy.adena
 }
 
 // cellSafety returns the safety multiplier: the static aggressive share

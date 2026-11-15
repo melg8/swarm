@@ -128,9 +128,11 @@ func (l *Loop) adoptServerTarget(now time.Time, manaHeld bool) bool {
         l.target = serverTarget
     }
     if l.target != 0 && !l.tracker.ObjectAlive(l.target) {
+        fight := l.fightDuration(l.target, now)
         if l.cell != nil {
             l.cellNoteKill(l.target, now)
         }
+        l.noteCellCombat(fight)
         l.noteKillPosition(l.target, now)
         l.journalKill(l.target, now)
         l.resetFightClock()

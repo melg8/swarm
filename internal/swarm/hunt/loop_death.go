@@ -9,6 +9,17 @@ import (
     "time"
 )
 
+// fightDuration returns the seconds the current fight of the object has run,
+// zero when the loop holds no live fight clock for it.
+func (l *Loop) fightDuration(objectID int32, now time.Time) float64 {
+    if l.fightStartFor != objectID || l.fightStartAt.IsZero() ||
+        !now.After(l.fightStartAt) {
+        return 0
+    }
+
+    return now.Sub(l.fightStartAt).Seconds()
+}
+
 // journalKill emits the structured kill record: the fight duration
 // and the health the character ended with ride along for the combat
 // efficiency aggregates of the session report.
@@ -18,11 +29,7 @@ func (l *Loop) journalKill(objectID int32, now time.Time) {
     }
     mob := l.tracker.ObjectName(objectID)
     mobLevel, _ := l.tracker.ObjectLevel(objectID)
-    fight := 0.0
-    if l.fightStartFor == objectID && !l.fightStartAt.IsZero() &&
-        now.After(l.fightStartAt) {
-        fight = now.Sub(l.fightStartAt).Seconds()
-    }
+    fight := l.fightDuration(objectID, now)
     var x, y int32
     if selfX, selfY, _, ok := l.tracker.SelfPosition(); ok {
         x, y = selfX, selfY

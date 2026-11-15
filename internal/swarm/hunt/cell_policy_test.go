@@ -55,13 +55,14 @@ func homeMobs() []CellMob {
     }
 }
 
-// richMobs are the wolves of the neighbor cell: the same window,
-// the double mass.
+// richMobs are the wolves and goblin scouts of the neighbor cell: the same
+// window, the double mass (the real templates of the elven levels six and
+// eight, so the ground economy prices their hp and adena).
 func richMobs() []CellMob {
     return []CellMob{
-        {TemplateID: 20014, Name: "Gray Wolf", Level: 6, Count: 8,
+        {TemplateID: 20525, Name: "Gray Wolf", Level: 6, Count: 8,
             RespawnMin: 15, RespawnMax: 20},
-        {TemplateID: 20017, Name: "Elder Wolf", Level: 8, Count: 4,
+        {TemplateID: 20326, Name: "Goblin Scout", Level: 8, Count: 4,
             RespawnMin: 15, RespawnMax: 20},
     }
 }
@@ -70,7 +71,7 @@ func richMobs() []CellMob {
 // of the starved sweep, never the economic winner.
 func poorMobs() []CellMob {
     return []CellMob{
-        {TemplateID: 20014, Name: "Gray Wolf", Level: 6, Count: 2,
+        {TemplateID: 20525, Name: "Gray Wolf", Level: 6, Count: 2,
             RespawnMin: 15, RespawnMax: 20},
     }
 }
@@ -89,6 +90,11 @@ func testCells() []Cell {
         quadCell("test-far", "Far Wolves", 46112, 46500, 900,
             []int32{1}, poorMobs()),
     }
+    // The far ground respawns slowly: it is the sparse escape valve of
+    // the starved sweep, never the economic winner while a ripe neighbor
+    // exists (the ground economy prices the supply at the window).
+    cells[2].RespawnMin = 35
+    cells[2].RespawnMax = 45
     for index := range cells {
         mass := 0.0
         for mob := range cells[index].Mobs {
@@ -574,7 +580,7 @@ func TestCellViewPublishesKillMarksWithoutPick(t *testing.T) {
 func TestCellMobRespawnLookup(t *testing.T) {
     cells := testCells()
     rmin, rmax, found := cellMobRespawn(cells,
-        npcdata.NPCWireTemplateID(20014))
+        npcdata.NPCWireTemplateID(20525))
 
     require.True(t, found)
     require.Equal(t, int32(15), rmin)
@@ -616,7 +622,7 @@ func TestCellMobPrioritiesBiasWindow(t *testing.T) {
     priorities := cellMobPriorities(cells[0], 6)
     require.Equal(t, int32(3), priorities[npcdata.NPCWireTemplateID(20534)])
     priorities = cellMobPriorities(cells[1], 6)
-    require.Equal(t, int32(2), priorities[npcdata.NPCWireTemplateID(20014)])
+    require.Equal(t, int32(2), priorities[npcdata.NPCWireTemplateID(20525)])
     // A level 13 character: the home ground falls out of every
     // window (the floor is 5) - no priority at all.
     require.Empty(t, cellMobPriorities(cells[0], 13))
@@ -734,7 +740,7 @@ func TestCellKillAttributesToTheGroundOfTheCorpse(t *testing.T) {
     bot := loop.tracker
     now := time.Now()
     bot.ApplyNpcInfo(state.NpcInfo{
-        ObjectID: 300, TemplateID: npcdata.NPCWireTemplateID(20014),
+        ObjectID: 300, TemplateID: npcdata.NPCWireTemplateID(20525),
         Attackable: true, X: 47712, Y: 41500, Name: "Neighbor Wolf",
     })
     loop.cellNoteKill(300, now)

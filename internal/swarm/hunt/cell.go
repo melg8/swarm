@@ -39,12 +39,12 @@ func cellDistance(cell Cell, x int32, y int32) float64 {
 }
 
 // cellWindowBounds returns the income window of a ground at the given level:
-// the mobs that pay the full adena drop below and that the engage accepts
-// above (cellMaxLevelSlack). The server penalizes neither the adena nor the
-// experience of a mob above the character level, so a ground that holds the
-// next band up is not a worse ground.
+// the mobs that pay the full adena drop below (adenaFullLevelGap) and that the
+// engage accepts above (cellMaxLevelSlack). The server penalizes neither the
+// adena nor the experience of a mob above the character level, so a ground
+// that holds the next band up is not a worse ground.
 func cellWindowBounds(level int32) (int32, int32) {
-    low := level - 5
+    low := level - adenaFullLevelGap
     if low < 1 {
         low = 1
     }
