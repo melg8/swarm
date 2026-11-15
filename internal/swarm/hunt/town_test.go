@@ -702,12 +702,11 @@ func TestTripStuckWalkRepaths(t *testing.T) {
             "waypoint plan")
 }
 
-// TestTripStartsThroughTheMidFightTarget pins the travel target reset
-// of the trip start: the bag crossing the trip threshold mid-fight
-// drops the merely held target (the trip owns the way, the owner rule
-// of 2026-09-21) instead of waiting the fight out. The loot of a kill
-// and the blows landing still hold the start (see
-// TestTripStartWaitsForLootAndBlows).
+// TestTripStartsThroughTheMidFightTarget pins the trip start hold of the
+// travel reset rule: the bag crossing the trip threshold mid-fight waits the
+// fight out instead of dropping a live mob on the character's tail (two of
+// three deaths of an observed run landed on a trip start). The trip starts on
+// the tick after the fight ended.
 func TestTripStartsThroughTheMidFightTarget(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     spawnMob(bot)
@@ -717,13 +716,20 @@ func TestTripStartsThroughTheMidFightTarget(t *testing.T) {
     loop.target = 7
     bot.ApplySelfTarget(7)
 
-    // The bag crosses the trip threshold mid-fight: the trip starts
-    // and the held fight drops (the clear click rides only when the
-    // server confirmed the selection - the selection-less pick of
-    // this fixture clears nothing, see TestTripStartDropsHeldTarget).
+    // The bag crosses the trip threshold mid-fight: the fight holds
+    // the start, the vendor walk waits.
     fillInventory(bot)
     loop.tick()
-    require.Equal(t, phaseTownWalk, loop.phase)
+    require.Equal(t, phaseEngage, loop.phase, "the fight holds the trip")
+    require.Equal(t, int32(7), loop.target, "the live target stays")
+    require.Empty(t, game.walks, "the vendor walk waits")
+
+    // The fight ended: the server selection cleared and the loop dropped
+    // the target, so the trip starts.
+    bot.ApplySelfTarget(0)
+    loop.target = 0
+    loop.tick()
+    require.Equal(t, phaseTownWalk, loop.phase, "the trip starts")
     require.Zero(t, loop.target, "the trip owns the way")
     require.NotEmpty(t, game.walks, "the vendor walk goes out")
 }

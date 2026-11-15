@@ -28,20 +28,15 @@ func (l *Loop) tripActive() bool {
 }
 
 // tripCooldownOver reports whether a new town trip may start. The bare handed
-// weapon run, the armed gear debt and the guide refill retry on the short
-// weaponRunCooldown (45 s) instead of the five minute trip cooldown: punching
-// mobs or farming without the armor the merchant sold is the wound those runs
-// prevent.
+// weapon run and the armed gear debt retry on the short weaponRunCooldown (45 s)
+// instead of the five minute trip cooldown: punching mobs or farming without the
+// armor the merchant sold is the wound those runs prevent.
 func (l *Loop) tripCooldownOver() bool {
     if l.tripEndedAt.IsZero() {
         return true
     }
     cooldown := tripCooldown
-    if l.weaponlessRunWanted() || l.gearDebtRunWanted() ||
-        l.guideRunWanted() {
-        // The guide run shares the short window: the support magic lapses by
-        // the server push, and the landed buffs keep guideWanted false for 1200
-        // seconds.
+    if l.weaponlessRunWanted() || l.gearDebtRunWanted() {
         cooldown = weaponRunCooldown
     } else if l.tripAbortRun > tripAbortEscalateAfter {
         // The abort streak escalates: a trip failing for a reason no retry
@@ -77,27 +72,28 @@ func (l *Loop) maybeStartTownTrip() {
         l.now().Sub(l.tracker.SessionStartedAt()) < skillListWaitLimit {
         return
     }
+    // A fight owns the character: the walk drops the server selection and a mob
+    // still on the tail kills the walker (two of three deaths of an observed
+    // run landed on a trip start). The trip waits the fight out.
+    if l.target != 0 || l.tracker.SelfUnderAttack() {
+        return
+    }
     shopping := l.shoppingTripEnabled() && l.shoppingWanted()
     learning := l.learnTripWanted()
     // The weapon run outranks every other trip reason.
     weaponRun := l.weaponlessRunWanted()
-    // The guide run is the buff refill of the Newbie Guide. It rides the
-    // ordinary sell stop, the guide stop planning behind the learning ones.
-    guideRun := l.guideRunWanted()
     if l.navigator == nil || !l.tripCooldownOver() ||
-        (!l.inventoryFull() && !shopping && !learning &&
-            !weaponRun && !guideRun) {
+        (!l.inventoryFull() && !shopping && !learning && !weaponRun) {
         return
     }
-    // A bot outside the hunting zone returns first. The weapon and guide runs
-    // are the exceptions - a weapon walks first whatever the distance, and the
-    // village revive lands next to the guide; the learning stops stay inside
-    // the gate.
-    if !weaponRun && !guideRun && l.zone() != nil && !l.inZoneSelf() {
+    // A bot outside the hunting zone returns first. The weapon run is the
+    // exception - a weapon walks first whatever the distance; the learning
+    // stops stay inside the gate.
+    if !weaponRun && l.zone() != nil && !l.inZoneSelf() {
         return
     }
-    // The trip owns the way from here: a held engage target drops with its
-    // server selection, so the old fight never binds the replacing walk.
+    // The trip owns the way from here: a dead or stale held target drops with
+    // its server selection, so the old fight never binds the replacing walk.
     l.dropAttackTarget("the town trip owns the way")
     // The walk needs a standing character.
     if !l.standUpGuarded(l.now()) {
@@ -127,11 +123,8 @@ func (l *Loop) maybeStartTownTrip() {
         merchant = weaponMerchant
     }
     // The walk back target: the farm spot when the trip starts inside the
-    // hunting zone, the zone center otherwise. The guide run keeps the spot the
-    // death preserved (resetTownTrip).
-    if !guideRun || l.inZoneSelf() {
-        l.rememberFarmSpot()
-    }
+    // hunting zone, the zone center otherwise.
+    l.rememberFarmSpot()
     l.tripStart = l.now()
     l.sold = make(map[int32]bool)
     l.rePaths = 0
@@ -156,7 +149,7 @@ func (l *Loop) maybeStartTownTrip() {
     // weapon stop still runs first, so a stuck teacher never strands a
     // bare-handed character.
     l.phase = phaseTownWalk
-    reason := l.tripStartReason(shopping, learning, weaponRun, guideRun)
+    reason := l.tripStartReason(shopping, learning, weaponRun)
     // The trigger plan cache drops: the frozen trip plan owns the trip, the
     // cache only feeds the widget view between the recomputes.
     l.shoppingPlanCache = nil
@@ -189,10 +182,10 @@ func (l *Loop) maybeStartTownTrip() {
 
 // tripStartReason composes the journal and log reason of a starting trip: every
 // trigger names itself, and the combined trips chain the reasons in trigger
-// priority - the weapon first, then the learning and guide refills, the
-// inventory and shop plan.
+// priority - the weapon first, then the learning refill, the inventory and the
+// shop plan.
 func (l *Loop) tripStartReason(
-    shopping, learning, weaponRun, guideRun bool,
+    shopping, learning, weaponRun bool,
 ) string {
     stats := l.tracker.InventoryStats()
     reason := "inventory at " + strconv.Itoa(stats.Slots) + " slots and " +
@@ -217,15 +210,6 @@ func (l *Loop) tripStartReason(
             reason += ", " + lessonReason
         } else {
             reason = lessonReason
-        }
-    }
-    if guideRun {
-        // The buff refill names itself, like the weapon run above.
-        guideReason := "the support magic buffs wait at the Newbie Guide"
-        if l.inventoryFull() || shopping || learning || weaponRun {
-            reason += ", " + guideReason
-        } else {
-            reason = guideReason
         }
     }
     if l.gearDebtRunWanted() {

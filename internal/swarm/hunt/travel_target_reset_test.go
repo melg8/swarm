@@ -4,11 +4,11 @@
 
 package hunt
 
-// The travel target reset tests (the owner rule of 2026-09-21): the
-// tasks of walking to town and changing the route own the target
-// register - a merely held engage target drops with its server
-// selection when the trip or the rotation starts, while a real fight
-// (the loot, the blows landing) still holds the start.
+// The travel target reset tests (the owner rule of 2026-09-21): the tasks of
+// walking to town and changing the route own the target register - a route
+// change drops a held engage target with its server selection, while the town
+// trip start waits a fight out (two of three deaths of an observed run landed
+// on a trip start under a mob).
 
 import (
     "testing"
@@ -33,38 +33,33 @@ func holdMob(t *testing.T, loop *Loop, game *fakeGame, bot *state.Bot) {
     require.Zero(t, game.clears)
 }
 
-// TestTripStartDropsHeldTarget pins the trip start drop: a loop with
-// a full inventory and a held fight starts the trip on the next tick,
-// the drop clears the loop target and the server selection (the
-// engage re-adopt would resurrect the fight from the selection).
-func TestTripStartDropsHeldTarget(t *testing.T) {
+// TestTripStartWaitsOutAHeldTarget pins the trip start hold: a loop with a
+// full inventory and a live target keeps fighting, and the trip starts only
+// once the fight ended - the walk never drops a living mob on its tail.
+func TestTripStartWaitsOutAHeldTarget(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     fillInventory(bot)
     holdMob(t, loop, game, bot)
 
     loop.tick()
 
-    require.Equal(t, phaseTownWalk, loop.phase, "the trip starts")
-    require.Zero(t, loop.target, "the loop target drops")
-    require.Equal(t, 1, game.clears, "the server selection clears")
-    require.Empty(t, game.forces, "no attack rides the trip start")
+    require.Equal(t, phaseEngage, loop.phase, "the fight holds the trip")
+    require.Equal(t, int32(7), loop.target, "the live target stays")
+    require.Zero(t, game.clears, "no selection clears under a fight")
+    require.Empty(t, game.walks, "the trip walk never starts")
 
-    // The stale server answer of the dropped fight (the MyTargetSelected
-    // of the old attack request racing the clear click) must not pull
-    // the fight back while the trip owns the way: the trip phase gates
-    // the engage re-adopt.
-    bot.ApplySelfTarget(7)
+    // The fight ended: the target cleared server-side and the loop dropped
+    // it, so nothing binds the character any more.
+    bot.ApplySelfTarget(0)
+    loop.target = 0
     loop.tick()
 
-    require.Equal(t, phaseTownWalk, loop.phase, "the trip continues")
-    require.Zero(t, loop.target)
-    require.Empty(t, game.forces, "the trip walks on, no fight")
-    require.NotEmpty(t, game.walks, "the trip walk stays planned")
+    require.Equal(t, phaseTownWalk, loop.phase, "the trip starts")
+    require.NotEmpty(t, game.walks, "the trip walk planned")
 }
 
-// TestTripStartWaitsForLootAndBlows pins the real fight hold: the
-// loot phase and a character under attack still wait out the trip
-// start - only the merely held target drops.
+// TestTripStartWaitsForLootAndBlows pins the fight hold of the trip start:
+// the loot phase and a character under attack still wait the trip out.
 func TestTripStartWaitsForLootAndBlows(t *testing.T) {
     // The loot phase: the trip never starts over a pending pickup.
     // The loot handover ends the phase on its own when nothing lies

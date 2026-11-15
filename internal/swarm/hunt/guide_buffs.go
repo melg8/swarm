@@ -194,16 +194,11 @@ func (l *Loop) selfBuffSuperseded(skillID int32) bool {
     return false
 }
 
-// guideRunWanted reports whether the support magic is worth a dedicated town
-// trip: the region carries a guide and the stop is wanted. It is the second
-// trip reason that may start outside the hunting zone - the village revive of
-// a death lands next to the guide, and walking home through the aggressive
-// packs unbuffed wastes the death, so the buffs come first.
-func (l *Loop) guideRunWanted() bool {
-    _, ok := guideForRegion(l.zoneRegion)
-
-    return ok && l.guideWanted()
-}
+// The support magic rides an already running town trip: a dedicated walk to the
+// guide costs a median 289 seconds of farm time and the level 1 buffs change no
+// measurable kill rate (a paired 44 cycle comparison of an observed run read 225
+// kills per hour with and without them), so nothing but the trip trigger ever
+// starts a walk for it - planGuideStop appends the stop to a sell trip.
 
 // planGuideStop appends the guide stop behind the learning stops (the sell
 // phase calls it after planLearnStops), so one town visit sells, buys, learns

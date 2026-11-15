@@ -154,12 +154,11 @@ func TestDelevelSkipsTheSingleLevelDrop(t *testing.T) {
     require.Zero(t, loop.delevelTarget, "no target was announced")
 }
 
-// TestDelevelFinishRefillsTheGuideFirst pins the village errand of the
-// phase end: the guard deaths clear the support magic and the revive
-// lands next to the guide, so the refill trip starts instead of the farm
-// walk - the measured night run walked home and back to the village for
-// the refill on every finish.
-func TestDelevelFinishRefillsTheGuideFirst(t *testing.T) {
+// TestDelevelFinishWalksHomeWithoutTheGuide pins the phase end: the guard
+// deaths clear the support magic, but the dedicated refill trip is gone (the
+// measured 289 second walk bought no kill rate), so the finish walks straight
+// home from the guard post and the next sell trip may carry the guide stop.
+func TestDelevelFinishWalksHomeWithoutTheGuide(t *testing.T) {
     loop, _, bot, _ := newDelevelLoop(11)
     spawnZoneMobs(bot)
     setGuideLevel(bot, 9)
@@ -177,17 +176,16 @@ func TestDelevelFinishRefillsTheGuideFirst(t *testing.T) {
     loop.SetLogger(log.New(logBuf, "", 0))
 
     loop.tick()
-    require.Equal(t, phaseEngage, loop.phase,
-        "the finish keeps the character in the village")
-    require.Contains(t, logBuf.String(), "support magic",
-        "the log names the refill at the phase end")
+    require.Equal(t, phaseTownReturn, loop.phase,
+        "the finish starts the walk home")
+    require.Empty(t, loop.tripStops,
+        "no guide errand replaces the walk home")
+    require.Contains(t, logBuf.String(), "walking back to the farm spot")
 
     loop.tick()
-    require.Equal(t, phaseTownWalk, loop.phase,
-        "the refill trip starts on the next tick")
-    require.NotEmpty(t, loop.tripStops)
-    require.True(t, loop.tripStops[0].sell,
-        "the trip opens with the ordinary sell stop")
+    require.Equal(t, phaseTownReturn, loop.phase,
+        "the return segment keeps the phase")
+    require.Empty(t, loop.tripStops, "the trip stays off")
 }
 
 // TestDelevelFightsTheGuard verifies the fight stage: the walk ends at
@@ -388,11 +386,10 @@ func TestDelevelFightTimeoutSwitchesGuard(t *testing.T) {
     require.Equal(t, 2, loop.rePaths)
 
     // Both archer guards ignored the provocation: the deleveling ends in
-    // the village errand (the guide refill first, the farm walk behind it)
-    // instead of a direct engage walk from the guard post, which the 9900
-    // unit server move limit would refuse.
+    // the walk home from the guard post, which the 9900 unit server move
+    // limit accepts as a segment route instead of a raw engage walk.
     loop.tick()
-    require.Equal(t, phaseEngage, loop.phase,
+    require.Equal(t, phaseTownReturn, loop.phase,
         "the aborted delevel keeps the village as the walk start")
     require.False(t, loop.delevelCooldownOver())
 }
@@ -437,8 +434,8 @@ func TestDelevelAbortsOnFreeDeaths(t *testing.T) {
         }
     }
     loop.tick()
-    require.Equal(t, phaseEngage, loop.phase,
-        "the penalty-free deleveling ends in the village errand")
+    require.Equal(t, phaseTownReturn, loop.phase,
+        "the penalty-free deleveling ends in the walk home")
     require.False(t, loop.delevelCooldownOver(),
         "the long free death cooldown is armed")
     require.Equal(t, 3, game.restarts,
