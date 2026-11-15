@@ -5,6 +5,8 @@
 package hunt
 
 import (
+    "bytes"
+    "log"
     "testing"
     "time"
 
@@ -310,7 +312,7 @@ func TestCellStarvedCooldownBreaksTheLivelock(t *testing.T) {
 func TestCellDeathHeatRegresses(t *testing.T) {
     loop, _, hunter := pickedCellLoop(t)
     now := time.Now()
-    loop.cellNoteDeath(now)
+    loop.cellNoteDeath(now, "death")
     require.GreaterOrEqual(t, hunter.metrics[0].deaths, 1.0)
     // The death regression escapes the deadly neighborhood through
     // the global contest: the proximity discount still prefers the
@@ -835,10 +837,12 @@ func TestCellDangerSpotDemotesTheScore(t *testing.T) {
 }
 
 // TestCellDangerLogoutMarksTheRing pins the emergency logout accounting: the
-// spot lands in the tracker danger ring (the next session seeds it back) and
-// demotes the ground the character stood on.
+// spot lands in the tracker danger ring (the next session seeds it back),
+// demotes the ground the character stood on and logs the cause as a pile up.
 func TestCellDangerLogoutMarksTheRing(t *testing.T) {
     loop, _, hunter := pickedCellLoop(t)
+    sink := &bytes.Buffer{}
+    loop.SetLogger(log.New(sink, "", 0))
 
     loop.noteZoneDanger()
 
@@ -846,6 +850,10 @@ func TestCellDangerLogoutMarksTheRing(t *testing.T) {
         "the logout spot survives the session in the tracker ring")
     require.True(t, hunter.cellDangerHeld(&hunter.metrics[0], loop.now()),
         "the ground of the logout is demoted")
+    require.Contains(t, sink.String(), "pile up at the cell",
+        "the accounting names the pile up, not a death")
+    require.NotContains(t, sink.String(), "death at the cell",
+        "an emergency logout never reads as a death")
 }
 
 // TestCellResumeRefusesTheDangerSpot pins the relogin handoff gate: the fresh

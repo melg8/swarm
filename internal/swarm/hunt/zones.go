@@ -475,7 +475,7 @@ func (l *Loop) noteZoneDanger() {
 // count against their zone, and past the limit the ladder caps below its band.
 func (l *Loop) noteZoneRegression(kind string, kinds string) {
     if l.cell != nil {
-        l.cellNoteDeath(l.now())
+        l.cellNoteDeath(l.now(), kind)
 
         return
     }

@@ -784,9 +784,10 @@ func (l *Loop) deathRegression(
     return age, true
 }
 
-// cellNoteDeath counts a hunting death against the current cell: the
-// heat rises and the regression re-pick fires right away.
-func (l *Loop) cellNoteDeath(now time.Time) {
+// cellNoteDeath counts a hunting death or an emergency logout against the
+// current cell: the heat rises and the regression re-pick fires right away.
+// The kind names the cause in the log, so a pile up never reads as a death.
+func (l *Loop) cellNoteDeath(now time.Time, kind string) {
     h := l.cell
     if h == nil || h.picked < 0 {
         return
@@ -798,7 +799,7 @@ func (l *Loop) cellNoteDeath(now time.Time) {
     metric.lastDeathAt = now
     // The record survives the session: a fresh loop would resume the ground.
     l.tracker.SetDeathRegression(cell.ID)
-    l.logger.Printf("Hunt: death at the cell %s (heat %.1f)", cell.Name,
+    l.logger.Printf("Hunt: %s at the cell %s (heat %.1f)", kind, cell.Name,
         metric.deaths)
     // The fresh heat crushed the score: re-pick when any eligible
     // alternative now outranks the ground.
@@ -807,8 +808,8 @@ func (l *Loop) cellNoteDeath(now time.Time) {
     if best >= 0 && best != h.picked && bestScore > current {
         h.foldVisit(h.picked)
         h.apply(l, best, now)
-        l.logger.Printf("Hunt: regressing from %s to %s after the "+
-            "death", cell.Name, h.cells[best].Name)
+        l.logger.Printf("Hunt: regressing from %s to %s after the %s",
+            cell.Name, h.cells[best].Name, kind)
     }
     h.publishView(l, now)
 }
