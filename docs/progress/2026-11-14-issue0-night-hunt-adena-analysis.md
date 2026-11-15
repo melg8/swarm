@@ -660,3 +660,26 @@ constraint and the D-grade line is the separate M3 work.
 Next step: rebuild, restart the 3-bot fleet on this build, read the
 picks in the log (the level 15-17 band instead of Lirein 18/19) and
 A/B the journal with `tools/journal_stats.py` against run6.
+
+### 2026-11-16 03:05 UTC - the fixed build is live
+
+Run7 started 02:51 on `b2f1f99b` (fleet pid 33464,
+`runs/night-run7.log`, journal `session-20261116-025103-33464`), the
+stack untouched. The first ten minutes:
+
+- the three bots resumed level 23; the re-picks after the death and
+  the emergency logout landed on the level 16 grounds (Hook Spider
+  SW-1/SW-2, Pincer Spider SW-5) instead of the Lirein 18/19 band
+  run6 kept choosing - the intended shift; the held-ground hysteresis
+  (`cellSwitchMargin` 1.25) is above the modelled +12%, so a healthy
+  Lirein ground is not dropped for it and the gain accrues on the
+  next pick (death, logout, starvation, level up);
+- the zone return walk ended with "Hunt: zone return finished: a
+  target stands inside the zone" and the journal holds no trip-end
+  record - the accounting defect is closed live;
+- the live measured rate of the Pincer ground read 249 adena/min at
+  the first stops, the run6 Lirein rate was 165 (the model's 180 is
+  the conservative side).
+
+The A/B against run6 needs a few hours of run7; the journal is the
+record and `tools/journal_stats.py` reads it.
