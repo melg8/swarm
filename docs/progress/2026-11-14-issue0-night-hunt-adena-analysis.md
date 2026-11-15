@@ -551,3 +551,78 @@ yet, the run needs its hours.
 
 Next step: read both journals with the tool once the run6 window is
 long enough to compare.
+
+### 2026-11-15 18:40 UTC - run6 read: the ground climbed out of the gear tier
+
+The run6 journal (`session-20261115-122750-10868`, build `414234f5`,
+window 12:27-21:29, 9.02 h) against the run5 baseline reads:
+
+| metric | run5 | run6 |
+| --- | --- | --- |
+| kills | 4500 | 3022 (-33%) |
+| kills per hour (fleet) | 508 | 335 |
+| net purse | 398740 | 269199 (-32%) |
+| adena per hour (fleet) | 44971 | 29883 |
+| adena per bot-hour | 14990 | 9961 |
+| experience | 1474249 | 1348119 (-9%) |
+| experience per bot-hour | 55423 | 49884 |
+| level ups | 9 | 6 |
+| deaths | 4 | 4 |
+| town trips | 102 | 7 |
+| emergency logouts | 22 | 249 |
+| engage share | 70.0% | 92.3% |
+| town share | 25.6% | 3.8% |
+| mean fight | 9.9 s | 14.1 s |
+| mean mob level | 11.6 | 14.5 |
+
+Root cause: the level ladder opened the 16-19 band the moment the
+level reached 20 (`zoneLevelLead` 1 over `MaxLevel` 19) and
+`PickHuntingZone` always takes the highest opened band, so the fleet
+moved from level 12-13 mobs to level 16-18 ones overnight. The server
+tables price the step: adena per kill 74.7 -> 87.1 (+17%), HP 196.5 ->
+262.6 (+34%), pAtk 22.5 -> 33.9 (+51%), experience per kill 348.8 ->
+467.2 (+34%). The character DPS stayed at 18.6 HP/s (19.8 in run5), so
+the fight grew 42% for 17% more income and the incoming damage grew by
+half.
+
+The journal confirms the tables on both sides: run5 collected 74.7
+adena per kill from the mobs (the net purse minus the 65 junk sale
+batches), run6 87.1 (minus 3 batches) - the drop curve is linear in
+the level while the HP curve is not.
+
+The cost per kill went 21.3 s -> 32.2 s: fight +4.2 s, emergency
+logout +5.3 s (249 logouts; the median time to the next kill after one
+is 96-111 s against a 19 s normal gap), rest +3.4 s (543 sittings,
+3.54 bot-hours, median 10 s). The 22 percentage points of town time
+the guide policy saved went into the longer fights, not into kills.
+
+Second order: 262 session drops against 25, 327 pile ups against 35,
+262 "HP under attack" against 16, 72 flights against 8, and 3097
+refusals to follow the standing ground (1749 emergency logout, 1348
+death regression) - the bot refuses the ground it stands on while the
+zone has nowhere else to go.
+
+The wallet: 2.58M adena, bags 23-31 of 80 slots, 7 trips, 3 sales, the
+buys are 908-934 adena of arrows. The next weapon (Bastard Sword, pAtk
+51 for 644000) is not sold in the elven village: Unoren's lists
+(3014700/3014701) carry the no-grade line only, the D-grade line lives
+at Dion (`docs/band_20_25_survey.md`) and the city shopping errand
+stops at the no-grade kit.
+
+Two accounting defects found on the way:
+
+- The zone-return walk ("outside the hunting zone, pathfinding back")
+  sets `phaseTownReturn` and `tripStart` without a `TripStart` record,
+  so its end journals "town trip ended: back at the farm spot": 27
+  trip ends against 7 trip starts in run6 (28 zone returns).
+- `journal.Dropped()` counts the records a full queue refused and
+  nothing reads it.
+
+Next step: the ladder must price the ground, not the level. The
+drop-gap scale (`NpcTemplate.java` 722, `Rates.ini` 109-117) plus the
+npc HP curve is the deterministic input - the weakest mob inside the
+full-drop window pays the best adena per HP. The fix needs the
+per-template combat and drop table (HP, pAtk, pDef, exp, mean adena)
+generated from the C1 npc stats, then a band score that divides the
+gap-adjusted adena per kill by the fight time at the measured DPS; the
+resulting cap feeds the existing `maxMinLevel` of `PickHuntingZone`.
