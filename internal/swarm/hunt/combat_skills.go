@@ -66,9 +66,14 @@ const (
 // strike that accepts the weapon in hand or the mystic attack spell. The
 // warrior cast is optional extra damage (the auto attack keeps swinging), the
 // mystic cast is the primary damage. One request per retry period, gated by the
-// local reuse windows.
+// local reuse windows. A dead or missing target casts nothing: the server
+// answers a strike at a corpse with the bare ActionFailed (the observed refusal
+// storm after every kill's death broadcast).
 func (l *Loop) maybeCastCombatSkill(now time.Time) {
     l.trackSwingDamage(now)
+    if l.target == 0 || !l.tracker.ObjectAlive(l.target) {
+        return
+    }
     if !l.castAt.IsZero() && now.Sub(l.castAt) < castRetryPeriod {
         return
     }

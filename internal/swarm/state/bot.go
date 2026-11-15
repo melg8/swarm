@@ -78,6 +78,10 @@ type Bot struct {
     // so the refusal channel compares them (see OtherRequestBetween).
     moveRequestAt  time.Time
     otherRequestAt time.Time
+    // lastRequestOpcode and lastRequestAt name the last recorded request: the
+    // refusal log and the pickup skip attribute an ActionFailed to it.
+    lastRequestOpcode byte
+    lastRequestAt     time.Time
     // packetWindow feeds the packet rate of the diagnostics view.
     packetWindow packetRateWindow
     // eventSink mirrors every event into the session journal (SetEventSink).

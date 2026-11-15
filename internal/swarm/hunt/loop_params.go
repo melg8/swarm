@@ -59,6 +59,10 @@ const (
     pickupTimeout = 20 * time.Second
     // pickupRetryDelay is how long a failed item stays skipped.
     pickupRetryDelay = 30 * time.Second
+    // pickupRefusalWindow bounds the arrival of an ActionFailed that answers
+    // the pickup request: the server answers within the same tick, so a later
+    // refusal belongs to another request.
+    pickupRefusalWindow = 2 * time.Second
     // cleanupSlotPercent destroys junk at this inventory fill level.
     cleanupSlotPercent = 70.0
     // cleanupWeightPercent destroys junk at this weight level.

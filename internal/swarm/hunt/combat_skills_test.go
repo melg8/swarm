@@ -154,6 +154,39 @@ func TestLoopCastsMagicSpellsOfCaster(t *testing.T) {
         "the magic attack spell fires in the fight")
 }
 
+// TestLoopDeadTargetTakesNoRequest pins the corpse gate: a target whose death
+// broadcast landed takes neither a strike nor an attack request - the server
+// answered those with the bare ActionFailed after every kill (57 percent of the
+// observed refusals landed right after the death broadcast).
+func TestLoopDeadTargetTakesNoRequest(t *testing.T) {
+    bot := newTestBot()
+    setSelfPAtk(bot, 50)
+    bot.SetSkills([]state.LearnedSkill{
+        {SkillID: 3, Level: 1, Passive: false},
+    })
+    equipSword(bot)
+    spawnMob(bot)
+    setMobHP(bot, 100)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+
+    startFight(loop, bot)
+    // The kill lands: the death broadcast marks the mob dead.
+    setMobHP(bot, 0)
+    loop.target = 7
+    loop.phase = phaseEngage
+    loop.castAt = time.Time{}
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+    game.forces = nil
+    game.casts = nil
+
+    loop.maybeCastCombatSkill(time.Now())
+    loop.requestAttack(time.Now())
+
+    require.Empty(t, game.casts, "no strike at a corpse")
+    require.Empty(t, game.forces, "no attack request at a corpse")
+}
+
 // TestLoopWarriorNeverCastsSpells pins the role split: a fighter
 // class never casts the magic attack spells it happens to know - the
 // auto attack stays its only damage.

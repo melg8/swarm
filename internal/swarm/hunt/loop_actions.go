@@ -310,13 +310,25 @@ func (l *Loop) loot() {
         l.lootID = item.ObjectID
         l.lootAt = now
         l.lootMoveAt = time.Time{}
+        l.lootSendAt = time.Time{}
     }
     if now.Sub(l.lootAt) > pickupTimeout {
         // The pickup did not finish: the item is protected or
         // unreachable. Skip it for a while and try the next one.
         l.itemSkip[item.ObjectID] = now.Add(pickupRetryDelay)
         l.lootID = 0
+        l.lootSendAt = time.Time{}
         l.logf("Hunt: pickup of %d timed out, skipping", item.ObjectID)
+
+        return
+    }
+    if l.pickupRefused(now) {
+        // The server answered the pickup request with ActionFailed: the drop
+        // left the ground (a fleet mate took it) or its protection refuses the
+        // character. Retrying the same object only herds the refusal storm.
+        l.itemSkip[item.ObjectID] = now.Add(pickupRetryDelay)
+        l.lootID = 0
+        l.logf("Hunt: pickup of %d refused, skipping", item.ObjectID)
 
         return
     }
@@ -338,7 +350,26 @@ func (l *Loop) loot() {
     }
     if err := l.game.PickupItem(item); err != nil {
         l.logf("Hunt: pickup failed: %v", err)
+
+        return
     }
+    l.lootSendAt = now
+}
+
+// pickupRefused reports whether an ActionFailed arrived after the pickup
+// request of the held item: the packet carries no identity, but a refusal that
+// follows the pickup send within the answer window belongs to it - the walk to
+// a far drop and the fight requests are sent outside that window.
+func (l *Loop) pickupRefused(now time.Time) bool {
+    if l.lootSendAt.IsZero() {
+        return false
+    }
+    failedAt := l.tracker.LastActionFailed()
+    if failedAt.IsZero() || !failedAt.After(l.lootSendAt) {
+        return false
+    }
+
+    return now.Sub(l.lootSendAt) <= pickupRefusalWindow
 }
 
 // lootAnswerAttacker hands the loot tick to the engage when a living mob holds

@@ -90,6 +90,9 @@ type lootState struct {
     lootID     int32
     lootAt     time.Time
     lootMoveAt time.Time
+    // lootSendAt stamps the last pickup request of lootID: the refusal window
+    // measures from it (see lootPendingRefused).
+    lootSendAt time.Time
     itemSkip   map[int32]time.Time
 }
 

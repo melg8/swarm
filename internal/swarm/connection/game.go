@@ -354,14 +354,14 @@ func (gc *GameClient) sendPacket(data crypt.Serializable) error {
     if gc.tracker != nil {
         // The refusal bookkeeping: the walk clicks (0x01) and the action
         // requests answer ActionFailed the same way, so their send times decide
-        // which arrival belongs to a click (see state.Bot.OtherRequestBetween).
-        // The maintenance stream never answers and stays out.
+        // which arrival belongs to a click (see state.Bot.OtherRequestBetween),
+        // and the opcode names the last candidate in the refusal log. The
+        // maintenance stream never answers and stays out.
         opcode := writer.Bytes()[0]
         now := time.Now()
-        if opcode == togameserver.MoveToLocationPacketID {
-            gc.tracker.ApplyMoveRequestSent(now)
-        } else if !silentSessionOpcodes[opcode] {
-            gc.tracker.ApplyOtherRequestSent(now)
+        move := opcode == togameserver.MoveToLocationPacketID
+        if move || !silentSessionOpcodes[opcode] {
+            gc.tracker.ApplyRequestSent(opcode, move, now)
         }
     }
 

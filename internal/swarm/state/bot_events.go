@@ -64,6 +64,32 @@ func (b *Bot) ApplyOtherRequestSent(at time.Time) {
     b.mu.Unlock()
 }
 
+// ApplyRequestSent records one request the server may answer with ActionFailed:
+// the opcode and the send time name the candidate of the next refusal, and the
+// walk flag routes the same send time into the refusal evidence of the clicks
+// (see ApplyMoveRequestSent and ApplyOtherRequestSent). The packet itself
+// carries no identity, so the attribution stays the last request sent.
+func (b *Bot) ApplyRequestSent(opcode byte, move bool, at time.Time) {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    b.lastRequestOpcode = opcode
+    b.lastRequestAt = at
+    if move {
+        b.moveRequestAt = at
+    } else {
+        b.otherRequestAt = at
+    }
+}
+
+// LastRequest returns the opcode and the send time of the last recorded
+// request, the zero pair when none was sent yet.
+func (b *Bot) LastRequest() (byte, time.Time) {
+    b.mu.RLock()
+    defer b.mu.RUnlock()
+
+    return b.lastRequestOpcode, b.lastRequestAt
+}
+
 // OtherRequestBetween reports whether a non walk request was sent inside the
 // answer window (after the walk click, before the arrival): the answer carries
 // no request identity, so an arrival with such a request in flight may answer

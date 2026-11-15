@@ -5,11 +5,14 @@
 package hunt
 
 // The loot interrupt regressions: a mob that reaches the character
-// while it picks up the kill hands the tick to the engage.
+// while it picks up the kill hands the tick to the engage, and a
+// refused pickup skips its drop instead of retrying it.
 
 import (
     "testing"
+    "time"
 
+    "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
 
@@ -48,4 +51,74 @@ func TestLootFleesTheUnwinnableAttacker(t *testing.T) {
     require.Zero(t, loop.target)
     require.NotEmpty(t, game.walks,
         "the hurt loot phase opens the escape")
+}
+
+// corpseWithDrop kills the spawned mob and leaves one adena drop next to
+// the corpse, the state the loot phase starts from.
+func corpseWithDrop(bot *state.Bot) {
+    spawnMob(bot)
+    bot.ApplySpawnItem(state.ItemInfo{
+        ObjectID: 9, TemplateID: 57, X: 45040, Y: 50040, Z: -3500,
+    })
+    bot.ApplyStatusUpdate(7, []state.Attribute{
+        {ID: state.AttrCurHP, Value: 0},
+    })
+    bot.ApplySelfTarget(7)
+}
+
+// TestLootSkipsTheRefusedPickup pins the refusal skip: an ActionFailed that
+// answers the pickup request skips the drop for the retry delay instead of
+// herding the refusal storm (57 percent of the observed refusals landed right
+// after a kill, and the 20 second pickup timeout retried every one of them).
+func TestLootSkipsTheRefusedPickup(t *testing.T) {
+    bot := newTestBot()
+    corpseWithDrop(bot)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.target = 7
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+
+    loop.tick()
+    require.Equal(t, phaseLoot, loop.phase)
+    require.Equal(t, []int32{9}, game.pickups, "the drop is clicked")
+
+    // The server refuses the pickup: the answer lands right after the
+    // request (a fleet mate took the drop).
+    bot.ApplyActionFailed(time.Now().Add(time.Millisecond))
+    loop.tick()
+
+    require.Zero(t, loop.lootID, "the refused drop stays out of flight")
+    skipUntil, skipped := loop.itemSkip[9]
+    require.True(t, skipped, "the drop lands on the skip list")
+    require.True(t, skipUntil.After(time.Now()), "the skip is armed")
+
+    // The drop is never clicked again inside the skip window.
+    loop.tick()
+    loop.tick()
+    require.Equal(t, []int32{9}, game.pickups,
+        "the refused drop is not retried")
+}
+
+// TestLootKeepsTheUnrefusedPickup is the control of the skip: a drop whose
+// pickup got no ActionFailed stays in flight and is retried by the ordinary
+// pacing.
+func TestLootKeepsTheUnrefusedPickup(t *testing.T) {
+    bot := newTestBot()
+    corpseWithDrop(bot)
+    game := &fakeGame{}
+    loop := NewLoop(game, bot)
+    loop.target = 7
+    loop.lastActionAt = time.Now().Add(-time.Minute)
+
+    loop.tick()
+    require.Equal(t, []int32{9}, game.pickups)
+
+    // The walk click of the corpse approach answers ActionFailed instead:
+    // a refusal older than the pickup send belongs to another request.
+    bot.ApplyActionFailed(time.Now().Add(-5 * time.Second))
+    loop.tick()
+
+    require.Equal(t, int32(9), loop.lootID,
+        "the unrefused pickup stays in flight")
+    require.NotContains(t, loop.itemSkip, int32(9))
 }

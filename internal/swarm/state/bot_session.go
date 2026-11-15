@@ -346,6 +346,8 @@ func (b *Bot) ResetSession() {
     b.huntLastAction = ""
     b.huntLastActionAt = time.Time{}
     b.huntErrand = HuntErrand{} //nolint:exhaustruct_v5 // zero resets
+    b.lastRequestOpcode = 0
+    b.lastRequestAt = time.Time{}
     b.status = StatusConnecting
     b.touch()
 }
