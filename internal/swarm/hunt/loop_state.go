@@ -194,6 +194,10 @@ type travelState struct {
     farmZ         int32
     zoneReturn    bool
     zoneFails     int
+    // zoneReturnWalk marks the town trip machinery busy with the walk home
+    // after a respawn: the return is not a town trip, so it writes no trip
+    // record and arms no trip cooldown (loop_movement.go).
+    zoneReturnWalk bool
     // zoneSegmentAt/X/Y hold the no-movement window of the direct zone
     // segments.
     zoneSegmentAt time.Time

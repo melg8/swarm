@@ -126,6 +126,7 @@ func (l *Loop) maybeStartTownTrip() {
     // hunting zone, the zone center otherwise.
     l.rememberFarmSpot()
     l.tripStart = l.now()
+    l.zoneReturnWalk = false
     l.sold = make(map[int32]bool)
     l.rePaths = 0
     l.segmentRefused = false
@@ -428,6 +429,16 @@ func (l *Loop) endTownTrip(reason string) {
     l.shoppingPlanAdena = 0
     l.resetReplacementSales()
     l.resetLearnState()
+    if l.zoneReturnWalk {
+        // The walk home after a respawn borrows this waypoint machinery but
+        // is no town trip: it writes no trip record, arms no trip cooldown
+        // and joins no abort streak (a trip record here counts an ending the
+        // journal never saw start).
+        l.zoneReturnWalk = false
+        l.logf("Hunt: zone return finished: %s", reason)
+
+        return
+    }
     l.tripEndedAt = l.now()
     l.noteTripAbortRun(reason)
     if l.journal != nil {
@@ -518,5 +529,6 @@ func (l *Loop) resetTownTrip() {
     l.resetBuyRequest()
     l.resetReplacementSales()
     l.resetLearnState()
+    l.zoneReturnWalk = false
     l.tripEndedAt = time.Time{}
 }

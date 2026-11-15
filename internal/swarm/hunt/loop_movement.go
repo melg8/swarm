@@ -294,12 +294,14 @@ func (l *Loop) returnToZone() {
     l.tripStart = l.now()
     l.rePaths = 0
     l.phase = phaseTownReturn
+    l.zoneReturnWalk = true
     l.segmentRadius = tripApproachRadius
     if !l.startZoneReturnSegment(dest) {
         // The planner owns no route to the zone at all: the return holds
         // instead of marching the direct segments. The paced line explains the
         // standing hunter, the next returnToZone re-plans.
         l.phase = phaseEngage
+        l.zoneReturnWalk = false
         l.zoneFails++
         if now.Sub(l.zoneSegmentLogAt) >= noPickLogPeriod {
             l.zoneSegmentLogAt = now

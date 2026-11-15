@@ -305,6 +305,11 @@ func (j *Journal) Close() {
     }
     close(j.done)
     j.wg.Wait()
+    // The refused records are the only journal failure the file cannot show:
+    // a run that reads short reports them here.
+    if dropped := j.Dropped(); j.logger != nil && dropped > 0 {
+        j.logger.Printf("Session journal dropped %d records", dropped)
+    }
 }
 
 // Build writes the process identity line (the first record of the file).
