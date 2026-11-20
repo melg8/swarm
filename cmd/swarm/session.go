@@ -212,6 +212,10 @@ func runBot( //nolint:funlen // linear session script
     // tab and the state dump carry the reasoning of the loop (zone switches,
     // escapes, stuck re-paths) next to the raw game events.
     loop.SetLogger(huntEventLogger(tracker))
+    // The party hub joins the session to its configured group: the leader
+    // invites the visible members, the followers walk after it and focus the
+    // target it picked.
+    loop.SetParty(cfg.partyHub, cfg.account)
     loop.SetJournal(journal)
     installNavigator(loop, engine, mesh, cfg.hunt)
     if cfg.hunt {

@@ -211,6 +211,13 @@ linters:
         - .*navmesh\.hierQuery$
         - .*navmesh\.queryState$
         - .*navmesh\.tileCall$
+        # The party mirror: an empty member is the documented scratch start
+        # of the add and update packets, the hub fills the group and state
+        # maps in its constructor, and an unknown member returns a zero
+        # state with no placement.
+        - .*from_game_server\.PartyMember$
+        - .*party\.Hub$
+        - .*party\.MemberState$
     exhaustive:
       # A switch with a default case explicitly handles the remaining
       # values; demanding every enum member listed there too would only

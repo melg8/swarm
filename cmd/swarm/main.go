@@ -151,6 +151,7 @@ func main() {
     // hunt routes when they exist (see loadNavmesh); a missing tile
     // set keeps everything on the grid engine.
     mesh := loadNavmesh(cfg)
+    cfg.partyHub = loadPartyHub(cfg.partyFile)
 
     web := startWebInterface(cfg, registry, nil, proxyServer)
     attachAcceptance(web, registry, cfg, engine, mesh, proxyServer)

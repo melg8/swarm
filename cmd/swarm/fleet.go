@@ -30,6 +30,9 @@ func runFleet(cfg config) {
     log.Printf("Starting swarm fleet of %d bots (%s)",
         len(plan), compositionText(plan))
     log.Printf("Build: %s", version.Identity())
+    // The party groups are shared by every session of the fleet: one hub
+    // carries the live placement and the target between the bots.
+    cfg.partyHub = loadPartyHub(cfg.partyFile)
 
     registry := state.NewRegistry()
     trackers := make([]*state.Bot, 0, len(plan))

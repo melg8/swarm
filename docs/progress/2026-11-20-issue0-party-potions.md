@@ -63,7 +63,7 @@ then the live restart.
 
 ## Status
 
-Implementing the potion economy; the party layer follows.
+All code and docs land; the live fleet restart is pending.
 
 ### 2026-11-20 - the potion wallet fallback
 
@@ -117,3 +117,12 @@ after the leader with a 450/280 hysteresis and adopts the leader's
 target within 1200 units so the group focus fires one mob. An active
 fight or an incoming blow holds the follow walk. The hunt docs record
 the behavior; the fake games and the hunt tests cover the roles.
+
+### 2026-11-20 - wire the party config into the launch
+
+The `-party-config` flag (default `configs/parties.json`) loads the hub
+once per process; both the fleet and the single-bot path share it and
+each session attaches it to its hunt loop. The strict lint gate gets
+the documented zero-value patterns for the party mirror structs. All
+build, vet, package test, `lint:new` and `fmt:check` gates pass; the
+live fleet restart is the remaining acceptance step.

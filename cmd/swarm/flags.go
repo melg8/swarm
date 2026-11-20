@@ -12,6 +12,7 @@ import (
     "strings"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/party"
     "github.com/melg8/swarm/internal/swarm/pathfind"
     "github.com/melg8/swarm/internal/swarm/proxy"
 )
@@ -80,6 +81,13 @@ type config struct {
     // configPath is the -config flag: the launch configuration file driving the
     // shared parameters and the fleet composition (see launch_config.go).
     configPath string
+    // partyFile is the -party-config flag: the party configuration file naming
+    // the groups (leader and member accounts). An empty value disables the
+    // group play.
+    partyFile string
+    // partyHub is the process wide party registry built from partyFile; every
+    // session of the fleet coordinates through it.
+    partyHub *party.Hub
     // botPlans is the expanded fleet composition: the account and the bot type
     // of every slot, whatever the origin (the -config file or the plain -bots
     // count). Nil until the launch normalization fills it.
@@ -176,6 +184,8 @@ func parseFlags() config {
         proxyLog:          "",
         bots:              1,
         configPath:        "",
+        partyFile:         "configs/parties.json",
+        partyHub:          nil,
         botPlans:          nil,
         botType:           "",
         kite:              nil,
@@ -283,6 +293,12 @@ func parseFlags() config {
             "explicitly set flag overrides the matching file value, an "+
             "omitted file field keeps the flag default, and without the "+
             "file the plain flag defaults apply")
+    flag.StringVar(&cfg.partyFile, "party-config", "configs/parties.json",
+        "party configuration file (JSON) naming the groups by account: "+
+            "every group carries a leader and its members (see "+
+            "configs/parties.json). The fleet forms the server parties, "+
+            "followers walk after their leader and focus its target; an "+
+            "empty value disables the group play")
     flag.StringVar(&cfg.acceptanceRun, "acceptance", "",
         "run an acceptance scenario headless instead of the bot: "+
             "the value is a scenario id (soak, farm-readiness, "+
