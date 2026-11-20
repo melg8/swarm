@@ -126,3 +126,13 @@ each session attaches it to its hunt loop. The strict lint gate gets
 the documented zero-value patterns for the party mirror structs. All
 build, vet, package test, `lint:new` and `fmt:check` gates pass; the
 live fleet restart is the remaining acceptance step.
+
+### 2026-11-20 - run the group on every hunt decision
+
+The live restart showed the group stuck: the members hunt in different
+zones and spend long stretches in town trips, while the party hook only
+ran inside the engage phase, so the hub never saw a fresh placement and
+the leader never saw a member inside the invite range. The hook now
+runs from `tickContext` on every decision: the hub stays fresh, the
+follower walks after its leader from any phase and the leader invites
+as soon as the member comes into view. A test pins the town walk case.

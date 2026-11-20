@@ -96,6 +96,12 @@ func (l *Loop) tickContext(ctx context.Context) {
     if l.tickCommandPhase() {
         return
     }
+    // The group runs on every decision, not only in the engage phase: the
+    // hub needs a fresh placement from a member that walks to town, and a
+    // follower joins its leader before it picks a fight of its own.
+    if l.partyTick(l.now()) {
+        return
+    }
     if l.tickErrands(ctx) {
         return
     }

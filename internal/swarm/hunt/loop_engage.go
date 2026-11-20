@@ -17,11 +17,6 @@ import (
 // rest, target adoption, safety verdicts, pick, kite machinery, attack.
 func (l *Loop) engage() {
     now := l.now()
-    if l.partyTick(now) {
-        // The follower walk after the leader owns the tick: the character
-        // catches up before it picks a fight of its own.
-        return
-    }
     l.syncLure()
     if l.guardGround(now) {
         return

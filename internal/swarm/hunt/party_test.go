@@ -157,6 +157,30 @@ func TestFollowerFollowsAStaleLeaderState(t *testing.T) {
     require.Empty(t, game.walks)
 }
 
+// TestPartyRunsOutsideTheEngagePhase pins the every tick hook: a member that
+// walks to town still publishes its placement and follows its leader, so the
+// hub does not go stale while the group travels.
+func TestPartyRunsOutsideTheEngagePhase(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    hub := newPartyHub("test1", "test2")
+    loop.SetParty(hub, "test2")
+    setSelf(bot, 200, 10000)
+    loop.phase = phaseTownWalk
+    now := time.Now()
+    hub.Publish(party.MemberState{
+        Account: "test1", ObjectID: 100, X: 12000, Y: 20000,
+        Z: -3500, Alive: true, At: now,
+    })
+
+    loop.tick()
+
+    published, ok := hub.Member("test2")
+    require.True(t, ok)
+    require.Equal(t, int32(200), published.ObjectID)
+    require.Len(t, game.walks, 1,
+        "the follower walks after the leader outside the fight")
+}
+
 // TestFollowerFocusesTheLeaderTarget pins the focus fire: the follower adopts
 // the living leader target in range instead of picking a mob of its own.
 func TestFollowerFocusesTheLeaderTarget(t *testing.T) {
