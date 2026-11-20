@@ -307,7 +307,8 @@ func (l *Loop) sellableJunk() []state.InventoryItem {
     junk := make([]state.InventoryItem, 0, 8)
     for _, entry := range l.tracker.SellableItemsExcluding(
         l.plannedEquipKeeps()) {
-        if gear.IsStarterItem(entry.ItemID) || keepSOE(entry) {
+        if gear.IsStarterItem(entry.ItemID) || keepSOE(entry) ||
+            keepPotion(entry) {
             continue
         }
         junk = append(junk, entry)

@@ -461,6 +461,20 @@ drop re-arms the panic run mid fight. The unwinnable pile up keeps
 the old run, relogin and regenerate cycle - which now lands into
 the settle instead of an immediate walk back into the pack.
 
+The potion economy (hunt/potions.go): the fight gate drinks the
+strongest carried healing potion (1061 over 1060) at 70 percent and
+it runs before the flee verdict, so the flee budget only opens when
+the bag had nothing to pour. The shopping queue keeps the stock:
+below `potionRestockFloor` (8) it orders up to
+`potionRestockTarget` (40) from the region potion merchant - the
+Dion Lara list 3006300 sells the 1061 and the 1060, the elven
+Herbiel list 3015000 only the 1060 - priced at the reference price
+plus the town tax (15 percent elven, 20 percent Dion) and capped by
+the adena the affordable gear plan leaves, so a thin wallet still
+buys its gear. The junk sell keeps every healing stack. The 51 hour
+run7 drank 60 potions and bought none: the plan never ordered a
+single one, and the pile up flee fired with an empty bag.
+
 The CEILING is one for every layer: the general pick ceiling
 (targetMaxLevelSlack, level plus two) bounds the melee trade, the
 armed archer kite and the pile up verdict alike (attackerEngageable

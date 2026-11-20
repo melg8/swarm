@@ -649,6 +649,7 @@ func TestTripPlanFreezesPurchasesAgainstResale(t *testing.T) {
     // of the guide table), so the plan under test plans no guide
     // stop either.
     addSOE(bot, 1)
+    addPotions(bot, lesserHealingPotionID, potionRestockFloor)
     bot.SetBuffs([]state.BuffEntry{
         {SkillID: 1204, Level: 2, Time: 1200},
         {SkillID: 1040, Level: 3, Time: 1200},

@@ -89,7 +89,7 @@ func fillInventoryForTripTest(bot *state.Bot) {
     items := make([]state.InventoryItem, 0, 48)
     for i := range 45 {
         items = append(items, state.InventoryItem{
-            ObjectID: int32(700 + i), ItemID: 1060, Count: 1,
+            ObjectID: int32(700 + i), ItemID: 1864, Count: 1,
         })
     }
     bot.ApplyItemList(items)

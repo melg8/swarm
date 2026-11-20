@@ -21,6 +21,10 @@ func (l *Loop) engage() {
     if l.guardGround(now) {
         return
     }
+    // The potion goes out before the flee verdict: the drink line sits above
+    // the re-engage line, and a fight that reaches the flee gate has already
+    // spent the potion window (docs/hunting.md).
+    l.maybeDrinkFightPotion(now)
     manaHeld := l.restOnLowMana()
     if l.adoptServerTarget(now, manaHeld) {
         return

@@ -126,6 +126,9 @@ func TestRound60DebtArmsOnStrandedReplacement(t *testing.T) {
     // (the level 14 fighter row of the guide table), so the trip
     // under test plans no guide stop either.
     addSOE(bot, 1)
+    // The potion stock is carried: the plan freeze under test carries no
+    // restock line (the potion economy has its own tests).
+    addPotions(bot, lesserHealingPotionID, potionRestockFloor)
     bot.SetBuffs([]state.BuffEntry{
         {SkillID: 1204, Level: 2, Time: 1200},
         {SkillID: 1040, Level: 3, Time: 1200},

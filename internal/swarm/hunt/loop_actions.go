@@ -181,23 +181,19 @@ func (l *Loop) maybeDrinkFightPotion(now time.Time) {
     if reuseHeld {
         return
     }
-    for _, item := range l.tracker.InventoryItems() {
-        if item.ItemID != questPotionItemID || item.Count <= 0 ||
-            item.Equipped {
-            continue
-        }
-        if err := l.game.UseItem(item.ObjectID); err != nil {
-            l.logf("Hunt: healing potion use failed: %v", err)
-            l.questPotionAt = now
-
-            return
-        }
+    objectID, ok := l.healingPotionObject()
+    if !ok {
+        return
+    }
+    if err := l.game.UseItem(objectID); err != nil {
+        l.logf("Hunt: healing potion use failed: %v", err)
         l.questPotionAt = now
-        l.logf("Hunt: HP %.0f%% in the fight, drinking a healing potion",
-            l.tracker.SelfHealthPercent())
 
         return
     }
+    l.questPotionAt = now
+    l.logf("Hunt: HP %.0f%% in the fight, drinking a healing potion",
+        l.tracker.SelfHealthPercent())
 }
 
 // noteKillPosition records where the mob died: the corpse position, or the

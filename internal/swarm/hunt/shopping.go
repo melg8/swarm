@@ -171,6 +171,13 @@ func (l *Loop) shoppingQueue() []gear.Purchase {
     if soe, ok := l.soePurchaseLine(); ok {
         queue = append([]gear.Purchase{soe}, queue...)
     }
+    // The potion restock spends what the affordable gear plan leaves: the gear
+    // milestones outrank the consumable, and the stock refills before it runs
+    // dry (docs/hunting.md).
+    budget := adena - gear.AdenaSpent(affordablePrefix(queue))
+    if potion, ok := l.potionPurchaseLine(budget); ok {
+        queue = append([]gear.Purchase{potion}, queue...)
+    }
 
     return queue
 }

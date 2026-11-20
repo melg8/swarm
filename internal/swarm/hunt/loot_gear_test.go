@@ -92,7 +92,7 @@ func TestLootedGearSurvivesTheCleanupDestroy(t *testing.T) {
     for i := range 56 {
         items = append(items, state.InventoryItem{
             ObjectID: 500 + int32(i),
-            ItemID:   1060,
+            ItemID:   1864,
             Count:    1,
             Type2:    5,
             Change:   1,

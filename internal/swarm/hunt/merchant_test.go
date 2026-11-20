@@ -125,7 +125,7 @@ func TestBuyStopReSelectsTheStopMerchant(t *testing.T) {
     junk := make([]state.InventoryItem, 0, 20)
     for i := range 20 {
         junk = append(junk, state.InventoryItem{
-            ObjectID: 500 + int32(i), ItemID: 1060, Count: 1,
+            ObjectID: 500 + int32(i), ItemID: 1864, Count: 1,
             Type2: 5, Change: 1,
         })
     }

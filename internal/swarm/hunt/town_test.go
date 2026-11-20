@@ -340,7 +340,7 @@ func fillInventory(bot *state.Bot) {
     for i := range 41 {
         items = append(items, state.InventoryItem{
             ObjectID: 500 + int32(i),
-            ItemID:   1060,
+            ItemID:   1864,
             Count:    1,
             Type2:    5,
             Change:   1,
@@ -650,7 +650,7 @@ func TestTripNoCleanupDuringTrip(t *testing.T) {
     items := make([]state.InventoryItem, 0, 76)
     for i := range 76 {
         items = append(items, state.InventoryItem{
-            ObjectID: 500 + int32(i), ItemID: 1060, Count: 1,
+            ObjectID: 500 + int32(i), ItemID: 1864, Count: 1,
             Type2: 5, Change: 1,
         })
     }
@@ -744,7 +744,7 @@ func TestShoppingTripSellsJunkBelowTheTrigger(t *testing.T) {
     items := make([]state.InventoryItem, 0, 6)
     for i := range 5 {
         items = append(items, state.InventoryItem{
-            ObjectID: 500 + int32(i), ItemID: 1060, Count: 1,
+            ObjectID: 500 + int32(i), ItemID: 1864, Count: 1,
             Type2: 5, Change: 1,
         })
     }
@@ -918,18 +918,18 @@ func TestSellableJunkSkipsStarterKit(t *testing.T) {
     bot.ApplyItemList([]state.InventoryItem{
         {ObjectID: 910, ItemID: 10, Count: 1, Type2: 0, Change: 1},
         {ObjectID: 911, ItemID: 2369, Count: 1, Type2: 0, Change: 1},
-        {ObjectID: 912, ItemID: 1060, Count: 1, Type2: 5, Change: 1},
-        {ObjectID: 913, ItemID: 1060, Count: 1, Type2: 5, Change: 1},
+        {ObjectID: 912, ItemID: 1864, Count: 1, Type2: 5, Change: 1},
+        {ObjectID: 913, ItemID: 1864, Count: 1, Type2: 5, Change: 1},
     })
 
     junk := loop.sellableJunk()
-    require.Len(t, junk, 2, "only the potions are offered")
+    require.Len(t, junk, 2, "only the stems are offered")
     for _, entry := range junk {
-        require.Equal(t, int32(1060), entry.ItemID,
+        require.Equal(t, int32(1864), entry.ItemID,
             "the starter dagger and sword never enter the junk")
     }
     require.True(t, loop.junkRemaining(),
-        "the unoffered potions keep the junk phase running")
+        "the unoffered stems keep the junk phase running")
     loop.sold[junk[0].ObjectID] = true
     loop.sold[junk[1].ObjectID] = true
     require.False(t, loop.junkRemaining(),
