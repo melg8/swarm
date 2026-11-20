@@ -63,7 +63,7 @@ then the live restart.
 
 ## Status
 
-All code and docs land; the live fleet restart is pending.
+Landed and live verified on run11; the fragment moves to the archive.
 
 ### 2026-11-20 - the potion wallet fallback
 
@@ -153,3 +153,18 @@ incoming blow, so the fight guard kept it from ever rejoining. Past
 2400 units the follower now drops its private target and walks to the
 leader; near the leader the fight and attack guards still hold. A test
 pins both ranges.
+
+
+### 2026-11-20 - live acceptance on run11
+
+The rebuilt fleet (`runs/night-run11.bat`, log `runs/night-run11.log`,
+commit 92bf3e4a) started with `Party coordination ready:
+test1[test1,test2,test3]`; all three accounts entered the world and
+converged, and the server party formed within 30 seconds (test3 at
+18:42:26, test2 at 18:42:30, window with two members). The API shows
+the three positions within a few hundred units of each other. test2
+holds 40 x 1060 potions; test1 and test3 carry the 1060 restock line
+in their shopping view and buy it on their town trip. Focus fire is
+pinned by the unit test; the short live window never caught a tick with
+the leader holding a target and a follower close enough to adopt it.
+The emergency logout rate over a full night remains the next read.
