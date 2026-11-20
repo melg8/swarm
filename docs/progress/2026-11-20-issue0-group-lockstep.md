@@ -56,7 +56,7 @@ the mana reserve, then docs and the live restart.
 
 ## Status
 
-Implementing the group coordination.
+Code and docs land; the live restart follows.
 
 ### 2026-11-20 - the hub carries the group state
 

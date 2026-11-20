@@ -2696,10 +2696,11 @@ The accounts of one fleet can be grouped into a C1 party by a separate
 configuration file (`configs/parties.json`, the `-party-config` flag).
 A group names a leader and its member accounts, e.g. `test1` leading
 `test1`-`test3`. One fleet process owns one in-process hub keyed by
-account; the hub shares the live placement, target and liveness every
-hunt tick. The server party itself is formed through the real C1
-packets (the layouts are in `docs/protocol_description.md`) - the hub
-only carries the state the game client of a follower cannot see.
+account; the hub shares the live placement, the vitals, the recovery
+wish and the current target every hunt tick, and the leader publishes
+one group command. The server party itself is formed through the real
+C1 packets (the layouts are in `docs/protocol_description.md`) - the
+hub only carries the state the game client of a follower cannot see.
 
 The leader invites the group members it sees inside 900 units, at most
 one ask per member every six seconds. The server refuses an invite to a
@@ -2710,19 +2711,37 @@ skipped. The follower accepts the pending invitation only when the
 requestor is the configured leader (by object id or name) and the ask
 is younger than 15 seconds, and declines every other requestor.
 
-A follower that falls more than 450 units behind the leader walks after
-it (one ground click per two second request period), stopping at 280
-units of hysteresis. Near the leader an active fight, an incoming blow,
-a town trip or a stale leader placement holds the walk so the character
-never leaves the fight it answers or the merchant errand that restocks
-its potions. Past 2400 units the group wins: the follower drops its
-private target and walks back even under attack, because a bot hunting
-in another zone would otherwise always find a local fight and never
-rejoin. Outside the follow walk the follower adopts the leader's
-current target when that mob is alive, attackable and within 1200 units,
-so the group focus-fires one mob instead of spreading its damage over
-three. The party loot distribution is finders keepers (0), so each
-member still loots its own kills.
+The group command carries the leader target, the formation anchor, the
+first attacker and the rest flag. Each follower owns a stable slot in
+the group configuration and walks into a small offset (150 units) around
+the leader, one paced click per two seconds, until it sits within 220
+units of its slot. Outside the slot it drops any private target, so a
+member hunting in another zone cannot keep a local fight and never
+rejoin; past 2400 units it walks back even under attack. Inside the slot
+it adopts only the leader target (within 1200 units) and never picks a
+private one, so the group attacks the same mob at the same time. A town
+trip or a loot phase owns its own movement and the group waits for the
+errand and the pickups before it marches again. The party loot
+distribution is finders keepers (0), so each member still loots its own
+kills.
+
+The first attacker is the member that pulls the mob. When its health
+falls below 65 percent the leader hands the role to the healthiest
+living warrior that beats it by at least 20 points, after a 12 second
+cooldown; the demoted member stands out of the attack for four seconds
+so the new first takes the blow. Casters never lead a warrior group.
+This spreads the damage over the group instead of grinding one member
+down. Every combat cast also keeps enough mana to pay for one learned
+instant self heal (`npcdata.SelfHealSkill`), so the recovery is always
+affordable (docs on the rest follow below).
+
+When any member wants recovery (health under the 60 percent re-engage
+line, or a caster under the 15 percent mana line) the command sets the
+shared rest flag. Every member drops its target, walks into its slot and
+sits there; the stand up and the resume happen together only after all
+living members stand above the recovery lines. A mob that reaches the
+resting spot stands the member up to answer it, and the group sits again
+once the blow stops.
 
 The group is optional: with no `-party-config` file the hub is nil and
 every bot hunts alone exactly as before. Session resets clear the party
