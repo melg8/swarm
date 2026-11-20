@@ -64,3 +64,10 @@ then the live restart.
 ## Status
 
 Implementing the potion economy; the party layer follows.
+
+### 2026-11-20 - the potion wallet fallback
+
+The restock line orders the potions strongest first: a Dion purse that
+cannot cover the 1061 now buys the 1060 of the same Lara list instead
+of skipping the line. The wallet test and the region test cover the
+fallback; the rest of the potion economy stays in the preceding commit.

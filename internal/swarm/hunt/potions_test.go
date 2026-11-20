@@ -60,7 +60,8 @@ func TestPotionRestockCapsByWallet(t *testing.T) {
     require.Equal(t, int32(3), line.Count)
     require.Equal(t, unit*3, line.Price)
 
-    _, ok = loop.potionPurchaseLine(unit - 1)
+    _, ok = loop.potionPurchaseLine(
+        potionUnitPrice(regionDion, lesserHealingPotionID) - 1)
     require.False(t, ok)
 }
 
@@ -74,6 +75,22 @@ func TestPotionRestockFollowsTheRegionMerchant(t *testing.T) {
     require.Equal(t, lesserHealingPotionID, line.ItemID)
     require.Equal(t, int32(3015000), line.ListID)
     require.Equal(t, int32(7150), line.MerchantTemplateID)
+}
+
+// TestPotionRestockFallsBackToTheLesser pins the wallet fallback: a purse that
+// cannot cover the Dion 1061 still buys the 1060 of the same list.
+func TestPotionRestockFallsBackToTheLesser(t *testing.T) {
+    loop, _, _, _ := newTripLoop()
+    loop.zoneRegion = regionDion
+    lesser := potionUnitPrice(regionDion, lesserHealingPotionID)
+    strong := potionUnitPrice(regionDion, healingPotionID)
+    require.Greater(t, strong, lesser)
+
+    line, ok := loop.potionPurchaseLine(lesser)
+    require.True(t, ok)
+    require.Equal(t, lesserHealingPotionID, line.ItemID)
+    require.Equal(t, int32(1), line.Count)
+    require.Equal(t, int32(3006300), line.ListID)
 }
 
 // TestPotionStockNeverSells pins the junk guard: the sell list keeps every

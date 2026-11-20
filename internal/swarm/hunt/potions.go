@@ -67,17 +67,25 @@ func (l *Loop) healingPotionObject() (int32, bool) {
     return 0, false
 }
 
-// potionMerchantOf resolves the potion line of the region: the Dion Lara list
-// 3006300 (1061 and 1060) and the elven Herbiel list 3015000 (1060 only).
-func potionMerchantOf(region string) (
-    listID int32, merchantID int32, itemID int32,
-) {
-    if region == regionDion {
-        return 3006300, 7063, healingPotionID
-    }
-
-    return 3015000, 7150, lesserHealingPotionID
+// potionOffer is one purchasable healing potion line of a region.
+type potionOffer struct {
+    listID     int32
+    merchantID int32
+    itemID     int32
 }
+
+// dionPotionOffers and elvenPotionOffers are the potion lines strongest
+// first: the Dion Lara carries the 1061 and the 1060, the elven Herbiel only
+// the 1060.
+var (
+    dionPotionOffers = [...]potionOffer{
+        {listID: 3006300, merchantID: 7063, itemID: healingPotionID},
+        {listID: 3006300, merchantID: 7063, itemID: lesserHealingPotionID},
+    }
+    elvenPotionOffers = [...]potionOffer{
+        {listID: 3015000, merchantID: 7150, itemID: lesserHealingPotionID},
+    }
+)
 
 // potionUnitPrice prices one potion of the region with its town tax.
 func potionUnitPrice(region string, itemID int32) int64 {
@@ -91,43 +99,50 @@ func potionUnitPrice(region string, itemID int32) int64 {
 }
 
 // potionPurchaseLine plans the restock order against the adena the affordable
-// gear plan leaves. Below the floor it buys the strongest potion the region
-// sells up to the target count, capped by the wallet; a wallet that cannot
-// cover one potion plans nothing so the gear lines still run.
+// gear plan leaves. Below the floor it buys the strongest potion the wallet
+// covers up to the target count; a wallet that cannot cover one potion plans
+// nothing so the gear lines still run.
 func (l *Loop) potionPurchaseLine(adena int64) (gear.Purchase, bool) {
     var zero gear.Purchase
     carried := l.potionCount()
     if carried >= potionRestockFloor {
         return zero, false
     }
-    listID, merchantID, itemID := potionMerchantOf(l.zoneRegion)
-    unit := potionUnitPrice(l.zoneRegion, itemID)
-    if unit <= 0 || adena < unit {
-        return zero, false
+    offers := elvenPotionOffers[:]
+    if l.zoneRegion == regionDion {
+        offers = dionPotionOffers[:]
     }
-    count := potionRestockTarget - carried
-    if capped := adena / unit; int64(count) > capped {
-        count = int32(capped)
-    }
-    if count <= 0 {
-        return zero, false
+    for _, offer := range offers {
+        unit := potionUnitPrice(l.zoneRegion, offer.itemID)
+        if unit <= 0 || adena < unit {
+            continue
+        }
+        count := potionRestockTarget - carried
+        if capped := adena / unit; int64(count) > capped {
+            count = int32(capped)
+        }
+        if count <= 0 {
+            continue
+        }
+
+        return gear.Purchase{
+            ItemID:             offer.itemID,
+            ListID:             offer.listID,
+            MerchantTemplateID: offer.merchantID,
+            Count:              count,
+            OwnedStack:         carried,
+            Price:              unit * int64(count),
+            Reason: "keep " + npcdata.ItemName(offer.itemID) +
+                " for the fights",
+            SellFirst:  nil,
+            SellCredit: 0,
+            Gain:       0,
+            Affordable: true,
+            Missing:    0,
+        }, true
     }
 
-    return gear.Purchase{
-        ItemID:             itemID,
-        ListID:             listID,
-        MerchantTemplateID: merchantID,
-        Count:              count,
-        OwnedStack:         carried,
-        Price:              unit * int64(count),
-        Reason: "keep " + npcdata.ItemName(itemID) +
-            " for the fights",
-        SellFirst:  nil,
-        SellCredit: 0,
-        Gain:       0,
-        Affordable: true,
-        Missing:    0,
-    }, true
+    return zero, false
 }
 
 // keepPotion is the junk sell guard: the healing stock never sells back, the

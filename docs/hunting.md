@@ -471,7 +471,9 @@ Dion Lara list 3006300 sells the 1061 and the 1060, the elven
 Herbiel list 3015000 only the 1060 - priced at the reference price
 plus the town tax (15 percent elven, 20 percent Dion) and capped by
 the adena the affordable gear plan leaves, so a thin wallet still
-buys its gear. The junk sell keeps every healing stack. The 51 hour
+buys its gear. A purse that cannot cover the 1061 falls back to the
+1060 of the same list. The junk sell keeps every healing stack. The
+51 hour
 run7 drank 60 potions and bought none: the plan never ordered a
 single one, and the pile up flee fired with an empty bag.
 
@@ -2687,3 +2689,38 @@ server integrity rules in AGENTS.md).
   pathfinding walk back to the farm spot (~62 s) -> farming resumed
   (kills with loot). The bot then kept hunting at level 9 until the
   test window ended.
+
+## Group play (internal/swarm/party, hunt/party.go)
+
+The accounts of one fleet can be grouped into a C1 party by a separate
+configuration file (`configs/parties.json`, the `-party-config` flag).
+A group names a leader and its member accounts, e.g. `test1` leading
+`test1`-`test3`. One fleet process owns one in-process hub keyed by
+account; the hub shares the live placement, target and liveness every
+hunt tick. The server party itself is formed through the real C1
+packets (the layouts are in `docs/protocol_description.md`) - the hub
+only carries the state the game client of a follower cannot see.
+
+The leader invites the group members it sees inside 900 units, at most
+one ask per member every six seconds. The server refuses an invite to a
+target outside the known list, so the visible range guard keeps the
+transaction window from filling with refusals; a member already in the
+party window and a member whose placement is stale (over 20 s) are
+skipped. The follower accepts the pending invitation only when the
+requestor is the configured leader (by object id or name) and the ask
+is younger than 15 seconds, and declines every other requestor.
+
+A follower that falls more than 450 units behind the leader walks after
+it (one ground click per two second request period), stopping at 280
+units of hysteresis. An active fight, an incoming blow or a stale
+leader placement holds the walk so the character never leaves the fight
+it answers. Outside the follow walk the follower adopts the leader's
+current target when that mob is alive, attackable and within 1200 units,
+so the group focus-fires one mob instead of spreading its damage over
+three. The party loot distribution is finders keepers (0), so each
+member still loots its own kills.
+
+The group is optional: with no `-party-config` file the hub is nil and
+every bot hunts alone exactly as before. Session resets clear the party
+mirror and the pending ask; the server re-sends the window after a
+reconnect.
