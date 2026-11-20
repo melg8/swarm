@@ -738,3 +738,56 @@ This is what makes a reconnection after the bot walked away correct:
 the client spawns where the character actually stands instead of the
 login-time place (the stale spawn ran into the server-side walls and
 crashed the real client).
+
+## Party packets (C1)
+
+The group play of the fleet forms a real C1 party: the client packets are
+`RequestJoinParty` (0x29) and `RequestAnswerJoinParty` (0x2A). The layouts
+follow the Mobius `RequestJoinParty.writeImpl` and
+`RequestAnswerJoinParty.writeImpl`:
+
+- `RequestJoinParty 0x29` - `[objectId: 4][distributionType: 4]`. The bot
+  sends `distributionType = 0` (finders keepers, the loot rule of the
+  group). The server creates the party on the invitee's acceptance and
+  requires the requestor to be the leader (or partyless).
+- `RequestAnswerJoinParty 0x2A` - `[response: 4]`: -1 refuses every
+  invitation, 0 declines this one, 1 accepts.
+
+The server answers with the packets of `ServerPackets`. Their layouts
+follow the matching Mobius `writeImpl` classes:
+
+- `AskJoinParty 0x4B` - `[requestorObjectId: 4][distributionType: 4]`: an
+  invitation addressed to the character. The hunt loop answers it with
+  `RequestAnswerJoinParty`, accepting only the configured leader.
+- `JoinParty 0x3C` - `[response: 4]`: the answer echo sent to the
+  requestor. **C1 opcode collision**: `ServerPackets.JOIN_PARTY` and
+  `ServerPackets.AUTO_ATTACK_STOP` are both 0x3C. The dispatch table keeps
+  the `AutoAttackStop` route (the attack machinery needs it), so the
+  party echo is not parsed or routed. Acceptance is detected by the
+  arrival of `PartySmallWindowAdd` instead.
+- `PartySmallWindowAll 0x63` - `[count: 4]` then `count` entries. The
+  count is **members minus one** (the self member is excluded) and is
+  bounded by the party cap of nine. Each entry is `[objectId: 4][name]
+  [curHP: 4][maxHP: 4][curMP: 4][maxMP: 4][classId: 4][unused: 4]
+  [race: 4]`.
+- `PartySmallWindowAdd 0x64` - one entry `[objectId: 4][name][curHP: 4]
+  [maxHP: 4][curMP: 4][maxMP: 4][classId: 4][level: 4][unused: 4]
+  [unused: 4]`.
+- `PartySmallWindowUpdate 0x67` - one entry with the same head as `Add`
+  but no trailing pair: `[objectId: 4][name][curHP: 4][maxHP: 4]
+  [curMP: 4][maxMP: 4][classId: 4][level: 4]`.
+- `PartySmallWindowDelete 0x66` - `[objectId: 4][name]`.
+- `PartySmallWindowDeleteAll 0x65` - empty body, ends the party.
+- `PartyMemberPosition 0xC0` - `[count: 4]` then `count` entries. Unlike
+  the window, the placement list **includes the self member**. Each
+  entry is `[objectId: 4][name][level: 4][classId: 4][unused: 4]
+  [clanId: 4][unused: 4][x: 4][y: 4][z: 4]`.
+
+All strings are null terminated UTF-16LE and all integers are little
+endian. The parsers live in `packets/from_game_server/party.go`, the
+senders in `packets/to_game_server/request_join_party.go` and
+`request_answer_join_party.go`. The application handlers mirror the
+packets into `state.Bot` through the application methods of
+`connection/game_apply.go`; the placement entries also seed world
+records so a follower reads the leader position even when its own game
+client lost sight of it.

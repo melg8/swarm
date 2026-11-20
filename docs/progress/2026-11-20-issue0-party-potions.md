@@ -71,3 +71,14 @@ The restock line orders the potions strongest first: a Dion purse that
 cannot cover the 1061 now buys the 1060 of the same Lara list instead
 of skipping the line. The wallet test and the region test cover the
 fallback; the rest of the potion economy stays in the preceding commit.
+
+### 2026-11-20 - the party packets
+
+The C1 invitation, answer, window and placement packets are parsed and
+serialized: RequestJoinParty 0x29 and RequestAnswerJoinParty 0x2A on
+the client side, AskJoinParty 0x4B, the window 0x63-0x67 and
+PartyMemberPosition 0xC0 on the server side. The window entries trail
+the class with two ints, the placement entries with three, as the
+Mobius `writeImpl` classes define. The protocol notes record the layouts
+and the 0x3C collision of JoinParty with AutoAttackStop. Unit tests
+pin every layout (including the implausible-count guard).
