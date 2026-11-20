@@ -5,9 +5,11 @@
 package hunt
 
 import (
+    "math"
     "testing"
     "time"
 
+    "github.com/melg8/swarm/internal/swarm/npcdata"
     "github.com/melg8/swarm/internal/swarm/state"
     "github.com/stretchr/testify/require"
 )
@@ -197,4 +199,50 @@ func TestNoSelfHealSkillKeepsTheOldRest(t *testing.T) {
     require.Empty(t, game.casts)
     require.Equal(t, 1, game.sits,
         "the heal-less character sits down as before")
+}
+
+// TestNoSelfHealSkillReservesNoMana pins the reserve baseline: a character
+// that never learned an instant self heal keeps every point of mana for the
+// combat casts.
+func TestNoSelfHealSkillReservesNoMana(t *testing.T) {
+    bot := newTestBot()
+    bot.SetSkills(nil)
+
+    loop := NewLoop(&fakeGame{}, bot)
+
+    require.Zero(t, loop.selfHealManaReserve())
+}
+
+// TestCombatCastKeepsTheHealMana pins the reserve: a spell that would drop the
+// bar under the cost of one self heal is held, and the same spell fires once
+// the bar covers both. Wind Strike is used because it carries no overhit gate.
+func TestCombatCastKeepsTheHealMana(t *testing.T) {
+    bot := newCasterBot(100)
+    bot.SetSkills([]state.LearnedSkill{
+        {SkillID: 1177, Level: 1, Passive: false},
+        {SkillID: 1216, Level: 1, Passive: false},
+    })
+    loop := NewLoop(&fakeGame{}, bot)
+    reserve := loop.selfHealManaReserve()
+    require.Positive(t, reserve)
+    cast, ok := npcdata.SkillCastOf(1177)
+    require.True(t, ok)
+    total := int32(math.Ceil(float64(cast.MPCostOf(1)) + reserve))
+    spell := state.LearnedSkill{SkillID: 1177, Level: 1}
+    setMP := func(value int32) {
+        bot.ApplyUserInfo(state.UserInfo{
+            Name: "unittest1", Level: 10, ClassID: bot.SelfClassID(), Race: 1,
+            X: 45000, Y: 50000, Z: -3500,
+            MaxHP: 100, CurHP: 90, MaxMP: 100, CurMP: value,
+        })
+    }
+
+    setMP(total - 1)
+    require.False(t, loop.combatSkillCandidate(
+        spell, "", false, true, time.Now()),
+        "the heal mana stays untouched")
+
+    setMP(total + 1)
+    require.True(t, loop.combatSkillCandidate(
+        spell, "", false, true, time.Now()))
 }

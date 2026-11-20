@@ -47,6 +47,30 @@ func (l *Loop) selfHealSkill(now time.Time) (int32, bool) {
     return 0, false
 }
 
+// selfHealManaReserve returns the mana one instant self heal costs, so a
+// combat cast never spends the recovery a hurt member relies on. A character
+// that learned no self heal reserves nothing.
+func (l *Loop) selfHealManaReserve() float64 {
+    var reserve float64
+    for _, skill := range l.tracker.ActiveSkills() {
+        if !npcdata.SelfHealSkill(skill.SkillID) {
+            continue
+        }
+        cast, ok := npcdata.SkillCastOf(skill.SkillID)
+        if !ok || cast.Operate != "A1" || cast.Target != "SELF" {
+            continue
+        }
+        cost := float64(cast.MPCostOf(skill.Level)) +
+            float64(npcdata.SelfHealInitialConsumeOf(
+                skill.SkillID, skill.Level))
+        if cost > reserve {
+            reserve = cost
+        }
+    }
+
+    return reserve
+}
+
 // healInFlight reports whether the heal cast is still running; the sit
 // transition waits it out.
 func (l *Loop) healInFlight(now time.Time) bool {

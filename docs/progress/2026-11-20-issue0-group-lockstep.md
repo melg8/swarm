@@ -76,3 +76,11 @@ first attacker rotates at 65 percent health to the healthiest warrior
 with a 20 point margin and a 12 second cooldown; the demoted member
 stands out of the attack for four seconds so the new first pulls the
 mob. The hunt tests pin the rotation, the rest and the formation walk.
+
+### 2026-11-20 - keep the mana of one self heal
+
+The combat cast gate now reads the cost of the strongest learned instant
+self heal from the server skill list and refuses to spend it: the bar
+always covers one recovery cast. A member without a learned self heal
+reserves nothing, so its casts are unchanged. The tests pin both paths
+and the exact gate at the reserve boundary.

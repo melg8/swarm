@@ -130,7 +130,7 @@ func (l *Loop) combatSkillCandidate(
     if !cast.Magic && hasWeapon && !cast.UsableWithWeapon(weapon) {
         return false
     }
-    if float64(cast.MPCostOf(skill.Level)) >
+    if float64(cast.MPCostOf(skill.Level))+l.selfHealManaReserve() >
         l.tracker.SelfCurMP() {
         return false
     }
