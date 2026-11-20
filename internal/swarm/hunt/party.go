@@ -4,13 +4,13 @@
 
 package hunt
 
-// The group play of the fleet: the leader invites the visible group members
-// and the followers walk after the leader, adopt its target and answer the
-// invitation of the configured leader only. The server party is the real C1
-// party (RequestJoinParty / RequestAnswerJoinParty); the process wide hub only
-// carries the live placement and the current target between the sessions of
-// one fleet, because the follower decisions need the leader state even when
-// the game client lost sight of it.
+// The group play of the fleet: the leader invites the visible members, then
+// publishes one command every tick - the shared target, the formation anchor,
+// the first attacker and the rest decision. The followers walk into their
+// formation slot, attack only the shared target and rest as one. The server
+// party is the real C1 party (RequestJoinParty / RequestAnswerJoinParty); the
+// process wide hub only carries the state the game client of a member cannot
+// see (docs/hunting.md).
 
 import (
     "math"
@@ -27,13 +27,13 @@ const (
     // server refuses an invite to a target outside the known list, so the
     // leader only invites the members it can see nearby.
     partyInviteRange = 900.0
-    // partyFollowDistance is the planar distance a follower starts walking
-    // after the leader; partyCatchUpDistance is the hysteresis that ends the
-    // walk, so a marching leader never toggles the follow every tick.
-    partyFollowDistance  = 450.0
-    partyCatchUpDistance = 280.0
-    // partyTargetRange bounds the focus fire: the follower adopts the leader
-    // target only when it sits inside this distance. Past
+    // partySlotSpacing is the offset of a follower from the leader anchor and
+    // partySlotRange the distance that ends the formation walk. The offsets
+    // keep the members close without stacking them on one point.
+    partySlotSpacing = 150.0
+    partySlotRange   = 220.0
+    // partyTargetRange bounds the shared target: a follower adopts the leader
+    // target only while it sits inside this distance. Past
     // partyConvergenceRange a follower drops its own fight to rejoin the group.
     partyTargetRange      = 1200.0
     partyConvergenceRange = 2400.0
@@ -43,24 +43,33 @@ const (
     // partyAskWindow bounds the age of an unanswered invitation: an ask older
     // than this is dropped instead of answered late.
     partyAskWindow = 15 * time.Second
-    // partyStateFreshness bounds the published state: a logged out leader
-    // keeps its last placement, and the follower must not chase it.
+    // partyStateFreshness bounds the published state and the group command:
+    // a logged out member keeps its last placement, and nobody chases it.
     partyStateFreshness = 20 * time.Second
+    // partyTankSwapHealth is the health line the first attacker gives up: a
+    // healthier member takes the lead when it beats the current one by
+    // partyTankSwapMargin, and only after partyRotationCooldown.
+    partyTankSwapHealth   = 65.0
+    partyTankSwapMargin   = 20.0
+    partyRotationCooldown = 12 * time.Second
+    // partyStandDown holds the demoted first attacker out of the attack: the
+    // new first has to pull the mob before the old one swings again.
+    partyStandDown = 4 * time.Second
 )
 
 // partyState is the group role of one loop: the shared hub, the account, the
-// leader account and the pacing of the invitations and the follow walk.
+// leader account, the invitation pacing, the walk pacing and the attack hold
+// of a demoted first attacker.
 type partyState struct {
     hub     *party.Hub
     account string
     leader  string
     invites map[string]time.Time
-    // following holds the hysteresis of the follow walk and followAt paces
-    // its click requests.
-    following bool
-    followAt  time.Time
-    // focusTarget names the adopted leader target the focus log already
-    // covered.
+    // followAt paces the formation click requests.
+    followAt time.Time
+    // holdUntil keeps a demoted first attacker out of the attack window.
+    holdUntil time.Time
+    // focusTarget names the shared target the focus log already covered.
     focusTarget int32
 }
 
@@ -80,8 +89,6 @@ func (l *Loop) SetParty(hub *party.Hub, account string) {
         account:     account,
         leader:      leader,
         invites:     make(map[string]time.Time),
-        following:   false,
-        followAt:    time.Time{},
         focusTarget: 0,
     }
     role := "follower"
@@ -93,7 +100,8 @@ func (l *Loop) SetParty(hub *party.Hub, account string) {
 }
 
 // partyTick publishes the live state of the character and runs the group role.
-// It reports true when the follower walk owns the tick.
+// The leader computes the command, the follower obeys it. It reports true when
+// the formation walk or the shared rest owns the tick.
 func (l *Loop) partyTick(now time.Time) bool {
     if l.party == nil {
         return false
@@ -102,28 +110,377 @@ func (l *Loop) partyTick(now time.Time) bool {
     if !ok {
         return false
     }
+    hp := l.tracker.SelfHealthPercent()
+    mp := l.tracker.SelfManaPercent()
     l.party.hub.Publish(party.MemberState{
-        Account:  l.party.account,
-        ObjectID: l.tracker.SelfObjectID(),
-        TargetID: l.target,
-        X:        x,
-        Y:        y,
-        Z:        z,
-        Alive:    !l.tracker.SelfDead(),
-        At:       now,
+        Account:   l.party.account,
+        ObjectID:  l.tracker.SelfObjectID(),
+        TargetID:  l.target,
+        X:         x,
+        Y:         y,
+        Z:         z,
+        HPPercent: hp,
+        MPPercent: mp,
+        Alive:     !l.tracker.SelfDead(),
+        Caster:    l.isCaster(),
+        RestWanted: hp < reengageHealthPercent ||
+            l.isCaster() && mp < manaSitPercent,
+        At: now,
     })
     if l.party.leader == l.party.account {
         l.partyInviteTick(now)
+        command := l.partyLeadTick(now, x, y, z)
+        l.partyRoleAttack(command, now)
 
         return false
     }
     l.partyAnswerTick(now)
-    if l.partyFollowTick(now) {
+    if l.phase == phaseLoot || l.tripActive() {
+        // Looting and the merchant errand own their phases: the group waits
+        // for the pickups and the potion restock before it marches again.
+        return false
+    }
+    command, ok := l.party.hub.CoordinationOf(l.party.account)
+    if !ok || now.Sub(command.At) > partyStateFreshness {
+        return false
+    }
+    l.partyRoleAttack(command, now)
+
+    return l.partyFollowTick(now, command)
+}
+
+// partyRoleAttack applies the first attacker role of the group command: the
+// promoted member attacks at once, the demoted one stands down so the mob
+// follows the new first instead of the old one.
+func (l *Loop) partyRoleAttack(command party.Coordination, now time.Time) {
+    if command.First == l.party.account {
+        l.party.holdUntil = time.Time{}
+
+        return
+    }
+    until := command.FirstAt.Add(partyStandDown)
+    if now.Before(until) && (l.party.holdUntil.IsZero() ||
+        until.After(l.party.holdUntil)) {
+        l.party.holdUntil = until
+        l.logf("Hunt: %s takes the lead of the group", command.First)
+    }
+}
+
+// partyAttackHeld reports whether the group holds this member out of the
+// attack: the demoted first attacker waits for the new one to pull the mob.
+func (l *Loop) partyAttackHeld(now time.Time) bool {
+    return l.party != nil && now.Before(l.party.holdUntil)
+}
+
+// partyLeadTick builds and publishes the group command from the fresh member
+// states: the first attacker rotation, the shared rest and the leader target.
+func (l *Loop) partyLeadTick(
+    now time.Time, x int32, y int32, z int32,
+) party.Coordination {
+    _, members, ok := l.party.hub.GroupOf(l.party.account)
+    if !ok {
+        return party.Coordination{}
+    }
+    states := make([]party.MemberState, 0, len(members))
+    for _, account := range members {
+        member, known := l.party.hub.Member(account)
+        if known && now.Sub(member.At) <= partyStateFreshness {
+            states = append(states, member)
+        }
+    }
+    previous, _ := l.party.hub.CoordinationOf(l.party.account)
+    first, firstAt := l.partyChooseFirst(states, previous, now)
+    command := party.Coordination{
+        Leader:   l.party.account,
+        First:    first,
+        FirstAt:  firstAt,
+        Rest:     l.partyWantRest(states, previous),
+        TargetID: l.target,
+        X:        x,
+        Y:        y,
+        Z:        z,
+        At:       now,
+    }
+    l.party.hub.PublishCoordination(l.party.account, command)
+
+    return command
+}
+
+// partyChooseFirst rotates the first attacker when its health fell below the
+// swap line and a healthier member is ready. Casters never take the lead of a
+// warrior group. A dead or stale first is replaced without the cooldown.
+func (l *Loop) partyChooseFirst(
+    states []party.MemberState, previous party.Coordination, now time.Time,
+) (string, time.Time) {
+    first := previous.First
+    firstAt := previous.FirstAt
+    fresh := first == ""
+    if fresh {
+        first = l.party.leader
+        firstAt = now
+    }
+    current, known := partyStateOf(states, first)
+    if known && current.HPPercent >= partyTankSwapHealth {
+        return first, firstAt
+    }
+    best, found := partyBestFirst(states)
+    if !found {
+        return first, firstAt
+    }
+    if known && best.HPPercent < current.HPPercent+partyTankSwapMargin {
+        return first, firstAt
+    }
+    if known && current.Alive && !fresh &&
+        now.Sub(firstAt) < partyRotationCooldown {
+        return first, firstAt
+    }
+    if best.Account == first {
+        return first, firstAt
+    }
+    l.logf("Hunt: party first attacker is now %s at %.0f%%",
+        best.Account, best.HPPercent)
+
+    return best.Account, now
+}
+
+// partyBestFirst picks the healthiest living warrior of the fresh states.
+// Casters never take the lead of a warrior group.
+func partyBestFirst(states []party.MemberState) (party.MemberState, bool) {
+    var best party.MemberState
+    found := false
+    for _, member := range states {
+        if !member.Alive || member.Caster || member.ObjectID == 0 {
+            continue
+        }
+        if !found || member.HPPercent > best.HPPercent {
+            best, found = member, true
+        }
+    }
+
+    return best, found
+}
+
+// partyStateOf finds the fresh state of one account.
+func partyStateOf(
+    states []party.MemberState, account string,
+) (party.MemberState, bool) {
+    for _, state := range states {
+        if state.Account == account {
+            return state, true
+        }
+    }
+
+    return party.MemberState{}, false
+}
+
+// partyWantRest starts the shared rest when any member needs recovery and ends
+// it only when every living member stands above the recovery lines. The
+// hysteresis keeps a group from toggling between the fight and the sit.
+func (l *Loop) partyWantRest(
+    states []party.MemberState, previous party.Coordination,
+) bool {
+    rest := previous.Rest
+    wanted := false
+    recovered := len(states) > 0
+    for _, member := range states {
+        if !member.Alive {
+            continue
+        }
+        if member.RestWanted {
+            wanted = true
+        }
+        if member.HPPercent < standUpHealthPercent ||
+            member.Caster && member.MPPercent < manaStandPercent {
+            recovered = false
+        }
+    }
+    if wanted {
+        rest = true
+    }
+    if rest && recovered {
+        rest = false
+    }
+
+    return rest
+}
+
+// partyFollowTick keeps a follower in its formation slot. A member outside the
+// slot walks back (dropping a private fight), a resting member gathers and
+// sits with the group, and a member in formation waits for the shared target
+// instead of picking one of its own.
+func (l *Loop) partyFollowTick(
+    now time.Time, command party.Coordination,
+) bool {
+    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    destX, destY := l.partySlot(command)
+    dist := math.Hypot(destX-float64(selfX), destY-float64(selfY))
+    if command.Rest {
+        l.partyDropTarget()
+
+        return l.partyRest(now, selfX, selfY, selfZ, destX, destY, dist)
+    }
+    if dist > partySlotRange {
+        l.partyDropTarget()
+
+        return l.partyWalkTo(now, selfX, selfY, selfZ, destX, destY, dist)
+    }
+    if l.partyAdoptTarget(now, command) {
+        return false
+    }
+    if l.partyHoldPick(command) {
         return true
     }
-    l.partyAdoptTarget(now)
+    if l.tracker.SelfSitting() &&
+        l.tracker.SelfHealthPercent() >= standUpHealthPercent {
+        l.standUpGuarded(now)
+
+        return true
+    }
 
     return false
+}
+
+// partySlot returns the formation point of this member: the leader anchor plus
+// a small per member offset around it.
+func (l *Loop) partySlot(command party.Coordination) (float64, float64) {
+    slot, ok := l.party.hub.SlotOf(l.party.account)
+    if !ok || slot == 0 {
+        return float64(command.X), float64(command.Y)
+    }
+    angle := float64(slot-1) * 2 * math.Pi / 6
+
+    return float64(command.X) + math.Cos(angle)*partySlotSpacing,
+        float64(command.Y) + math.Sin(angle)*partySlotSpacing
+}
+
+// partyWalkTo issues one paced ground click toward the formation point and
+// reports that the walk owns the tick.
+func (l *Loop) partyWalkTo(
+    now time.Time, selfX int32, selfY int32, selfZ int32,
+    destX float64, destY float64, dist float64,
+) bool {
+    if !l.party.followAt.IsZero() &&
+        now.Sub(l.party.followAt) < walkRequestPeriod {
+        return true
+    }
+    moveX, moveY, _ := walkClickSegment(
+        selfX, selfY, selfZ, destX, destY, float64(selfZ),
+        math.Min(returnWalkSegment, dist))
+    if err := l.game.WalkTo(int32(moveX), int32(moveY), selfZ); err != nil {
+        l.logf("Hunt: party formation walk failed: %v", err)
+
+        return true
+    }
+    l.party.followAt = now
+    l.logf("Hunt: party formation walk, %.0f units from the slot", dist)
+
+    return true
+}
+
+// partyRest gathers a resting member and sits it down when it reached its
+// slot. The shared rest ends with the leader command, never with one member
+// that recovered early.
+func (l *Loop) partyRest(
+    now time.Time, selfX int32, selfY int32, selfZ int32,
+    destX float64, destY float64, dist float64,
+) bool {
+    if dist > partySlotRange {
+        return l.partyWalkTo(now, selfX, selfY, selfZ, destX, destY, dist)
+    }
+    if l.tracker.SelfUnderAttack() {
+        // A mob reached the resting spot: stand and let the defensive
+        // decision answer it, the group sits again once the blow stops.
+        l.standUpGuarded(now)
+
+        return true
+    }
+    l.rest()
+
+    return true
+}
+
+// partyDropTarget clears a private fight when the group moves or rests.
+func (l *Loop) partyDropTarget() {
+    if l.target == 0 {
+        return
+    }
+    l.target = 0
+    l.clearBlindRecovery()
+}
+
+// partyHoldPick keeps a member in formation from picking a private fight: only
+// the shared target is worth attacking. An attacker that reached the member is
+// still answered by the defensive gate in engage.
+func (l *Loop) partyHoldPick(command party.Coordination) bool {
+    if l.phase != phaseEngage || l.tracker.SelfUnderAttack() {
+        return false
+    }
+    if command.TargetID == 0 || !l.tracker.ObjectAlive(command.TargetID) ||
+        !l.tracker.ObjectAttackable(command.TargetID) {
+        return true
+    }
+    selfX, selfY, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    targetX, targetY, _, known := l.tracker.ObjectPosition(command.TargetID)
+    if !known {
+        return true
+    }
+
+    return math.Hypot(float64(targetX-selfX), float64(targetY-selfY)) >
+        partyTargetRange
+}
+
+// partyAdoptTarget adopts the shared target for the simultaneous attack. It
+// reports true when a fresh target was selected this tick.
+func (l *Loop) partyAdoptTarget(
+    now time.Time, command party.Coordination,
+) bool {
+    if command.TargetID == 0 || l.target == command.TargetID {
+        return false
+    }
+    target := command.TargetID
+    if !l.tracker.ObjectAlive(target) ||
+        !l.tracker.ObjectAttackable(target) {
+        return false
+    }
+    targetX, targetY, targetZ, ok := l.tracker.ObjectPosition(target)
+    if !ok {
+        return false
+    }
+    selfX, selfY, _, ok := l.tracker.SelfPosition()
+    if !ok {
+        return false
+    }
+    if math.Hypot(float64(targetX-selfX), float64(targetY-selfY)) >
+        partyTargetRange {
+        return false
+    }
+    l.partyDropTarget()
+    l.target = target
+    l.noTargetSince = time.Time{}
+    l.noPickLogAt = time.Time{}
+    l.engageAt = now
+    l.clearBlindRecovery()
+    l.maybeBeginLure(now)
+    l.approachPick(now, state.AttackTarget{
+        ObjectID: target,
+        Name:     l.tracker.ObjectName(target),
+        X:        targetX,
+        Y:        targetY,
+        Z:        targetZ,
+    })
+    if l.party.focusTarget != target {
+        l.party.focusTarget = target
+        l.logf("Hunt: focusing the target %s of %s",
+            l.tracker.ObjectName(target), l.party.leader)
+    }
+
+    return true
 }
 
 // partyInviteTick invites the visible group members that are not in the party
@@ -218,122 +575,4 @@ func (l *Loop) partyAnswerTick(now time.Time) {
         return
     }
     l.logf("Hunt: declined the party invitation of %d", requestor)
-}
-
-// partyFollowTick walks a follower after a leader it fell behind. Near the
-// leader an active fight or an incoming blow holds the walk; far away the
-// group wins and the private target is dropped. It reports true while the
-// follow owns the movement.
-func (l *Loop) partyFollowTick(now time.Time) bool {
-    // An errand owns the movement until it ends: a follower that abandons a
-    // town trip to chase its leader never reaches the merchant and never
-    // restocks the potions the trip started for.
-    if l.tripActive() {
-        return false
-    }
-    leader, known := l.party.hub.LeaderOf(l.party.account)
-    if !known || !leader.Alive || leader.ObjectID == 0 ||
-        now.Sub(leader.At) > partyStateFreshness {
-        l.party.following = false
-
-        return false
-    }
-    selfX, selfY, selfZ, ok := l.tracker.SelfPosition()
-    if !ok {
-        return false
-    }
-    dist := math.Hypot(float64(leader.X-selfX), float64(leader.Y-selfY))
-    if dist > partyConvergenceRange {
-        // A follower hunting in another zone always finds a local target and
-        // an incoming blow, so it would never rejoin the group. Past this
-        // range cohesion wins: drop the private fight and walk to the leader.
-        if l.target != 0 {
-            l.target = 0
-            l.clearBlindRecovery()
-        }
-    } else {
-        if l.target != 0 && l.tracker.ObjectAlive(l.target) {
-            return false
-        }
-        if l.tracker.SelfUnderAttack() {
-            return false
-        }
-    }
-    if l.party.following {
-        if dist <= partyCatchUpDistance {
-            l.party.following = false
-
-            return false
-        }
-    } else {
-        if dist <= partyFollowDistance {
-            return false
-        }
-        l.party.following = true
-    }
-    if !l.party.followAt.IsZero() &&
-        now.Sub(l.party.followAt) < walkRequestPeriod {
-        return true
-    }
-    moveX, moveY, _ := walkClickSegment(
-        selfX, selfY, selfZ,
-        float64(leader.X), float64(leader.Y), float64(selfZ),
-        math.Min(returnWalkSegment, dist-partyCatchUpDistance))
-    if err := l.game.WalkTo(int32(moveX), int32(moveY), selfZ); err != nil {
-        l.logf("Hunt: follow walk failed: %v", err)
-
-        return true
-    }
-    l.party.followAt = now
-    l.logf("Hunt: walking after %s, %.0f units behind", l.party.leader, dist)
-
-    return true
-}
-
-// partyAdoptTarget adopts the leader target for the focus fire: the follower
-// attacks the mob the group fights instead of picking its own.
-func (l *Loop) partyAdoptTarget(now time.Time) {
-    if l.target != 0 {
-        return
-    }
-    leader, known := l.party.hub.LeaderOf(l.party.account)
-    if !known || !leader.Alive || leader.TargetID == 0 ||
-        now.Sub(leader.At) > partyStateFreshness {
-        return
-    }
-    target := leader.TargetID
-    if !l.tracker.ObjectAlive(target) ||
-        !l.tracker.ObjectAttackable(target) {
-        return
-    }
-    targetX, targetY, targetZ, ok := l.tracker.ObjectPosition(target)
-    if !ok {
-        return
-    }
-    selfX, selfY, _, ok := l.tracker.SelfPosition()
-    if !ok {
-        return
-    }
-    if math.Hypot(float64(targetX-selfX), float64(targetY-selfY)) >
-        partyTargetRange {
-        return
-    }
-    l.target = target
-    l.noTargetSince = time.Time{}
-    l.noPickLogAt = time.Time{}
-    l.engageAt = now
-    l.clearBlindRecovery()
-    l.maybeBeginLure(now)
-    l.approachPick(now, state.AttackTarget{
-        ObjectID: target,
-        Name:     l.tracker.ObjectName(target),
-        X:        targetX,
-        Y:        targetY,
-        Z:        targetZ,
-    })
-    if l.party.focusTarget != target {
-        l.party.focusTarget = target
-        l.logf("Hunt: focusing the target %s of %s",
-            l.tracker.ObjectName(target), l.party.leader)
-    }
 }

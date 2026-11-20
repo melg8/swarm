@@ -65,3 +65,14 @@ wish; a new `Coordination` carries the leader's shared target, the
 formation anchor, the first attacker and the rest decision. The hub
 stores one command per leader and exposes the stable formation slot of
 every account. The hub tests pin the command channel and the slots.
+
+### 2026-11-20 - one command, one formation, one target
+
+The leader computes and publishes a group command every tick: the shared
+target, the formation anchor, the first attacker and the rest flag. The
+followers walk into stable small offsets around the leader, drop private
+targets, attack only the shared one and sit when the group rests. The
+first attacker rotates at 65 percent health to the healthiest warrior
+with a 20 point margin and a 12 second cooldown; the demoted member
+stands out of the attack for four seconds so the new first pulls the
+mob. The hunt tests pin the rotation, the rest and the formation walk.

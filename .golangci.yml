@@ -218,6 +218,7 @@ linters:
         - .*from_game_server\.PartyMember$
         - .*party\.Hub$
         - .*party\.MemberState$
+        - .*party\.Coordination$
     exhaustive:
       # A switch with a default case explicitly handles the remaining
       # values; demanding every enum member listed there too would only

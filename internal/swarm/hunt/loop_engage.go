@@ -53,6 +53,11 @@ func (l *Loop) engage() {
     if l.fightTick(now) {
         return
     }
+    if l.partyAttackHeld(now) {
+        // The demoted first attacker lets the new leader pull the mob: the
+        // damage spreads over the group instead of grinding one member down.
+        return
+    }
     l.requestAttack(now)
 }
 
