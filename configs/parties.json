@@ -1,0 +1,8 @@
+{
+    "groups": [
+        {
+            "leader": "test1",
+            "members": ["test1", "test2", "test3"]
+        }
+    ]
+}

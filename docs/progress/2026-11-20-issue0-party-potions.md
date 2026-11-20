@@ -99,3 +99,11 @@ AnswerJoinParty senders. The dispatch routes the window and the ask;
 the JoinParty echo stays unrouted because it shares 0x3C with
 AutoAttackStop in C1 - the acceptance arrives with PartySmallWindowAdd.
 A dispatch test drives the packets through the table.
+
+### 2026-11-20 - the group config and the fleet hub
+
+The separate `configs/parties.json` defines the groups (test1 leads
+test1-test3). The `party` package parses and validates it (leader listed,
+no shared account, at most nine members) and hosts the process wide hub
+that shares the live placement and the target between the sessions of
+one fleet. Tests pin the parse, the validation and the hub contract.
