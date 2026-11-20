@@ -222,6 +222,12 @@ func (l *Loop) partyAnswerTick(now time.Time) {
 // fight or an incoming blow holds the walk: the character finishes what it
 // answers. It reports true while the follow owns the movement.
 func (l *Loop) partyFollowTick(now time.Time) bool {
+    // An errand owns the movement until it ends: a follower that abandons a
+    // town trip to chase its leader never reaches the merchant and never
+    // restocks the potions the trip started for.
+    if l.tripActive() {
+        return false
+    }
     if l.target != 0 && l.tracker.ObjectAlive(l.target) {
         return false
     }

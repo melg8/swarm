@@ -157,15 +157,15 @@ func TestFollowerFollowsAStaleLeaderState(t *testing.T) {
     require.Empty(t, game.walks)
 }
 
-// TestPartyRunsOutsideTheEngagePhase pins the every tick hook: a member that
-// walks to town still publishes its placement and follows its leader, so the
-// hub does not go stale while the group travels.
+// TestPartyRunsOutsideTheEngagePhase pins the every tick hook: a member
+// outside a fight still publishes its placement and follows its leader, so
+// the hub does not go stale while the group travels.
 func TestPartyRunsOutsideTheEngagePhase(t *testing.T) {
     loop, game, bot, _ := newTripLoop()
     hub := newPartyHub("test1", "test2")
     loop.SetParty(hub, "test2")
     setSelf(bot, 200, 10000)
-    loop.phase = phaseTownWalk
+    loop.phase = phaseLoot
     now := time.Now()
     hub.Publish(party.MemberState{
         Account: "test1", ObjectID: 100, X: 12000, Y: 20000,
@@ -179,6 +179,28 @@ func TestPartyRunsOutsideTheEngagePhase(t *testing.T) {
     require.Equal(t, int32(200), published.ObjectID)
     require.Len(t, game.walks, 1,
         "the follower walks after the leader outside the fight")
+}
+
+// TestTownTripYieldsToTheErrand pins the restock guard: a member on a town
+// trip finishes the merchant errand instead of abandoning it for the leader.
+func TestTownTripYieldsToTheErrand(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    hub := newPartyHub("test1", "test2")
+    loop.SetParty(hub, "test2")
+    setSelf(bot, 200, 10000)
+    loop.phase = phaseTownWalk
+    now := time.Now()
+    hub.Publish(party.MemberState{
+        Account: "test1", ObjectID: 100, X: 12000, Y: 20000,
+        Z: -3500, Alive: true, At: now,
+    })
+
+    loop.partyTick(now)
+
+    require.Empty(t, game.walks, "the errand owns the movement")
+    published, ok := hub.Member("test2")
+    require.True(t, ok)
+    require.Equal(t, int32(200), published.ObjectID)
 }
 
 // TestFollowerFocusesTheLeaderTarget pins the focus fire: the follower adopts

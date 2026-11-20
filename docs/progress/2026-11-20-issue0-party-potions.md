@@ -136,3 +136,11 @@ the leader never saw a member inside the invite range. The hook now
 runs from `tickContext` on every decision: the hub stays fresh, the
 follower walks after its leader from any phase and the leader invites
 as soon as the member comes into view. A test pins the town walk case.
+
+### 2026-11-20 - let the potion errand finish
+
+The live run formed the party (test3, then test2 joined) and converged
+the group, but the follow walk was hijacking the town trips: a follower
+with a potion plan never reached Herbiel. A town trip now owns the
+movement until it ends; the follower rejoins the leader afterwards.
+The second live check confirms the party window and the 1060 restock.
