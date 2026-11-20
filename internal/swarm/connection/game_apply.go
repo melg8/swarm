@@ -697,3 +697,151 @@ func (gc *GameClient) convertInventoryItems(
 
     return gc.invItems
 }
+
+// The party apply paths mirror the server party view into the tracker: the
+// small window owns the membership and the vitals, the position packet the
+// placements (which also seed world records for followers that lost sight of
+// the leader), and the ask the pending invitation. The layouts live in
+// packets/from_game_server/party.go.
+
+// applyPartySmallWindowAll replaces the party view with the whole window.
+func (gc *GameClient) applyPartySmallWindowAll(payload []byte) {
+    if err := fromgameserver.ParsePartySmallWindowAllPacket(
+        &gc.partyAll, payload); err != nil {
+        gc.logger.Printf("Failed to parse party window: %v", err)
+
+        return
+    }
+    if gc.tracker == nil {
+        return
+    }
+    members := gc.convertPartyMembers(gc.partyAll.Members)
+    gc.tracker.ApplyPartyAll(members)
+    gc.logger.Printf("Party window with %d members", len(members))
+}
+
+// applyPartySmallWindowAdd adds one joined member to the party view.
+func (gc *GameClient) applyPartySmallWindowAdd(payload []byte) {
+    if err := fromgameserver.ParsePartySmallWindowAddPacket(
+        &gc.partyAdd, payload); err != nil {
+        gc.logger.Printf("Failed to parse party window add: %v", err)
+
+        return
+    }
+    if gc.tracker == nil {
+        return
+    }
+    member := gc.convertPartyMember(gc.partyAdd.Member)
+    gc.tracker.ApplyPartyAdd(member)
+    gc.logger.Printf("Party member joined: %s", member.Name)
+}
+
+// applyPartySmallWindowUpdate refreshes the vitals of one member.
+func (gc *GameClient) applyPartySmallWindowUpdate(payload []byte) {
+    if err := fromgameserver.ParsePartySmallWindowUpdatePacket(
+        &gc.partyUpdate, payload); err != nil {
+        gc.logger.Printf("Failed to parse party window update: %v", err)
+
+        return
+    }
+    if gc.tracker == nil {
+        return
+    }
+    gc.tracker.ApplyPartyUpdate(gc.convertPartyMember(gc.partyUpdate.Member))
+}
+
+// applyPartySmallWindowDeleteAll ends the party view.
+func (gc *GameClient) applyPartySmallWindowDeleteAll(payload []byte) {
+    if err := fromgameserver.ParsePartySmallWindowDeleteAllPacket(
+        &gc.partyDeleteAll, payload); err != nil {
+        gc.logger.Printf("Failed to parse party delete all: %v", err)
+
+        return
+    }
+    if gc.tracker == nil {
+        return
+    }
+    gc.tracker.ClearParty()
+    gc.logger.Println("Party ended")
+}
+
+// applyPartySmallWindowDelete removes one member of the party view.
+func (gc *GameClient) applyPartySmallWindowDelete(payload []byte) {
+    if err := fromgameserver.ParsePartySmallWindowDeletePacket(
+        &gc.partyDelete, payload); err != nil {
+        gc.logger.Printf("Failed to parse party member delete: %v", err)
+
+        return
+    }
+    if gc.tracker == nil {
+        return
+    }
+    gc.tracker.ApplyPartyDelete(gc.partyDelete.ObjectID)
+    gc.logger.Printf("Party member left: %s", gc.partyDelete.Name)
+}
+
+// applyPartyMemberPosition mirrors the placements of the party members.
+func (gc *GameClient) applyPartyMemberPosition(payload []byte) {
+    if err := fromgameserver.ParsePartyMemberPositionPacket(
+        &gc.partyPositions, payload); err != nil {
+        gc.logger.Printf("Failed to parse party positions: %v", err)
+
+        return
+    }
+    if gc.tracker == nil {
+        return
+    }
+    members := gc.convertPartyMembers(gc.partyPositions.Members)
+    gc.tracker.ApplyPartyPositions(members)
+}
+
+// applyAskJoinParty records a pending invitation for the hunt loop to answer.
+func (gc *GameClient) applyAskJoinParty(payload []byte) {
+    if err := fromgameserver.ParseAskJoinPartyPacket(
+        &gc.askJoinParty, payload); err != nil {
+        gc.logger.Printf("Failed to parse join party ask: %v", err)
+
+        return
+    }
+    if gc.tracker == nil {
+        return
+    }
+    gc.tracker.ApplyPartyAsk(gc.askJoinParty.RequestorObjectID)
+    gc.logger.Printf("Party invitation from %d",
+        gc.askJoinParty.RequestorObjectID)
+}
+
+// convertPartyMember converts one parsed member into the state view.
+func (gc *GameClient) convertPartyMember(
+    source fromgameserver.PartyMember,
+) state.PartyMember {
+    return state.PartyMember{
+        ObjectID: source.ObjectID,
+        Name:     source.Name,
+        HP:       source.HP,
+        MaxHP:    source.MaxHP,
+        MP:       source.MP,
+        MaxMP:    source.MaxMP,
+        ClassID:  source.ClassID,
+        Level:    source.Level,
+        X:        source.X,
+        Y:        source.Y,
+        Z:        source.Z,
+    }
+}
+
+// convertPartyMembers converts a parsed member list through the reused
+// conversion buffer: the state layer copies the values, so the buffer is not
+// retained. The server caps a party at nine, the buffer size.
+func (gc *GameClient) convertPartyMembers(
+    source []fromgameserver.PartyMember,
+) []state.PartyMember {
+    if len(source) > partyScratchCapacity {
+        source = source[:partyScratchCapacity]
+    }
+    for i := range source {
+        gc.partyMembers[i] = gc.convertPartyMember(source[i])
+    }
+
+    return gc.partyMembers[:len(source)]
+}

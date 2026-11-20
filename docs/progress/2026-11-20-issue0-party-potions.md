@@ -90,3 +90,12 @@ member, the vitals refresh, the removal, the reset on a new session and
 the pending invitation. The placement packet also seeds world records
 so a follower reads the leader position when its own client lost sight
 of it. The state tests pin the whole packet walk and the reset.
+
+### 2026-11-20 - the party packets in the game session
+
+The session parses the party packets into reusable scratch structs and
+mirrors them into the tracker, and it exposes the JoinParty and
+AnswerJoinParty senders. The dispatch routes the window and the ask;
+the JoinParty echo stays unrouted because it shares 0x3C with
+AutoAttackStop in C1 - the acceptance arrives with PartySmallWindowAdd.
+A dispatch test drives the packets through the table.

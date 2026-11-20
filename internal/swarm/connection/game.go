@@ -136,9 +136,17 @@ type GameClient struct {
     skillList      fromgameserver.SkillListPacket
     questList      fromgameserver.QuestListPacket
     abnormalStatus fromgameserver.AbnormalStatusUpdatePacket
+    partyAll       fromgameserver.PartySmallWindowAllPacket
+    partyAdd       fromgameserver.PartySmallWindowAddPacket
+    partyUpdate    fromgameserver.PartySmallWindowUpdatePacket
+    partyDelete    fromgameserver.PartySmallWindowDeletePacket
+    partyDeleteAll fromgameserver.PartySmallWindowDeleteAllPacket
+    partyPositions fromgameserver.PartyMemberPositionPacket
+    askJoinParty   fromgameserver.AskJoinPartyPacket
     npcHTML        fromgameserver.NpcHTMLMessage
     invItems       []state.InventoryItem
     skills         []state.LearnedSkill
+    partyMembers   [partyScratchCapacity]state.PartyMember
     statusAttrs    [statusAttrsCapacity]state.Attribute
     htmlMu         sync.Mutex
     lastHTML       fromgameserver.NpcHTMLMessage
@@ -155,6 +163,10 @@ type GameClient struct {
 
 // statusAttrsCapacity bounds the scratch attributes of status updates.
 const statusAttrsCapacity = 8
+
+// partyScratchCapacity bounds the state conversion scratch of the party
+// packets: the server caps a party at nine players.
+const partyScratchCapacity = 9
 
 // packetTraceEnv enables a one line trace of every received packet id
 // when set, which is the fastest way to follow a protocol flow live.
@@ -223,8 +235,16 @@ func NewGameClient(conn net.Conn) (*GameClient, error) { //nolint:funlen
         skillList:       *fromgameserver.NewSkillListPacket(),
         questList:       *fromgameserver.NewQuestListPacket(),
         abnormalStatus:  *fromgameserver.NewAbnormalStatusUpdatePacket(),
+        partyAll:        *fromgameserver.NewPartySmallWindowAllPacket(),
+        partyAdd:        *fromgameserver.NewPartySmallWindowAddPacket(),
+        partyUpdate:     *fromgameserver.NewPartySmallWindowUpdatePacket(),
+        partyDelete:     *fromgameserver.NewPartySmallWindowDeletePacket(),
+        partyDeleteAll:  *fromgameserver.NewPartySmallWindowDeleteAllPacket(),
+        partyPositions:  *fromgameserver.NewPartyMemberPositionPacket(),
+        askJoinParty:    *fromgameserver.NewAskJoinPartyPacket(),
         invItems:        nil,
         skills:          nil,
+        partyMembers:    [partyScratchCapacity]state.PartyMember{},
         statusAttrs:     [statusAttrsCapacity]state.Attribute{},
         claimsOwnStream: atomic.Bool{},
     }

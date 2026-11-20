@@ -103,6 +103,24 @@ var packetRoutes = []struct {
     {fromgameserver.ItemListPacketID, (*GameClient).applyItemList},
     {fromgameserver.InventoryUpdatePacketID,
         (*GameClient).applyInventoryUpdate},
+    // The party: the small window membership, the placements and the
+    // invitation ask.
+    {fromgameserver.PartySmallWindowAllPacketID,
+        (*GameClient).applyPartySmallWindowAll},
+    {fromgameserver.PartySmallWindowAddPacketID,
+        (*GameClient).applyPartySmallWindowAdd},
+    {fromgameserver.PartySmallWindowUpdatePacketID,
+        (*GameClient).applyPartySmallWindowUpdate},
+    {fromgameserver.PartySmallWindowDeleteAllPacketID,
+        (*GameClient).applyPartySmallWindowDeleteAll},
+    {fromgameserver.PartySmallWindowDeletePacketID,
+        (*GameClient).applyPartySmallWindowDelete},
+    {fromgameserver.PartyMemberPositionPacketID,
+        (*GameClient).applyPartyMemberPosition},
+    {fromgameserver.AskJoinPartyPacketID, (*GameClient).applyAskJoinParty},
+    // JoinParty (0x3C) shares its opcode with AutoAttackStop in C1: the
+    // dispatch keeps AutoAttackStop and the party acceptance arrives through
+    // PartySmallWindowAdd, so the echo stays unrouted (see the protocol notes).
 }
 
 // packetHandlers is the indexed form of packetRoutes: one array read

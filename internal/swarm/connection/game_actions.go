@@ -309,3 +309,33 @@ func (gc *GameClient) RestartAtVillage() error {
 
     return nil
 }
+
+// JoinParty invites a visible player into the party of the character. The
+// server requires the requestor to be the party leader (or partyless, which
+// creates the party on the acceptance) and the target to sit in the known
+// list; the answer arrives as the JoinParty echo and, on an accept, as the
+// PartySmallWindowAdd of the joined member.
+func (gc *GameClient) JoinParty(objectID int32) error {
+    request := togameserver.NewRequestJoinParty()
+    request.ObjectID = objectID
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to invite %d into the party: %w",
+            objectID, err)
+    }
+    gc.tracker.RecordEvent("inviting " +
+        strconv.Itoa(int(objectID)) + " into the party")
+
+    return nil
+}
+
+// AnswerJoinParty answers the pending AskJoinParty invitation: 1 joins the
+// party of the requestor, 0 declines.
+func (gc *GameClient) AnswerJoinParty(response int32) error {
+    request := togameserver.NewRequestAnswerJoinParty()
+    request.Response = response
+    if err := gc.sendPacket(request); err != nil {
+        return fmt.Errorf("failed to answer the party invitation: %w", err)
+    }
+
+    return nil
+}
