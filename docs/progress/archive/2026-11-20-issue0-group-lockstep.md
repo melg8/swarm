@@ -56,7 +56,7 @@ the mana reserve, then docs and the live restart.
 
 ## Status
 
-Code and docs land; the live restart follows.
+Landed and live verified on run12; the fragment moves to the archive.
 
 ### 2026-11-20 - the hub carries the group state
 
@@ -84,3 +84,17 @@ self heal from the server skill list and refuses to spend it: the bar
 always covers one recovery cast. A member without a learned self heal
 reserves nothing, so its casts are unchanged. The tests pin both paths
 and the exact gate at the reserve boundary.
+
+
+### 2026-11-20 - live acceptance on run12
+
+The rebuilt fleet (`runs/night-run12.bat`, log `runs/night-run12.log`,
+commit f761d6aa) started with the party config and formed the server
+party within seven seconds (test3 at 19:43:46, test2 at 19:43:50).
+The formation walk logs show both followers closing to their slots and
+the focus log shows the shared target of test1 being adopted by both.
+A live sample at 19:46 had all three in the engage phase on the same
+object id with positions within 150 units and health 100/87/81. The
+first attacker rotation and the shared rest are pinned by unit tests;
+the short live window never pushed the first below the 65 percent swap
+line and never armed the rest flag. A longer night run is the next read.
