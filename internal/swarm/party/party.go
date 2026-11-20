@@ -114,34 +114,57 @@ func (c *Config) Describe() string {
     return strings.Join(parts, " ")
 }
 
-// MemberState is the live placement one member publishes every hunt tick: the
-// object id its client sees itself under, the current target, the position and
-// the liveness. At stamps the publish for the freshness check.
+// MemberState is the live state one member publishes every hunt tick: the
+// object id its client sees itself under, the target, the placement, the
+// vitals and the recovery and class roles. At stamps the publish for the
+// freshness check. The leader uses the vitals to rotate the first attacker and
+// to decide when the whole group rests.
 type MemberState struct {
-    Account  string
-    ObjectID int32
+    Account    string
+    ObjectID   int32
+    TargetID   int32
+    X          int32
+    Y          int32
+    Z          int32
+    HPPercent  float64
+    MPPercent  float64
+    Alive      bool
+    Caster     bool
+    RestWanted bool
+    At         time.Time
+}
+
+// Coordination is the group command the leader publishes every hunt tick: the
+// shared target, the formation anchor, the current first attacker and the rest
+// decision. The followers read it instead of deciding on their own.
+type Coordination struct {
+    Leader   string
+    First    string
+    FirstAt  time.Time
+    Rest     bool
     TargetID int32
     X        int32
     Y        int32
     Z        int32
-    Alive    bool
     At       time.Time
 }
 
-// Hub is the process wide party registry: the group of every account and the
-// last published state. One fleet process owns one hub and every loop of the
-// fleet reads through it.
+// Hub is the process wide party registry: the group of every account, the last
+// published member state and the coordination of every leader. One fleet
+// process owns one hub and every loop of the fleet reads through it.
 type Hub struct {
-    mu     sync.Mutex
-    groups map[string]Group
-    states map[string]MemberState
+    mu       sync.Mutex
+    groups   map[string]Group
+    states   map[string]MemberState
+    commands map[string]Coordination
 }
 
 // NewHub builds the hub from a validated configuration.
 func NewHub(config *Config) *Hub {
     hub := &Hub{
-        groups: make(map[string]Group, len(config.Groups)),
-        states: make(map[string]MemberState),
+        groups:   make(map[string]Group, len(config.Groups)),
+        states:   make(map[string]MemberState),
+        commands: make(map[string]Coordination, len(config.Groups)),
     }
     for _, group := range config.Groups {
         for _, member := range group.Members {
@@ -195,4 +218,43 @@ func (h *Hub) LeaderOf(account string) (MemberState, bool) {
     state, ok := h.states[group.Leader]
 
     return state, ok
+}
+
+// PublishCoordination records the group command of one leader.
+func (h *Hub) PublishCoordination(leader string, command Coordination) {
+    h.mu.Lock()
+    defer h.mu.Unlock()
+    h.commands[leader] = command
+}
+
+// CoordinationOf returns the last command of the group the account belongs to.
+func (h *Hub) CoordinationOf(account string) (Coordination, bool) {
+    h.mu.Lock()
+    defer h.mu.Unlock()
+    group, ok := h.groups[account]
+    if !ok {
+        return Coordination{}, false
+    }
+    command, ok := h.commands[group.Leader]
+
+    return command, ok
+}
+
+// SlotOf returns the stable formation index of one account: the leader is zero
+// and every follower keeps the index it holds in the group configuration, so
+// the offsets never swap while the group walks.
+func (h *Hub) SlotOf(account string) (int, bool) {
+    h.mu.Lock()
+    defer h.mu.Unlock()
+    group, ok := h.groups[account]
+    if !ok {
+        return 0, false
+    }
+    for i, member := range group.Members {
+        if member == account {
+            return i, true
+        }
+    }
+
+    return 0, false
 }

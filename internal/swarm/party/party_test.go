@@ -116,3 +116,48 @@ func TestHubGroupSliceIsACopy(t *testing.T) {
     require.True(t, ok)
     require.Equal(t, "test1", fresh[0])
 }
+
+// TestHubSharesTheCoordination pins the command channel: the leader publishes
+// the shared target and the followers read it through their group.
+func TestHubSharesTheCoordination(t *testing.T) {
+    config, err := LoadConfig(writeConfig(t, `{"groups":[{"leader":"test1",
+        "members":["test1","test2","test3"]}]}`))
+    require.NoError(t, err)
+    hub := NewHub(config)
+
+    now := time.Unix(1_700_000_000, 0)
+    hub.PublishCoordination("test1", Coordination{
+        Leader: "test1", First: "test2", FirstAt: now,
+        TargetID: 500, X: 1000, Y: 2000, Z: -3500, At: now,
+    })
+
+    command, ok := hub.CoordinationOf("test3")
+    require.True(t, ok)
+    require.Equal(t, "test2", command.First)
+    require.Equal(t, int32(500), command.TargetID)
+    require.Equal(t, now, command.At)
+
+    _, ok = hub.CoordinationOf("stranger")
+    require.False(t, ok)
+}
+
+// TestHubSlotsAreStable pins the formation index: every member keeps the
+// index it holds in the configuration, so the offsets never swap mid walk.
+func TestHubSlotsAreStable(t *testing.T) {
+    config, err := LoadConfig(writeConfig(t, `{"groups":[{"leader":"test1",
+        "members":["test1","test2","test3"]}]}`))
+    require.NoError(t, err)
+    hub := NewHub(config)
+
+    slot, ok := hub.SlotOf("test1")
+    require.True(t, ok)
+    require.Zero(t, slot)
+    slot, ok = hub.SlotOf("test2")
+    require.True(t, ok)
+    require.Equal(t, 1, slot)
+    slot, ok = hub.SlotOf("test3")
+    require.True(t, ok)
+    require.Equal(t, 2, slot)
+    _, ok = hub.SlotOf("stranger")
+    require.False(t, ok)
+}
