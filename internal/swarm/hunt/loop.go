@@ -45,6 +45,9 @@ type Loop struct {
     userState
     gearState
     kiteState
+    // party is the group role of the loop (see party.go): nil when the
+    // session runs outside a configured group.
+    party *partyState
 }
 
 // NewLoop creates the hunt loop for a connected game client. Every

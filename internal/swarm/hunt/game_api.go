@@ -83,6 +83,12 @@ type GameAPI interface {
     // (the web UI chat input). The whisper channel carries the
     // recipient name, every other channel an empty target.
     Say(text string, channel int32, target string) error
+    // JoinParty invites a visible player into the party of the character; the
+    // leader alone may invite and the party is created on the acceptance.
+    JoinParty(objectID int32) error
+    // AnswerJoinParty answers the pending party invitation: 1 accepts the
+    // group of the requestor, 0 declines.
+    AnswerJoinParty(response int32) error
     // LastHTMLDialog returns the npc object id and the html body of the last
     // NpcHTMLMessage the server sent (the gatekeeper dialog the bot reads the
     // bypass buttons from). A zero npcObjID means no dialog arrived yet.

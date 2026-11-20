@@ -38,27 +38,29 @@ func disablePace(t *testing.T) {
 // double click semantics: the first attack request for a new target only
 // selects it, the repeated request starts the fight.
 type fakeGame struct {
-    forces      []int32
-    pickups     []int32
-    walks       [][3]int32
-    cursorWalks [][3]int32
-    claims      [][4]int32
-    sits        int
-    restarts    int
-    destroys    [][2]int32
-    sells       [][]state.InventoryItem
-    buys        [][]gear.Purchase
-    uses        []int32
-    drops       [][5]int32
-    clicks      []int32
-    pulls       []int32
-    clears      int
-    lessons     [][2]int32
-    casts       []int32
-    noTargets   bool
-    logouts     int
-    bypasses    []string
-    says        []sayCall
+    forces       []int32
+    pickups      []int32
+    walks        [][3]int32
+    cursorWalks  [][3]int32
+    claims       [][4]int32
+    sits         int
+    restarts     int
+    destroys     [][2]int32
+    sells        [][]state.InventoryItem
+    buys         [][]gear.Purchase
+    uses         []int32
+    drops        [][5]int32
+    clicks       []int32
+    pulls        []int32
+    clears       int
+    lessons      [][2]int32
+    casts        []int32
+    noTargets    bool
+    logouts      int
+    bypasses     []string
+    says         []sayCall
+    partyInvites []int32
+    partyAnswers []int32
     // htmlMu guards the html dialog pair: the production await loop
     // polls LastHTMLDialog from the loop goroutine while the test
     // server simulation writes the reply from its own goroutine.
@@ -213,6 +215,24 @@ func (f *fakeGame) Say(text string, channel int32, target string) error {
     f.says = append(f.says, sayCall{
         Text: text, Channel: channel, Target: target,
     })
+
+    return nil
+}
+
+func (f *fakeGame) JoinParty(objectID int32) error {
+    if f.lastError != nil {
+        return f.lastError
+    }
+    f.partyInvites = append(f.partyInvites, objectID)
+
+    return nil
+}
+
+func (f *fakeGame) AnswerJoinParty(response int32) error {
+    if f.lastError != nil {
+        return f.lastError
+    }
+    f.partyAnswers = append(f.partyAnswers, response)
 
     return nil
 }

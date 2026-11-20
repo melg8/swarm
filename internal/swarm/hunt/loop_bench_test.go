@@ -44,6 +44,8 @@ func (b *benchGame) DropItem(_, _, _, _, _ int32) error    { return nil }
 func (b *benchGame) RequestLogout() error                  { return nil }
 func (b *benchGame) SendBypass(_ string) error             { return nil }
 func (b *benchGame) Say(_ string, _ int32, _ string) error { return nil }
+func (b *benchGame) JoinParty(_ int32) error               { return nil }
+func (b *benchGame) AnswerJoinParty(_ int32) error         { return nil }
 func (b *benchGame) LastHTMLDialog() (int32, string)       { return 0, "" }
 func (b *benchGame) LastHTMLDialogArrival() (int32, string, uint64) {
     return 0, "", 0

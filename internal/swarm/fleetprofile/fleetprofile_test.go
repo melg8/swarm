@@ -61,6 +61,8 @@ func (s *sinkGame) DropItem(_, _, _, _, _ int32) error    { return nil }
 func (s *sinkGame) RequestLogout() error                  { return nil }
 func (s *sinkGame) SendBypass(_ string) error             { return nil }
 func (s *sinkGame) Say(_ string, _ int32, _ string) error { return nil }
+func (s *sinkGame) JoinParty(_ int32) error               { return nil }
+func (s *sinkGame) AnswerJoinParty(_ int32) error         { return nil }
 func (s *sinkGame) LastHTMLDialog() (int32, string) {
     return 0, ""
 }

@@ -107,3 +107,13 @@ test1-test3). The `party` package parses and validates it (leader listed,
 no shared account, at most nine members) and hosts the process wide hub
 that shares the live placement and the target between the sessions of
 one fleet. Tests pin the parse, the validation and the hub contract.
+
+### 2026-11-20 - walk together and focus fire
+
+The hunt loop publishes its live state every tick, the leader invites
+visible members in range with a per-member pacing, and the follower
+accepts only the configured leader. A follower that falls behind walks
+after the leader with a 450/280 hysteresis and adopts the leader's
+target within 1200 units so the group focus fires one mob. An active
+fight or an incoming blow holds the follow walk. The hunt docs record
+the behavior; the fake games and the hunt tests cover the roles.
