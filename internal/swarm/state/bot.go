@@ -31,6 +31,9 @@ type Bot struct {
     // place, scans walk it sequentially.
     world     objectStore
     inventory inventoryStore
+    // party mirrors the server party of the session (see party.go): the
+    // follower and invitation decisions read it.
+    party partyStore
     // inventoryVersion counts the inventory and paperdoll mutations; the
     // equip managers key their cached scans on it (see hunt equipManager).
     inventoryVersion uint64
@@ -178,6 +181,7 @@ func NewBot(id string) *Bot {
         char:               newCharacterState(),
         world:              newObjectStore(),
         inventory:          newInventoryStore(),
+        party:              newPartyStore(),
         inventoryVersion:   0,
         paperdoll:          [PaperdollSlots]int32{},
         log:                newEventLog(),

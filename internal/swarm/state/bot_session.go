@@ -325,6 +325,7 @@ func (b *Bot) ResetSession() {
     b.char = newCharacterState()
     b.world = newObjectStore()
     b.inventory = newInventoryStore()
+    b.party = newPartyStore()
     b.inventoryVersion++
     b.skills = nil
     b.skillsRevision++

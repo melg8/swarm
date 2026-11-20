@@ -82,3 +82,11 @@ the class with two ints, the placement entries with three, as the
 Mobius `writeImpl` classes define. The protocol notes record the layouts
 and the 0x3C collision of JoinParty with AutoAttackStop. Unit tests
 pin every layout (including the implausible-count guard).
+
+### 2026-11-20 - the party mirror in the tracker
+
+`state.Bot` now owns the party view: the window replacement, the joined
+member, the vitals refresh, the removal, the reset on a new session and
+the pending invitation. The placement packet also seeds world records
+so a follower reads the leader position when its own client lost sight
+of it. The state tests pin the whole packet walk and the reset.
