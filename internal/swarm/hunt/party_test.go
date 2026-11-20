@@ -157,6 +157,39 @@ func TestFollowerFollowsAStaleLeaderState(t *testing.T) {
     require.Empty(t, game.walks)
 }
 
+// TestFarFollowerDropsItsPrivateFight pins the convergence rule: a member in
+// another zone walks to the leader even with a live target, while a member
+// already close to the leader finishes the fight it answers.
+func TestFarFollowerDropsItsPrivateFight(t *testing.T) {
+    loop, game, bot, _ := newTripLoop()
+    hub := newPartyHub("test1", "test2")
+    loop.SetParty(hub, "test2")
+    setSelf(bot, 200, 10000)
+    bot.ApplyNpcInfo(state.NpcInfo{
+        ObjectID: 500, TemplateID: 1000003, Attackable: true,
+        X: 10100, Y: 20000, Z: -3500, Name: "Goblin",
+    })
+    loop.target = 500
+    now := time.Now()
+    hub.Publish(party.MemberState{
+        Account: "test1", ObjectID: 100, X: 15000, Y: 20000,
+        Z: -3500, Alive: true, At: now,
+    })
+
+    require.True(t, loop.partyTick(now))
+    require.Zero(t, loop.target)
+    require.Len(t, game.walks, 1)
+
+    loop.target = 500
+    hub.Publish(party.MemberState{
+        Account: "test1", ObjectID: 100, X: 11000, Y: 20000,
+        Z: -3500, Alive: true, At: now,
+    })
+
+    require.False(t, loop.partyTick(now))
+    require.Equal(t, int32(500), loop.target)
+}
+
 // TestPartyRunsOutsideTheEngagePhase pins the every tick hook: a member
 // outside a fight still publishes its placement and follows its leader, so
 // the hub does not go stale while the group travels.

@@ -33,8 +33,10 @@ const (
     partyFollowDistance  = 450.0
     partyCatchUpDistance = 280.0
     // partyTargetRange bounds the focus fire: the follower adopts the leader
-    // target only when it sits inside this distance.
-    partyTargetRange = 1200.0
+    // target only when it sits inside this distance. Past
+    // partyConvergenceRange a follower drops its own fight to rejoin the group.
+    partyTargetRange      = 1200.0
+    partyConvergenceRange = 2400.0
     // partyInvitePeriod paces the invitation retries per member: the server
     // refuses a second ask while the first one is pending.
     partyInvitePeriod = 6 * time.Second
@@ -218,20 +220,15 @@ func (l *Loop) partyAnswerTick(now time.Time) {
     l.logf("Hunt: declined the party invitation of %d", requestor)
 }
 
-// partyFollowTick walks a follower after a leader it fell behind. An active
-// fight or an incoming blow holds the walk: the character finishes what it
-// answers. It reports true while the follow owns the movement.
+// partyFollowTick walks a follower after a leader it fell behind. Near the
+// leader an active fight or an incoming blow holds the walk; far away the
+// group wins and the private target is dropped. It reports true while the
+// follow owns the movement.
 func (l *Loop) partyFollowTick(now time.Time) bool {
     // An errand owns the movement until it ends: a follower that abandons a
     // town trip to chase its leader never reaches the merchant and never
     // restocks the potions the trip started for.
     if l.tripActive() {
-        return false
-    }
-    if l.target != 0 && l.tracker.ObjectAlive(l.target) {
-        return false
-    }
-    if l.tracker.SelfUnderAttack() {
         return false
     }
     leader, known := l.party.hub.LeaderOf(l.party.account)
@@ -246,6 +243,22 @@ func (l *Loop) partyFollowTick(now time.Time) bool {
         return false
     }
     dist := math.Hypot(float64(leader.X-selfX), float64(leader.Y-selfY))
+    if dist > partyConvergenceRange {
+        // A follower hunting in another zone always finds a local target and
+        // an incoming blow, so it would never rejoin the group. Past this
+        // range cohesion wins: drop the private fight and walk to the leader.
+        if l.target != 0 {
+            l.target = 0
+            l.clearBlindRecovery()
+        }
+    } else {
+        if l.target != 0 && l.tracker.ObjectAlive(l.target) {
+            return false
+        }
+        if l.tracker.SelfUnderAttack() {
+            return false
+        }
+    }
     if l.party.following {
         if dist <= partyCatchUpDistance {
             l.party.following = false

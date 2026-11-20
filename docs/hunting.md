@@ -2712,10 +2712,13 @@ is younger than 15 seconds, and declines every other requestor.
 
 A follower that falls more than 450 units behind the leader walks after
 it (one ground click per two second request period), stopping at 280
-units of hysteresis. An active fight, an incoming blow, a town trip or a
-stale leader placement holds the walk so the character never leaves the
-fight it answers or the merchant errand that restocks its potions.
-Outside the follow walk the follower adopts the leader's
+units of hysteresis. Near the leader an active fight, an incoming blow,
+a town trip or a stale leader placement holds the walk so the character
+never leaves the fight it answers or the merchant errand that restocks
+its potions. Past 2400 units the group wins: the follower drops its
+private target and walks back even under attack, because a bot hunting
+in another zone would otherwise always find a local fight and never
+rejoin. Outside the follow walk the follower adopts the leader's
 current target when that mob is alive, attackable and within 1200 units,
 so the group focus-fires one mob instead of spreading its damage over
 three. The party loot distribution is finders keepers (0), so each

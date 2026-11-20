@@ -144,3 +144,12 @@ the group, but the follow walk was hijacking the town trips: a follower
 with a potion plan never reached Herbiel. A town trip now owns the
 movement until it ends; the follower rejoins the leader afterwards.
 The second live check confirms the party window and the 1060 restock.
+
+### 2026-11-20 - converge from another zone
+
+The third live check formed the party of test1 and test2, but test3
+stayed 16 km away: a far follower always had a local target and an
+incoming blow, so the fight guard kept it from ever rejoining. Past
+2400 units the follower now drops its private target and walks to the
+leader; near the leader the fight and attack guards still hold. A test
+pins both ranges.
